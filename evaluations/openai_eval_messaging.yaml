@@ -1,0 +1,174 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: "OpenAI Model Evaluation for messaging tasks using llm-as-a-judge, confidence, regex, and icontains assertions"
+
+# No top-level prompts → Promptfoo uses the default prompt: {{prompt}}
+# We set {{prompt}} inside each scenario's config.vars
+
+providers:
+  - id: openai:gpt-3.5-turbo
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:gpt-4o-mini
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:gpt-4o
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-nano-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-mini-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+
+gradingProvider:
+  id: openai:gpt-4o-mini
+  config:
+    temperature: 0
+    max_tokens: 1024
+    
+
+defaultTest:
+  assert:
+    # sanity: JSON-only and no code fences
+    - type: not-icontains
+      value: '```'
+    # expect valid JSON output
+    - type: regex
+      value: '^\s*\{[\s\S]*\}\s*$'
+    # expect cost < 0.0008 USD
+    #- type: cost
+    #  threshold: 0.0008
+    # expect latency < 10 seconds
+    - type: latency
+      threshold: 30000
+    # expect a confidence score of >= 0.92
+    - type: javascript
+      value: |
+        try {
+          const o = JSON.parse(output);
+          return typeof o.confidence === 'number' &&
+                 o.confidence >= 0.92 &&
+                 o.confidence <= 1;
+        } catch { return false; }
+
+scenarios:
+  - description: Tweet
+    config:
+      - vars:
+          prompt: >
+            Write a tweet about {{topic}}.
+            Reply ONLY with JSON:
+            {"style":"tweet","text":"<tweet text>","hashtags":["#..."],"confidence":<float from 0.00 to 1.00 with two decimal places, do not round to .00 or .05 unless unavoidable>}
+            Rules:
+            - "text" ≤ 280 chars and includes the topic.
+            - At least one hashtag in "hashtags".
+            - Avoid ALL CAPS; ≤ 1 link. No prose outside JSON.
+    tests:
+      - vars: { topic: kubernetes to a technical audience }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              Grade strictly:
+              - Valid JSON with "style","text","hashtags","confidence":<float from 0.00 to 1.00 with two decimal places, do not round to .00 or .05 unless unavoidable>.
+              - Mentions '{{topic}}' accurately.
+              - ≤ 280 chars; ≥1 hashtag; ≤1 link; not ALL CAPS.
+              Pass only if all are met.
+      - vars: { topic: avocado toast }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              Grade strictly:
+              - JSON shape valid; includes "avocado" in text.
+              - ≤ 280 chars; ≥1 hashtag; ≤1 link; not ALL CAPS.
+              Pass only if all are met.
+
+  - description: Intro paragraph
+    config:
+      - vars:
+          prompt: >
+            Write an intro paragraph about {{topic}}.
+            Reply ONLY with JSON:
+            {"style":"intro","text":"<1 short paragraph>","confidence":<float from 0.00 to 1.00 with two decimal places, do not round to .00 or .05 unless unavoidable>}
+            Rules:
+            - 2–5 sentences; mentions the topic; professional tone; no hashtags. No prose outside JSON.
+    tests:
+      - vars: { topic: kubernetes to a technical audience }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              Grade strictly:
+              - JSON with "style","text","confidence":<float from 0.00 to 1.00 with two decimal places, do not round to .00 or .05 unless unavoidable>.
+              - 2–5 sentences; professional; no hashtags.
+              - Clearly introduces '{{topic}}' with accurate cues.
+              Pass only if all are met.
+      - vars: { topic: new york city to a humorous audience }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              Grade strictly:
+              - JSON valid; 2–5 sentences; no hashtags.
+              - References NYC (New York/NYC/boroughs/Big Apple).
+              - Light humor evident (puns/playful phrasing), still readable.
+              Pass only if all are met.
+
+  - description: Executive summary
+    config:
+      - vars:
+          prompt: >
+            Write an executive summary about {{topic}}.
+            Reply ONLY with JSON:
+            {"style":"executive_summary","text":"<brief framing>","bullets":["point 1","point 2"],"confidence":<float from 0.00 to 1.00 with two decimal places, do not round to .00 or .05 unless unavoidable>}
+            Rules:
+            - 2–5 concise, action-focused bullets; must reference the topic. No prose outside JSON.
+    tests:
+      - vars: { topic: kubernetes migration strategy }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              Grade strictly:
+              - JSON valid; bullets array present (2–5 items); each bullet ≤ 140 chars.
+              - Action-focused phrasing (verbs like "migrate", "reduce", "improve", "automate").
+              - Topic referenced appropriately.
+              Pass only if all are met.
+      - vars: { topic: AI governance for enterprises }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              Grade strictly (higher bar):
+              - JSON valid; 2–5 concise bullets with exec-relevant actions (risk, compliance, observability, policy).
+              - Clear framing in "text"; topic evident.
+              Pass only if all are met.
+
+  - description: LinkedIn message
+    config:
+      - vars:
+          prompt: >
+            Write a LinkedIn message about {{topic}}.
+            Reply ONLY with JSON:
+            {"style":"linkedin","text":"<message>","confidence":<float from 0.00 to 1.00 with two decimal places, do not round to .00 or .05 unless unavoidable>}
+            Rules:
+            - Begin with a greeting; include a clear CTA (e.g., “let’s connect”, “would love to discuss”).
+            - Professional tone; no slang like “lol” or “u”. No prose outside JSON.
+    tests:
+      - vars: { topic: platform engineering and internal developer portals }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              Grade strictly:
+              - JSON valid; greeting at start; contains a clear CTA.
+              - Professional tone; mentions '{{topic}}' meaningfully.
+              Pass only if all are met.
+      - vars: { topic: fintech data lineage modernization }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              Grade strictly (higher bar):
+              - JSON valid; greeting + CTA; professional tone.
+              - Specific references to data lineage/governance/scale relevant to fintech.
+              Pass only if all are met.

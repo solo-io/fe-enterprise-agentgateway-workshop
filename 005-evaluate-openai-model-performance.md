@@ -1,4 +1,4 @@
-# Configure Basic Routing to OpenAI
+# Evaluate OpenAI Model Performance with Promptfoo
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
@@ -7,7 +7,8 @@ This lab assumes that you have completed the setup in `001`, and `002`
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
 - Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
 - Curl OpenAI through the agentgateway proxy
-- Validate the request went through the gateway in Jaeger UI
+- Install promptfoo on your local machine
+- Run evaluations
 
 Create openai api-key secret
 ```bash
@@ -75,16 +76,43 @@ curl $GATEWAY_IP:8080/openai -H "content-type: application/json" -d'{
 ]}'
 ```
 
-## Port-forward to Jaeger UI
+## Install promptfoo
+
+Using brew:
 ```bash
-kubectl port-forward svc/jaeger-query -n observability 16686:16686
+brew install promptfoo
+```
+For other installation methods, see: https://promptfoo.dev/docs/installation
+
+Open up the promptfoo UI in another terminal
+```bash
+promptfoo view -y
 ```
 
-Navigate to http://localhost:16686 in your browser, you should be able to see traces for agentgateway that include information such as `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
+Set the OpenAI base URL for promptfoo
+```bash
+export OPENAI_BASE_URL="http://$GATEWAY_IP:8080/openai"
+```
+
+Run a model eval for coding tasks using llm-as-a-judge and confidence scoring assertions
+```bash
+promptfoo eval --no-cache -c evaluations/openai_eval_coding.yaml
+```
+You should see results for the various tests in the Promptfoo UI as well as in the terminal output
+
+Run a model eval for messaging tasks using llm-as-a-judge, confidence, regex, and icontains assertions
+```bash
+promptfoo eval --no-cache -c evaluations/openai_eval_messaging.yaml
+```
+You should see results for the various tests in the Promptfoo UI as well as in the terminal output
+
+## Additional Evaluations
+Feel free to review or test out the other evaluation examples in `/evaluations`
 
 ## Cleanup
 ```bash
 kubectl delete httproute -n gloo-system openai
 kubectl delete backend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
+rm -f promptfoo-errors.log
 ```
