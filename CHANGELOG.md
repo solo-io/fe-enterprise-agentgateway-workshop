@@ -1,5 +1,9 @@
 # Changelog
 
+0.0.4 - (9-4-25)
+---
+- Update README.md
+
 0.0.3 - (9-4-25)
 ---
 - Add new lab: `005-evaluate-openai-model-performance.md`
