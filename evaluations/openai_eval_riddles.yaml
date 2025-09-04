@@ -1,0 +1,149 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: OpenAI Model Evaluation for riddles using confidence scoring and icontains assertions
+
+prompts:
+  - >
+    Solve the riddle and reply **only** with JSON:
+    {"answer":"<one lowercase word or short phrase>",
+     "explanation":"<<=15 words>",
+     "confidence": <number 0..1>}
+    Rules:
+    - No prose outside JSON. No code fences.
+    - "answer" must be lowercase; no punctuation except spaces or hyphen.
+    - "explanation" ≤ 15 words.
+    - "confidence" is a number between 0 and 1 inclusive.
+    Riddle: {{riddle}}
+
+providers:
+  - id: openai:gpt-3.5-turbo
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:gpt-4o-mini
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:gpt-4o
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-nano-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-mini-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+
+defaultTest:
+  assert:
+    # JSON only (no extra text)
+    - type: regex
+      value: '^\s*\{[\s\S]*\}\s*$'
+    # No apologies
+    - type: not-icontains
+      value: 'sorry'
+    - type: not-icontains
+      value: 'apolog'
+    # Confidence must be a valid number in [0,1]
+    - type: javascript
+      value: |
+        try {
+          const o = JSON.parse(output);
+          return typeof o.confidence === 'number' && o.confidence >= 0 && o.confidence <= 1;
+        } catch { return false; }
+
+tests:
+  # 1 — Echo
+  - vars:
+      riddle: 'I speak without a mouth and hear without ears. I have no body, but I come alive with wind. What am I?'
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const okAns = (o.answer || '').toLowerCase().trim() === 'echo';
+          return okAns && o.confidence >= 0.93;
+
+  # 2 — Darkness
+  - vars:
+      riddle: 'The more of this there is, the less you see. What is it?'
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const okAns = (o.answer || '').toLowerCase().trim() === 'darkness';
+          return okAns && o.confidence >= 0.93;
+
+  # 3 — Keyboard
+  - vars:
+      riddle: "I have keys but no locks. I have space but no room. You can enter, but can't go outside. What am I?"
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const a = (o.answer || '').toLowerCase().trim();
+          const okAns = ['keyboard', 'computer keyboard'].includes(a);
+          return okAns && o.confidence >= 0.93;
+
+  # 4 — Fire
+  - vars:
+      riddle: "I am not alive, but I grow; I don't have lungs, but I need air; I don't have a mouth, but water kills me. What am I?"
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const okAns = (o.answer || '').toLowerCase().trim() === 'fire';
+          return okAns && o.confidence >= 0.93;
+
+  # 5 — Stamp
+  - vars:
+      riddle: 'What can travel around the world while staying in a corner?'
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const okAns = (o.answer || '').toLowerCase().trim() === 'stamp';
+          return okAns && o.confidence >= 0.93;
+
+  # 6 — ton
+  - vars:
+      riddle: 'Forward I am heavy, but backward I am not. What am I?'
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const okAns = (o.answer || '').toLowerCase().trim() === 'ton';
+          return okAns && o.confidence >= 0.93;
+
+  # 7 — Coffin
+  - vars:
+      riddle: "The person who makes it, sells it. The person who buys it, never uses it. The person who uses it, doesn't know they're using it. What is it?"
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const okAns = (o.answer || '').toLowerCase().trim() === 'coffin';
+          return okAns && o.confidence >= 0.93;
+
+  # 8 — Joke
+  - vars:
+      riddle: 'I can be cracked, made, told, and played. What am I?'
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const okAns = (o.answer || '').toLowerCase().trim() === 'joke';
+          return okAns && o.confidence >= 0.93;
+
+  # 9 — Breath
+  - vars:
+      riddle: "I'm light as a feather, yet the strongest person can't hold me for much more than a minute. What am I?"
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const okAns = (o.answer || '').toLowerCase().trim() === 'breath';
+          return okAns && o.confidence >= 0.93;
+
+  # 10 — David
+  - vars:
+      riddle: "David's father has three sons: Snap, Crackle, and _____? What is the name of the third son?"
+    assert:
+      - type: javascript
+        value: |
+          const o = JSON.parse(output);
+          const okAns = (o.answer || '').toLowerCase().trim() === 'david';
+          return okAns && o.confidence >= 0.93;

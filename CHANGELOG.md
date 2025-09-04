@@ -1,5 +1,10 @@
 # Changelog
 
+0.0.3 - (9-4-25)
+---
+- Add new lab: `005-evaluate-openai-model-performance.md`
+- Add new lab: `006-configure-routing-to-aws-bedrock.md`
+
 0.0.2 - (9-4-25)
 ---
 - Update `000-introduction.md` to `README.md`

@@ -1,0 +1,175 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: "OpenAI Model Evaluation for coding tasks using llm-as-a-judge and confidence scoring assertions"
+
+providers:
+  - id: openai:gpt-3.5-turbo
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:gpt-4o-mini
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:gpt-4o
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-nano-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-mini-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+  
+gradingProvider:
+  id: openai:gpt-4o-mini
+  config: { temperature: 0, max_tokens: 1024, apiBaseUrl: $OPENAI_BASE_URL }
+
+defaultTest:
+  assert:
+    - type: not-icontains
+      value: '```'
+    - type: regex
+      value: '^\s*\{[\s\S]*\}\s*$'
+    - type: latency
+      threshold: 30000
+    - type: javascript
+      value: |
+        try {
+          const o = JSON.parse(output);
+          return typeof o.confidence === 'number' &&
+                 o.confidence >= 0.92 &&
+                 o.confidence <= 1;
+        } catch { return false; }
+
+scenarios:
+  - description: Algorithm design
+    config:
+      - vars:
+          prompt: >
+            Write a function in {{language}} that finds the longest substring of unique characters in a given string.
+
+            Respond **ONLY** with a single valid JSON object (not an array) in this format:
+            {"style":"function","language":"{{language}}","code":"<full function code>","time_complexity":"<Big-O>","confidence":<float from 0.00 to 1.00>}
+
+            Rules (failure if any are broken):
+            - Output must be a single JSON object, not inside code fences, quotes, or markdown.
+            - Do NOT include ```json, ```python, ``` or any markdown formatting.
+            - Do NOT include any text, commentary, or explanation outside the JSON.
+            - JSON must parse without modification (no trailing commas, comments, or missing quotes).
+            - Function must handle Unicode.
+            - Include correct Big-O notation in "time_complexity".
+    tests:
+      - vars: { language: Python }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              - JSON valid; contains "style","language","code","time_complexity","confidence".
+              - Code runs in {{language}} without syntax errors.
+              - Handles Unicode correctly.
+              - "time_complexity" is accurate.
+      - vars: { language: JavaScript }
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              - JSON valid and syntactically correct {{language}} code.
+              - Correct for edge cases ("", repeated chars, Unicode).
+              - Accurate Big-O.
+
+  - description: Bug fixing
+    config:
+      - vars:
+          prompt: >
+            The following {{language}} function is intended to perform a binary search but has a bug. Fix it.
+
+            Original code:
+            {{buggy_code}}
+
+            Respond **ONLY** with a single valid JSON object:
+            {"style":"bugfix","language":"{{language}}","fixed_code":"<corrected code>","explanation":"<brief reason for fix>","confidence":<float>}
+
+            Rules (failure if any are broken):
+            - Output must be a single JSON object, not inside code fences or markdown.
+            - Do NOT include ```json, ```{{language}}, ``` or any markdown formatting.
+            - Do NOT include any text or commentary outside the JSON.
+            - JSON must parse as-is (no extra commas, no missing quotes).
+            - "fixed_code" must be complete and runnable.
+            - "explanation" ≤ 2 sentences.
+    tests:
+      - vars:
+          language: Python
+          buggy_code: |
+            def binary_search(arr, target):
+                left, right = 0, len(arr)
+                while left <= right:
+                    mid = (left + right) // 2
+                    if arr[mid] == target:
+                        return mid
+                    elif arr[mid] < target:
+                        left = mid + 1
+                    else:
+                        right = mid - 1
+                return -1
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              - JSON valid; fixed_code correct and free of off-by-one/index errors.
+              - Passes typical binary search tests.
+              - Explanation accurately identifies bug.
+
+  - description: Code optimization
+    config:
+      - vars:
+          prompt: >
+            Optimize the following {{language}} code for both time and space without changing functionality.
+
+            Original code:
+            {{unoptimized_code}}
+
+            Respond **ONLY** with a single valid JSON object:
+            {"style":"optimize","language":"{{language}}","optimized_code":"<optimized code>","changes":["change1","change2"],"confidence":<float>}
+
+            Rules (failure if any are broken):
+            - Output must be a single JSON object, not inside code fences or markdown.
+            - Do NOT include ```json, ```{{language}}, ``` or any markdown formatting.
+            - No explanation outside JSON.
+            - "changes" must be a JSON array describing concrete optimizations.
+            - Optimized code must produce identical output for all valid inputs.
+    tests:
+      - vars:
+          language: Python
+          unoptimized_code: |
+            def count_even_numbers(nums):
+                count = 0
+                for n in nums:
+                    if n % 2 == 0:
+                        count += 1
+                return count
+        assert:
+          - type: llm-rubric
+            threshold: 0.85
+            value: |
+              - JSON valid; optimized_code more concise and/or faster.
+              - "changes" list matches actual modifications.
+              - Code output identical to original.
+
+  - description: Regex extraction
+    config:
+      - vars:
+          prompt: >
+            Write a {{language}} regular expression that matches and extracts IPv4 addresses from text.
+
+            Respond **ONLY** with a single valid JSON object:
+            {"style":"regex","language":"{{language}}","pattern":"<regex>","example_match":"<example>","confidence":<float>}
+
+            Rules (failure if any are broken):
+            - Output must be a single JSON object, not inside code fences or markdown.
+            - Do NOT include ```json, ```{{language}}, ``` or any markdown formatting.
+            - JSON must parse as-is.
+            - "pattern" must match only valid IPv4 addresses (0–255 in each octet).
+            - "example_match" must be a valid IPv4 found in sample text.
+    tests:
+      - vars: { language: Python }
+        assert:
+          - type: llm-rubric
+            threshold: 0.9
+            value: |
+              - JSON valid; regex properly limits octet range.
+              - example_match is valid IPv4 and matches pattern.

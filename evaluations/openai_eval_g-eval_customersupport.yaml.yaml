@@ -1,0 +1,108 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+description: "OpenAI Model Evaluation for customer support tasks using g-eval assertions"
+
+providers:
+  - id: openai:gpt-3.5-turbo
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:gpt-4o-mini
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:gpt-4o
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-nano-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-mini-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+  - id: openai:chat:gpt-5-2025-08-07
+    config: { temperature: 0, max_tokens: 1024 }
+
+gradingProvider:
+  id: openai:gpt-4o-mini
+  config: { temperature: 0, max_tokens: 512 }
+
+defaultTest:
+  assert:
+    # keep only latency sanity
+    - type: latency
+      threshold: 30000
+
+evaluateOptions:
+  maxConcurrency: 1
+  repeat: 1
+  delay: 5
+  showProgressBar: true
+
+scenarios:
+  - description: Clarify Missing Info
+    config:
+      - vars:
+          prompt: >
+            You are a customer support agent. Read the customer’s message and ask exactly three targeted clarifying questions.
+            Then, on a new line, write a single sentence starting with “Next step:” describing what you’ll do after getting answers.
+            
+            Requirements:
+            - Ask exactly 3 specific, non-leading questions tailored to the customer’s message.
+            - Each question must end with a question mark.
+            - No solutions or instructions yet.
+            - Do not request secrets (passwords, full card numbers, raw API keys/tokens). Safer substitutes are OK (e.g., last 4 digits, redacted screenshots).
+            - Keep a professional, empathetic tone.
+            
+            Customer message:
+            "{{customer_message}}"
+
+    tests:
+      # A) Session/logout
+      - vars:
+          customer_message: >
+            I keep getting logged out randomly when using the dashboard. It happened twice today.
+            It’s not consistent—sometimes after a few minutes, sometimes after an hour.
+        expected:
+          g_eval:
+            criteria: >
+              Evaluate the reply on these points:
+              1) Structure: Exactly 3 questions (each ends with '?') followed by one line starting with "Next step:".
+              2) Relevance: Questions focus on session/logout diagnosis (e.g., steps to reproduce, device/OS/browser, timestamps/timezone).
+              3) Safety: No solutions/instructions; no secrets requested (passwords, full card numbers, raw API keys/tokens).
+              4) Tone: Professional and empathetic.
+              5) Next step: Plausible for auth/session triage (e.g., reproduce, check logs, investigate session settings).
+            provider:
+              id: openai:gpt-4o-mini
+              config: { temperature: 0, max_tokens: 512 }
+            threshold: 0.90
+
+      # B) Billing duplicate charge
+      - vars:
+          customer_message: >
+            Billing shows I was charged twice this month but I only have one account.
+            Not sure which invoice is correct.
+        expected:
+          g_eval:
+            criteria: >
+              Evaluate the reply on these points:
+              1) Structure: Exactly 3 questions (each ends with '?') + one "Next step:" line.
+              2) Relevance: Questions request billing verification details (invoice IDs, charge dates/amounts/currency, payment method last 4, account email).
+              3) Safety: No full card numbers or sensitive PII beyond safe substitutes; no refund promises or solutions.
+              4) Tone: Professional and empathetic.
+              5) Next step: Plausible for billing triage (verify invoices, reconcile provider, open billing investigation, escalate to billing).
+            provider:
+              id: openai:gpt-4o-mini
+              config: { temperature: 0, max_tokens: 512 }
+            threshold: 0.90
+
+      # C) VPN-related 500 errors (regional/time-based)
+      - vars:
+          customer_message: >
+            We intermittently get 500 errors when our team connects through a VPN, but it works fine off VPN.
+            It seems to happen mostly for our EU folks in the morning.
+        expected:
+          g_eval:
+            criteria: >
+              Evaluate the reply on these points:
+              1) Structure: Exactly 3 questions (each ends with '?') + one "Next step:" line.
+              2) Relevance: Questions target network/timing factors (VPN/provider or IP/CIDR, timestamps with timezone/region, correlation_id or error code, minimal steps).
+              3) Safety: No solutions; safe handling suggestions (e.g., redacted logs/screenshots) are permissible.
+              4) Tone: Professional and empathetic.
+              5) Next step: Plausible for diagnostics (gather diagnostics, reproduce, check logs, escalate to engineering).
+            provider:
+              id: openai:gpt-4o-mini
+              config: { temperature: 0, max_tokens: 512 }
+            threshold: 0.90
