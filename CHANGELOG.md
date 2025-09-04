@@ -1,5 +1,9 @@
 # Changelog
 
+0.0.2 - (9-4-25)
+---
+- Update `000-introduction.md` to `README.md`
+
 0.0.1 - (9-4-25)
 ---
 - First commit
