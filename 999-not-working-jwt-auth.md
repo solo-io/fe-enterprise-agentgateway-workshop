@@ -64,15 +64,17 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=gloo-agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-
-curl $GATEWAY_IP:8080/openai -H "content-type: application/json" -d'{
-"model": "gpt-4o-mini",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 
 Create Gloo traffic policy
@@ -110,44 +112,57 @@ EOF
 
 Make a curl request to the OpenAI endpoint again, this time it should fail
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=gloo-agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
-
-
-curl $GATEWAY_IP:8080/openai -H "content-type: application/json" -d'{
-"model": "gpt-4o-mini",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
+Verify that the request is denied with a 4xx HTTP response code 
 
-
-## Check access logs
-
-- Check the logs of the proxy for access log information
-
+## curl with valid JWT token
 ```bash
-kubectl logs -n gloo-system deploy/gloo-agentgateway -f
+export ALICE_TOKEN="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyAiaXNzIjogInNvbG8uaW8iLCAib3JnIjogInNvbG8uaW8iLCAic3ViIjogImFsaWNlIiwgInRlYW0iOiAiZGV2IiwgImxsbXMiOiB7ICJvcGVuYWkiOiBbICJncHQtMy41LXR1cmJvIiBdIH0gfQ.I7whTti0aDKxlILc5uLK9oo6TljGS6JUrjPVd6z1PxzucUa_cnuKkY0qj_wrkzyVN5djy4t2ggE1uBO8Llpwi-Ygru9hM84-1m53aO07JYFya1VTDsI25tCRG8rYhShDdAP5L935SIARta2QtHhrVcd1Ae7yfTDZ8G1DXLtjR2QelszCd2R8PioCQmqJ8PeKg4sURhu05GlBCZoXES9-rtPVbe6j3YLBTodJAvLHhyy3LgV_QbN7IiZ5qEywdKHoEF4D4aCUf_LqPp4NoqHXnGT4jLzWJEtZXHQ4sgRy_5T93NOLzWLdIjgMjGO_F0aVLwBzU-phykOVfcBPaMvetg"
+
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $ALICE_TOKEN" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 
-We should see access log information about our LLM request
+Currently failing with
 ```
-2025-09-03T23:28:43.168548Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:29683 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 llm.provider=openai llm.request.model=gpt-3.5-turbo llm.request.tokens=12 llm.response.model=gpt-3.5-turbo-0125 llm.response.tokens=16 duration=947ms
+HTTP/1.1 403 Forbidden
+content-type: text/plain
+content-length: 65
+date: Mon, 08 Sep 2025 17:01:38 GMT
+
+authentication failure: the token header does not specify a `kid`
 ```
 
-## curl openai
+## Port-forward to Jaeger UI
 ```bash
-curl $GATEWAY_IP:8080/openai -H "content-type: application/json" -d'{
-"model": "gpt-4o-mini",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```
+
+Navigate to http://localhost:16686 in your browser, you should be able to see traces for our recent requests
+
+- The request without an api-key should have been rejected with a `http.status` of `403` and an `error` with `authorization failed`
+- The request with an api-key should be successful and you should see information such as `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
 
 ## Cleanup
 ```bash

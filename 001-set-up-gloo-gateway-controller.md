@@ -17,7 +17,7 @@ This minimal guide covers the installation and simple usage of Gloo Gateway with
 Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Gloo Gateway
 
 ```bash
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/experimental-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
 ```
 
 To check if the the Kubernetes Gateway API CRDS are installed
@@ -29,17 +29,12 @@ kubectl api-resources --api-group=gateway.networking.k8s.io
 Expected Output:
 
 ```bash
-NAME                 SHORTNAMES   APIVERSION                           NAMESPACED   KIND
-backendlbpolicies    blbpolicy    gateway.networking.k8s.io/v1alpha2   true         BackendLBPolicy
-backendtlspolicies   btlspolicy   gateway.networking.k8s.io/v1alpha3   true         BackendTLSPolicy
-gatewayclasses       gc           gateway.networking.k8s.io/v1         false        GatewayClass
-gateways             gtw          gateway.networking.k8s.io/v1         true         Gateway
-grpcroutes                        gateway.networking.k8s.io/v1         true         GRPCRoute
-httproutes                        gateway.networking.k8s.io/v1         true         HTTPRoute
-referencegrants      refgrant     gateway.networking.k8s.io/v1beta1    true         ReferenceGrant
-tcproutes                         gateway.networking.k8s.io/v1alpha2   true         TCPRoute
-tlsroutes                         gateway.networking.k8s.io/v1alpha2   true         TLSRoute
-udproutes                         gateway.networking.k8s.io/v1alpha2   true         UDPRoute
+NAME              SHORTNAMES   APIVERSION                          NAMESPACED   KIND
+gatewayclasses    gc           gateway.networking.k8s.io/v1        false        GatewayClass
+gateways          gtw          gateway.networking.k8s.io/v1        true         Gateway
+grpcroutes                     gateway.networking.k8s.io/v1        true         GRPCRoute
+httproutes                     gateway.networking.k8s.io/v1        true         HTTPRoute
+referencegrants   refgrant     gateway.networking.k8s.io/v1beta1   true         ReferenceGrant
 ```
 
 ### Gloo Gateway CRDs

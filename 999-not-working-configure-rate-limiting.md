@@ -64,15 +64,17 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=gloo-agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-
-curl $GATEWAY_IP:8080/openai -H "content-type: application/json" -d'{
-"model": "gpt-4o-mini",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 
 Create rate limit config
@@ -118,30 +120,29 @@ spec:
 EOF
 ```
 
-## Check access logs
-
-- Check the logs of the proxy for access log information
-
-```bash
-kubectl logs -n gloo-system deploy/gloo-agentgateway -f
-```
-
-We should see access log information about our LLM request
-```
-2025-09-03T23:28:43.168548Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:29683 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 llm.provider=openai llm.request.model=gpt-3.5-turbo llm.request.tokens=12 llm.response.model=gpt-3.5-turbo-0125 llm.response.tokens=16 duration=947ms
-```
-
 ## curl openai
 ```bash
-curl $GATEWAY_IP:8080/openai -H "content-type: application/json" -d'{
-"model": "gpt-4o-mini",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
+
+## Port-forward to Jaeger UI
+```bash
+kubectl port-forward svc/jaeger-query -n observability 16686:16686
+```
+
+Navigate to http://localhost:16686 in your browser, you should be able to see traces for our recent requests
+
+- The rate limited requests should have been rejected with a `http.status` of `429`
 
 ## Cleanup
 ```bash

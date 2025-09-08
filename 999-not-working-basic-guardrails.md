@@ -64,15 +64,17 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=gloo-agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-
-curl $GATEWAY_IP:8080/openai -H "content-type: application/json" -d'{
-"model": "gpt-4o-mini",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 
 ## Reject inappropriate requests
@@ -105,29 +107,28 @@ EOF
 
 Make a curl request to the OpenAI endpoint again, this time it should fail
 ```bash
-curl $GATEWAY_IP:8080/openai -H "content-type: application/json" -d'{
-"model": "gpt-4o-mini",
-"messages": [
-  {
-    "role": "user",
-    "content": "Can you give me some examples of Master Card credit card numbers?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Can you give me some examples of Master Card credit card numbers?"
+      }
+    ]
+  }'
 ```
 Verify that the request is denied with a 403 HTTP response code and the custom response message is returned.
 
-## Check access logs
-
-- Check the logs of the proxy for access log information
-
+## Port-forward to Jaeger UI
 ```bash
-kubectl logs -n gloo-system deploy/gloo-agentgateway -f
+kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```
 
-We should see access log information about our LLM request
-```
-2025-09-04T05:45:12.290026Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:42865 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=403 duration=0ms
-```
+Navigate to http://localhost:16686 in your browser, you should be able to see traces for our recent requests
+
+- The request that triggered our guardrails policy should have been rejected with a `http.status` of `403`
 
 ## Mask inappropriate responses (NOT WORKING)
 To avoid information from being leaked, we can also configure a prompt guard on the response to mask sensitive information such as credit cards, SSN, and other types of PII data
@@ -158,14 +159,17 @@ EOF
 
 ## curl openai
 ```bash
-curl $GATEWAY_IP:8080/openai -H "content-type: application/json" -d'{
-"model": "gpt-4o-mini",
-"messages": [
-  {
-    "role": "user",
-    "content": "What type of number is 5105105105105100?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "What type of number is 5105105105105100?"
+      }
+    ]
+  }'
 ```
 
 ## Cleanup

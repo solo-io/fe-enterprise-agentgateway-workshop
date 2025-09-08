@@ -3,6 +3,8 @@
 0.0.5 - (9-8-25)
 ---
 - Update Gloo Gateway version to 2.0.0-beta.3
+- `007-api-key-masking.md` is now working
+- Update curl request format for readability
 
 0.0.4 - (9-4-25)
 ---

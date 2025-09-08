@@ -26,13 +26,18 @@ echo $AWS_SESSION_TOKEN
 
 Create a secret containing an AWS access key
 ```bash
-kubectl create secret generic bedrock-secret \
-  -n gloo-system \
-  --from-literal=aws_access_key_id="$AWS_ACCESS_KEY_ID" \
-  --from-literal=aws_secret_access_key="$AWS_SECRET_ACCESS_KEY" \
-  --from-literal=aws_session_token="$AWS_SESSION_TOKEN" \
-  --type=Opaque \
-  --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bedrock-secret
+  namespace: gloo-system
+type: Opaque
+stringData:
+  accessKey: ${AWS_ACCESS_KEY_ID}
+  secretKey: ${AWS_SECRET_ACCESS_KEY}
+  sessionToken: ${AWS_SESSION_TOKEN}
+EOF
 ```
 
 Create AWS Bedrock route and backend. For this setup we will configure multiple `Backends` using a single provider (AWS Bedrock) in a path-per-model routing configuration
@@ -152,39 +157,47 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=gloo-agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-
-curl $GATEWAY_IP:8080/bedrock/titan -H "content-type: application/json" -d'{
-"model": "",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/bedrock/titan" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 
 ## curl AWS Bedrock Haiku endpoint
 ```bash
-curl $GATEWAY_IP:8080/bedrock/haiku -H "content-type: application/json" -d'{
-"model": "",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/bedrock/haiku" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 
 ## curl AWS Bedrock llama3-8b endpoint
 ```bash
-curl $GATEWAY_IP:8080/bedrock/llama3-8b -H "content-type: application/json" -d'{
-"model": "",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/bedrock/llama3-8b" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 
 ## Port-forward to Jaeger UI
