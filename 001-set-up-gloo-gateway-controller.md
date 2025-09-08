@@ -50,7 +50,7 @@ kubectl create namespace gloo-system
 
 ```bash
 helm install --create-namespace --namespace gloo-system \
-    --version 2.0.0-beta.2 gloo-gateway-crds \
+    --version 2.0.0-beta.3 gloo-gateway-crds \
     oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/gloo-gateway-crds
 ```
 
@@ -81,7 +81,7 @@ trafficpolicies.gateway.kgateway.dev
 ```bash
 helm upgrade -i -n gloo-system gloo-gateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/gloo-gateway \
 --create-namespace \
---version 2.0.0-beta.2 \
+--version 2.0.0-beta.3 \
 --set-string licensing.glooGatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 imagePullSecrets: []
@@ -119,7 +119,7 @@ controller:
 #--- Image overrides for deployment ---
 image:
   registry: us-docker.pkg.dev/solo-public/gloo-gateway
-  tag: "2.0.0-beta.2"
+  tag: "2.0.0-beta.3"
   pullPolicy: IfNotPresent
 inferenceExtension:
   enabled: false

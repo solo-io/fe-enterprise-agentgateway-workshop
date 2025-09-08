@@ -1,5 +1,9 @@
 # Changelog
 
+0.0.5 - (9-8-25)
+---
+- Update Gloo Gateway version to 2.0.0-beta.3
+
 0.0.4 - (9-4-25)
 ---
 - Update README.md
