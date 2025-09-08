@@ -18,7 +18,7 @@ kubectl create secret generic openai-secret -n gloo-system \
 
 ### Configure LLM routing example with fixed path + header matching to access endpoints
 
-Now we can configure a `HTTPRoute` that has a specific path-per-model endpoint
+Now we can configure a `HTTPRoute` that has a specific path-per-model endpoint using the same backends we used previously
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -80,52 +80,58 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=gloo-agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-
-curl "$GATEWAY_IP:8080/openai?model=gpt-3.5-turbo" -H "content-type: application/json" -d'{
-"model": "",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai?model=gpt-3.5-turbo" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 We should see that the response shows that the model used was `gpt-3.5-turbo-0125`
 
 ## curl /openai with the "model=gpt-4o-mini" query parameter
 ```bash
-curl "$GATEWAY_IP:8080/openai?model=gpt-4o-mini" -H "content-type: application/json" -d'{
-"model": "",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o-mini" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 We should see that the response shows that the model used was `gpt-4o-mini-2024-07-18`
 
 ## curl /openai with the "model=gpt-4o" query parameter
 ```bash
-curl "$GATEWAY_IP:8080/openai?model=gpt-4o" -H "content-type: application/json" -d'{
-"model": "",
-"messages": [
-  {
-    "role": "user",
-    "content": "Whats your favorite poem?"
-  }
-]}'
+curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
 ```
 We should see that the response shows that the model used was `gpt-4o-2024-08-06`
 
-# Check access logs
-
-- Check the logs of the proxy for access log information
-
+## Port-forward to Jaeger UI
 ```bash
-kubectl logs -n gloo-system deploy/gloo-agentgateway -f
+kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```
-We should see access log information about our LLM requests such as `http.path` and `llm.response.model`
+
+Navigate to http://localhost:16686 in your browser, you should be able to see traces for agentgateway that include information such as `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
 
 ## Cleanup
 ```bash
