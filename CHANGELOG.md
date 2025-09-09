@@ -1,5 +1,10 @@
 # Changelog
 
+0.0.6 - (9-9-25)
+---
+- `008-jwt-auth.md` is now working
+- Update cleanup section in `008-jwt-auth.md` lab
+
 0.0.5 - (9-8-25)
 ---
 - Update Gloo Gateway version to 2.0.0-beta.3
