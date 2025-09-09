@@ -1,5 +1,9 @@
 # Changelog
 
+0.0.7 - (9-9-25)
+---
+- Initial commit of agentgateway on OpenShift deployment (with workarounds) located in the `/install-on-openshift` directory
+
 0.0.6 - (9-9-25)
 ---
 - `008-jwt-auth.md` is now working
