@@ -4,6 +4,7 @@
 ---
 - `008-jwt-auth.md` is now working
 - Update cleanup section in `008-jwt-auth.md` lab
+- Update README.md
 
 0.0.5 - (9-8-25)
 ---
