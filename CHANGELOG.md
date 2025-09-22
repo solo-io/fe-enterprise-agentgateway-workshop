@@ -1,5 +1,16 @@
 # Changelog
 
+0.0.8 - (9-22-25)
+---
+- Update repo to use `2.0.0-rc.1`
+- `2.0.0-rc.1` uses `--set` instead of `--set-string` for the license keys in the install. Updated lab to configure `--set licensing.glooGatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY` and `--set licensing.agentgatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY`
+- Update `agentGateway` to `agentgateway` across the repo
+- Remove `GatewayClass` from lab in 002 since this is now automatically generated
+- Update agentgateway `gatewayClassName` from `gloo-agentgateway` to `agentgateway-enterprise`
+- Configure `infrastructure.parametersRef` in the `Gateway` resource to configure tracing extensions. This was previously handled in the `GatewayClass`, but the user no longer needs to provision this resource
+- Update the AI `Backend` resources which switched from `ai.llm.provider.<provider>` to `ai.llm.<provider>` (e.g. `ai.llm.openai`)
+- Remove `model` from request body when defined in the AI `Backend` resource. Previously when using model override the client still had to provide `model: ""` but this bug has been fixed
+
 0.0.7 - (9-9-25)
 ---
 - Initial commit of agentgateway on OpenShift deployment (with workarounds) located in the `/install-on-openshift` directory

@@ -52,14 +52,13 @@ spec:
   type: AI
   ai:
     llm:
-      provider:
-        bedrock:
-          model: amazon.titan-tg1-large
-          region: us-west-2
-          auth:
-            type: Secret
-            secretRef:
-              name: bedrock-secret
+      bedrock:
+        model: amazon.titan-tg1-large
+        region: us-west-2
+        auth:
+          type: Secret
+          secretRef:
+            name: bedrock-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
@@ -70,14 +69,13 @@ spec:
   type: AI
   ai:
     llm:
-      provider:
-        bedrock:
-          model: anthropic.claude-3-5-haiku-20241022-v1:0
-          region: us-west-2
-          auth:
-            type: Secret
-            secretRef:
-              name: bedrock-secret
+      bedrock:
+        model: anthropic.claude-3-5-haiku-20241022-v1:0
+        region: us-west-2
+        auth:
+          type: Secret
+          secretRef:
+            name: bedrock-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
@@ -88,14 +86,13 @@ spec:
   type: AI
   ai:
     llm:
-      provider:
-        bedrock:
-          model: meta.llama3-1-8b-instruct-v1:0
-          region: us-west-2
-          auth:
-            type: Secret
-            secretRef:
-              name: bedrock-secret
+      bedrock:
+        model: meta.llama3-1-8b-instruct-v1:0
+        region: us-west-2
+        auth:
+          type: Secret
+          secretRef:
+            name: bedrock-secret
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

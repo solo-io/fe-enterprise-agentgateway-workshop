@@ -26,7 +26,9 @@ provider:
 ```
 When a model override is configured, the gateway will override any user-input `model` parameter in the request body (e.g. if user supplies `model: gpt-5-2025-08-07` it will be overridden to `gpt-4o-mini`)
 
-With this option, we can create a `Backend` per model if we want more granular control of access to models.
+With this option, we can create a `Backend` per model if we want more granular control of access to models. 
+
+**Additionally, when model overrides are specified, the client does not have to supply a `model` parameter in the request body, since the gateway will inject it. The client can input a model in the request body, but effectively it will just be overwritten.**
 
 Lets create an OpenAI backend per specific-model
 ```bash
@@ -41,14 +43,13 @@ spec:
   type: AI
   ai:
     llm:
-      provider:
-        openai:
-          #--- Uncomment to configure model override ---
-          model: "gpt-3.5-turbo"
-          authToken:
-            kind: "SecretRef"
-            secretRef:
-              name: openai-secret
+      openai:
+        #--- Uncomment to configure model override ---
+        model: "gpt-3.5-turbo"
+        authToken:
+          kind: "SecretRef"
+          secretRef:
+            name: openai-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
@@ -59,14 +60,13 @@ spec:
   type: AI
   ai:
     llm:
-      provider:
-        openai:
-          #--- Uncomment to configure model override ---
-          model: "gpt-4o-mini"
-          authToken:
-            kind: "SecretRef"
-            secretRef:
-              name: openai-secret
+      openai:
+        #--- Uncomment to configure model override ---
+        model: "gpt-4o-mini"
+        authToken:
+          kind: "SecretRef"
+          secretRef:
+            name: openai-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
 kind: Backend
@@ -77,14 +77,13 @@ spec:
   type: AI
   ai:
     llm:
-      provider:
-        openai:
-          #--- Uncomment to configure model override ---
-          model: "gpt-4o"
-          authToken:
-            kind: "SecretRef"
-            secretRef:
-              name: openai-secret
+      openai:
+        #--- Uncomment to configure model override ---
+        model: "gpt-4o"
+        authToken:
+          kind: "SecretRef"
+          secretRef:
+            name: openai-secret
 EOF
 ```
 
@@ -141,7 +140,6 @@ export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking
 curl -i "$GATEWAY_IP:8080/openai/gpt-3.5-turbo" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
     "messages": [
       {
         "role": "user",
@@ -157,7 +155,6 @@ We should see that the response shows that the model used was `gpt-3.5-turbo-012
 curl -i "$GATEWAY_IP:8080/openai/gpt-4o-mini" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
     "messages": [
       {
         "role": "user",
@@ -173,7 +170,6 @@ We should see that the response shows that the model used was `gpt-4o-mini-2024-
 curl -i "$GATEWAY_IP:8080/openai/gpt-4o" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
     "messages": [
       {
         "role": "user",

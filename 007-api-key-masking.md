@@ -49,14 +49,13 @@ spec:
   type: AI
   ai:
     llm:
-      provider:
-        openai:
-          #--- Uncomment to configure model override ---
-          #model: ""
-          authToken:
-            kind: "SecretRef"
-            secretRef:
-              name: openai-secret
+      openai:
+        #--- Uncomment to configure model override ---
+        #model: ""
+        authToken:
+          kind: "SecretRef"
+          secretRef:
+            name: openai-secret
 EOF
 ```
 

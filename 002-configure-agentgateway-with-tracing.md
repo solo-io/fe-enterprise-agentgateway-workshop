@@ -45,13 +45,13 @@ metadata:
   namespace: gloo-system
 spec:
   kube:
-    agentGateway:
+    agentgateway:
       enabled: true
       logLevel: trace
       customConfigMapName: agent-gateway-config
       #--- Image overrides for deployment ---
       #image:  
-      #  tag: "0.7.5"
+      #  tag: "0.8.3"
     #--- Adding sample annotation specific to AWS env ---
     service:
       extraAnnotations:
@@ -62,25 +62,17 @@ spec:
     #    istio.io/dataplane-mode: ambient
 ---
 apiVersion: gateway.networking.k8s.io/v1
-kind: GatewayClass
-metadata:
- name: gloo-agentgateway
-spec:
- controllerName: solo.io/gloo-gateway-v2
- description: Specialized class for agentgateway.
- parametersRef:
-   group: gloo.solo.io
-   kind: GlooGatewayParameters
-   name: gloo-agentgateway-params
-   namespace: gloo-system
----
-apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: gloo-agentgateway
   namespace: gloo-system
 spec:
-  gatewayClassName: gloo-agentgateway
+  gatewayClassName: agentgateway-enterprise
+  infrastructure:
+    parametersRef:
+      name: gloo-agentgateway-params
+      group: gloo.solo.io
+      kind: GlooGatewayParameters  
   listeners:
     - name: http
       port: 8080
