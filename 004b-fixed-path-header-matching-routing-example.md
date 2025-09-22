@@ -84,7 +84,6 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "model: gpt-3.5-turbo" \
   -d '{
-    "model": "",
     "messages": [
       {
         "role": "user",
@@ -101,7 +100,6 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "model: gpt-4o-mini" \
   -d '{
-    "model": "",
     "messages": [
       {
         "role": "user",
@@ -118,7 +116,6 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "model: gpt-4o" \
   -d '{
-    "model": "",
     "messages": [
       {
         "role": "user",

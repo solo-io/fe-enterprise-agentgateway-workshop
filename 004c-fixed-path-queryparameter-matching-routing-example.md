@@ -83,7 +83,6 @@ export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking
 curl -i "$GATEWAY_IP:8080/openai?model=gpt-3.5-turbo" \
   -H "content-type: application/json" \
   -d '{
-    "model": "",
     "messages": [
       {
         "role": "user",
@@ -99,7 +98,6 @@ We should see that the response shows that the model used was `gpt-3.5-turbo-012
 curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o-mini" \
   -H "content-type: application/json" \
   -d '{
-    "model": "",
     "messages": [
       {
         "role": "user",
@@ -115,7 +113,6 @@ We should see that the response shows that the model used was `gpt-4o-mini-2024-
 curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o" \
   -H "content-type: application/json" \
   -d '{
-    "model": "",
     "messages": [
       {
         "role": "user",
