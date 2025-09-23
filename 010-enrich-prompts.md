@@ -1,4 +1,4 @@
-# Basic Guardrails using Agentgateway
+# Prompt Enrichment
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
@@ -6,8 +6,9 @@ This lab assumes that you have completed the setup in `001`, and `002`
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
 - Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Configure built-in guardrails
-- Validate guardrails are enforced
+- Curl OpenAI through the agentgateway proxy
+- Add prompt enrichment policy
+- Validate the request went through the gateway in Jaeger UI, and that the prompt has been enriched
 
 Create openai api-key secret
 ```bash
@@ -76,83 +77,26 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-## Reject inappropriate requests
+## Apply prompt enrichment policy
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: TrafficPolicy
+apiVersion: gloo.solo.io/v1alpha1
+kind: GlooTrafficPolicy
 metadata:
-  name: openai-prompt-guard
+  name: openai-opt
   namespace: gloo-system
   labels:
-    app: ai-gateway
+    app: agentgateway
 spec:
   targetRefs:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: openai
   ai:
-    promptGuard:
-      request:
-        customResponse:
-          message: "Rejected due to inappropriate content"
-        regex:
-          action: REJECT
-          matches:
-          - pattern: "credit card"
-            name: "CC"
-EOF
-```
-
-Make a curl request to the OpenAI endpoint again, this time it should fail
-```bash
-curl -i "$GATEWAY_IP:8080/openai" \
-  -H "content-type: application/json" \
-  -d '{
-    "model": "gpt-4o-mini",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Can you give me some examples of Master Card credit card numbers?"
-      }
-    ]
-  }'
-```
-Verify that the request is denied with a 403 HTTP response code and the custom response message is returned.
-
-## Port-forward to Jaeger UI
-```bash
-kubectl port-forward svc/jaeger-query -n observability 16686:16686
-```
-
-Navigate to http://localhost:16686 in your browser, you should be able to see traces for our recent requests
-
-- The request that triggered our guardrails policy should have been rejected with a `http.status` of `403`
-
-## Mask inappropriate responses (NOT WORKING)
-To avoid information from being leaked, we can also configure a prompt guard on the response to mask sensitive information such as credit cards, SSN, and other types of PII data
-
-```bash
-kubectl apply -f- <<EOF
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: TrafficPolicy
-metadata:
-  name: openai-prompt-guard
-  namespace: gloo-system
-  labels:
-    app: ai-gateway
-spec:
-  targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: openai
-  ai:
-    promptGuard:
-      response:
-        regex:
-          action: MASK
-          builtins:
-          - CREDIT_CARD
+    promptEnrichment:
+      prepend:
+      - role: SYSTEM
+        content: "Return the response in JSON format"
 EOF
 ```
 
@@ -165,15 +109,43 @@ curl -i "$GATEWAY_IP:8080/openai" \
     "messages": [
       {
         "role": "user",
-        "content": "What type of number is 5105105105105100?"
+        "content": "Whats your favorite poem?"
       }
     ]
   }'
 ```
 
+We should see that the response was returned in JSON format
+```
+{"id":"chatcmpl-CJ1ZTRQCOuIwe8yiaRnpLPDyvE4QX","choices":[{"index":0,"message":{"content":"```json\n{\n  \"favorite_poem\": {\n    \"title\": \"The Road Not Taken\",\n    \"author\": \"Robert Frost\",\n    \"summary\": \"The poem explores the theme of choices and their consequences, using the metaphor of a fork in the road to illustrate the decisions we face in life.\"\n  }\n}\n```","role":"assistant"},"finish_reason":"stop"}],"created":1758650307,"model":"gpt-4o-mini-2024-07-18","service_tier":"default","system_fingerprint":"fp_560af6e559","object":"chat.completion","usage":{"prompt_tokens":22,"completion_tokens":67,"total_tokens":89,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0}}}
+```
+
+## Port-forward to Jaeger UI
+```bash
+kubectl port-forward svc/jaeger-query -n observability 16686:16686
+```
+
+Navigate to http://localhost:16686 in your browser, you should be able to see our system prompt was injected in the `gen_ai.prompt` tag
+```
+{
+  "key": "gen_ai.prompt",
+  "type": "string",
+  "value": "[{\"content\": \"Return the response in JSON format\", \"role\": \"user\"}, {\"role\": \"user\", \"content\": \"Whats your favorite poem?\"}]"
+}
+```
+
+We should also see that the `gen_ai.completion` tag shows the response was returned in JSON
+```
+{
+  "key": "gen_ai.completion",
+  "type": "string",
+  "value": "[{\"role\": \"assistant\", \"content\": \"```json\\n{\\n  \\\"favorite_poem\\\": {\\n    \\\"title\\\": \\\"The Road Not Taken\\\",\\n    \\\"author\\\": \\\"Robert Frost\\\",\\n    \\\"summary\\\": \\\"The poem explores the theme of choices and their consequences, using the metaphor of a fork in the road to illustrate the decisions we face in life.\\\"\\n  }\\n}\\n```\"}]"
+}
+```
+
 ## Cleanup
 ```bash
-kubectl delete trafficpolicy -n gloo-system openai-prompt-guard
+kubectl delete glootrafficpolicy -n gloo-system openai-opt
 kubectl delete httproute -n gloo-system openai
 kubectl delete backend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
