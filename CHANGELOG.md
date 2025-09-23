@@ -1,5 +1,12 @@
 # Changelog
 
+0.0.9 - (9-23-25)
+---
+- Update `/install-on-openshift` 001 and 002 labs with latest updates from `2.0.0-rc.1`. Still waiting on [Issue #585](https://github.com/solo-io/gloo-gateway/issues/585) to support `floatingUserId` for ext-auth and redis in OpenShift.
+- Add new lab: `009-configure-basic-routing-to-anthropic.md` - Thank you to Michael L. for the contribution
+- Add new lab: `010-enrich-prompts.md`
+- Add new lab: `011-advanced-guardrails-webhook.md`
+
 0.0.8 - (9-22-25)
 ---
 - Update repo to use `2.0.0-rc.1`

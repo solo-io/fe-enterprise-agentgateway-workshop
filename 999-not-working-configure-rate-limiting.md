@@ -1,4 +1,4 @@
-# Configure Basic Routing to OpenAI
+# Configure Basic Routing to OpenAI with Token-based Rate Limiting
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
@@ -49,14 +49,13 @@ spec:
   type: AI
   ai:
     llm:
-      provider:
-        openai:
-          #--- Uncomment to configure model override ---
-          #model: ""
-          authToken:
-            kind: "SecretRef"
-            secretRef:
-              name: openai-secret
+      openai:
+        #--- Uncomment to configure model override ---
+        #model: ""
+        authToken:
+          kind: "SecretRef"
+          secretRef:
+            name: openai-secret
 EOF
 ```
 
