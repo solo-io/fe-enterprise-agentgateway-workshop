@@ -83,7 +83,7 @@ metadata:
     app: agentgateway
 spec:
   parentRefs:
-    - name: agentgateway
+    - name: gloo-agentgateway
       namespace: gloo-system
   rules:
   - matches:
