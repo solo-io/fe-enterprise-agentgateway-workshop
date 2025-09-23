@@ -5,67 +5,23 @@
 To follow along with this lab, you should have:
 1. A Kubernetes cluster running (Kind/Minikube or another type of cluster is fine)
 2. An Anthropic account
+3. A Gateway configuration
 
 ## Objectives
 
 The goal with this lab is to:
 1. Use agentgateway to securely connect to an LLM (in this case, a Claude Model)
-2. Configure Gloo Gateway + agentgateway
 
 ## Set Environment Variables
 
-These environment variables will be for within your environment (cluster name, license keys)
+These environment variables will be for authenticating to Anthropic.
 
-```
-export GLOO_GATEWAY_LICENSE_KEY=
-
-export AGENTGATEWAY_LICENSE_KEY=
-```
-
-```
-export CLUSTER1=
-
-export CLUSTER1_NAME=
-```
-
-## Deploy Kubernetes Gateway API CRDs
-
-The Gateway objects rely on Kubernetes Gateway API as the standard.
-
-```
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml --context=$CLUSTER1
-```
-
-## Deploy Gloo Gateway
-```
-helm upgrade -i gloo-gateway-crds oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/gloo-gateway-crds --kube-context=$CLUSTER1 \
---create-namespace \
---namespace gloo-system \
---version 2.0.0-rc.1
-```
-
-```
-helm upgrade -i gloo-gateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/gloo-gateway --kube-context=$CLUSTER1 \
--n gloo-system \
---version 2.0.0-rc.1 \
---set agentgateway.enabled=true \
---set licensing.glooGatewayLicenseKey=$GLOO_GATEWAY_LICENSE_KEY \
---set licensing.agentgatewayLicenseKey=$AGENTGATEWAY_LICENSE_KEY
-```
-
-```
-kubectl get pods -n gloo-system --context=$CLUSTER1
-```
-
-```
-kubectl get gatewayclass -n gloo-system --context=$CLUSTER1
-```
-
-## Set Up Anthropic Connection
 
 ```
 export CLAUDE_API_KEY=
 ```
+
+## Set Up Anthropic Connection
 
 Set up a Gateway for the HTTP Route that will be used (you'll see this in the next few sections) to interact with the LLM of your choosing (in this case, Claude)
 
