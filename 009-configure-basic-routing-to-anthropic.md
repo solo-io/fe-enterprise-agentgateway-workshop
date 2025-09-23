@@ -23,29 +23,6 @@ export CLAUDE_API_KEY=
 
 ## Set Up Anthropic Connection
 
-Set up a Gateway for the HTTP Route that will be used (you'll see this in the next few sections) to interact with the LLM of your choosing (in this case, Claude)
-
-```
-kubectl apply -f- <<EOF
-kind: Gateway
-apiVersion: gateway.networking.k8s.io/v1
-metadata:
-  name: agentgateway
-  namespace: gloo-system
-  labels:
-    app: agentgateway
-spec:
-  gatewayClassName: agentgateway-enterprise
-  listeners:
-  - protocol: HTTP
-    port: 8080
-    name: http
-    allowedRoutes:
-      namespaces:
-        from: All
-EOF
-```
-
 The secret created below contains the Anthropic API key for interacting with Anthropic Models.
 
 ```
