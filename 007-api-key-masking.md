@@ -161,7 +161,13 @@ This request should succeed
 {"id":"chatcmpl-CDYZl9fmDSiDRwdhx3ZEQV0pCB8an","choices":[{"index":0,"message":{"content":"I don’t have personal feelings or favorites, but I can certainly share a well-loved poem! One that many people appreciate is \"The Road Not Taken\" by Robert Frost. It explores themes of choice, individuality, and the passage of time. Would you like a summary or an analysis of it?","role":"assistant"},"finish_reason":"stop"}],"created":1757347209,"model":"gpt-4o-mini-2024-07-18","service_tier":"default","system_fingerprint":"fp_e665f7564b","object":"chat.completion","usage":{"prompt_tokens":12,"completion_tokens":60,"total_tokens":72,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0}}}
 ```
 
-## Port-forward to Jaeger UI
+## View access logs
+Agentgateway enterprise automatically logs information about the LLM request to stdout
+```bash
+kubectl logs deploy/gloo-agentgateway -n gloo-system --tail 1
+```
+
+## Port-forward to Jaeger UI to view traces
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```

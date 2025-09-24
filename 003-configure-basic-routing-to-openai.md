@@ -76,7 +76,18 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-## Port-forward to Jaeger UI
+## View access logs
+Agentgateway enterprise automatically logs information about the LLM request to stdout
+```bash
+kubectl logs deploy/gloo-agentgateway -n gloo-system --tail 1
+```
+
+Example output
+```
+2025-09-24T06:05:19.901893Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:54955 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 trace.id=60488f5d01d8606cfe7ae7f57c20f981 span.id=be198303a1e1a64f llm.provider=openai llm.request.model=gpt-4o-mini llm.request.tokens=12 llm.response.model=gpt-4o-mini-2024-07-18 llm.response.tokens=46 duration=1669ms
+```
+
+## Port-forward to Jaeger UI to view traces
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```

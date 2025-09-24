@@ -1,5 +1,12 @@
 # Changelog
 
+0.1.0 - (9-24-25)
+---
+- Set `agentgateway.logLevel` to `info` so that tailing access logs is less noisy
+- Add instructions on how to view access logs to relevant labs
+- Update header for port-forwarding to the Jaeger UI
+- Add new lab: `012-configure-per-request-based-rate-limiting.md`
+
 0.0.9 - (9-23-25)
 ---
 - Update `/install-on-openshift` 001 and 002 labs with latest updates from `2.0.0-rc.1`. Still waiting on [Issue #585](https://github.com/solo-io/gloo-gateway/issues/585) to support `floatingUserId` for ext-auth and redis in OpenShift.

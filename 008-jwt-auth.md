@@ -148,7 +148,13 @@ We should see that we get a response from the backend LLM when JWT is provided
 {"id":"chatcmpl-CDwyrpA4JiYZtZqykYZoH6a4Ea7hL","choices":[{"index":0,"message":{"content":"I don't have personal preferences, but one widely admired poem is \"The Road Not Taken\" by Robert Frost. It explores themes of choice, individuality, and the paths we take in life. Many find its reflective nature and imagery to be profound. If you're interested, I can provide an analysis or discuss its themes!","role":"assistant"},"finish_reason":"stop"}],"created":1757441021,"model":"gpt-4o-mini-2024-07-18","service_tier":"default","system_fingerprint":"fp_8bda4d3a2c","object":"chat.completion","usage":{"prompt_tokens":12,"completion_tokens":63,"total_tokens":75,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0}}}
 ```
 
-## Port-forward to Jaeger UI
+## View access logs
+Agentgateway enterprise automatically logs information about the LLM request to stdout
+```bash
+kubectl logs deploy/gloo-agentgateway -n gloo-system --tail 1
+```
+
+## Port-forward to Jaeger UI to view traces
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```
