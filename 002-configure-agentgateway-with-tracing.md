@@ -51,7 +51,7 @@ spec:
       customConfigMapName: agent-gateway-config
       #--- Image overrides for deployment ---
       #image:  
-      #  tag: "0.8.3"
+      #  tag: ""
     #--- Adding sample annotation specific to AWS env ---
     service:
       extraAnnotations:
@@ -83,7 +83,7 @@ spec:
 EOF
 ```
 
-Check that the Gloo Gateway Proxy is now running:
+Check that the Gloo Agentgateway Proxy is now running:
 
 ```bash
 kubectl get pods -n gloo-system -l app.kubernetes.io/name=gloo-agentgateway
