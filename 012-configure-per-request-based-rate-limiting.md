@@ -1,4 +1,4 @@
-# Configure Basic Routing to OpenAI with Token-based Rate Limiting
+# Configure Basic Routing to OpenAI with Per-request based Rate Limiting
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
@@ -90,7 +90,7 @@ spec:
     - key: generic_key
       value: counter
       rateLimit:
-        requestsPerUnit: 10
+        requestsPerUnit: 3
         unit: MINUTE
     rateLimits:
     - actions:
@@ -132,6 +132,18 @@ curl -i "$GATEWAY_IP:8080/openai" \
       }
     ]
   }'
+```
+You should be rate limited on the 4th request to the LLM
+
+## View access logs
+Agentgateway enterprise automatically logs information about the LLM request to stdout
+```bash
+kubectl logs deploy/gloo-agentgateway -n gloo-system --tail 1
+```
+
+Example output, you should see that the `http.status=429`
+```
+2025-09-24T18:24:36.916204Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai src.addr=10.42.0.1:41015 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=429 trace.id=0e107053e94f6759febedbd0992c95ce span.id=414ed2d771f63b5a duration=0ms
 ```
 
 ## Port-forward to Jaeger UI to view traces

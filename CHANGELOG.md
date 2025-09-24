@@ -5,6 +5,7 @@
 - Set `agentgateway.logLevel` to `info` so that tailing access logs is less noisy
 - Add instructions on how to view access logs to relevant labs
 - Update header for port-forwarding to the Jaeger UI
+- Add new lab: `012-configure-per-request-based-rate-limiting.md`
 
 0.0.9 - (9-23-25)
 ---
