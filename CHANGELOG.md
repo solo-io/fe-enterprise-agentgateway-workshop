@@ -1,5 +1,12 @@
 # Changelog
 
+0.1.1 - (9-24-25)
+---
+- Update and test `001` and `002` labs in `/install-on-openshift` using `2.0.0-rc.1`. Validated that all labs are working on OpenShift `4.16.30` which is a current AI GW V2 customer's targeted version
+- Change newly added `012` lab to `999-not-working` until next `rc` release
+- Add a "required variables" section in `001` labs
+- Update README.md
+
 0.1.0 - (9-24-25)
 ---
 - Set `agentgateway.logLevel` to `info` so that tailing access logs is less noisy
