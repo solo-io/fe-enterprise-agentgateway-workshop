@@ -47,7 +47,7 @@ spec:
   kube:
     agentgateway:
       enabled: true
-      logLevel: trace
+      logLevel: info
       customConfigMapName: agent-gateway-config
       #--- Image overrides for deployment ---
       #image:  

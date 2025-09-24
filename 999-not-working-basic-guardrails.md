@@ -120,7 +120,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 Verify that the request is denied with a 403 HTTP response code and the custom response message is returned.
 
-## Port-forward to Jaeger UI
+## Port-forward to Jaeger UI to view traces
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```

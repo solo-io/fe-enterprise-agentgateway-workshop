@@ -376,7 +376,7 @@ INFO:     10.42.0.10:40274 - "POST /request HTTP/1.1" 200 OK
 2025-09-23 19:10:14,935 [INFO] ✅ PassAction returned (request)
 ```
 
-## Port-forward to Jaeger UI
+## Port-forward to Jaeger UI to view traces
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```

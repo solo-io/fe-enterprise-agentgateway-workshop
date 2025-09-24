@@ -197,7 +197,13 @@ curl -i "$GATEWAY_IP:8080/bedrock/llama3-8b" \
   }'
 ```
 
-## Port-forward to Jaeger UI
+## View access logs
+Agentgateway enterprise automatically logs information about the LLM request to stdout
+```bash
+kubectl logs deploy/gloo-agentgateway -n gloo-system --tail 1
+```
+
+## Port-forward to Jaeger UI to view traces
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```
