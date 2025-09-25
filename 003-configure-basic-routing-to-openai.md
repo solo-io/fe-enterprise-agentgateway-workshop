@@ -76,6 +76,32 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
+## View all metrics
+All metrics
+```bash
+echo
+echo "Objective: curl /metrics endpoint and show all metrics"
+kubectl port-forward -n gloo-system deployment/gloo-agentgateway 15020:15020 & \
+sleep 1 && curl -s http://localhost:15020/metrics && kill $!
+``` 
+
+Filter for number of requests served through the gateway
+```bash
+echo
+echo "Objective: curl /metrics endpoint and filter for number of requests served through the gateway"
+kubectl port-forward -n gloo-system deployment/gloo-agentgateway 15020:15020 & \
+sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_requests_total && kill $!
+``` 
+
+Total input and output token usage through the gateway
+```bash
+echo
+echo "Objective: curl /metrics endpoint and filter for input/output token usage through the gateway"
+kubectl port-forward -n gloo-system deployment/gloo-agentgateway 15020:15020 & \
+sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_gen_ai_client_token_usage_sum && kill $!
+``` 
+You can tell the difference between the two metrics from the `gen_ai_token_type="input/output"` label
+
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash

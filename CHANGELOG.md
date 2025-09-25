@@ -1,5 +1,11 @@
 # Changelog
 
+0.1.2 - (9-25-25)
+---
+- Add section on viewing /metrics endpoint to `003-configure-basic-routing-to-openai.md`
+- Update `999-request-based-rate-limiting.md` to have both basic counter and header-based request rate limit examples
+- Add "User Stories / Acceptance Criteria" section to the README.md
+
 0.1.1 - (9-24-25)
 ---
 - Update and test `001` and `002` labs in `/install-on-openshift` using `2.0.0-rc.1`. Validated that all labs are working on OpenShift `4.16.30` which is a current AI GW V2 customer's targeted version

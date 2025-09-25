@@ -1,4 +1,4 @@
-# Configure Basic Routing to OpenAI with Per-request based Rate Limiting
+# Configure Request Based Rate Limiting
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
@@ -6,8 +6,10 @@ This lab assumes that you have completed the setup in `001`, and `002`
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
 - Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Configure RateLimitConfig
-- Validate basic rate limiting
+- Create an initial RateLimitConfig to implement request-based rate limiting using a simple counter (e.g. all users get 5 requests per minute)
+- Validate basic global rate limiting
+- Configure an additional `RateLimitConfig` to enforce a limit of 2 requests per minute when the request includes the header `x-user-type: limited`  
+- Validate header-driven request rate limiting  
 
 Create openai api-key secret
 ```bash
@@ -76,13 +78,14 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
+## Configure global request rate limit of 5 requests per minute
 Create rate limit config
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: ratelimit.solo.io/v1alpha1
 kind: RateLimitConfig
 metadata:
-  name: per-user-counter-minute
+  name: global-request-rate-limit
   namespace: gloo-system
 spec:
   raw:
@@ -90,7 +93,7 @@ spec:
     - key: generic_key
       value: counter
       rateLimit:
-        requestsPerUnit: 3
+        requestsPerUnit: 5
         unit: MINUTE
     rateLimits:
     - actions:
@@ -105,7 +108,7 @@ kubectl apply -f- <<EOF
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooTrafficPolicy
 metadata:
-  name: token-based-rate-limit
+  name: global-request-rate-limit
   namespace: gloo-system
 spec:
   targetRefs:
@@ -115,7 +118,7 @@ spec:
   glooRateLimit:
     global:
       rateLimitConfigRef:
-        name: per-user-counter-minute
+        name: global-request-rate-limit
 EOF
 ```
 
@@ -133,7 +136,69 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-You should be rate limited on the 4th request to the LLM
+You should be rate limited on the 6th request to the LLM
+
+## Configure header-driven request rate limiting  
+Configure an additional `RateLimitConfig` to enforce a limit of 2 requests per minute when the request includes the header `x-user-type: limited`  
+```bash
+kubectl apply -f- <<EOF
+apiVersion: ratelimit.solo.io/v1alpha1
+kind: RateLimitConfig
+metadata:
+  name: limited-user-rate-limit
+  namespace: gloo-system
+spec:
+  raw:
+    descriptors:
+    - key: user_type
+      value: "limited"
+      rateLimit:
+        unit: MINUTE
+        requestsPerUnit: 2
+    rateLimits:
+    - actions:
+      - requestHeaders:
+          descriptorKey: "user_type"
+          headerName: "x-user-type"
+EOF
+```
+
+Create GlooTrafficPolicy referencing the rate limit config we just created
+```bash
+kubectl apply -f- <<EOF
+apiVersion: gloo.solo.io/v1alpha1
+kind: GlooTrafficPolicy
+metadata:
+  name: limited-user-rate-limit
+  namespace: gloo-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: gloo-agentgateway
+  glooRateLimit:
+    global:
+      rateLimitConfigRef:
+        name: limited-user-rate-limit
+EOF
+```
+
+## curl openai
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "x-user-type: limited" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+You should be rate limited on the 3rd request to the LLM only when the header `x-user-type: limited` is present
 
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
@@ -155,11 +220,14 @@ Navigate to http://localhost:16686 in your browser, you should be able to see tr
 
 - The rate limited requests should have been rejected with a `http.status` of `429`
 
+
 ## Cleanup
 ```bash
 kubectl delete httproute -n gloo-system openai
 kubectl delete backend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
-kubectl delete glootrafficpolicy -n gloo-system token-based-rate-limit
-kubectl delete rlc -n gloo-system per-user-counter-minute
+kubectl delete glootrafficpolicy -n gloo-system global-request-rate-limit
+kubectl delete glootrafficpolicy -n gloo-system limited-user-rate-limit
+kubectl delete rlc -n gloo-system global-request-rate-limit
+kubectl delete rlc -n gloo-system limited-user-rate-limit
 ```
