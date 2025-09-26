@@ -7,6 +7,7 @@
 - Minor fixes to `004c-fixed-path-queryparameter-matching-routing-example.md`
 - Validated that `011-basic-guardrails.md` masking on response works with agentgateway `0.9.0` which will land in GGV2 `rc.2`
 - Minor fixes to `013-advanced-guardrails-webhook.md`
+- Update `012` external moderation lab to use `GlooTrafficPolicy` instead of `TrafficPolicy`
 
 0.1.2 - (9-26-25)
 ---

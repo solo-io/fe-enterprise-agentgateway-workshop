@@ -79,8 +79,8 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ## Reject inappropriate requests using the external moderation endpoint
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: TrafficPolicy
+apiVersion: gloo.solo.io/v1alpha1
+kind: GlooTrafficPolicy
 metadata:
   name: openai-prompt-guard
   namespace: gloo-system
@@ -149,7 +149,7 @@ Navigate to http://localhost:16686 in your browser, you should be able to see tr
 
 ## Cleanup
 ```bash
-kubectl delete trafficpolicy -n gloo-system openai-prompt-guard
+kubectl delete glootrafficpolicy -n gloo-system openai-prompt-guard
 kubectl delete httproute -n gloo-system openai
 kubectl delete backend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
