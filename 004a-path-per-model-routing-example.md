@@ -197,4 +197,7 @@ Navigate to http://localhost:16686 in your browser, you should be able to see tr
 ```bash
 kubectl delete httproute -n gloo-system openai
 kubectl delete secret -n gloo-system openai-secret
+kubectl delete backends -n gloo-system openai-gpt-4o
+kubectl delete backends -n gloo-system openai-gpt-4o-mini
+kubectl delete backends -n gloo-system openai-gpt-3.5-turbo
 ```

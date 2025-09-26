@@ -1,5 +1,13 @@
 # Changelog
 
+0.1.3 - (9-26-25)
+---
+- Fix cleanup instructions in `004a-path-per-model-routing-example.md`
+- Minor fixes to `004b-fixed-path-header-matching-routing-example.md`
+- Minor fixes to `004c-fixed-path-queryparameter-matching-routing-example.md`
+- Validated that `011-basic-guardrails.md` masking on response works with agentgateway `0.9.0` which will land in GGV2 `rc.2`
+- Minor fixes to `013-advanced-guardrails-webhook.md`
+
 0.1.2 - (9-26-25)
 ---
 - Update lab numbering in README
@@ -7,7 +15,6 @@
 - Update `014-request-based-rate-limiting.md` to have both basic counter and header-based request rate limit examples
 - Add new lab: `012-external-moderation-openai-guardrails.md`
 - Add "User Stories / Acceptance Criteria" section to the README, these cases will be weaved into the labs over time
-
 
 0.1.1 - (9-24-25)
 ---

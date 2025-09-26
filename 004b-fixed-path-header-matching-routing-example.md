@@ -16,6 +16,63 @@ kubectl create secret generic openai-secret -n gloo-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
+Lets create an OpenAI backend per specific-model if you haven't already
+```bash
+kubectl apply -f - <<EOF
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: openai-gpt-3.5-turbo
+  namespace: gloo-system
+spec:
+  type: AI
+  ai:
+    llm:
+      openai:
+        #--- Uncomment to configure model override ---
+        model: "gpt-3.5-turbo"
+        authToken:
+          kind: "SecretRef"
+          secretRef:
+            name: openai-secret
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: openai-gpt-4o-mini
+  namespace: gloo-system
+spec:
+  type: AI
+  ai:
+    llm:
+      openai:
+        #--- Uncomment to configure model override ---
+        model: "gpt-4o-mini"
+        authToken:
+          kind: "SecretRef"
+          secretRef:
+            name: openai-secret
+---
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: openai-gpt-4o
+  namespace: gloo-system
+spec:
+  type: AI
+  ai:
+    llm:
+      openai:
+        #--- Uncomment to configure model override ---
+        model: "gpt-4o"
+        authToken:
+          kind: "SecretRef"
+          secretRef:
+            name: openai-secret
+EOF
+```
+
 ### Configure LLM routing example with fixed path + header matching to access endpoints
 
 Now we can configure a `HTTPRoute` that has a specific path-per-model endpoint using the same backends we used previously
@@ -143,4 +200,7 @@ Navigate to http://localhost:16686 in your browser, you should be able to see tr
 ```bash
 kubectl delete httproute -n gloo-system openai
 kubectl delete secret -n gloo-system openai-secret
+kubectl delete backends -n gloo-system openai-gpt-4o
+kubectl delete backends -n gloo-system openai-gpt-4o-mini
+kubectl delete backends -n gloo-system openai-gpt-3.5-turbo
 ```
