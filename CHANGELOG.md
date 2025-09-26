@@ -1,10 +1,13 @@
 # Changelog
 
-0.1.2 - (9-25-25)
+0.1.2 - (9-26-25)
 ---
+- Update lab numbering in README
 - Add section on viewing /metrics endpoint to `003-configure-basic-routing-to-openai.md`
-- Update `999-request-based-rate-limiting.md` to have both basic counter and header-based request rate limit examples
-- Add "User Stories / Acceptance Criteria" section to the README.md
+- Update `014-request-based-rate-limiting.md` to have both basic counter and header-based request rate limit examples
+- Add new lab: `012-external-moderation-openai-guardrails.md`
+- Add "User Stories / Acceptance Criteria" section to the README
+
 
 0.1.1 - (9-24-25)
 ---
