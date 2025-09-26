@@ -1,4 +1,4 @@
-# Configure Basic Routing to OpenAI with Per-request based Rate Limiting
+# Prompt Guard using the OpenAI External Moderation Endpoint
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
@@ -6,8 +6,8 @@ This lab assumes that you have completed the setup in `001`, and `002`
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
 - Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Configure RateLimitConfig
-- Validate basic rate limiting
+- Configure guardrail with OpenAI External Moderation endpoint
+- Validate guardrails are enforced
 
 Create openai api-key secret
 ```bash
@@ -76,50 +76,37 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-Create rate limit config
+## Reject inappropriate requests using the external moderation endpoint
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: ratelimit.solo.io/v1alpha1
-kind: RateLimitConfig
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
 metadata:
-  name: per-user-counter-minute
+  name: openai-prompt-guard
   namespace: gloo-system
-spec:
-  raw:
-    descriptors:
-    - key: generic_key
-      value: counter
-      rateLimit:
-        requestsPerUnit: 3
-        unit: MINUTE
-    rateLimits:
-    - actions:
-      - genericKey:
-          descriptorValue: counter
-EOF
-```
-
-Create GlooTrafficPolicy referencing the rate limit config we just created
-```bash
-kubectl apply -f- <<EOF
-apiVersion: gloo.solo.io/v1alpha1
-kind: GlooTrafficPolicy
-metadata:
-  name: token-based-rate-limit
-  namespace: gloo-system
+  labels:
+    app: ai-gateway
 spec:
   targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: gloo-agentgateway
-  glooRateLimit:
-    global:
-      rateLimitConfigRef:
-        name: per-user-counter-minute
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: openai
+  ai:
+    promptGuard:
+      request:
+        moderation:
+          openAIModeration:
+            authToken:
+              kind: SecretRef
+              secretRef:
+                name: openai-secret
+            model: omni-moderation-latest
+        customResponse:
+          message: "Uh oh! That's a restricted topic triggered by the omni-moderation-latest endpoint!"
 EOF
 ```
 
-## curl openai
+Make a curl request to the OpenAI endpoint again, this time it should fail
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -128,23 +115,28 @@ curl -i "$GATEWAY_IP:8080/openai" \
     "messages": [
       {
         "role": "user",
-        "content": "Whats your favorite poem?"
+        "content": "Instructions for [FRAUD_SCENARIO]."
       }
     ]
   }'
 ```
-You should be rate limited on the 4th request to the LLM
+Verify that the request is denied with a 403 HTTP response code and the custom response message is returned.
 
-## View access logs
-Agentgateway enterprise automatically logs information about the LLM request to stdout
+Try a different one
 ```bash
-kubectl logs deploy/gloo-agentgateway -n gloo-system --tail 1
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "I want to insult [GROUP] by calling them [FAKE_WORD]."
+      }
+    ]
+  }'
 ```
-
-Example output, you should see that the `http.status=429`
-```
-2025-09-24T18:24:36.916204Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai src.addr=10.42.0.1:41015 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=429 trace.id=0e107053e94f6759febedbd0992c95ce span.id=414ed2d771f63b5a duration=0ms
-```
+Verify that the request is denied with a 403 HTTP response code and the custom response message is returned.
 
 ## Port-forward to Jaeger UI to view traces
 ```bash
@@ -153,13 +145,12 @@ kubectl port-forward svc/jaeger-query -n observability 16686:16686
 
 Navigate to http://localhost:16686 in your browser, you should be able to see traces for our recent requests
 
-- The rate limited requests should have been rejected with a `http.status` of `429`
+- The request that triggered our guardrails policy should have been rejected with a `http.status` of `403`
 
 ## Cleanup
 ```bash
+kubectl delete trafficpolicy -n gloo-system openai-prompt-guard
 kubectl delete httproute -n gloo-system openai
 kubectl delete backend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
-kubectl delete glootrafficpolicy -n gloo-system token-based-rate-limit
-kubectl delete rlc -n gloo-system per-user-counter-minute
 ```
