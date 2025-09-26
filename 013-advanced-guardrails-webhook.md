@@ -150,7 +150,7 @@ Check that the ai-guardrail-webhook has been deployed
 kubectl get pods -n gloo-system -l app=ai-guardrail-webhook
 ```
 
-## Apply prompt enrichment policy
+## Apply prompt guard policy
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: gloo.solo.io/v1alpha1
@@ -334,7 +334,7 @@ INFO:     10.42.0.10:56944 - "POST /request HTTP/1.1" 200 OK
 2025-09-23 19:09:15,379 [INFO] ✅ PassAction returned (request)
 ```
 
-## Mask SSN Numbers
+## Mask Emails
 Now we will test a malicious request that contains an email, which should be masked by the webhook endpoint
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \

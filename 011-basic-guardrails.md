@@ -129,7 +129,7 @@ Navigate to http://localhost:16686 in your browser, you should be able to see tr
 
 - The request that triggered our guardrails policy should have been rejected with a `http.status` of `403`
 
-## Mask inappropriate responses (NOT WORKING)
+## Mask inappropriate responses
 To avoid information from being leaked, we can also configure a prompt guard on the response to mask sensitive information such as credit cards, SSN, and other types of PII data
 
 ```bash
