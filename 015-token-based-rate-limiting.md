@@ -1,4 +1,4 @@
-# Configure Request Based Rate Limiting
+# Configure Input Token Based Rate Limiting
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
@@ -6,8 +6,8 @@ This lab assumes that you have completed the setup in `001`, and `002`
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
 - Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Create an initial RateLimitConfig to implement request-based rate limiting using a simple counter (e.g. all users get 5 requests per hour)
-- Validate request-based rate limiting
+- Create an initial RateLimitConfig to implement token-based rate limiting (input tokens) using a simple counter (e.g. all users get 10 tokens per hour)
+- Validate token-based rate limiting
 
 Create openai api-key secret
 ```bash
@@ -76,14 +76,14 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-## Configure global request rate limit of 5 requests per minute
-Create rate limit config
+## Configure global request rate limit of 10 input tokens per hour
+Create rate limit config, note that this policy uses `type: TOKEN`
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: ratelimit.solo.io/v1alpha1
 kind: RateLimitConfig
 metadata:
-  name: global-request-rate-limit
+  name: token-based-rate-limit
   namespace: gloo-system
 spec:
   raw:
@@ -91,13 +91,13 @@ spec:
     - key: generic_key
       value: counter
       rateLimit:
-        requestsPerUnit: 5
+        requestsPerUnit: 10
         unit: HOUR
     rateLimits:
     - actions:
       - genericKey:
           descriptorValue: counter
-      type: REQUEST
+      type: TOKEN
 EOF
 ```
 
@@ -107,7 +107,7 @@ kubectl apply -f- <<EOF
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooTrafficPolicy
 metadata:
-  name: global-request-rate-limit
+  name: token-based-rate-limit
   namespace: gloo-system
 spec:
   targetRefs:
@@ -117,11 +117,12 @@ spec:
   glooRateLimit:
     global:
       rateLimitConfigRef:
-        name: global-request-rate-limit
+        name: token-based-rate-limit
 EOF
 ```
 
 ## curl openai
+Note that the following user prompt "Whats your favorite poem" contains 5 tokens based on the [OpenAI tokenizer](https://platform.openai.com/tokenizer)
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -135,7 +136,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-You should be rate limited on the 6th request to the LLM
+You should be rate limited after several requests to the LLM because we will have hit our token-based rate limit of 10 input tokens per hour
 
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
@@ -163,6 +164,6 @@ Navigate to http://localhost:16686 in your browser, you should be able to see tr
 kubectl delete httproute -n gloo-system openai
 kubectl delete backend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
-kubectl delete glootrafficpolicy -n gloo-system global-request-rate-limit
-kubectl delete rlc -n gloo-system global-request-rate-limit
+kubectl delete glootrafficpolicy -n gloo-system token-based-rate-limit
+kubectl delete rlc -n gloo-system token-based-rate-limit
 ```

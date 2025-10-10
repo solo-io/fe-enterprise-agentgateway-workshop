@@ -10,13 +10,14 @@
 - [005-evaluate-openai-model-performance.md](005-evaluate-openai-model-performance.md)
 - [006-configure-routing-to-aws-bedrock.md](006-configure-routing-to-aws-bedrock.md)
 - [007-api-key-masking.md](007-api-key-masking.md)
-- [008-jwt-auth.md](008-jwt-auth.md)
+- [008-jwt-auth-with-rbac.md](008-jwt-auth-with-rbac.md)
 - [009-configure-basic-routing-to-anthropic.md](009-configure-basic-routing-to-anthropic.md)
 - [010-enrich-prompts.md](010-enrich-prompts.md)
 - [011-basic-guardrails.md](011-basic-guardrails.md)
 - [012-external-moderation-openai-guardrails.md](012-external-moderation-openai-guardrails.md)
 - [013-advanced-guardrails-webhook.md](013-advanced-guardrails-webhook.md)
 - [014-request-based-rate-limiting.md](014-request-based-rate-limiting.md)
+- [015-token-based-rate-limiting.md](015-token-based-rate-limiting.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
@@ -41,19 +42,12 @@
 - Rate Limit on a per-request basis
 - Rate Limit on a per-token basis
 
-## 
-
-
 ## WIP / to-do / Known Issues (999)
-- Prompt guard response masking on request in 011 is not working - fix in rc2
-- Rate limit on basic counter in 014 is not working - fix in rc2
-- Rate limit on token (basic counter)
-- Rate limit on token + header
 - LLM Failover
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Gloo Gateway 2.0.0-rc.1
+- Gloo Gateway 2.0.0-rc.2
 
 
 ## User Stories / Acceptance Criteria

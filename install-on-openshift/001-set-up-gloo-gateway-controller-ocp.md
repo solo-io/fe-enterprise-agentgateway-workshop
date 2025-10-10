@@ -41,7 +41,7 @@ referencegrants   refgrant     gateway.networking.k8s.io/v1beta1   true         
 Export your Gloo Trial license key variable and Gloo Gateway version
 ```bash
 export GLOO_TRIAL_LICENSE_KEY=$GLOO_TRIAL_LICENSE_KEY
-export GLOO_VERSION=2.0.0-rc.1
+export GLOO_VERSION=2.0.0-rc.2
 ```
 
 ### Gloo Gateway CRDs

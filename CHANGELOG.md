@@ -1,5 +1,13 @@
 # Changelog
 
+0.1.4 - (10-10-25)
+---
+- add `service.type: LoadBalancer` to the `GlooGatewayParameters` for agentgateway in `install-base.sh`. This is the default behavior, but explicitly configuring it so that we can see how it is configured if we need to use another service type
+- Update `GLOO_VERSION=2.0.0-rc.2`
+- Update `014-request-based-rate-limiting.md`
+- Add new lab: `015-token-based-rate-limiting.md`
+- Enhanced lab: `008` JWT auth with RBAC policy added to enforce claims in the JWT
+
 0.1.3 - (9-26-25)
 ---
 - Fix cleanup instructions in `004a-path-per-model-routing-example.md`

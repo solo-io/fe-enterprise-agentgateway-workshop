@@ -54,6 +54,7 @@ spec:
       #  tag: ""
     #--- Required for Openshift---
     floatingUserId: true
+    omitDefaultSecurityContext: true
     #--- Adding sample annotation specific to AWS env ---
     service:
       extraAnnotations:

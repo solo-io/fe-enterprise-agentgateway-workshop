@@ -56,6 +56,7 @@ spec:
     service:
       extraAnnotations:
         service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      type: LoadBalancer
     #--- Uncomment to add gateway to ambient mesh ---
     #podTemplate:
     #  extraLabels:
