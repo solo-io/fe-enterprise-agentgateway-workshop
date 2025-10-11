@@ -116,8 +116,8 @@ spec:
       name: gloo-agentgateway
   glooRateLimit:
     global:
-      rateLimitConfigRef:
-        name: token-based-rate-limit
+      rateLimitConfigRefs:
+      - name: token-based-rate-limit
 EOF
 ```
 
