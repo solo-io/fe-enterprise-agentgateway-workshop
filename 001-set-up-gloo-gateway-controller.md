@@ -17,7 +17,7 @@ This minimal guide covers the installation and simple usage of Gloo Gateway with
 Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Gloo Gateway
 
 ```bash
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.1/standard-install.yaml
+kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
 ```
 
 To check if the the Kubernetes Gateway API CRDS are installed
@@ -29,19 +29,20 @@ kubectl api-resources --api-group=gateway.networking.k8s.io
 Expected Output:
 
 ```bash
-NAME              SHORTNAMES   APIVERSION                          NAMESPACED   KIND
-gatewayclasses    gc           gateway.networking.k8s.io/v1        false        GatewayClass
-gateways          gtw          gateway.networking.k8s.io/v1        true         Gateway
-grpcroutes                     gateway.networking.k8s.io/v1        true         GRPCRoute
-httproutes                     gateway.networking.k8s.io/v1        true         HTTPRoute
-referencegrants   refgrant     gateway.networking.k8s.io/v1beta1   true         ReferenceGrant
+NAME                 SHORTNAMES   APIVERSION                          NAMESPACED   KIND
+backendtlspolicies   btlspolicy   gateway.networking.k8s.io/v1        true         BackendTLSPolicy
+gatewayclasses       gc           gateway.networking.k8s.io/v1        false        GatewayClass
+gateways             gtw          gateway.networking.k8s.io/v1        true         Gateway
+grpcroutes                        gateway.networking.k8s.io/v1        true         GRPCRoute
+httproutes                        gateway.networking.k8s.io/v1        true         HTTPRoute
+referencegrants      refgrant     gateway.networking.k8s.io/v1beta1   true         ReferenceGrant
 ```
 
 ### Configure Required Variables
 Export your Gloo Trial license key variable and Gloo Gateway version
 ```bash
 export GLOO_TRIAL_LICENSE_KEY=$GLOO_TRIAL_LICENSE_KEY
-export GLOO_VERSION=2.0.0-rc.1
+export GLOO_VERSION=2.0.0
 ```
 
 ### Gloo Gateway CRDs

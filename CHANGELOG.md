@@ -1,5 +1,16 @@
 # Changelog
 
+0.1.4 - (10-13-25)
+---
+- Update `GLOO_VERSION=2.0.0`
+- Update GWAPI CRD version to `v1.4.0`
+- Update /install-on-openshift instructions to remove workarounds required in previous releases
+- update `rateLimitConfigRef` to `rateLimitConfigRefs` in 014-request-based-rate-limiting.md to reflect change of API in rc.3
+- Add new lab: `015-token-based-rate-limiting.md`
+- update `SYSTEM` to `system` in 010-enrich-prompts.md to reflect change of API in rc.3
+- Enhanced lab: `008` JWT auth with RBAC policy added to enforce claims in the JWT
+- add `service.type: LoadBalancer` to the `GlooGatewayParameters` for agentgateway in `install-base.sh`. This is the default behavior, but explicitly configuring it so that we can see how it is configured if we need to use another service type
+
 0.1.3 - (9-26-25)
 ---
 - Fix cleanup instructions in `004a-path-per-model-routing-example.md`

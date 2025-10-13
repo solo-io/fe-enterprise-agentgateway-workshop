@@ -106,6 +106,10 @@ spec:
                 rdmgZcqjWdsMfmRbwJGRst2658MwIZ3skYGTd8LiUTWnxTRpQ5TJoSzck4w8k+0l
                 LwIDAQAB
                 -----END PUBLIC KEY-----
+  rbac:
+    policy:
+      matchExpressions:
+        - '(jwt.org == "internal") && (jwt.group == "engineering")'
 EOF
 ```
 
@@ -146,6 +150,28 @@ curl -i "$GATEWAY_IP:8080/openai" \
 We should see that we get a response from the backend LLM when JWT is provided
 ```
 {"id":"chatcmpl-CDwyrpA4JiYZtZqykYZoH6a4Ea7hL","choices":[{"index":0,"message":{"content":"I don't have personal preferences, but one widely admired poem is \"The Road Not Taken\" by Robert Frost. It explores themes of choice, individuality, and the paths we take in life. Many find its reflective nature and imagery to be profound. If you're interested, I can provide an analysis or discuss its themes!","role":"assistant"},"finish_reason":"stop"}],"created":1757441021,"model":"gpt-4o-mini-2024-07-18","service_tier":"default","system_fingerprint":"fp_8bda4d3a2c","object":"chat.completion","usage":{"prompt_tokens":12,"completion_tokens":63,"total_tokens":75,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0}}}
+```
+
+If you decode the JWT, you’ll see that agentgateway successfully verified it and enforced RBAC based on the `jwt.org` and `jwt.group` claims
+```
+{
+  "iss": "https://dev.example.com",
+  "exp": 4804324736,
+  "iat": 1648651136,
+  "org": "internal",
+  "email": "dev1@solo.io",
+  "group": "engineering",
+  "scope": "is:developer"
+}
+```
+
+Bonus Exercise:
+Update the CEL expression in the GlooTrafficPolicy to experiment with RBAC behavior. For example, adjust the claims in your JWT and resend the request to see when access is allowed or denied:
+```
+rbac:
+    policy:
+      matchExpressions:
+        - '(jwt.org == "internal") && (jwt.group == "engineering")'
 ```
 
 ## View access logs

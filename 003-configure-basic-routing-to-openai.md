@@ -9,6 +9,12 @@ This lab assumes that you have completed the setup in `001`, and `002`
 - Curl OpenAI through the agentgateway proxy
 - Validate the request went through the gateway in Jaeger UI
 
+### Configure Required Variables
+Replace with a valid OpenAI API key
+```bash
+export OPENAI_API_KEY=$OPENAI_API_KEY
+```
+
 Create openai api-key secret
 ```bash
 kubectl create secret generic openai-secret -n gloo-system \

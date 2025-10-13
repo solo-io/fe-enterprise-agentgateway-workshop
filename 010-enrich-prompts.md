@@ -95,7 +95,7 @@ spec:
   ai:
     promptEnrichment:
       prepend:
-      - role: SYSTEM
+      - role: system
         content: "Return the response in JSON format"
 EOF
 ```
