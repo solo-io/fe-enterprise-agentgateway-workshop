@@ -47,7 +47,7 @@
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Gloo Gateway 2.0.0-rc.3
+- Gloo Gateway 2.0.0
 
 
 ## User Stories / Acceptance Criteria

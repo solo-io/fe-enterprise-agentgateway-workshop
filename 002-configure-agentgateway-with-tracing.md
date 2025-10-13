@@ -87,12 +87,16 @@ EOF
 Check that the Gloo Agentgateway Proxy is now running:
 
 ```bash
-kubectl get pods -n gloo-system -l app.kubernetes.io/name=gloo-agentgateway
+kubectl get pods -n gloo-system
 ```
 
 Expected Output:
 
 ```bash
-NAME                               READY   STATUS    RESTARTS   AGE
-gloo-agentgateway-8984f7f7-rr2qq   1/1     Running   0          16s
+NAME                                                        READY   STATUS    RESTARTS   AGE
+ext-auth-service-agentgateway-enterprise-5b5bcdc7fb-769ts   1/1     Running   0          28s
+gloo-agentgateway-85fd5c587f-96b7p                          1/1     Running   0          29s
+gloo-ext-cache-agentgateway-enterprise-59dc8ccf7b-5q5b6     1/1     Running   0          29s
+gloo-gateway-6989b69f49-7q7db                               1/1     Running   0          52s
+rate-limiter-agentgateway-enterprise-9fd599685-cpdsr        1/1     Running   0          28s
 ```

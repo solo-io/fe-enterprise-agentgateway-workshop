@@ -116,8 +116,8 @@ spec:
       name: gloo-agentgateway
   glooRateLimit:
     global:
-      rateLimitConfigRef:
-        name: global-request-rate-limit
+      rateLimitConfigRefs:
+      - name: global-request-rate-limit
 EOF
 ```
 

@@ -53,7 +53,6 @@ spec:
       #image:  
       #  tag: ""
     #--- Required for Openshift---
-    floatingUserId: true
     omitDefaultSecurityContext: true
     #--- Adding sample annotation specific to AWS env ---
     service:
@@ -89,58 +88,18 @@ EOF
 Check that the Gloo Agentgateway Proxy is now running:
 
 ```bash
-kubectl get pods -n gloo-system -l app.kubernetes.io/name=gloo-agentgateway
+kubectl get pods -n gloo-system
 ```
 
 Expected Output:
 
 ```bash
-NAME                               READY   STATUS    RESTARTS   AGE
-gloo-agentgateway-8984f7f7-rr2qq   1/1     Running   0          16s
-```
-
-### Temporary patching of redis, and ext-auth
-
-> Note:
-> There is currently an issue with auto deploying the ext-auth, and redis components on OpenShift. As a temporary workaround, we can patch these Deployments and update the securityContext as per requirement in OCP.
-
-#### redis-gloo-agentgateway
-
-To remove `runAsUser` from `redis`:
-
-```bash
-kubectl patch deployment gloo-ext-cache-agentgateway-enterprise -n gloo-system --type='json' -p='[
-  {"op": "remove", "path": "/spec/template/spec/containers/0/securityContext/runAsUser"}
-]'
-```
-
-#### ext-auth-service-gloo-agentgateway
-
-- Remove `runAsUser` from ext-auth
-- Add `runAsNonRoot: true` to ext-auth
-
-```bash
-kubectl patch deployment ext-auth-service-agentgateway-enterprise -n gloo-system --type='json' -p='[
-  {"op": "remove", "path": "/spec/template/spec/securityContext/runAsUser"},
-  {"op": "add", "path": "/spec/template/spec/securityContext/runAsNonRoot", "value": true}
-]'
-```
-
-Check that all these pods are now running in `gloo-system` NameSpace:
-
-```bash
-kubectl get pods -n gloo-system
-```
-
-Expected output:
-
-```bash
 NAME                                                        READY   STATUS    RESTARTS   AGE
-ext-auth-service-agentgateway-enterprise-5f8dc65f48-ssjh2   1/1     Running   0          19s
-gloo-agentgateway-67fd6668d8-hmzj6                          1/1     Running   0          8m25s
-gloo-ext-cache-agentgateway-enterprise-674dc8f989-pf9vn     1/1     Running   0          34s
-gloo-gateway-855cc5b4fd-ghgnl                               1/1     Running   0          8m26s
-rate-limiter-agentgateway-enterprise-5f5d8b85c-lq8qv        1/1     Running   0          8m25s
+ext-auth-service-agentgateway-enterprise-5b5bcdc7fb-769ts   1/1     Running   0          28s
+gloo-agentgateway-85fd5c587f-96b7p                          1/1     Running   0          29s
+gloo-ext-cache-agentgateway-enterprise-59dc8ccf7b-5q5b6     1/1     Running   0          29s
+gloo-gateway-6989b69f49-7q7db                               1/1     Running   0          52s
+rate-limiter-agentgateway-enterprise-9fd599685-cpdsr        1/1     Running   0          28s
 ```
 
 ## Next Steps
