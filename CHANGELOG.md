@@ -1,5 +1,10 @@
 # Changelog
 
+0.1.5 - (10-20-25)
+---
+- Rename `015` lab to `016-global-token-based-rate-limiting.md`
+- Add new lab: `015-local-token-based-rate-limiting.md` to showcase OSS local token-based rate limiting before moving on to Enterprise global rate limiting
+
 0.1.4 - (10-13-25)
 ---
 - Update `GLOO_VERSION=2.0.0`
