@@ -17,7 +17,8 @@
 - [012-external-moderation-openai-guardrails.md](012-external-moderation-openai-guardrails.md)
 - [013-advanced-guardrails-webhook.md](013-advanced-guardrails-webhook.md)
 - [014-request-based-rate-limiting.md](014-request-based-rate-limiting.md)
-- [015-token-based-rate-limiting.md](015-token-based-rate-limiting.md)
+- [015-local-token-based-rate-limiting.md](015-local-token-based-rate-limiting.md)
+- [016-global-token-based-rate-limiting.md](016-global-token-based-rate-limiting.md)
 
 # Use Cases
 - Support Kubernetes Gateway API

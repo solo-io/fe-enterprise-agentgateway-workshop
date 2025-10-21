@@ -1,4 +1,4 @@
-# Configure Input Token Based Rate Limiting
+# Configure Local Input Token Based Rate Limiting
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
 - Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Create an initial RateLimitConfig to implement token-based rate limiting (input tokens) using a simple counter (e.g. all users get 10 tokens per hour)
+- Create an Local rate limit policy to implement token-based rate limiting (input tokens) using a simple counter (e.g. all users get 10 tokens per hour)
 - Validate token-based rate limiting
 
 Create openai api-key secret
@@ -76,48 +76,26 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-## Configure global request rate limit of 10 input tokens per hour
-Create rate limit config, note that this policy uses `type: TOKEN`
-```bash
-kubectl apply -f- <<EOF
-apiVersion: ratelimit.solo.io/v1alpha1
-kind: RateLimitConfig
-metadata:
-  name: token-based-rate-limit
-  namespace: gloo-system
-spec:
-  raw:
-    descriptors:
-    - key: generic_key
-      value: counter
-      rateLimit:
-        requestsPerUnit: 10
-        unit: HOUR
-    rateLimits:
-    - actions:
-      - genericKey:
-          descriptorValue: counter
-      type: TOKEN
-EOF
-```
-
-Create GlooTrafficPolicy referencing the rate limit config we just created
+## Configure Local token-based rate limit of 10 input tokens per hour
+The following policy will allow 1 token per 100s
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooTrafficPolicy
 metadata:
-  name: token-based-rate-limit
+  name: local-token-based-rate-limit
   namespace: gloo-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
       name: gloo-agentgateway
-  glooRateLimit:
-    global:
-      rateLimitConfigRefs:
-      - name: token-based-rate-limit
+  rateLimit:
+    local:
+      tokenBucket:
+        maxTokens: 1
+        tokensPerFill: 1
+        fillInterval: 100s
 EOF
 ```
 
@@ -136,7 +114,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-You should be rate limited after several requests to the LLM because we will have hit our token-based rate limit of 10 input tokens per hour
+You should be rate limited on the second request to LLM because we will have hit our token-based rate limit of 1 input tokens per 100s
 
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
@@ -146,7 +124,7 @@ kubectl logs deploy/gloo-agentgateway -n gloo-system --tail 1
 
 Example output, you should see that the `http.status=429`
 ```
-2025-09-24T18:24:36.916204Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai src.addr=10.42.0.1:41015 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=429 trace.id=0e107053e94f6759febedbd0992c95ce span.id=414ed2d771f63b5a duration=0ms
+2025-10-20T17:12:35.122531Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai src.addr=10.42.0.1:42671 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=429 trace.id=3ad6e9fbc49d0ec2dceda4ec85d411f8 span.id=df920a4246c1b338 error="rate limit exceeded" duration=0ms
 ```
 
 ## Port-forward to Jaeger UI to view traces
@@ -158,12 +136,18 @@ Navigate to http://localhost:16686 in your browser, you should be able to see tr
 
 - The rate limited requests should have been rejected with a `http.status` of `429`
 
+## Local vs. Global Rate Limiting
+Local rate limiting shown in this lab is enforced directly on each proxy, with every replica maintaining its own independent counter. This makes it useful as a coarse-grained, first line of defense to shed excess traffic before it reaches backend services or global rate limit servers.
+
+Global rate limiting, by contrast, is enforced by a central service that all proxies consult. This allows requests across all proxies and replicas to share the same counter, enabling consistent, tenant-wide quotas and more fine-grained policies. Global limits can also incorporate request metadata such as headers or JWT claims for advanced API management scenarios.
+
+Next, we’ll explore how to configure global rate limiting using the Gloo Rate Limit server.
+
 
 ## Cleanup
 ```bash
 kubectl delete httproute -n gloo-system openai
 kubectl delete backend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
-kubectl delete glootrafficpolicy -n gloo-system token-based-rate-limit
-kubectl delete rlc -n gloo-system token-based-rate-limit
+kubectl delete glootrafficpolicy -n gloo-system local-token-based-rate-limit
 ```
