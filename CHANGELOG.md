@@ -1,5 +1,9 @@
 # Changelog
 
+0.1.6 - (10-30-25)
+---
+- Added logging field options to `agent-gateway-config` configmap in `002` to capture all request headers (map or flattened) or extract specific headers. Default set to map with all headers
+
 0.1.5 - (10-20-25)
 ---
 - Rename `015` lab to `016-global-token-based-rate-limiting.md`
