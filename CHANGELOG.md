@@ -1,5 +1,9 @@
 # Changelog
 
+0.1.7 - (11-4-25)
+---
+- Update to Gloo Gateway 2.0.1
+
 0.1.6 - (10-30-25)
 ---
 - Added logging field options to `agent-gateway-config` configmap in `002` to capture all request headers (map or flattened) or extract specific headers. Default set to map with all headers
