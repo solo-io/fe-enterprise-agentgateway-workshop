@@ -15,7 +15,7 @@ kubectl apply -f- <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: agent-gateway-config
+  name: agentgateway-config
   namespace: gloo-system
 data:
   config.yaml: |-
@@ -41,14 +41,14 @@ data:
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooGatewayParameters
 metadata:
-  name: gloo-agentgateway-params
+  name: agentgateway-params
   namespace: gloo-system
 spec:
   kube:
     agentgateway:
       enabled: true
       logLevel: info
-      customConfigMapName: agent-gateway-config
+      customConfigMapName: agentgateway-config
       #--- Image overrides for deployment ---
       #image:  
       #  tag: ""
@@ -66,13 +66,13 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: gloo-agentgateway
+  name: agentgateway
   namespace: gloo-system
 spec:
   gatewayClassName: agentgateway-enterprise
   infrastructure:
     parametersRef:
-      name: gloo-agentgateway-params
+      name: agentgateway-params
       group: gloo.solo.io
       kind: GlooGatewayParameters
   listeners:

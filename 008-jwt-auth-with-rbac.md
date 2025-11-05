@@ -26,7 +26,7 @@ metadata:
   namespace: gloo-system
 spec:
   parentRefs:
-    - name: gloo-agentgateway
+    - name: agentgateway
       namespace: gloo-system
   rules:
     - matches:
@@ -61,7 +61,7 @@ EOF
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=gloo-agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -88,7 +88,7 @@ spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: gloo-agentgateway
+      name: agentgateway
   glooJWT:
     beforeExtAuth:
       providers:
@@ -177,7 +177,7 @@ rbac:
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/gloo-agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n gloo-system --tail 1
 ```
 
 ## Port-forward to Jaeger UI to view traces
