@@ -1,5 +1,9 @@
 # Changelog
 
+0.1.8 - (11-5-25)
+---
+- Capture full request headers (`request.headers`) and JWT claims (`jwt`) in logs/traces.
+
 0.1.7 - (11-4-25)
 ---
 - Update to Gloo Gateway 2.0.1
