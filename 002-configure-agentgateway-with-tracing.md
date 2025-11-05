@@ -25,6 +25,8 @@ data:
           add:
             # --- Capture all request headers as a single map under rq.headers.all
             rq.headers.all: 'request.headers'
+            # --- Capture claims from a verified JWT token if JWT policy is enabled
+            jwt: 'jwt'
             # --- Capture all request headers as individual keys (flattened)
             #rq.headers: 'flatten(request.headers)'
             # --- Capture a single header by name (example: x-foo)
@@ -48,6 +50,8 @@ data:
             gen_ai.request.model: 'llm.response_model'
             gen_ai.response.model: 'llm.response_model'
             gen_ai.request: 'flatten(llm.params)'
+            rq.headers.all: 'request.headers'
+            jwt: 'jwt'
 ---
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooGatewayParameters
