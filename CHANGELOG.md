@@ -3,6 +3,8 @@
 0.1.7 - (11-4-25)
 ---
 - Update to Gloo Gateway 2.0.1
+- Add new lab: `017-route-to-mcp-server.md` for basic demo of MCP connectivity
+- change `Gateway` name from `gloo-agentgateway` to `agentgateway` to match docs
 
 0.1.6 - (10-30-25)
 ---

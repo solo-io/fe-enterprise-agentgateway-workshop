@@ -15,7 +15,7 @@ kubectl apply -f- <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: agent-gateway-config
+  name: agentgateway-config
   namespace: gloo-system
 data:
   config.yaml: |-
@@ -52,14 +52,14 @@ data:
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooGatewayParameters
 metadata:
-  name: gloo-agentgateway-params
+  name: agentgateway-params
   namespace: gloo-system
 spec:
   kube:
     agentgateway:
       enabled: true
       logLevel: info
-      customConfigMapName: agent-gateway-config
+      customConfigMapName: agentgateway-config
       #--- Image overrides for deployment ---
       #image:  
       #  tag: ""
@@ -76,13 +76,13 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: gloo-agentgateway
+  name: agentgateway
   namespace: gloo-system
 spec:
   gatewayClassName: agentgateway-enterprise
   infrastructure:
     parametersRef:
-      name: gloo-agentgateway-params
+      name: agentgateway-params
       group: gloo.solo.io
       kind: GlooGatewayParameters  
   listeners:
@@ -105,9 +105,9 @@ Expected Output:
 
 ```bash
 NAME                                                        READY   STATUS    RESTARTS   AGE
-ext-auth-service-agentgateway-enterprise-5b5bcdc7fb-769ts   1/1     Running   0          28s
-gloo-agentgateway-85fd5c587f-96b7p                          1/1     Running   0          29s
-gloo-ext-cache-agentgateway-enterprise-59dc8ccf7b-5q5b6     1/1     Running   0          29s
-gloo-gateway-6989b69f49-7q7db                               1/1     Running   0          52s
-rate-limiter-agentgateway-enterprise-9fd599685-cpdsr        1/1     Running   0          28s
+agentgateway-55ccdfb97f-vgj4t                               1/1     Running   0          22s
+ext-auth-service-agentgateway-enterprise-76f699bd4d-8sm2b   1/1     Running   0          21s
+gloo-ext-cache-agentgateway-enterprise-6d9fb97dc8-dn75s     1/1     Running   0          22s
+gloo-gateway-6b589f4849-sqw6q                               1/1     Running   0          3m17s
+rate-limiter-agentgateway-enterprise-5cc6d9586b-rxj9r       1/1     Running   0          21s
 ```
