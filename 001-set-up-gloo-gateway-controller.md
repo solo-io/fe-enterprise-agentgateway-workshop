@@ -84,8 +84,8 @@ trafficpolicies.gateway.kgateway.dev
 helm upgrade -i -n gloo-system gloo-gateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/gloo-gateway \
 --create-namespace \
 --version $GLOO_VERSION \
---set licensing.glooGatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
---set licensing.agentgatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
+--set-string licensing.glooGatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
+--set-string licensing.agentgatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 imagePullSecrets: []
 nameOverride: ""
