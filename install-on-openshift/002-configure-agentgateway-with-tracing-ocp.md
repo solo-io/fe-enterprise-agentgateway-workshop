@@ -20,6 +20,18 @@ metadata:
 data:
   config.yaml: |-
     config: 
+      logging:
+        fields:
+          add:
+            # --- Capture all request headers as a single map under rq.headers.all
+            rq.headers.all: 'request.headers'
+            # --- Capture claims from a verified JWT token if JWT policy is enabled
+            jwt: 'jwt'
+            # --- Capture all request headers as individual keys (flattened)
+            #rq.headers: 'flatten(request.headers)'
+            # --- Capture a single header by name (example: x-foo)
+            #x-foo: 'request.headers["x-foo"]'
+        format: json
       tracing: 
         otlpProtocol: grpc
         otlpEndpoint: http://jaeger-collector.observability.svc.cluster.local:4317
@@ -37,6 +49,8 @@ data:
             gen_ai.request.model: 'llm.response_model'
             gen_ai.response.model: 'llm.response_model'
             gen_ai.request: 'flatten(llm.params)'
+            rq.headers.all: 'request.headers'
+            jwt: 'jwt'
 ---
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooGatewayParameters
