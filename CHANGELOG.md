@@ -4,7 +4,7 @@
 ---
 - Match OCP logging/tracing config to the standard setup
 - Update Gloo Gateway V2 install to use `--set-string` instead of `--set` which matches how license keys for other Solo.io products are documented
-- Simplify the Helm install values in `001` to a more narrow set of configuration options
+- Simplify the Helm install values in `001`
 - Added new lab: `003-configure-mock-openai-server.md` to validate core functionality using a mock OpenAI server before testing with OpenAI directly
 - Renamed basic routing to OpenAI lab from `003-` to `004-configure-basic-routing-to-openai.md`
 - Update README.md table of contents
