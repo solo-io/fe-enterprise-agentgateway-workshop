@@ -3,7 +3,7 @@
 0.1.9 - (11-10-25)
 ---
 - Match OCP logging/tracing config to the standard setup
-- Update Gloo Gateway V2 install to use `--set-string` instead of `--set`
+- Update Gloo Gateway V2 install to use `--set-string` instead of `--set` which matches how license keys for other Solo.io products are documented
 
 0.1.8 - (11-5-25)
 ---
