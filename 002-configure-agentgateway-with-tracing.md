@@ -36,8 +36,7 @@ data:
         otlpProtocol: grpc
         otlpEndpoint: http://jaeger-collector.observability.svc.cluster.local:4317
         randomSampling: 'true'
-        headers:
-          headers.all: 'request.headers'
+        headers: {}
         fields:
           add:
             gen_ai.operation.name: '"chat"'
