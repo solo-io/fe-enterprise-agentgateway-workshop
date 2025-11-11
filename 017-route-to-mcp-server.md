@@ -139,7 +139,7 @@ kubectl logs deploy/agentgateway -n gloo-system --tail 1
 
 Example output
 ```
-{"level":"info","time":"2025-11-04T23:47:16.481036Z","scope":"request","gateway":"gloo-system/gloo-agentgateway","listener":"http","route":"gloo-system/mcp","src.addr":"10.42.0.1:1631","http.method":"POST","http.host":"192.168.107.2","http.path":"/mcp","http.version":"HTTP/1.1","http.status":200,"trace.id":"9f000726164f9b8a7dd76ceda28fae01","span.id":"854183e460b0b1c2","mcp.method":"tools/call","mcp.target":"mcp-target","mcp.resource":"tool","mcp.resource.name":"fetch","duration":"716ms","rq.headers.all":{"accept-language":"*","accept-encoding":"gzip, deflate","content-length":"141","content-type":"application/json","authorization":"Bearer Bearer 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","mcp-session-id":"6499251e-4e2f-4c8b-83ba-f8b6f6f769fc","user-agent":"node","accept":"application/json, text/event-stream","sec-fetch-mode":"cors"}}
+{"level":"info","time":"2025-11-11T18:11:19.747638Z","scope":"request","gateway":"gloo-system/agentgateway","listener":"http","route":"gloo-system/mcp","src.addr":"10.42.0.1:65003","http.method":"POST","http.host":"192.168.107.2","http.path":"/mcp","http.version":"HTTP/1.1","http.status":200,"trace.id":"ba8e0e8c4138978666eecdc5d494f00a","span.id":"b9a6ff1a457183f3","mcp.method":"tools/call","mcp.target":"mcp-target","mcp.resource":"tool","mcp.resource.name":"fetch","duration":"476ms","rq.headers.all":{"accept-encoding":"gzip, deflate","user-agent":"node","sec-fetch-mode":"cors","mcp-session-id":"0d1ce700-447b-49e3-a97a-212a2b091ca1","content-length":"140","content-type":"application/json","accept-language":"*","accept":"application/json, text/event-stream"}}
 ```
 
 ## Port-forward to Jaeger UI to view traces
@@ -147,7 +147,7 @@ Example output
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```
 
-Navigate to http://localhost:16686 in your browser, you should be able to see traces for agentgateway that include information such as `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
+Navigate to http://localhost:16686 in your browser, you should be able to see traces for agentgateway that include information such as `mcp.method`, `mcp.resource`, `mcp.resource.name`, `mcp.target`, and more
 
 ## Cleanup
 ```bash

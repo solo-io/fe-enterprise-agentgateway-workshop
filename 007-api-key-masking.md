@@ -82,7 +82,15 @@ curl -i "$GATEWAY_IP:8080/openai" \
 kubectl apply -f- <<EOF
 apiVersion: v1
 data:
+  # consider this as a vanity api-key
+  # api-key auth expects key "api-key" and is not configurable
+  # dGVhbTEta2V5 is "team1-key" base64 encoded
   api-key: dGVhbTEta2V5
+  #
+  # headersFromMetadataEntry can be used to inject additional headers
+  # here we add x-org
+  # the following is "developers" base64 encoded
+  x-org: ZGV2ZWxvcGVycw==
 kind: Secret
 metadata:
   labels:
@@ -101,9 +109,21 @@ spec:
     - apiKeyAuth:
         # The request header name that holds the API key.
         # This field is optional and defaults to api-key if not present.
-        headerName: authorization
-        labelSelector:
-          llm-provider: openai
+        headerName: vanity-auth
+        k8sSecretApikeyStorage:
+          # can use label selector to select secret(s) that hold api-keys
+          #labelSelector:
+          #  llm-provider: openai
+          # can also directly reference specific secret by name
+          apiKeySecretRefs:
+            - name: team1-apikey
+              namespace: gloo-system
+        # additional headers to inject from secret entries
+        # key is the header name to add to the request
+        # value.name is the key in the secret to read the value from
+        headersFromMetadataEntry:
+          x-org:
+            name: x-org
 ---
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooTrafficPolicy
@@ -144,7 +164,7 @@ Make a curl request to the OpenAI endpoint, this time with the header `Authoriza
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
-  -H "Authorization: team1-key" \
+  -H "vanity-auth: team1-key" \
   -d '{
     "model": "gpt-4o-mini",
     "messages": [
