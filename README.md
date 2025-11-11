@@ -20,6 +20,7 @@
 - [014-request-based-rate-limiting.md](014-request-based-rate-limiting.md)
 - [015-local-token-based-rate-limiting.md](015-local-token-based-rate-limiting.md)
 - [016-global-token-based-rate-limiting.md](016-global-token-based-rate-limiting.md)
+- [017-mcp.md](017-mcp.md)
 
 # Use Cases
 - Support Kubernetes Gateway API

@@ -3,7 +3,9 @@
 0.2.0 - (11-11-25)
 ---
 - Enhanced lab: `007` API-key masking
-- Enhanced lab: `017` route to MCP server
+- Renamed lab: `017-route-to-mcp-server.md` to `017-mcp.md`
+- Enhanced lab: `017-mcp.md` with examples of JWT auth and RBAC on claims and tools using CEL expressions
+- Update README.md table of contents
 
 0.1.9 - (11-10-25)
 ---
