@@ -1,5 +1,12 @@
 # Changelog
 
+0.2.1 - (11-12-25)
+---
+- Renamed lab: `017-mcp.md` to `018-mcp.md`
+- Added new lab: `017-transformations.md` to showcase transformation capabilities
+- Simplify the Helm install values in `install-on-openshift/001`
+- Update README.md table of contents
+
 0.2.0 - (11-11-25)
 ---
 - Enhanced lab: `007` API-key masking

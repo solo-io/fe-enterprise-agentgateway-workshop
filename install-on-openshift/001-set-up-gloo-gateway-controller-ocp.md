@@ -87,47 +87,11 @@ helm upgrade -i -n gloo-system gloo-gateway oci://us-docker.pkg.dev/solo-public/
 --set licensing.glooGatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
 --set licensing.agentgatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
 -f -<<EOF
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: "gloo-gateway"
-serviceAccount:
-  create: true
-  annotations: {}
-  name: ""
-deploymentAnnotations: {}
-podAnnotations:
-  prometheus.io/scrape: "true"
-podSecurityContext: {}
-securityContext: {}
-resources: {}
-nodeSelector: {}
-tolerations: []
-affinity: {}
-controller:
-  replicaCount: 1
-  logLevel: info
-  #--- Image overrides for controller deployment ---
-  #image:
-  #  registry: ""
-  #  repository: gloo-gateway-controller
-  #  pullPolicy: ""
-  #  tag: ""
-  service:
-    type: ClusterIP
-    ports:
-      grpc: 9977
-      health: 9093
-      metrics: 9092
-  extraEnv: {}
-#--- Image overrides for deployment ---
-image:
-  registry: us-docker.pkg.dev/solo-public/gloo-gateway
-  tag: "$GLOO_VERSION"
-  pullPolicy: IfNotPresent
-inferenceExtension:
-  enabled: false
-  autoProvision: false
-discoveryNamespaceSelectors: []
+#--- Optional: global override for image registry/tag
+#image:
+#  registry: us-docker.pkg.dev/solo-public/gloo-gateway
+#  tag: "$GLOO_VERSION"
+#  pullPolicy: IfNotPresent
 #--- Enable integration with agentgateway ---
 agentgateway:
   enabled: true
