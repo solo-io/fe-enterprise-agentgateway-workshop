@@ -20,6 +20,10 @@ metadata:
 data:
   config.yaml: |-
     config: 
+      metrics:
+        fields:
+          add:
+            modelId: json(request.body).modelId
       logging:
         fields:
           add:
@@ -31,6 +35,10 @@ data:
             #rq.headers: 'flatten(request.headers)'
             # --- Capture a single header by name (example: x-foo)
             #x-foo: 'request.headers["x-foo"]'
+            # --- Capture entire request body
+            #request.body: json(request.body)
+            # --- Capture a field in the request body
+            #request.body: json(request.body).modelId
         format: json
       tracing: 
         otlpProtocol: grpc
@@ -64,8 +72,8 @@ spec:
       logLevel: info
       customConfigMapName: agentgateway-config
       #--- Image overrides for deployment ---
-      #image:  
-      #  tag: ""
+      image:  
+        tag: "0.10.3"
     #--- Adding sample annotation specific to AWS env ---
     service:
       extraAnnotations:
