@@ -5,6 +5,7 @@
 - agentgateway: Added example demonstrating how to label all metrics using a value extracted from the request body (`json(request.body).modelId`) (commented out for now until a later release)
 - agentgateway: Added example of capturing full request body in access logs (commented out for now until a later release)
 - agentgateway: Added example of capturing `modelId` field from request body in access logs, as an example filtering on specific fields of the request body (commented out for now until a later release)
+- agentgateway: add comments in the configmap to describe the behavior above
 
 
 0.2.1 - (11-12-25)

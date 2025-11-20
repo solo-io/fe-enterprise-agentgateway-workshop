@@ -20,6 +20,7 @@ metadata:
 data:
   config.yaml: |-
     config: 
+      # --- Label all metrics using a value extracted from the request body
       #metrics:
       #  fields:
       #    add:
@@ -57,8 +58,12 @@ data:
             gen_ai.request.model: 'llm.response_model'
             gen_ai.response.model: 'llm.response_model'
             gen_ai.request: 'flatten(llm.params)'
+            # --- Capture all request headers as a single map under rq.headers.all
             rq.headers.all: 'request.headers'
+            # --- Capture claims from a verified JWT token if JWT policy is enabled
             jwt: 'jwt'
+            # --- Capture the whole response body as JSON
+            #response.body: 'json(response.body)'
 ---
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooGatewayParameters
