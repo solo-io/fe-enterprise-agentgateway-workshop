@@ -20,6 +20,11 @@ metadata:
 data:
   config.yaml: |-
     config: 
+      # --- Label all metrics using a value extracted from the request body
+      #metrics:
+      #  fields:
+      #    add:
+      #      modelId: json(request.body).modelId
       logging:
         fields:
           add:
@@ -31,6 +36,10 @@ data:
             #rq.headers: 'flatten(request.headers)'
             # --- Capture a single header by name (example: x-foo)
             #x-foo: 'request.headers["x-foo"]'
+            # --- Capture entire request body
+            #request.body: json(request.body)
+            # --- Capture a field in the request body
+            #request.body.modelId: json(request.body).modelId
         format: json
       tracing: 
         otlpProtocol: grpc
@@ -49,8 +58,12 @@ data:
             gen_ai.request.model: 'llm.response_model'
             gen_ai.response.model: 'llm.response_model'
             gen_ai.request: 'flatten(llm.params)'
+            # --- Capture all request headers as a single map under rq.headers.all
             rq.headers.all: 'request.headers'
+            # --- Capture claims from a verified JWT token if JWT policy is enabled
             jwt: 'jwt'
+            # --- Capture the whole response body as JSON
+            #response.body: 'json(response.body)'
 ---
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooGatewayParameters
@@ -65,7 +78,7 @@ spec:
       customConfigMapName: agentgateway-config
       #--- Image overrides for deployment ---
       #image:  
-      #  tag: ""
+      #  tag: "0.10.3"
     #--- Adding sample annotation specific to AWS env ---
     service:
       extraAnnotations:

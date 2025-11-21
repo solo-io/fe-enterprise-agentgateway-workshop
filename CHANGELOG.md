@@ -1,5 +1,14 @@
 # Changelog
 
+0.2.2 - (11-21-25)
+---
+- agentgateway: Added example demonstrating how to label all metrics using a value extracted from the request body (`json(request.body).modelId`) (commented out for now until a later release)
+- agentgateway: Added example of capturing full request body in access logs (commented out for now until a later release)
+- agentgateway: Added example of capturing `modelId` field from request body in access logs, as an example filtering on specific fields of the request body (commented out for now until a later release)
+- agentgateway: add comments in the configmap to describe the behavior above
+- Added new lab: `019-configure-direct-response.md` to showcase direct response capabilities
+
+
 0.2.1 - (11-12-25)
 ---
 - Renamed lab: `017-mcp.md` to `018-mcp.md`
