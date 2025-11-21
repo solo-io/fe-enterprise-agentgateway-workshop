@@ -1,8 +1,8 @@
 # Gloo Gateway V2 + Agentgateway Workshop
 
 # Labs
-- [001-set-up-gloo-gateway-controller.md](001-set-up-gloo-gateway-controller.md)
-- [002-configure-agentgateway-with-tracing.md](002-configure-agentgateway-with-tracing.md)
+- [001-set-up-gloo-gateway-with-agentgateway.md](001-set-up-gloo-gateway-with-agentgateway.md)
+- [002-set-up-monitoring-tools.md](002-set-up-monitoring-tools.md)
 - [003-configure-mock-openai-server.md](003-configure-mock-openai-server.md)
 - [004-configure-basic-routing-to-openai.md](004-configure-basic-routing-to-openai.md)
 - [004a-path-per-model-routing-example.md](004a-path-per-model-routing-example.md)
