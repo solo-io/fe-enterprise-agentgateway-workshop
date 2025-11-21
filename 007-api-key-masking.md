@@ -187,12 +187,18 @@ Agentgateway enterprise automatically logs information about the LLM request to 
 kubectl logs deploy/agentgateway -n gloo-system --tail 1
 ```
 
+## Port-forward to Grafana UI to view traces
+Default credentials are admin:prom-operator
+```bash
+kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
+```
+
 ## Port-forward to Jaeger UI to view traces
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```
 
-Navigate to http://localhost:16686 in your browser, you should be able to see traces for our recent requests
+Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you should be able to see traces for our recent requests
 
 - The request without an api-key should have been rejected with a `http.status` of `403` and an `error` with `authorization failed`
 - The request with an api-key should be successful and you should see information such as `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more

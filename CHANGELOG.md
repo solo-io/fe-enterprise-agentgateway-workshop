@@ -1,5 +1,14 @@
 # Changelog
 
+0.2.3 - (11-21-25)
+---
+- update `001` to cover the setup of Gloo Gateway control plane and agentgateway in one lab, renamed `001-set-up-gloo-gateway-with-agentgateway.md`
+- update `002` to cover the setup of monitoring tools, renamed `002-set-up-monitoring-tools.md`
+- updated README to reflect these changes in the TOC
+- Added Grafana, Loki, Tempo setup instructions to `002`
+- Changed default agentgateway configmap to use Tempo setup, leaving Jaeger config as optionally configurable (commented out in config)
+- Add section on how to port-forward to Grafana UI
+
 0.2.2 - (11-21-25)
 ---
 - agentgateway: Added example demonstrating how to label all metrics using a value extracted from the request body (`json(request.body).modelId`) (commented out for now until a later release)
