@@ -1,6 +1,6 @@
 # Changelog
 
-0.2.2 - (11-20-25)
+0.2.2 - (11-21-25)
 ---
 - agentgateway: Added example demonstrating how to label all metrics using a value extracted from the request body (`json(request.body).modelId`) (commented out for now until a later release)
 - agentgateway: Added example of capturing full request body in access logs (commented out for now until a later release)
