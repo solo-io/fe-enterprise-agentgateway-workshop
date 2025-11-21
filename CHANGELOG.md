@@ -7,6 +7,7 @@
 - updated README to reflect these changes in the TOC
 - Added Grafana, Loki, Tempo setup instructions to `002`
 - Changed default agentgateway configmap to use Tempo setup, leaving Jaeger config as optionally configurable (commented out in config)
+- Add section on how to port-forward to Grafana UI
 
 0.2.2 - (11-21-25)
 ---

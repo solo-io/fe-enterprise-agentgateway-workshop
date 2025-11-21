@@ -376,12 +376,18 @@ INFO:     10.42.0.10:40274 - "POST /request HTTP/1.1" 200 OK
 2025-09-23 19:10:14,935 [INFO] ✅ PassAction returned (request)
 ```
 
+## Port-forward to Grafana UI to view traces
+Default credentials are admin:prom-operator
+```bash
+kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
+```
+
 ## Port-forward to Jaeger UI to view traces
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```
 
-Navigate to http://localhost:16686 in your browser, you should be able to see that our rejected responses have a `http.status` of `403` and for our masked responses the `gen_ai.completion` tag will show the masked value
+Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you should be able to see that our rejected responses have a `http.status` of `403` and for our masked responses the `gen_ai.completion` tag will show the masked value
 
 Example of a masked response trace in Jaeger
 ```
