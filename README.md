@@ -22,6 +22,7 @@
 - [016-global-token-based-rate-limiting.md](016-global-token-based-rate-limiting.md)
 - [017-transformations.md](017-transformations.md)
 - [018-mcp.md](018-mcp.md)
+- [019-configure-direct-response.md](019-configure-direct-response.md)
 
 # Use Cases
 - Support Kubernetes Gateway API

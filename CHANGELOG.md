@@ -6,6 +6,7 @@
 - agentgateway: Added example of capturing full request body in access logs (commented out for now until a later release)
 - agentgateway: Added example of capturing `modelId` field from request body in access logs, as an example filtering on specific fields of the request body (commented out for now until a later release)
 - agentgateway: add comments in the configmap to describe the behavior above
+- Added new lab: `019-configure-direct-response.md` to showcase direct response capabilities
 
 
 0.2.1 - (11-12-25)
