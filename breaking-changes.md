@@ -5,7 +5,107 @@
 - `018-mcp.md` - fails RBAC when using `mcp.tool.name`, seems like this may have changed to `mcp.resource.name` however when testing with that it also still fails
 
 
+### Breaking Changes: `Backend` → `AgentgatewayBackend`
 
+- Removed `spec.type: AI`
+- Replaced `spec.ai.llm` with `spec.ai.provider`
+- Flattened endpoint fields:
+  - `ai.llm.host` → `ai.host`
+  - `ai.llm.port` → `ai.port`
+  - `ai.llm.path.full` → `ai.path`
+- Authentication schema updated:
+  - `authToken.kind: Passthrough` → `policies.auth.passthrough`
+
+### Other Notable Changes
+
+- HTTPRoute backend reference updated:
+  - `kind: Backend` → `kind: AgentgatewayBackend`
+- Provider configuration moved:
+  - `ai.llm.openai.model` → `ai.provider.openai.model`
+
+Example Backend before:
+```
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: Backend
+metadata:
+  name: openai-all-models
+  namespace: gloo-system
+spec:
+  type: AI
+  ai:
+    llm:
+      openai:
+        #--- Uncomment to configure model override ---
+        #model: ""
+        authToken:
+          kind: "SecretRef"
+          secretRef:
+            name: openai-secret
+```
+
+Example `AgentgatewayBackend` after:
+```
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: openai-all-models
+  namespace: gloo-system
+spec:
+  ai:
+    provider:
+      openai: {}
+        #--- Uncomment to configure model override ---
+        #model: ""
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+```
+
+### Breaking Changes: `GlooTrafficPolicy` → `AgentgatewayEnterprisePolicy`
+
+- Resource kind updated:
+  - `kind: GlooTrafficPolicy` → `kind: AgentgatewayEnterprisePolicy`
+- External Auth configuration moved:
+  - `spec.entExtAuth` → `spec.traffic.entExtAuth`
+- Policy now follows the Agentgateway enterprise policy schema
+
+**Before:**
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: GlooTrafficPolicy
+metadata:
+  name: api-key-auth
+  namespace: gloo-system
+spec:
+  targetRefs:
+    - name: agentgateway
+      group: gateway.networking.k8s.io
+      kind: Gateway
+  entExtAuth:
+    authConfigRef:
+      name: apikey-auth
+      namespace: gloo-system
+```
+
+After:
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: AgentgatewayEnterprisePolicy
+metadata:
+  name: api-key-auth
+  namespace: gloo-system
+spec:
+  targetRefs:
+    - name: agentgateway
+      group: gateway.networking.k8s.io
+      kind: Gateway
+  traffic:
+    entExtAuth:
+      authConfigRef:
+        name: apikey-auth
+        namespace: gloo-system
+```
 
 
 
