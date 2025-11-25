@@ -1,6 +1,8 @@
 # Labs currently not working
 - `006-configure-routing-to-aws-bedrock.md` - access to Bedrock failing with `backend authentication failed: the credential provider was not enabled `
+  - https://github.com/solo-io/gloo-gateway/issues/1132
 - `008-jwt-auth-with-rbac.md` - Remote JWKS fetch is failing with `jwks ConfigMap isn't available`
+  - https://github.com/solo-io/gloo-gateway/issues/1133
 - `013-advanced-guardrails-webhook.md` - seems like a bug here since they moved from specifying host to only supporting a backendRef
 - `018-mcp.md` - fails RBAC when using `mcp.tool.name`, seems like this may have changed to `mcp.resource.name` however when testing with that it also still fails
 
