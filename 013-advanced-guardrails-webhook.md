@@ -39,26 +39,25 @@ spec:
       backendRefs:
         - name: openai-all-models
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
-      openai:
+    provider:
+      openai: {}
         #--- Uncomment to configure model override ---
         #model: ""
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
@@ -154,9 +153,9 @@ kubectl get pods -n gloo-system -l app=ai-guardrail-webhook
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: gloo.solo.io/v1alpha1
-kind: GlooTrafficPolicy
+kind: AgentgatewayEnterprisePolicy
 metadata:
-  name: openai-opt
+  name: openai-prompt-guard
   namespace: gloo-system
   labels:
     app: agentgateway
@@ -165,21 +164,23 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: openai
-  ai:
-    promptGuard:
-      request:
-        customResponse:
-          message: "Your request was rejected due to inappropriate content"
-          statusCode: 403
-        webhook:
-          host:
-            host: "ai-guardrail-webhook.gloo-system.svc.cluster.local"
-            port: 8000
-      response:
-        webhook:
-          host:
-            host: "ai-guardrail-webhook.gloo-system.svc.cluster.local"
-            port: 8000
+  backend:
+    ai:
+      promptGuard:
+        request:
+          - webhook:
+              backendRef:
+                name: ai-guardrail-webhook
+                namespace: gloo-system
+                kind: Service
+                port: 8000
+        response:
+          - webhook:
+              backendRef:
+                name: ai-guardrail-webhook
+                namespace: gloo-system
+                kind: Service
+                port: 8000
 EOF
 ```
 

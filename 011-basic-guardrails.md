@@ -36,26 +36,25 @@ spec:
       backendRefs:
         - name: openai-all-models
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
-      openai:
+    provider:
+      openai: {}
         #--- Uncomment to configure model override ---
         #model: ""
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
@@ -79,28 +78,29 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ## Reject inappropriate requests
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: TrafficPolicy
+apiVersion: gloo.solo.io/v1alpha1
+kind: AgentgatewayEnterprisePolicy
 metadata:
   name: openai-prompt-guard
   namespace: gloo-system
   labels:
-    app: ai-gateway
+    app: agentgateway
 spec:
   targetRefs:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: openai
-  ai:
-    promptGuard:
-      request:
-        customResponse:
-          message: "Rejected due to inappropriate content"
-        regex:
-          action: REJECT
-          matches:
-          - pattern: "credit card"
-            name: "CC"
+  backend:
+    ai:
+      promptGuard:
+        request:
+        - response:
+            message: "Rejected due to inappropriate content"
+            statusCode: 403
+          regex:
+            action: REJECT
+            matches:
+            - "credit card"
 EOF
 ```
 
@@ -140,25 +140,26 @@ To avoid information from being leaked, we can also configure a prompt guard on 
 
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: TrafficPolicy
+apiVersion: gloo.solo.io/v1alpha1
+kind: AgentgatewayEnterprisePolicy
 metadata:
   name: openai-prompt-guard
   namespace: gloo-system
   labels:
-    app: ai-gateway
+    app: agentgateway
 spec:
   targetRefs:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: openai
-  ai:
-    promptGuard:
-      response:
-        regex:
-          action: MASK
-          builtins:
-          - CREDIT_CARD
+  backend:
+    ai:
+      promptGuard:
+        response:
+        - regex:
+            action: MASK
+            builtins:
+            - "CREDIT_CARD"
 EOF
 ```
 
@@ -179,8 +180,8 @@ curl -i "$GATEWAY_IP:8080/openai" \
 
 ## Cleanup
 ```bash
-kubectl delete trafficpolicy -n gloo-system openai-prompt-guard
+kubectl delete agentgatewayenterprisepolicy -n gloo-system openai-prompt-guard
 kubectl delete httproute -n gloo-system openai
-kubectl delete backend -n gloo-system openai-all-models
+kubectl delete agentgatewaybackend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
 ```

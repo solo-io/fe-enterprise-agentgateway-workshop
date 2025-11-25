@@ -101,28 +101,26 @@ spec:
       backendRefs:
         - name: mock-openai
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: mock-openai
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
+      openai:
+        model: "gpt-4o"
       host: mock-gpt-4o-svc.gloo-system.svc.cluster.local
       port: 8000
-      path:
-        full: "/v1/chat/completions"
-      openai:
-        #--- Uncomment to configure model override ---
-        model: "gpt-4o"
-        authToken:
-          kind: Passthrough
+      path: "/v1/chat/completions"
+  policies:
+    auth:
+      passthrough: {}
 EOF
 ```
 

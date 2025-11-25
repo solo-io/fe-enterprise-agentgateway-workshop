@@ -44,55 +44,52 @@ Create AWS Bedrock route and backend. For this setup we will configure multiple 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: bedrock-titan
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
       bedrock:
         model: amazon.titan-tg1-large
         region: us-west-2
-        auth:
-          type: Secret
-          secretRef:
-            name: bedrock-secret
+  policies:
+    auth:
+      secretRef:
+        name: bedrock-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: bedrock-haiku3.5
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
       bedrock:
         model: anthropic.claude-3-5-haiku-20241022-v1:0
         region: us-west-2
-        auth:
-          type: Secret
-          secretRef:
-            name: bedrock-secret
+  policies:
+    auth:
+      secretRef:
+        name: bedrock-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: bedrock-llama3-8b
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
       bedrock:
         model: meta.llama3-1-8b-instruct-v1:0
         region: us-west-2
-        auth:
-          type: Secret
-          secretRef:
-            name: bedrock-secret
+  policies:
+    auth:
+      secretRef:
+        name: bedrock-secret
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -113,7 +110,7 @@ spec:
       backendRefs:
         - name: bedrock-haiku3.5
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -123,7 +120,7 @@ spec:
       backendRefs:
         - name: bedrock-titan
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -133,7 +130,7 @@ spec:
       backendRefs:
         - name: bedrock-llama3-8b
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
     # catch-all will route to the bedrock titan upstream
@@ -144,7 +141,7 @@ spec:
       backendRefs:
         - name: bedrock-titan
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -219,8 +216,8 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 ## Cleanup
 ```bash
 kubectl delete httproute -n gloo-system bedrock
-kubectl delete backend -n gloo-system bedrock-titan
-kubectl delete backend -n gloo-system bedrock-haiku3.5
-kubectl delete backend -n gloo-system bedrock-llama3-8b
+kubectl delete agentgatewaybackend -n gloo-system bedrock-titan
+kubectl delete agentgatewaybackend -n gloo-system bedrock-haiku3.5
+kubectl delete agentgatewaybackend -n gloo-system bedrock-llama3-8b
 kubectl delete secret -n gloo-system bedrock-secret
 ```

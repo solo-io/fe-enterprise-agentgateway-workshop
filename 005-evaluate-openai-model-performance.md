@@ -37,26 +37,25 @@ spec:
       backendRefs:
         - name: openai-all-models
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
-      openai:
+    provider:
+      openai: {}
         #--- Uncomment to configure model override ---
         #model: ""
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
@@ -114,7 +113,7 @@ Feel free to review or test out the other evaluation examples in `/evaluations`
 ## Cleanup
 ```bash
 kubectl delete httproute -n gloo-system openai
-kubectl delete backend -n gloo-system openai-all-models
+kubectl delete agentgatewaybackend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
 rm -f promptfoo-errors.log
 ```

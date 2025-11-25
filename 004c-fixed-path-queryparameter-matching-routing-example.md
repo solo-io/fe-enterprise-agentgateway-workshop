@@ -21,55 +21,52 @@ Lets create an OpenAI backend per specific-model if you haven't already
 kubectl apply -f - <<EOF
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-3.5-turbo
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
       openai:
         #--- Uncomment to configure model override ---
         model: "gpt-3.5-turbo"
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-4o-mini
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
       openai:
         #--- Uncomment to configure model override ---
         model: "gpt-4o-mini"
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-4o
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
       openai:
         #--- Uncomment to configure model override ---
         model: "gpt-4o"
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
@@ -99,7 +96,7 @@ spec:
       backendRefs:
         - name: openai-gpt-3.5-turbo
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -113,7 +110,7 @@ spec:
       backendRefs:
         - name: openai-gpt-4o-mini
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -127,7 +124,7 @@ spec:
       backendRefs:
         - name: openai-gpt-4o
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -203,7 +200,7 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 ```bash
 kubectl delete httproute -n gloo-system openai
 kubectl delete secret -n gloo-system openai-secret
-kubectl delete backend -n gloo-system openai-gpt-3.5-turbo
-kubectl delete backend -n gloo-system openai-gpt-4o
-kubectl delete backend -n gloo-system openai-gpt-4o-mini
+kubectl delete agentgatewaybackend -n gloo-system openai-gpt-3.5-turbo
+kubectl delete agentgatewaybackend -n gloo-system openai-gpt-4o
+kubectl delete agentgatewaybackend -n gloo-system openai-gpt-4o-mini
 ```

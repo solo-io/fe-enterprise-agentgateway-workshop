@@ -37,26 +37,25 @@ spec:
       backendRefs:
         - name: openai-all-models
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
-      openai:
+    provider:
+      openai: {}
         #--- Uncomment to configure model override ---
         #model: ""
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
@@ -81,7 +80,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: gloo.solo.io/v1alpha1
-kind: GlooTrafficPolicy
+kind: AgentgatewayEnterprisePolicy
 metadata:
   name: openai-opt
   namespace: gloo-system
@@ -92,11 +91,12 @@ spec:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: openai
-  ai:
-    promptEnrichment:
-      prepend:
-      - role: system
-        content: "Return the response in JSON format"
+  backend:
+    ai:
+      prompt:
+        prepend:
+        - role: system
+          content: "Return the response in JSON format"
 EOF
 ```
 
@@ -157,7 +157,7 @@ We should also see that the `gen_ai.completion` tag shows the response was retur
 
 ## Cleanup
 ```bash
-kubectl delete glootrafficpolicy -n gloo-system openai-opt
+kubectl delete agentgatewayenterprisepolicy -n gloo-system openai-opt
 kubectl delete httproute -n gloo-system openai
 kubectl delete backend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret

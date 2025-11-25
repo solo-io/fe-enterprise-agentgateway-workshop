@@ -36,26 +36,25 @@ spec:
       backendRefs:
         - name: openai-all-models
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
-      openai:
+    provider:
+      openai: {}
         #--- Uncomment to configure model override ---
         #model: ""
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
@@ -81,21 +80,21 @@ The following policy will allow 1 token per 100s
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: gloo.solo.io/v1alpha1
-kind: GlooTrafficPolicy
+kind: AgentgatewayEnterprisePolicy
 metadata:
   name: local-token-based-rate-limit
   namespace: gloo-system
 spec:
   targetRefs:
-    - group: gateway.networking.k8s.io
+    - name: agentgateway
+      group: gateway.networking.k8s.io
       kind: Gateway
-      name: agentgateway
-  rateLimit:
-    local:
-      tokenBucket:
-        maxTokens: 1
-        tokensPerFill: 1
-        fillInterval: 100s
+  traffic:
+    rateLimit:
+      local:
+        - unit: Minutes
+          requests: 1
+          burst: 0          
 EOF
 ```
 
@@ -153,7 +152,7 @@ Next, we’ll explore how to configure global rate limiting using the Gloo Rate 
 ## Cleanup
 ```bash
 kubectl delete httproute -n gloo-system openai
-kubectl delete backend -n gloo-system openai-all-models
+kubectl delete agentgatewaybackend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
-kubectl delete glootrafficpolicy -n gloo-system local-token-based-rate-limit
+kubectl delete agentgatewayenterprisepolicy -n gloo-system local-token-based-rate-limit
 ```

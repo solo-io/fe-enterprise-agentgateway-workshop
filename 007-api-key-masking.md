@@ -36,26 +36,25 @@ spec:
       backendRefs:
         - name: openai-all-models
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
-      openai:
+    provider:
+      openai: {}
         #--- Uncomment to configure model override ---
         #model: ""
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
@@ -126,7 +125,7 @@ spec:
             name: x-org
 ---
 apiVersion: gloo.solo.io/v1alpha1
-kind: GlooTrafficPolicy
+kind: AgentgatewayEnterprisePolicy
 metadata:
   name: api-key-auth
   namespace: gloo-system
@@ -135,10 +134,11 @@ spec:
     - name: agentgateway
       group: gateway.networking.k8s.io
       kind: Gateway
-  glooExtAuth:
-    authConfigRef:
-      name: apikey-auth
-      namespace: gloo-system
+  traffic:
+    entExtAuth:
+      authConfigRef:
+        name: apikey-auth
+        namespace: gloo-system
 EOF
 ```
 
@@ -206,10 +206,10 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete glootrafficpolicy -n gloo-system api-key-auth
+kubectl delete agentgatewayenterprisepolicy -n gloo-system api-key-auth
 kubectl delete authconfig -n gloo-system apikey-auth
 kubectl delete secret -n gloo-system team1-apikey
 kubectl delete httproute -n gloo-system openai
-kubectl delete backend -n gloo-system openai-all-models
+kubectl delete agentgatewaybackend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
 ```

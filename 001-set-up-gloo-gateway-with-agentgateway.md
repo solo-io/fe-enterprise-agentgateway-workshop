@@ -45,7 +45,7 @@ referencegrants      refgrant     gateway.networking.k8s.io/v1beta1   true      
 Export your Gloo Trial license key variable and Gloo Gateway version
 ```bash
 export GLOO_TRIAL_LICENSE_KEY=$GLOO_TRIAL_LICENSE_KEY
-export GLOO_VERSION=2.0.1
+export GLOO_VERSION=2.1.0-beta.1
 ```
 
 ### Gloo Gateway CRDs
@@ -145,9 +145,11 @@ data:
             # --- Capture a single header by name (example: x-foo)
             #x-foo: 'request.headers["x-foo"]'
             # --- Capture entire request body
-            #request.body: json(request.body)
+            request.body: json(request.body)
             # --- Capture a field in the request body
             #request.body.modelId: json(request.body).modelId
+            # --- Capture entire response body
+            response.body: json(response.body)
         format: json
       tracing: 
         otlpProtocol: grpc
@@ -173,8 +175,12 @@ data:
             rq.headers.all: 'request.headers'
             # --- Capture claims from a verified JWT token if JWT policy is enabled
             jwt: 'jwt'
+            # --- Capture entire request body
+            request.body: json(request.body)
+            # --- Capture a field in the request body
+            #request.body.modelId: json(request.body).modelId
             # --- Capture the whole response body as JSON
-            #response.body: 'json(response.body)'
+            response.body: 'json(response.body)'
 ---
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooGatewayParameters
@@ -189,7 +195,7 @@ spec:
       customConfigMapName: agentgateway-config
       #--- Image overrides for deployment ---
       #image:  
-      #  tag: "0.10.3"
+      #  tag: ""
     #--- Adding sample annotation specific to AWS env ---
     service:
       extraAnnotations:

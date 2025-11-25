@@ -37,26 +37,25 @@ spec:
       backendRefs:
         - name: openai-all-models
           group: gateway.kgateway.dev
-          kind: Backend
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
 apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: gloo-system
 spec:
-  type: AI
   ai:
-    llm:
-      openai:
+    provider:
+      openai: {}
         #--- Uncomment to configure model override ---
         #model: ""
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
@@ -82,20 +81,21 @@ We’ll configure a `GlooTrafficPolicy` to capture a request header `x-user-id` 
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: gloo.solo.io/v1alpha1
-kind: GlooTrafficPolicy
+kind: AgentgatewayEnterprisePolicy
 metadata:
   name: openai-transformation
   namespace: gloo-system
 spec:
   targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: openai
-  transformation:     
-    response:
-      set:
-      - name: x-user-id
-        value: default(request.headers["x-user-id"], "anonymous")
+    - name: agentgateway
+      group: gateway.networking.k8s.io
+      kind: Gateway
+  traffic:
+    transformation:
+      response:
+        set:
+        - name: x-user-id
+          value: default(request.headers["x-user-id"], "anonymous")
 EOF
 ```
 
@@ -161,28 +161,29 @@ Here is the expected behavior of the transformation policy below
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: gloo.solo.io/v1alpha1
-kind: GlooTrafficPolicy
+kind: AgentgatewayEnterprisePolicy
 metadata:
   name: openai-transformation
   namespace: gloo-system
 spec:
   targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: openai
-  transformation:     
-    response:
-      set:
-      - name: x-user-id
-        value: default(request.headers["x-user-id"], "anonymous")
-      - name: x-llm-provider
-        value: llm.provider
-      - name: x-llm-request-model
-        value: llm.requestModel
-      - name: x-request-method
-        value: request.method
-      - name: x-request-path
-        value: request.path
+    - name: agentgateway
+      group: gateway.networking.k8s.io
+      kind: Gateway
+  traffic:
+    transformation:
+      response:
+        set:
+          - name: x-user-id
+            value: default(request.headers["x-user-id"], "anonymous")
+          - name: x-llm-provider
+            value: llm.provider
+          - name: x-llm-request-model
+            value: llm.requestModel
+          - name: x-request-method
+            value: request.method
+          - name: x-request-path
+            value: request.path
 EOF
 ```
 
@@ -227,8 +228,8 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete glootrafficpolicy -n gloo-system openai-transformation
+kubectl delete agentgatewayenterprisepolicy -n gloo-system openai-transformation
 kubectl delete httproute -n gloo-system openai
-kubectl delete backend -n gloo-system openai-all-models
+kubectl delete agentgatewaybackend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
 ```
