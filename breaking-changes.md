@@ -6,24 +6,31 @@
 - `013-advanced-guardrails-webhook.md` - seems like a bug here since they moved from specifying host to only supporting a backendRef
 - `018-mcp.md` - fails RBAC when using `mcp.tool.name`, seems like this may have changed to `mcp.resource.name` however when testing with that it also still fails
 
-
 ### Breaking Changes: `Backend` → `AgentgatewayBackend`
 
-- Removed `spec.type: AI`
-- Replaced `spec.ai.llm` with `spec.ai.provider`
-- Flattened endpoint fields:
+- **Removed**
+  - `spec.type: AI`
+
+- **Replaced**
+  - `spec.ai.llm` → `spec.ai.provider`
+
+- **Provider configuration moved**
+  - `ai.llm.openai.model` → `ai.provider.openai.model`
+
+- **Changed LLM provider fields**
   - `ai.llm.host` → `ai.host`
   - `ai.llm.port` → `ai.port`
   - `ai.llm.path.full` → `ai.path`
-- Authentication schema updated:
-  - `authToken.kind: Passthrough` → `policies.auth.passthrough`
 
-### Other Notable Changes
+- **Authentication schema updated**
+  - `authToken.secretRef` → `policies.auth.secretRef`
+  - `authToken.kind: Passthrough` → `policies.auth.passthrough: {}`
 
-- HTTPRoute backend reference updated:
+- **Provider blocks now require explicit initialization**
+  - `openai:` → `openai: {}`
+
+- **HTTPRoute backend reference updated**
   - `kind: Backend` → `kind: AgentgatewayBackend`
-- Provider configuration moved:
-  - `ai.llm.openai.model` → `ai.provider.openai.model`
 
 Example Backend before:
 ```
@@ -40,7 +47,7 @@ spec:
         #--- Uncomment to configure model override ---
         #model: ""
         authToken:
-          kind: "SecretRef"
+          kind: SecretRef
           secretRef:
             name: openai-secret
 ```
@@ -66,13 +73,20 @@ spec:
 
 ### Breaking Changes: `GlooTrafficPolicy` → `AgentgatewayEnterprisePolicy`
 
-- Resource kind updated:
+- **Resource kind updated**
   - `kind: GlooTrafficPolicy` → `kind: AgentgatewayEnterprisePolicy`
-- External Auth configuration moved:
-  - `spec.entExtAuth` → `spec.traffic.entExtAuth`
-- Policy now follows the Agentgateway enterprise policy schema
 
-**Before:**
+- **The following is now moved under spec.traffic**
+  - `spec.glooJWT` → `traffic.jwtAuthentication`
+  - `spec.rbac` → `traffic.authorization`
+  - `spec.glooRateLimit` → `spec.traffic.entRateLimit`
+  - `spec.entExtAuth` → `spec.traffic.entExtAuth`
+
+- **The following is now moved under spec.backend**
+  - Guardrails & moderation → `backend.ai.promptGuard`
+  - Webhooks → `backend.ai.promptGuard.request[].webhook.backendRef`
+
+API Key Auth Before:
 ```yaml
 apiVersion: gloo.solo.io/v1alpha1
 kind: GlooTrafficPolicy
@@ -90,7 +104,7 @@ spec:
       namespace: gloo-system
 ```
 
-After:
+API Key Auth After:
 ```yaml
 apiVersion: gloo.solo.io/v1alpha1
 kind: AgentgatewayEnterprisePolicy
@@ -109,74 +123,328 @@ spec:
         namespace: gloo-system
 ```
 
-
-
-# 001
-```
-## 🔥 Breaking Changes
-
-- **GLOO_VERSION default updated**  
-  `2.0.1` → `2.1.0-beta.1`
-
-- **Access log schema changed**  
-  - `request.body` and `response.body` are now enabled by default (previously commented out)  
-  - New default field added: `response.body: json(response.body)`
-
-- **Duplicate log fields introduced**  
-  `request.body` appears in both the request and response logging sections, which may change log structure or increase log volume.
-
-- **Image override example removed**  
-  The sample image tag (`0.10.3`) was removed and replaced with an empty string, which may affect users who relied on the example for version pinning.
-```
-
-# 003
-```
-## 🔥 Breaking Changes
-
-- **Backend kind changed**  
-  `Backend` → `AgentgatewayBackend` (all `backendRefs` must be updated)
-
-- **Spec structure rewritten**  
-  - Old: `spec.type: AI` + `spec.ai.llm`  
-  - New: `spec.ai.provider` (OpenAI provider block)  
-  This layout is **not backward-compatible**.
-
-- **Path field format changed**  
-  - Old: `path.full: "/v1/chat/completions"`  
-  - New: `path: "/v1/chat/completions"`
-
-- **Auth configuration changed**  
-  - Old: `authToken.kind: Passthrough`  
-  - New: `policies.auth.passthrough: {}`
-
-- **`host` / `port` relocated**  
-  Moved under the new `spec.ai` hierarchy (no longer under `llm`).
+JWT Auth Before:
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: GlooTrafficPolicy
+metadata:
+  name: agentgateway-jwt-auth
+  namespace: gloo-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: agentgateway
+  glooJWT:
+    beforeExtAuth:
+      providers:
+        selfminted:
+          issuer: https://dev.example.com
+          jwks:
+            local:
+              key: |
+                <key>
+  rbac:
+    policy:
+      matchExpressions:
+        - '(jwt.org == "internal") && (jwt.group == "engineering")'
 ```
 
-# 004
+JWT Auth After:
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: AgentgatewayEnterprisePolicy
+metadata:
+  name: agentgateway-jwt-auth
+  namespace: gloo-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: agentgateway
+  traffic:
+    jwtAuthentication:
+      mode: Strict
+      providers:
+        - issuer: solo.io
+          jwks:
+            inline: |
+                <key>
+    authorization:
+      policy:
+        matchExpressions:
+          - '(jwt.org == "solo.io") && (jwt.team == "team-id")'
 ```
-## 🔥 Breaking Changes
 
-- **Backend kind updated**  
-  `Backend` → `AgentgatewayBackend` (must update all `backendRefs`)
-
-- **Spec structure replaced**  
-  - Old hierarchy: `spec.type: AI` + `spec.ai.llm.openai`  
-  - New hierarchy: `spec.ai.provider.openai`  
-  This restructuring is **not backward-compatible**.
-
-- **Auth configuration moved and renamed**  
-  - Old:  
-    `authToken.kind: SecretRef`  
-    `authToken.secretRef.name: openai-secret`  
-  - New:  
-    `policies.auth.secretRef.name: openai-secret`
-
-- **Removal of `type: AI`**  
-  Backend type is now inferred automatically; the explicit field is no longer supported.
-
-- **OpenAI block initialization changed**  
-  Old: `llm.openai`  
-  New: `provider.openai: {}` (empty map required)
+Prompt Enrichment Before:
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: GlooTrafficPolicy
+metadata:
+  name: openai-opt
+  namespace: gloo-system
+  labels:
+    app: agentgateway
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: openai
+  ai:
+    promptEnrichment:
+      prepend:
+      - role: system
+        content: "Return the response in JSON format"
 ```
 
+Prompt enrichment after:
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: AgentgatewayEnterprisePolicy
+metadata:
+  name: openai-opt
+  namespace: gloo-system
+  labels:
+    app: agentgateway
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: openai
+  backend:
+    ai:
+      prompt:
+        prepend:
+        - role: system
+          content: "Return the response in JSON format"
+```
+
+Built-in Guardrails Before:
+```yaml
+apiVersion: gateway.kgateway.dev/v1alpha1
+kind: TrafficPolicy
+metadata:
+  name: openai-prompt-guard
+  namespace: gloo-system
+  labels:
+    app: ai-gateway
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: openai
+  ai:
+    promptGuard:
+      request:
+        customResponse:
+          message: "Rejected due to inappropriate content"
+        regex:
+          action: REJECT
+          matches:
+          - pattern: "credit card"
+            name: "CC"
+```
+
+Built-in Guardrails after:
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: AgentgatewayEnterprisePolicy
+metadata:
+  name: openai-prompt-guard
+  namespace: gloo-system
+  labels:
+    app: agentgateway
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: openai
+  backend:
+    ai:
+      promptGuard:
+        response:
+        - regex:
+            action: MASK
+            builtins:
+            - "CREDIT_CARD"
+```
+
+Webhook Guardrails before:
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: GlooTrafficPolicy
+metadata:
+  name: openai-opt
+  namespace: gloo-system
+  labels:
+    app: agentgateway
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: openai
+  ai:
+    promptGuard:
+      request:
+        customResponse:
+          message: "Your request was rejected due to inappropriate content"
+          statusCode: 403
+        webhook:
+          host:
+            host: "ai-guardrail-webhook.gloo-system.svc.cluster.local"
+            port: 8000
+      response:
+        webhook:
+          host:
+            host: "ai-guardrail-webhook.gloo-system.svc.cluster.local"
+            port: 8000
+```
+
+Webhook Guardrails after (regression - not working)
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: AgentgatewayEnterprisePolicy
+metadata:
+  name: openai-prompt-guard
+  namespace: gloo-system
+  labels:
+    app: agentgateway
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: openai
+  backend:
+    ai:
+      promptGuard:
+        request:
+          - webhook:
+              backendRef:
+                name: ai-guardrail-webhook
+                namespace: gloo-system
+                kind: Service
+                port: 8000
+        response:
+          - webhook:
+              backendRef:
+                name: ai-guardrail-webhook
+                namespace: gloo-system
+                kind: Service
+                port: 8000
+```
+
+Rate limit before:
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: GlooTrafficPolicy
+metadata:
+  name: global-request-rate-limit
+  namespace: gloo-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: agentgateway
+  glooRateLimit:
+    global:
+      rateLimitConfigRefs:
+      - name: global-request-rate-limit
+```
+
+Rate limit after:
+```yaml
+apiVersion: gloo.solo.io/v1alpha1
+kind: AgentgatewayEnterprisePolicy
+metadata:
+  name: global-request-rate-limit
+  namespace: gloo-system
+spec:
+  targetRefs:
+    - name: agentgateway
+      group: gateway.networking.k8s.io
+      kind: Gateway
+  traffic:
+    entRateLimit:
+      global:
+        rateLimitConfigRefs:
+        - name: global-request-rate-limit
+```
+
+
+## Breaking Changes: PromptGuard / Moderation / Guardrails
+
+- **Guardrail configuration moved**
+  - `ai.promptGuard` → `backend.ai.promptGuard`
+
+- **Request/response actions now expressed as lists**
+  - `request:` → `request: [ … ]`
+  - `response:` → `response: [ … ]`
+
+- **Webhooks replaced**
+  - `webhook.host.host` / `webhook.host.port` → `webhook.backendRef`
+
+Before (simplified):
+```
+ai:
+  promptGuard:
+    request:
+      regex: "credit card"
+      customResponse:
+        message: "blocked"
+```
+
+After:
+```
+backend:
+  ai:
+    promptGuard:
+      request:
+        - regex:
+            - "credit card"
+          response:
+            message: "blocked"
+```
+
+Webhook before:
+```
+webhook:
+  host:
+    host: ai-guardrail-webhook.gloo-system.svc.cluster.local
+    port: 8000
+```
+
+Webhook After:
+```
+webhook:
+  backendRef:
+    name: ai-guardrail-webhook
+    namespace: gloo-system
+    kind: Service
+    port: 8000
+```
+
+## Breaking Changes: JWT Authentication
+- moved into `traffic.jwtAuthentication`
+- Inline JWKS and remote JWKS locations changed
+- RBAC removed from legacy rbac block → now CEL-based under `traffic.authorization`
+
+After:
+```
+traffic:
+  jwtAuthentication:
+    mode: Strict
+    providers:
+      - issuer: solo.io
+        jwks:
+          inline: |
+            { "keys": [...] }
+
+  authorization:
+    policy:
+      matchExpressions:
+        - 'jwt.org == "engineering"'
+```
+
+## Breaking Changes: Rate Limiting
+- Local rate limits now live under `traffic.rateLimit.local` and global under `traffic.entRateLimit.global`
+- Removed old fields `glooRateLimit`
