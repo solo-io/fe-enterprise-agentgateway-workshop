@@ -35,12 +35,12 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
@@ -202,20 +202,7 @@ spec:
         - issuer: https://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697
           jwks:
             remote:
-              jwksUri: http://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697/v1/keys
-            #inline: |
-            #  {
-            #      "keys": [
-            #          {
-            #              "kty": "RSA",
-            #              "alg": "RS256",
-            #              "kid": "TlZ1rm1_htq5wehmOOZLea4ADefV9Fs-sOrHpXtIJHI",
-            #              "use": "sig",
-            #              "e": "AQAB",
-            #              "n": "v-yfaGPLJNV-4PF63Xhxb8D5lVWieNGlt-Ak4WYcpDgfJyx-GmJ6TOgaWBl_AXeIArKyNFnNjo4B6Sj3bJUeov6SceA2M-xW7FGSipq4Jaj5JHyXoWUQS3E7pIjJrJb_9GPIepvhPslS1YbhoxE7WcvdAZExCRZTlABWA7LfJ3PwFEu5DR0HkmeK5d6GG4wLO9znu8bgNBeIqkhgyisAFZx5O5ulLpk8XEhYzCAK5YU0WLyfFlpoE8O52xvwSkAUGxgadY6Py-YLUWzndKzHgeCixRcHkgQ2McPV0aolv0TziJu4maGddbKOhKjzi7vkbMEY_M65AQEmOHloDe0LHw"
-            #          }
-            #      ]
-            #  }
+              uri: http://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697/v1/keys
     authorization:
       policy:
         matchExpressions:
@@ -262,7 +249,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 
 ## curl with valid token
 ```bash
-export VALID_TOKEN="eyJraWQiOiJUbFoxcm0xX2h0cTV3ZWhtT09aTGVhNEFEZWZWOUZzLXNPckhwWHRJSkhJIiwiYWxnIjoiUlMyNTYifQ.eyJ2ZXIiOjEsImp0aSI6IkFULjdwVmdpbl81bGhRa3dNQmJacDA1VXNtOTFLRUlzcmZVdnI1VmNVV2wyR2ciLCJpc3MiOiJodHRwczovL2ludGVncmF0b3ItNTUxMzY2Mi5va3RhLmNvbS9vYXV0aDIvYXVzeGt2bWVmdGdjZGo2SEE2OTciLCJhdWQiOiJhcGk6Ly9zb2xvIiwiaWF0IjoxNzY0MDg2MjU3LCJleHAiOjE3NjQwODk4NTcsImNpZCI6IjBvYXhrc2hrbDJsaDBlOHZjNjk3Iiwic2NwIjpbImFwaS5yZWFkIl0sInN1YiI6IjBvYXhrc2hrbDJsaDBlOHZjNjk3In0.ZgR6uBcR5Eu5sahjHK_FedeohN62--evRtjYLSoSdctuy4kgYZL16RU-nYp1cGQa0fbhUawM3Q1dZMQj490bIX9QqDzxTTl4AYAhWDtSxRNBDOdiKcYRv2ucByW-J0apjfCypDpote1ykjIqT9-XpLP29WRBCC3w-QyDl2MWflCUJQMcM_favog-hZIOO69BjORSUhvLYfuRic9oaOjP1mAp5kM9GQIUuul6kCL3E2OcQWoVjMeWWlkChz1TLibbiDxWMXDi3bqD0s5DHF3zkDdNe6jyI0ovol8PYc4SAzIcUZQB9Qlu_07eVhTZZsEU2iCqArdbG_9p2obaBarBsQ"
+export VALID_TOKEN="eyJraWQiOiJUbFoxcm0xX2h0cTV3ZWhtT09aTGVhNEFEZWZWOUZzLXNPckhwWHRJSkhJIiwiYWxnIjoiUlMyNTYifQ.eyJ2ZXIiOjEsImp0aSI6IkFULjRzb1A3MmlBelljdEFrUlhLVjYtMXVDbW9TSDlqZkJDU1IxelFoYjdON00iLCJpc3MiOiJodHRwczovL2ludGVncmF0b3ItNTUxMzY2Mi5va3RhLmNvbS9vYXV0aDIvYXVzeGt2bWVmdGdjZGo2SEE2OTciLCJhdWQiOiJhcGk6Ly9zb2xvIiwiaWF0IjoxNzY1NDA0Mjg3LCJleHAiOjE3NjU0MDc4ODcsImNpZCI6IjBvYXhrc2hrbDJsaDBlOHZjNjk3Iiwic2NwIjpbImFwaS5yZWFkIl0sInN1YiI6IjBvYXhrc2hrbDJsaDBlOHZjNjk3In0.kLfNG5OzT8hKTVgEJ2B3DYu9D3xL6hPwcXDRTt6N5vy5FW4BELyHeBZX1pRLdzVEvyKP2gDgP2H0pNdQgwk8A6lopnRtZv47SG2t3FWDeGUEj9PKQn-R1bZRrECg6vBsLgt71g-Ph3YD3PUxb97-hgNLk6U-baLXHC3rOAc_SLvQj7FWKuhE9NTkTGIqpJdfiiLiDa3Amda1QaJTZaZRHv3bkvfn-8sDCN5mqOZ4KHKzkM3C6q9WZkK0Cbr0oeqn-t1q8g4GjoF3n-fM7XDYAiywdU4zOZ9c1W4aujYgdVTBP0XNXA9fNipMTDL8pv0irSrDgAT4oyzR7tL7FlFjNQ"
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
