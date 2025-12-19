@@ -13,9 +13,11 @@
   - GatewayClass name: `agentgateway-enterprise` → `enterprise-agentgateway`
   - Policy structure: traffic fields moved to `spec.traffic`, AI backend fields moved to `spec.backend`
   - Backend structure: `spec.ai.llm` → `spec.ai.provider`, `authToken` → `policies.auth`
+  - DirectResponse: separate `DirectResponse` CRD removed, now configured via `AgentgatewayPolicy.spec.traffic.directResponse`
 
   **Updates:**
   - Updated all labs (001-020) to use new API versions and Helm charts
+  - Updated lab 019 to use `AgentgatewayPolicy.spec.traffic.directResponse` instead of separate DirectResponse CRD
   - Reorganized `/install-on-openshift` files to mirror root structure (001: full installation, 002: monitoring tools)
   - Updated OpenShift deployment to use `EnterpriseAgentgatewayParameters` with proper security context configuration
   - Add new lab: `020-configure-basic-routing-to-azureopenai.md` for Azure OpenAI routing
