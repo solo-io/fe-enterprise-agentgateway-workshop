@@ -22,7 +22,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-gpt-4o
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   replicas: 1
   selector:
@@ -66,7 +66,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-gpt-4o-svc
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
   labels:
     app: mock-gpt-4o
 spec:
@@ -88,11 +88,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -100,35 +100,33 @@ spec:
             value: /openai
       backendRefs:
         - name: mock-openai
-          group: gateway.kgateway.dev
-          kind: Backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
 metadata:
   name: mock-openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
-  type: AI
   ai:
-    llm:
-      host: mock-gpt-4o-svc.gloo-system.svc.cluster.local
-      port: 8000
-      path:
-        full: "/v1/chat/completions"
+    provider:
       openai:
-        #--- Uncomment to configure model override ---
         model: "gpt-4o"
-        authToken:
-          kind: Passthrough
+      host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
+      port: 8000
+      path: "/v1/chat/completions"
+  policies:
+    auth:
+      passthrough: {}
 EOF
 ```
 
 ## curl mock openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -148,7 +146,7 @@ All metrics
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and show all metrics"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ``` 
 
@@ -156,7 +154,7 @@ Filter for number of requests served through the gateway
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and filter for number of requests served through the gateway"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_requests_total && kill $!
 ``` 
 
@@ -164,7 +162,7 @@ Total input and output token usage through the gateway
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and filter for input/output token usage through the gateway"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_gen_ai_client_token_usage_sum && kill $!
 ``` 
 You can tell the difference between the two metrics from the `gen_ai_token_type="input/output"` label
@@ -172,12 +170,78 @@ You can tell the difference between the two metrics from the `gen_ai_token_type=
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1 | jq .
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1 | jq .
 ```
 
 Example output
 ```
-2025-09-24T06:05:19.901893Z     info    request gateway=gloo-system/agentgateway listener=http route=gloo-system/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:54955 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 trace.id=60488f5d01d8606cfe7ae7f57c20f981 span.id=be198303a1e1a64f llm.provider=openai llm.request.model=gpt-4o-mini llm.request.tokens=12 llm.response.model=gpt-4o-mini llm.response.tokens=46 duration=1669ms
+{
+  "level": "info",
+  "time": "2025-12-19T06:23:49.655336Z",
+  "scope": "request",
+  "gateway": "enterprise-agentgateway/agentgateway",
+  "listener": "http",
+  "route": "enterprise-agentgateway/mock-openai",
+  "endpoint": "mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local:8000",
+  "src.addr": "10.42.0.1:52000",
+  "http.method": "POST",
+  "http.host": "192.168.107.2",
+  "http.path": "/openai",
+  "http.version": "HTTP/1.1",
+  "http.status": 200,
+  "trace.id": "42d8b4df6a37562a3acfaabde69a16a8",
+  "span.id": "c8bcc8a3f650398e",
+  "protocol": "llm",
+  "gen_ai.operation.name": "chat",
+  "gen_ai.provider.name": "openai",
+  "gen_ai.request.model": "gpt-4o",
+  "gen_ai.response.model": "gpt-4o",
+  "gen_ai.usage.input_tokens": 5,
+  "gen_ai.usage.output_tokens": 31,
+  "duration": "0ms",
+  "request.body": {
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  },
+  "response.body": {
+    "do_remote_decode": false,
+    "remote_block_ids": null,
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "content": "I am your AI assistant, how can I help you today? Give a man a fish and you feed him for a day; teach a man to fish ",
+          "role": "assistant"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "created": 1766125429,
+    "usage": {
+      "completion_tokens": 31,
+      "prompt_tokens": 5,
+      "total_tokens": 36
+    },
+    "remote_port": 0,
+    "do_remote_prefill": false,
+    "object": "chat.completion",
+    "id": "chatcmpl-f58ffb8c-95fc-4f78-8c66-9de4f55a0f58",
+    "remote_engine_id": "",
+    "remote_host": "",
+    "model": "gpt-4o"
+  },
+  "rq.headers.all": {
+    "accept": "*/*",
+    "content-length": "144",
+    "user-agent": "curl/8.7.1",
+    "content-type": "application/json"
+  }
+}
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -195,8 +259,8 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system mock-openai
-kubectl delete backend -n gloo-system mock-openai
-kubectl delete -n gloo-system svc/mock-gpt-4o-svc
-kubectl delete -n gloo-system deploy/mock-gpt-4o
+kubectl delete httproute -n enterprise-agentgateway mock-openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway mock-openai
+kubectl delete -n enterprise-agentgateway svc/mock-gpt-4o-svc
+kubectl delete -n enterprise-agentgateway deploy/mock-gpt-4o
 ```

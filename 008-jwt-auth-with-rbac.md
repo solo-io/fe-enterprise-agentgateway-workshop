@@ -5,29 +5,29 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
 - Configure JWT Auth
 - Validate JWT Auth
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n gloo-system \
+kubectl create secret generic openai-secret -n enterprise-agentgateway \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create openai route and backend
+Create openai route and `AgentgatewayBackend`
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -35,33 +35,32 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: gateway.kgateway.dev
-          kind: Backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
-  type: AI
   ai:
-    llm:
-      openai:
+    provider:
+      openai: {}
         #--- Uncomment to configure model override ---
         #model: ""
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -76,40 +75,42 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-Create Gloo traffic policy
+Create agentgateway traffic policy
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gloo.solo.io/v1alpha1
-kind: GlooTrafficPolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: agentgateway-jwt-auth
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
       name: agentgateway
-  glooJWT:
-    beforeExtAuth:
+  traffic:
+    jwtAuthentication:
+      mode: Strict
       providers:
-        selfminted:
-          issuer: https://dev.example.com
+        - issuer: solo.io
           jwks:
-            local:
-              key: |
-                -----BEGIN PUBLIC KEY-----
-                MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwrqLvf76rkErpNyvlYs4
-                U8dq/2hcaMSRXXrFD38KQ3S/5ciXWn3+0w/bGvY2w0/9tBTVZmGnWj3vLiWHRAer
-                NtvBHRUKE/c1AqRJ1RiPdPpQodUsS/ZK7BNDey250ZfsyU94EX/zZ4sROh5EGE1Y
-                3+p860H8DLEofeTepKmHRu6yEuZl4GscbEg5+Bjb+k/LVW+UQCSQqkOyHxVwrrt2
-                6gmKtWqW7/L9jZclmW+J5Jn+/7DUo5QkXxTIM4C9/01XA1ibWkyMhAx9wyZCFIKA
-                rdmgZcqjWdsMfmRbwJGRst2658MwIZ3skYGTd8LiUTWnxTRpQ5TJoSzck4w8k+0l
-                LwIDAQAB
-                -----END PUBLIC KEY-----
-  rbac:
-    policy:
-      matchExpressions:
-        - '(jwt.org == "internal") && (jwt.group == "engineering")'
+            inline: |
+                {
+                  "keys": [
+                    {
+                      "kty": "RSA",
+                      "kid": "solo-public-key-001",
+                      "n": "vlmc5pb-jYaOq75Y4r91AC2iuS9B0sm6sxzRm3oOG7nIt2F1hHd4AKll2jd6BZg437qvsLdREnbnVrr8kU0drmJNPHL-xbsTz_cQa95GuKb6AI6osAaUAEL3dPjuoqkGNRe1sAJyOi48qtcbV0kPWcwFmCV0-OiqliCms12jrd1PSI_LYiNc3GcutpxY6BiHkbxxNeIuWDxE-i_Obq8EhhGkwha1KVUvLHV-EwD4M_AY8BegGsX-sjoChXOxyueu_ReqWV227I-FTKwMnjwWW0BQkeI6g1w1WqADmtKZ2sLamwGUJgWt4ZgIyhQ-iQfeN1WN2iupTWa5JAsw--CQJw",
+                      "e": "AQAB",
+                      "use": "sig",
+                      "alg": "RS256"
+                    }
+                  ]
+                }
+    authorization:
+      policy:
+        matchExpressions:
+          - '(jwt.org == "solo.io") && (jwt.team == "team-id")'
 EOF
 ```
 
@@ -131,7 +132,7 @@ Verify that the request is denied with a 403 HTTP response code
 
 ## curl with valid JWT token
 ```bash
-export DEV_TOKEN_1="eyJhbGciOiJSUzI1NiIsImtpZCI6ImpsOElCZTFYMjB6NF9JdEZpUEg3VEI5RF8tQmRXN1pRT2Fwa2t2ZFdpUWc9IiwidHlwIjoiSldUIn0.eyJpc3MiOiJodHRwczovL2Rldi5leGFtcGxlLmNvbSIsImV4cCI6NDgwNDMyNDczNiwiaWF0IjoxNjQ4NjUxMTM2LCJvcmciOiJpbnRlcm5hbCIsImVtYWlsIjoiZGV2MUBzb2xvLmlvIiwiZ3JvdXAiOiJlbmdpbmVlcmluZyIsInNjb3BlIjoiaXM6ZGV2ZWxvcGVyIn0.BVLsWoLObIf8r19HxEg6yOdqHrZ9WDRJOc-t9VmkluenLdwbMu2uQNLY_RkZApEAeylb00oZnmxa4wCAXNcTjbF6f6_TZgXE5pFZU1CdTKOB2b7bVlNToKFuJJBnqWJ7-bkRQEC5BptASR4bIK_E-sOHrfyXk7NG7ocPB6xqSDIYBRdUpWNJbyRemyhFfyOJ1j8pTR9CwmgrG9ROGSGT_ucXrmY7SzKbuFQtjA14wVQEWBlnFTori8TtfSiP6okkcCEiQE8u6nQ_J5NOJYbEKVkFAzSZJlICqsnMS9q5AXVQ2pDUo18eqjyGT2EfbWBgHK-ZC5DGn-9pU5OJ56AhTQ"
+export DEV_TOKEN_1="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw"
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -155,18 +156,21 @@ We should see that we get a response from the backend LLM when JWT is provided
 If you decode the JWT, you’ll see that agentgateway successfully verified it and enforced RBAC based on the `jwt.org` and `jwt.group` claims
 ```
 {
-  "iss": "https://dev.example.com",
-  "exp": 4804324736,
-  "iat": 1648651136,
-  "org": "internal",
-  "email": "dev1@solo.io",
-  "group": "engineering",
-  "scope": "is:developer"
+  "iss": "solo.io",
+  "org": "solo.io",
+  "sub": "user-id",
+  "team": "team-id",
+  "exp": 2079556104,
+  "llms": {
+    "openai": [
+      "gpt-4o"
+    ]
+  }
 }
 ```
 
 Bonus Exercise:
-Update the CEL expression in the GlooTrafficPolicy to experiment with RBAC behavior. For example, adjust the claims in your JWT and resend the request to see when access is allowed or denied:
+Update the CEL expression in the EnterpriseAgentgatewayPolicy to experiment with RBAC behavior. For example, adjust the claims in your JWT and resend the request to see when access is allowed or denied:
 ```
 rbac:
     policy:
@@ -174,10 +178,119 @@ rbac:
         - '(jwt.org == "internal") && (jwt.group == "engineering")'
 ```
 
+## Dynamic JWT Auth
+
+
+Create an AgentgatewayBackend for the Okta JWKS endpoint
+```bash
+kubectl apply -f- <<EOF
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: okta-jwks
+  namespace: enterprise-agentgateway
+spec:
+  static:
+    host: integrator-5513662.okta.com
+    port: 443
+  policies:
+    tls: {}
+EOF
+```
+
+Create agentgateway traffic policy
+```bash
+kubectl apply -f- <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: agentgateway-jwt-auth
+  namespace: enterprise-agentgateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: agentgateway
+  traffic:
+    jwtAuthentication:
+      mode: Strict
+      providers:
+        - issuer: https://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697
+          jwks:
+            remote:
+              backendRef:
+                name: okta-jwks
+                namespace: enterprise-agentgateway
+                kind: AgentgatewayBackend
+                group: agentgateway.dev
+              jwksPath: /oauth2/ausxkvmeftgcdj6HA697/v1/keys
+    authorization:
+      policy:
+        matchExpressions:
+          #- '(jwt.org == "solo.io") && (jwt.team == "team-id")'
+          - '(jwt.aud == "api://solo")'
+EOF
+```
+
+## curl with no token
+Make a curl request to the OpenAI endpoint again (without a JWT), this time it should fail with `authentication failure: no bearer token found`
+```bash
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+## curl with previous JWT token (invalid token)
+```bash
+export DEV_TOKEN_1="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw"
+
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $DEV_TOKEN_1" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+## curl with valid token
+```bash
+export VALID_TOKEN="eyJraWQiOiJUbFoxcm0xX2h0cTV3ZWhtT09aTGVhNEFEZWZWOUZzLXNPckhwWHRJSkhJIiwiYWxnIjoiUlMyNTYifQ.eyJ2ZXIiOjEsImp0aSI6IkFULjRzb1A3MmlBelljdEFrUlhLVjYtMXVDbW9TSDlqZkJDU1IxelFoYjdON00iLCJpc3MiOiJodHRwczovL2ludGVncmF0b3ItNTUxMzY2Mi5va3RhLmNvbS9vYXV0aDIvYXVzeGt2bWVmdGdjZGo2SEE2OTciLCJhdWQiOiJhcGk6Ly9zb2xvIiwiaWF0IjoxNzY1NDA0Mjg3LCJleHAiOjE3NjU0MDc4ODcsImNpZCI6IjBvYXhrc2hrbDJsaDBlOHZjNjk3Iiwic2NwIjpbImFwaS5yZWFkIl0sInN1YiI6IjBvYXhrc2hrbDJsaDBlOHZjNjk3In0.kLfNG5OzT8hKTVgEJ2B3DYu9D3xL6hPwcXDRTt6N5vy5FW4BELyHeBZX1pRLdzVEvyKP2gDgP2H0pNdQgwk8A6lopnRtZv47SG2t3FWDeGUEj9PKQn-R1bZRrECg6vBsLgt71g-Ph3YD3PUxb97-hgNLk6U-baLXHC3rOAc_SLvQj7FWKuhE9NTkTGIqpJdfiiLiDa3Amda1QaJTZaZRHv3bkvfn-8sDCN5mqOZ4KHKzkM3C6q9WZkK0Cbr0oeqn-t1q8g4GjoF3n-fM7XDYAiywdU4zOZ9c1W4aujYgdVTBP0XNXA9fNipMTDL8pv0irSrDgAT4oyzR7tL7FlFjNQ"
+
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $VALID_TOKEN" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -198,8 +311,9 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system openai
-kubectl delete backend -n gloo-system openai-all-models
-kubectl delete secret -n gloo-system openai-secret
-kubectl delete glootrafficpolicy -n gloo-system agentgateway-jwt-auth
+kubectl delete httproute -n enterprise-agentgateway openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
+kubectl delete agentgatewaybackend -n enterprise-agentgateway okta-jwks
+kubectl delete secret -n enterprise-agentgateway openai-secret
+kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway agentgateway-jwt-auth
 ```

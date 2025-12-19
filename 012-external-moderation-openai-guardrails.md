@@ -5,13 +5,13 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Configure guardrail with OpenAI External Moderation endpoint
+- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Configure guardrail with OpenAI External Moderation endpoint using `EnterpriseAgentgatewayPolicy`
 - Validate guardrails are enforced
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n gloo-system \
+kubectl create secret generic openai-secret -n enterprise-agentgateway \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -23,11 +23,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -35,33 +35,32 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: gateway.kgateway.dev
-          kind: Backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
-  type: AI
   ai:
-    llm:
-      openai:
+    provider:
+      openai: {}
         #--- Uncomment to configure model override ---
         #model: ""
-        authToken:
-          kind: "SecretRef"
-          secretRef:
-            name: openai-secret
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -79,30 +78,28 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ## Reject inappropriate requests using the external moderation endpoint
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gloo.solo.io/v1alpha1
-kind: GlooTrafficPolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: openai-prompt-guard
-  namespace: gloo-system
-  labels:
-    app: ai-gateway
+  namespace: enterprise-agentgateway
 spec:
   targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: openai
-  ai:
-    promptGuard:
-      request:
-        moderation:
-          openAIModeration:
-            authToken:
-              kind: SecretRef
-              secretRef:
-                name: openai-secret
-            model: omni-moderation-latest
-        customResponse:
-          message: "Uh oh! That's a restricted topic triggered by the omni-moderation-latest endpoint!"
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  backend:
+    ai:
+      promptGuard:
+        request:
+          - openAIModeration:
+              policies:
+                auth:
+                  secretRef:
+                    name: openai-secret
+              model: omni-moderation-latest
+            response:
+              message: "Uh oh! That's a restricted topic triggered by the omni-moderation-latest endpoint!"
 EOF
 ```
 
@@ -155,8 +152,8 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete glootrafficpolicy -n gloo-system openai-prompt-guard
-kubectl delete httproute -n gloo-system openai
-kubectl delete backend -n gloo-system openai-all-models
-kubectl delete secret -n gloo-system openai-secret
+kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway openai-prompt-guard
+kubectl delete httproute -n enterprise-agentgateway openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
+kubectl delete secret -n enterprise-agentgateway openai-secret
 ```

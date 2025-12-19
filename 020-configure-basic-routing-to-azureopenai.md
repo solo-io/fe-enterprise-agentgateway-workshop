@@ -1,34 +1,49 @@
-# Configure Basic Routing to OpenAI
+# Configure Basic Routing to Azure OpenAI
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
-- Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Curl OpenAI through the agentgateway proxy
-- Validate the request went through the gateway in Jaeger UI
+- Create a Kubernetes secret that contains our Azure OpenAI api-key credentials
+- Create a route to Azure OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Curl Azure OpenAI through the agentgateway proxy
+- Validate the request went through the gateway in Grafana/Jaeger UI
 
 ### Configure Required Variables
-Replace with a valid OpenAI API key
+
+Set the following environment variables to match your Azure OpenAI deployment.
+For reference, an endpoint typically follows this format:
+`https://${ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-01`
+
+**Note:** The ENDPOINT should be just the hostname without the `https://` scheme (e.g., `my-endpoint.openai.azure.com`)
+
 ```bash
-export OPENAI_API_KEY=$OPENAI_API_KEY
+export AZURE_OPENAI_API_KEY="<API-KEY>"
+export ENDPOINT="<AZURE-OPENAI-ENDPOINT>"  # Just the hostname, no https://
+export DEPLOYMENT_NAME="<DEPLOYMENT-NAME>"
 ```
 
-Create openai api-key secret
+Create azure openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n enterprise-agentgateway \
---from-literal="Authorization=Bearer $OPENAI_API_KEY" \
---dry-run=client -oyaml | kubectl apply -f -
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: azureopenai-secret
+  namespace: enterprise-agentgateway # Putting in same ns where the redis, ext auth is getting deployed
+type: Opaque
+stringData:
+  Authorization: "Bearer ${AZURE_OPENAI_API_KEY}"
+EOF
 ```
 
-Create openai route and backend
+Create azure openai route and backend
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: openai
+  name: azure-openai
   namespace: enterprise-agentgateway
 spec:
   parentRefs:
@@ -38,9 +53,9 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /openai
+            value: /azure
       backendRefs:
-        - name: openai-all-models
+        - name: azure-openai
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -49,26 +64,26 @@ spec:
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: openai-all-models
+  name: azure-openai
   namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
-      openai: {}
-        #--- Uncomment to configure model override ---
-        #model: ""
+      azureopenai:
+        endpoint: "${ENDPOINT}"
+        deploymentName: "${DEPLOYMENT_NAME}"
   policies:
     auth:
       secretRef:
-        name: openai-secret
+        name: azureopenai-secret
 EOF
 ```
 
-## curl openai
+## curl azure openai
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/azure" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-4o-mini",
@@ -115,7 +130,7 @@ kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 
 Example output
 ```
-2025-12-19T00:47:17.454755Z     info    request gateway=enterprise-agentgateway/agentgateway listener=http route=enterprise-agentgateway/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:4478 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 protocol=llm gen_ai.operation.name=chat gen_ai.provider.name=openai gen_ai.request.model=gpt-4o-mini gen_ai.response.model=gpt-4o-mini-2024-07-18 gen_ai.usage.input_tokens=12 gen_ai.usage.output_tokens=52 duration=2163ms
+2025-09-24T06:05:19.901893Z     info    request gateway=enterprise-agentgateway/gloo-agentgateway listener=http route=enterprise-agentgateway/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:54955 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 trace.id=60488f5d01d8606cfe7ae7f57c20f981 span.id=be198303a1e1a64f llm.provider=openai llm.request.model=gpt-4o-mini llm.request.tokens=12 llm.response.model=gpt-4o-mini-2024-07-18 llm.response.tokens=46 duration=1669ms
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -133,7 +148,7 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n enterprise-agentgateway openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
-kubectl delete secret -n enterprise-agentgateway openai-secret
+kubectl delete httproute -n enterprise-agentgateway azure-openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway azure-openai
+kubectl delete secret -n enterprise-agentgateway azureopenai-secret
 ```

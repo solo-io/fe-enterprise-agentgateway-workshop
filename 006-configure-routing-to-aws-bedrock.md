@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our AWS Access Key credentials
-- Create a route to AWS Bedrock as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Create a route to AWS Bedrock as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
 - Curl AWS Bedrock through the agentgateway proxy
 - Validate the request went through the gateway in Jaeger UI
 
@@ -31,7 +31,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: bedrock-secret
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 type: Opaque
 stringData:
   accessKey: ${AWS_ACCESS_KEY_ID}
@@ -40,71 +40,71 @@ stringData:
 EOF
 ```
 
-Create AWS Bedrock route and backend. For this setup we will configure multiple `Backends` using a single provider (AWS Bedrock) in a path-per-model routing configuration
+Create AWS Bedrock route and `AgentgatewayBackend`. For this setup we will configure multiple `AgentgatewayBackends` using a single provider (AWS Bedrock) in a path-per-model routing configuration
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
 metadata:
   name: bedrock-titan
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
       bedrock:
         model: amazon.titan-tg1-large
         region: us-west-2
-        auth:
-          type: Secret
-          secretRef:
-            name: bedrock-secret
+  policies:
+    auth:
+      aws:
+        secretRef:
+          name: bedrock-secret
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
 metadata:
   name: bedrock-haiku3.5
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
       bedrock:
         model: anthropic.claude-3-5-haiku-20241022-v1:0
         region: us-west-2
-        auth:
-          type: Secret
-          secretRef:
-            name: bedrock-secret
+  policies:
+    auth:
+      aws:
+        secretRef:
+          name: bedrock-secret
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
-kind: Backend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
 metadata:
   name: bedrock-llama3-8b
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
-  type: AI
   ai:
-    llm:
+    provider:
       bedrock:
         model: meta.llama3-1-8b-instruct-v1:0
         region: us-west-2
-        auth:
-          type: Secret
-          secretRef:
-            name: bedrock-secret
+  policies:
+    auth:
+      aws:
+        secretRef:
+          name: bedrock-secret
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: bedrock
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
   labels:
     example: bedrock-route
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -112,8 +112,8 @@ spec:
             value: /bedrock/haiku
       backendRefs:
         - name: bedrock-haiku3.5
-          group: gateway.kgateway.dev
-          kind: Backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -122,8 +122,8 @@ spec:
             value: /bedrock/titan
       backendRefs:
         - name: bedrock-titan
-          group: gateway.kgateway.dev
-          kind: Backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -132,8 +132,8 @@ spec:
             value: /bedrock/llama3-8b
       backendRefs:
         - name: bedrock-llama3-8b
-          group: gateway.kgateway.dev
-          kind: Backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
     # catch-all will route to the bedrock titan upstream
@@ -143,8 +143,8 @@ spec:
             value: /bedrock
       backendRefs:
         - name: bedrock-titan
-          group: gateway.kgateway.dev
-          kind: Backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -152,7 +152,7 @@ EOF
 
 ## curl AWS Bedrock Titan endpoint
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/bedrock/titan" \
   -H "content-type: application/json" \
@@ -200,7 +200,7 @@ curl -i "$GATEWAY_IP:8080/bedrock/llama3-8b" \
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -218,9 +218,9 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system bedrock
-kubectl delete backend -n gloo-system bedrock-titan
-kubectl delete backend -n gloo-system bedrock-haiku3.5
-kubectl delete backend -n gloo-system bedrock-llama3-8b
-kubectl delete secret -n gloo-system bedrock-secret
+kubectl delete httproute -n enterprise-agentgateway bedrock
+kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-titan
+kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-haiku3.5
+kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-llama3-8b
+kubectl delete secret -n enterprise-agentgateway bedrock-secret
 ```

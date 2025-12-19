@@ -48,7 +48,7 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm repo update prometheus-community
 helm upgrade --install grafana-prometheus \
   prometheus-community/kube-prometheus-stack \
-  --version 76.4.1 \
+  --version 80.4.2 \
   --namespace monitoring \
   --values - <<EOF
 alertmanager:
@@ -82,11 +82,11 @@ apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   name: data-plane-monitoring-gloo-ai-metrics
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   namespaceSelector:
     matchNames:
-      - gloo-system
+      - enterprise-agentgateway
   podMetricsEndpoints:
     - port: metrics
   selector:

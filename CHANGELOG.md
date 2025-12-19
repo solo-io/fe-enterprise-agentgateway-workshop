@@ -1,5 +1,31 @@
 # Changelog
 
+0.3.0 - (12-19-25)
+  ---
+  **Breaking Changes:**
+  - Helm chart rename: `gloo-gateway` → `enterprise-agentgateway`, `gloo-gateway-crds` → `enterprise-agentgateway-crds`
+  - Helm registry path change: charts now at `oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway*`
+  - Changed namespace: `gloo-system` → `enterprise-agentgateway`
+  - License key flag: `licensing.glooGatewayLicenseKey` / `licensing.agentgatewayLicenseKey` → `licensing.licenseKey`
+  - API group migration: `gateway.kgateway.dev` → `agentgateway.dev` for AgentgatewayBackend
+  - API group migration: `gloo.solo.io` → `enterpriseagentgateway.solo.io` for policies
+  - CRD renames: `Backend` → `AgentgatewayBackend`, `GlooGatewayParameters` → `EnterpriseAgentgatewayParameters`, `GlooTrafficPolicy`/`AgentgatewayEnterprisePolicy` → `EnterpriseAgentgatewayPolicy`
+  - GatewayClass name: `agentgateway-enterprise` → `enterprise-agentgateway`
+  - Policy structure: traffic fields moved to `spec.traffic`, AI backend fields moved to `spec.backend`
+  - Backend structure: `spec.ai.llm` → `spec.ai.provider`, `authToken` → `policies.auth`
+  - DirectResponse: separate `DirectResponse` CRD removed, now configured via `AgentgatewayPolicy.spec.traffic.directResponse`
+
+  **Updates:**
+  - Updated all labs (001-020) to use new API versions and Helm charts
+  - Updated lab 019 to use `AgentgatewayPolicy.spec.traffic.directResponse` instead of separate DirectResponse CRD
+  - Reorganized `/install-on-openshift` files to mirror root structure (001: full installation, 002: monitoring tools)
+  - Updated OpenShift deployment to use `EnterpriseAgentgatewayParameters` with proper security context configuration
+  - Add new lab: `020-configure-basic-routing-to-azureopenai.md` for Azure OpenAI routing
+  - Fixed Azure OpenAI endpoint configuration (hostname only, no `https://` scheme)
+  - Updated config for OpenShift deploys
+  - add `000-image-list.md`
+  - add optional air-gapped installation instruction steps to `001`
+
 0.2.3 - (11-21-25)
 ---
 - update `001` to cover the setup of Gloo Gateway control plane and agentgateway in one lab, renamed `001-set-up-gloo-gateway-with-agentgateway.md`
