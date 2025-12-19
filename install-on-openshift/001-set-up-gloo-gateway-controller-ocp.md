@@ -111,7 +111,7 @@ enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 
 **Note - SCC workaround for redis cache in 2.1.0-beta2**: For this beta release we will need to set `anyuid` for the redis cache until [#1235](https://github.com/solo-io/gloo-gateway/issues/1235) is completed
 ```bash
-oc adm policy add-scc-to-group anyuid system:serviceaccounts:ext-cache-enterprise-agentgateway-enterprise-agentgateway-airgapped
+oc adm policy add-scc-to-user anyuid -z ext-cache-enterprise-agentgateway-enterprise-agentgateway-airgapped -n enterprise-agentgateway
 ```
 
 ## Air-gapped install (private repo images)
