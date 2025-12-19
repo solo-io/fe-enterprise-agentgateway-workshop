@@ -11,7 +11,7 @@ This lab assumes that you have completed the setup in `001`, and `002`, and `003
 
 Create openai api-key secret if it has not been created already
 ```bash
-kubectl create secret generic openai-secret -n gloo-system \
+kubectl create secret generic openai-secret -n enterprise-agentgateway \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -24,7 +24,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-3.5-turbo
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -40,7 +40,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-4o-mini
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -56,7 +56,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-4o
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -79,11 +79,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -132,7 +132,7 @@ EOF
 
 ## curl /openai with the "model=gpt-3.5-turbo" query parameter
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai?model=gpt-3.5-turbo" \
   -H "content-type: application/json" \
@@ -180,7 +180,7 @@ We should see that the response shows that the model used was `gpt-4o-2024-08-06
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -198,9 +198,9 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system openai
-kubectl delete secret -n gloo-system openai-secret
-kubectl delete agentgatewaybackend -n gloo-system openai-gpt-3.5-turbo
-kubectl delete agentgatewaybackend -n gloo-system openai-gpt-4o
-kubectl delete agentgatewaybackend -n gloo-system openai-gpt-4o-mini
+kubectl delete httproute -n enterprise-agentgateway openai
+kubectl delete secret -n enterprise-agentgateway openai-secret
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-gpt-3.5-turbo
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-gpt-4o
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-gpt-4o-mini
 ```

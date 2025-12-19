@@ -11,7 +11,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n gloo-system \
+kubectl create secret generic openai-secret -n enterprise-agentgateway \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -23,11 +23,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -44,7 +44,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -60,7 +60,7 @@ EOF
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 
 curl -i "$GATEWAY_IP:8080/openai" \
@@ -95,14 +95,14 @@ metadata:
   labels:
     llm-provider: openai
   name: team1-apikey
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 type: extauth.solo.io/apikey
 ---
 apiVersion: extauth.solo.io/v1
 kind: AuthConfig
 metadata:
   name: apikey-auth
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   configs:
     - apiKeyAuth:
@@ -116,7 +116,7 @@ spec:
           # can also directly reference specific secret by name
           apiKeySecretRefs:
             - name: team1-apikey
-              namespace: gloo-system
+              namespace: enterprise-agentgateway
         # additional headers to inject from secret entries
         # key is the header name to add to the request
         # value.name is the key in the secret to read the value from
@@ -128,7 +128,7 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: api-key-auth
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   targetRefs:
     - name: agentgateway
@@ -138,7 +138,7 @@ spec:
     entExtAuth:
       authConfigRef:
         name: apikey-auth
-        namespace: gloo-system
+        namespace: enterprise-agentgateway
 EOF
 ```
 
@@ -184,7 +184,7 @@ This request should succeed
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -206,10 +206,10 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n gloo-system api-key-auth
-kubectl delete authconfig -n gloo-system apikey-auth
-kubectl delete secret -n gloo-system team1-apikey
-kubectl delete httproute -n gloo-system openai
-kubectl delete agentgatewaybackend -n gloo-system openai-all-models
-kubectl delete secret -n gloo-system openai-secret
+kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway api-key-auth
+kubectl delete authconfig -n enterprise-agentgateway apikey-auth
+kubectl delete secret -n enterprise-agentgateway team1-apikey
+kubectl delete httproute -n enterprise-agentgateway openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
+kubectl delete secret -n enterprise-agentgateway openai-secret
 ```

@@ -11,7 +11,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n gloo-system \
+kubectl create secret generic openai-secret -n enterprise-agentgateway \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -23,11 +23,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -44,7 +44,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -60,7 +60,7 @@ EOF
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -82,7 +82,7 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: agentgateway-jwt-auth
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
@@ -188,7 +188,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: okta-jwks
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   static:
     host: integrator-5513662.okta.com
@@ -205,7 +205,7 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: agentgateway-jwt-auth
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
@@ -220,7 +220,7 @@ spec:
             remote:
               backendRef:
                 name: okta-jwks
-                namespace: gloo-system
+                namespace: enterprise-agentgateway
                 kind: AgentgatewayBackend
                 group: agentgateway.dev
               jwksPath: /oauth2/ausxkvmeftgcdj6HA697/v1/keys
@@ -235,7 +235,7 @@ EOF
 ## curl with no token
 Make a curl request to the OpenAI endpoint again (without a JWT), this time it should fail with `authentication failure: no bearer token found`
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -290,7 +290,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -311,9 +311,9 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system openai
-kubectl delete agentgatewaybackend -n gloo-system openai-all-models
-kubectl delete agentgatewaybackend -n gloo-system okta-jwks
-kubectl delete secret -n gloo-system openai-secret
-kubectl delete enterpriseagentgatewaypolicy -n gloo-system agentgateway-jwt-auth
+kubectl delete httproute -n enterprise-agentgateway openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
+kubectl delete agentgatewaybackend -n enterprise-agentgateway okta-jwks
+kubectl delete secret -n enterprise-agentgateway openai-secret
+kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway agentgateway-jwt-auth
 ```

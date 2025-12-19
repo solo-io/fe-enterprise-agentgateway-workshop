@@ -12,7 +12,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n gloo-system \
+kubectl create secret generic openai-secret -n enterprise-agentgateway \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -24,11 +24,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -45,7 +45,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -61,7 +61,7 @@ EOF
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -83,7 +83,7 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: openai-opt
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
@@ -121,7 +121,7 @@ We should see that the response was returned in JSON format
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -155,8 +155,8 @@ We should also see that the `gen_ai.completion` tag shows the response was retur
 
 ## Cleanup
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n gloo-system openai-opt
-kubectl delete httproute -n gloo-system openai
-kubectl delete agentgatewaybackend -n gloo-system openai-all-models
-kubectl delete secret -n gloo-system openai-secret
+kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway openai-opt
+kubectl delete httproute -n enterprise-agentgateway openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
+kubectl delete secret -n enterprise-agentgateway openai-secret
 ```

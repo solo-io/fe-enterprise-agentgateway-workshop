@@ -19,7 +19,7 @@ apiVersion: gateway.kgateway.dev/v1alpha1
 kind: DirectResponse
 metadata:
   name: health-response
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   status: 200
   body: "Status: Healthy"
@@ -33,11 +33,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: agentgateway
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -54,7 +54,7 @@ EOF
 
 ## curl our agentgateway endpoint
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080" \
   -H "content-type: application/json" \
@@ -81,7 +81,7 @@ Status: Healthy
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1 | jq .
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1 | jq .
 ```
 
 Example output
@@ -90,9 +90,9 @@ Example output
   "level": "info",
   "time": "2025-11-21T18:19:00.300505Z",
   "scope": "request",
-  "gateway": "gloo-system/agentgateway",
+  "gateway": "enterprise-agentgateway/agentgateway",
   "listener": "http",
-  "route": "gloo-system/agentgateway",
+  "route": "enterprise-agentgateway/agentgateway",
   "src.addr": "10.42.0.1:18982",
   "http.method": "POST",
   "http.host": "192.168.107.2",
@@ -126,6 +126,6 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system agentgateway
-kubectl delete directresponses -n gloo-system health-response
+kubectl delete httproute -n enterprise-agentgateway agentgateway
+kubectl delete directresponses -n enterprise-agentgateway health-response
 ```

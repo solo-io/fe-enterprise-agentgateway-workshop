@@ -11,7 +11,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n gloo-system \
+kubectl create secret generic openai-secret -n enterprise-agentgateway \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -23,11 +23,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -44,7 +44,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -60,7 +60,7 @@ EOF
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -83,7 +83,7 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: local-token-based-rate-limit
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   targetRefs:
     - name: agentgateway
@@ -118,12 +118,12 @@ You should be rate limited on the second request to LLM because we will have hit
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 Example output, you should see that the `http.status=429`
 ```
-2025-10-20T17:12:35.122531Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai src.addr=10.42.0.1:42671 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=429 trace.id=3ad6e9fbc49d0ec2dceda4ec85d411f8 span.id=df920a4246c1b338 error="rate limit exceeded" duration=0ms
+2025-10-20T17:12:35.122531Z     info    request gateway=enterprise-agentgateway/gloo-agentgateway listener=http route=enterprise-agentgateway/openai src.addr=10.42.0.1:42671 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=429 trace.id=3ad6e9fbc49d0ec2dceda4ec85d411f8 span.id=df920a4246c1b338 error="rate limit exceeded" duration=0ms
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -151,8 +151,8 @@ Next, we’ll explore how to configure global rate limiting using the Gloo Rate 
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system openai
-kubectl delete agentgatewaybackend -n gloo-system openai-all-models
-kubectl delete secret -n gloo-system openai-secret
-kubectl delete enterpriseagentgatewaypolicy -n gloo-system local-token-based-rate-limit
+kubectl delete httproute -n enterprise-agentgateway openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
+kubectl delete secret -n enterprise-agentgateway openai-secret
+kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway local-token-based-rate-limit
 ```

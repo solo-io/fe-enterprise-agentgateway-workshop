@@ -30,7 +30,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: azureopenai-secret
-  namespace: gloo-system # Putting in same ns where the redis, ext auth is getting deployed
+  namespace: enterprise-agentgateway # Putting in same ns where the redis, ext auth is getting deployed
 type: Opaque
 stringData:
   Authorization: "Bearer ${AZURE_OPENAI_API_KEY}"
@@ -44,11 +44,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: azure-openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -65,7 +65,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: azure-openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -81,7 +81,7 @@ EOF
 
 ## curl azure openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/azure" \
   -H "content-type: application/json" \
@@ -101,7 +101,7 @@ All metrics
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and show all metrics"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ``` 
 
@@ -109,7 +109,7 @@ Filter for number of requests served through the gateway
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and filter for number of requests served through the gateway"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_requests_total && kill $!
 ``` 
 
@@ -117,7 +117,7 @@ Total input and output token usage through the gateway
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and filter for input/output token usage through the gateway"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_gen_ai_client_token_usage_sum && kill $!
 ``` 
 You can tell the difference between the two metrics from the `gen_ai_token_type="input/output"` label
@@ -125,12 +125,12 @@ You can tell the difference between the two metrics from the `gen_ai_token_type=
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 Example output
 ```
-2025-09-24T06:05:19.901893Z     info    request gateway=gloo-system/gloo-agentgateway listener=http route=gloo-system/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:54955 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 trace.id=60488f5d01d8606cfe7ae7f57c20f981 span.id=be198303a1e1a64f llm.provider=openai llm.request.model=gpt-4o-mini llm.request.tokens=12 llm.response.model=gpt-4o-mini-2024-07-18 llm.response.tokens=46 duration=1669ms
+2025-09-24T06:05:19.901893Z     info    request gateway=enterprise-agentgateway/gloo-agentgateway listener=http route=enterprise-agentgateway/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:54955 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 trace.id=60488f5d01d8606cfe7ae7f57c20f981 span.id=be198303a1e1a64f llm.provider=openai llm.request.model=gpt-4o-mini llm.request.tokens=12 llm.response.model=gpt-4o-mini-2024-07-18 llm.response.tokens=46 duration=1669ms
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -148,7 +148,7 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system azure-openai
-kubectl delete agentgatewaybackend -n gloo-system azure-openai
-kubectl delete secret -n gloo-system azureopenai-secret
+kubectl delete httproute -n enterprise-agentgateway azure-openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway azure-openai
+kubectl delete secret -n enterprise-agentgateway azureopenai-secret
 ```

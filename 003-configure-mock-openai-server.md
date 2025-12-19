@@ -22,7 +22,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-gpt-4o
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   replicas: 1
   selector:
@@ -66,7 +66,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-gpt-4o-svc
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
   labels:
     app: mock-gpt-4o
 spec:
@@ -88,11 +88,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -109,13 +109,13 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mock-openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
       openai:
         model: "gpt-4o"
-      host: mock-gpt-4o-svc.gloo-system.svc.cluster.local
+      host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
       port: 8000
       path: "/v1/chat/completions"
   policies:
@@ -126,7 +126,7 @@ EOF
 
 ## curl mock openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -146,7 +146,7 @@ All metrics
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and show all metrics"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ``` 
 
@@ -154,7 +154,7 @@ Filter for number of requests served through the gateway
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and filter for number of requests served through the gateway"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_requests_total && kill $!
 ``` 
 
@@ -162,7 +162,7 @@ Total input and output token usage through the gateway
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and filter for input/output token usage through the gateway"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_gen_ai_client_token_usage_sum && kill $!
 ``` 
 You can tell the difference between the two metrics from the `gen_ai_token_type="input/output"` label
@@ -170,7 +170,7 @@ You can tell the difference between the two metrics from the `gen_ai_token_type=
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1 | jq .
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1 | jq .
 ```
 
 Example output
@@ -179,10 +179,10 @@ Example output
   "level": "info",
   "time": "2025-12-19T06:23:49.655336Z",
   "scope": "request",
-  "gateway": "gloo-system/agentgateway",
+  "gateway": "enterprise-agentgateway/agentgateway",
   "listener": "http",
-  "route": "gloo-system/mock-openai",
-  "endpoint": "mock-gpt-4o-svc.gloo-system.svc.cluster.local:8000",
+  "route": "enterprise-agentgateway/mock-openai",
+  "endpoint": "mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local:8000",
   "src.addr": "10.42.0.1:52000",
   "http.method": "POST",
   "http.host": "192.168.107.2",
@@ -259,8 +259,8 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system mock-openai
-kubectl delete agentgatewaybackend -n gloo-system mock-openai
-kubectl delete -n gloo-system svc/mock-gpt-4o-svc
-kubectl delete -n gloo-system deploy/mock-gpt-4o
+kubectl delete httproute -n enterprise-agentgateway mock-openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway mock-openai
+kubectl delete -n enterprise-agentgateway svc/mock-gpt-4o-svc
+kubectl delete -n enterprise-agentgateway deploy/mock-gpt-4o
 ```

@@ -31,7 +31,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: bedrock-secret
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 type: Opaque
 stringData:
   accessKey: ${AWS_ACCESS_KEY_ID}
@@ -47,7 +47,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: bedrock-titan
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -64,7 +64,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: bedrock-haiku3.5
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -81,7 +81,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: bedrock-llama3-8b
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -98,13 +98,13 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: bedrock
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
   labels:
     example: bedrock-route
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -152,7 +152,7 @@ EOF
 
 ## curl AWS Bedrock Titan endpoint
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/bedrock/titan" \
   -H "content-type: application/json" \
@@ -200,7 +200,7 @@ curl -i "$GATEWAY_IP:8080/bedrock/llama3-8b" \
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -218,9 +218,9 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system bedrock
-kubectl delete agentgatewaybackend -n gloo-system bedrock-titan
-kubectl delete agentgatewaybackend -n gloo-system bedrock-haiku3.5
-kubectl delete agentgatewaybackend -n gloo-system bedrock-llama3-8b
-kubectl delete secret -n gloo-system bedrock-secret
+kubectl delete httproute -n enterprise-agentgateway bedrock
+kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-titan
+kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-haiku3.5
+kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-llama3-8b
+kubectl delete secret -n enterprise-agentgateway bedrock-secret
 ```

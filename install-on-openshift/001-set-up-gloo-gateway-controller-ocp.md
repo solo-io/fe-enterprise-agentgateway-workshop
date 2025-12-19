@@ -51,11 +51,11 @@ export GLOO_VERSION=2.1.0-beta.2
 
 ### Enterprise Agentgateway CRDs
 ```bash
-kubectl create namespace gloo-system
+kubectl create namespace enterprise-agentgateway
 ```
 
 ```bash
-helm upgrade -i --create-namespace --namespace gloo-system \
+helm upgrade -i --create-namespace --namespace enterprise-agentgateway \
     --version $GLOO_VERSION enterprise-agentgateway-crds \
     oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway-crds
 ```
@@ -81,7 +81,7 @@ ratelimitconfigs.ratelimit.solo.io
 ## Install Enterprise Agentgateway Controller
 Using Helm:
 ```bash
-helm upgrade -i -n gloo-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway \
+helm upgrade -i -n enterprise-agentgateway enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $GLOO_VERSION \
 --set-string licensing.licenseKey=$GLOO_TRIAL_LICENSE_KEY \
@@ -97,7 +97,7 @@ EOF
 Check that the Enterprise Agentgateway Controller is now running:
 
 ```bash
-kubectl get pods -n gloo-system -l app.kubernetes.io/name=enterprise-agentgateway
+kubectl get pods -n enterprise-agentgateway -l app.kubernetes.io/name=enterprise-agentgateway
 ```
 
 Expected Output:
@@ -117,7 +117,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: agentgateway-config
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 data:
   config.yaml: |-
     config:
@@ -177,7 +177,7 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayParameters
 metadata:
   name: agentgateway-params
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   logging:
     level: info
@@ -225,7 +225,7 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: agentgateway
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   gatewayClassName: enterprise-agentgateway
   infrastructure:
@@ -246,7 +246,7 @@ EOF
 Check that the Gloo Agentgateway Proxy is now running:
 
 ```bash
-kubectl get pods -n gloo-system
+kubectl get pods -n enterprise-agentgateway
 ```
 
 Expected Output:

@@ -5,6 +5,7 @@
   **Breaking Changes:**
   - Helm chart rename: `gloo-gateway` → `enterprise-agentgateway`, `gloo-gateway-crds` → `enterprise-agentgateway-crds`
   - Helm registry path change: charts now at `oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway*`
+  - Changed namespace: `gloo-system` → `enterprise-agentgateway`
   - License key flag: `licensing.glooGatewayLicenseKey` / `licensing.agentgatewayLicenseKey` → `licensing.licenseKey`
   - API group migration: `gateway.kgateway.dev` → `agentgateway.dev` for AgentgatewayBackend
   - API group migration: `gloo.solo.io` → `enterpriseagentgateway.solo.io` for policies

@@ -82,11 +82,11 @@ apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
   name: data-plane-monitoring-gloo-ai-metrics
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   namespaceSelector:
     matchNames:
-      - gloo-system
+      - enterprise-agentgateway
   podMetricsEndpoints:
     - port: metrics
   selector:

@@ -17,7 +17,7 @@ export OPENAI_API_KEY=$OPENAI_API_KEY
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n gloo-system \
+kubectl create secret generic openai-secret -n enterprise-agentgateway \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -29,11 +29,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -50,7 +50,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -66,7 +66,7 @@ EOF
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -86,7 +86,7 @@ All metrics
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and show all metrics"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ``` 
 
@@ -94,7 +94,7 @@ Filter for number of requests served through the gateway
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and filter for number of requests served through the gateway"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_requests_total && kill $!
 ``` 
 
@@ -102,7 +102,7 @@ Total input and output token usage through the gateway
 ```bash
 echo
 echo "Objective: curl /metrics endpoint and filter for input/output token usage through the gateway"
-kubectl port-forward -n gloo-system deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_gen_ai_client_token_usage_sum && kill $!
 ``` 
 You can tell the difference between the two metrics from the `gen_ai_token_type="input/output"` label
@@ -110,12 +110,12 @@ You can tell the difference between the two metrics from the `gen_ai_token_type=
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n gloo-system --tail 1
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
 Example output
 ```
-2025-12-19T00:47:17.454755Z     info    request gateway=gloo-system/agentgateway listener=http route=gloo-system/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:4478 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 protocol=llm gen_ai.operation.name=chat gen_ai.provider.name=openai gen_ai.request.model=gpt-4o-mini gen_ai.response.model=gpt-4o-mini-2024-07-18 gen_ai.usage.input_tokens=12 gen_ai.usage.output_tokens=52 duration=2163ms
+2025-12-19T00:47:17.454755Z     info    request gateway=enterprise-agentgateway/agentgateway listener=http route=enterprise-agentgateway/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:4478 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 protocol=llm gen_ai.operation.name=chat gen_ai.provider.name=openai gen_ai.request.model=gpt-4o-mini gen_ai.response.model=gpt-4o-mini-2024-07-18 gen_ai.usage.input_tokens=12 gen_ai.usage.output_tokens=52 duration=2163ms
 ```
 
 ## Port-forward to Grafana UI to view traces
@@ -133,7 +133,7 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system openai
-kubectl delete agentgatewaybackend -n gloo-system openai-all-models
-kubectl delete secret -n gloo-system openai-secret
+kubectl delete httproute -n enterprise-agentgateway openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
+kubectl delete secret -n enterprise-agentgateway openai-secret
 ```

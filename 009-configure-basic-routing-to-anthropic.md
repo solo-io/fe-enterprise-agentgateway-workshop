@@ -21,7 +21,7 @@ export CLAUDE_API_KEY=<your-anthropic-api-key>
 The secret created below contains the Anthropic API key for interacting with Anthropic Models.
 
 ```bash
-kubectl create secret generic anthropic-secret -n gloo-system \
+kubectl create secret generic anthropic-secret -n enterprise-agentgateway \
 --from-literal="Authorization=$CLAUDE_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -34,7 +34,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: anthropic
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -48,7 +48,7 @@ EOF
 ```
 
 ```bash
-kubectl get agentgatewaybackend -n gloo-system
+kubectl get agentgatewaybackend -n enterprise-agentgateway
 ```
 
 Create the route used to interact with the LLM via the Gateway that you created previously.
@@ -61,11 +61,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: claude
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -83,7 +83,7 @@ EOF
 Retrieve the Gateway address to use for testing purposes in the `curl` command to interact with Claude.
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/anthropic" \
   -H "content-type: application/json" \
@@ -106,7 +106,7 @@ Expected output should be a successful response from Claude with a paragraph abo
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n gloo-system claude
-kubectl delete agentgatewaybackend -n gloo-system anthropic
-kubectl delete secret -n gloo-system anthropic-secret
+kubectl delete httproute -n enterprise-agentgateway claude
+kubectl delete agentgatewaybackend -n enterprise-agentgateway anthropic
+kubectl delete secret -n enterprise-agentgateway anthropic-secret
 ```

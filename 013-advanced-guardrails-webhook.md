@@ -14,7 +14,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n gloo-system \
+kubectl create secret generic openai-secret -n enterprise-agentgateway \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -26,11 +26,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   parentRefs:
     - name: agentgateway
-      namespace: gloo-system
+      namespace: enterprise-agentgateway
   rules:
     - matches:
         - path:
@@ -47,7 +47,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
@@ -63,7 +63,7 @@ EOF
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n gloo-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -94,13 +94,13 @@ metadata:
   labels:
     account: ai-guardrail
   name: ai-guardrail
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: ai-guardrail-webhook
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
   labels:
     app: ai-guardrail
 spec:
@@ -115,7 +115,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ai-guardrail-webhook
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
   labels:
     app: ai-guardrail
 spec:
@@ -146,7 +146,7 @@ EOF
 
 Check that the ai-guardrail-webhook has been deployed
 ```bash
-kubectl get pods -n gloo-system -l app=ai-guardrail-webhook
+kubectl get pods -n enterprise-agentgateway -l app=ai-guardrail-webhook
 ```
 
 ## Apply prompt guard policy
@@ -156,7 +156,7 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: openai-prompt-guard
-  namespace: gloo-system
+  namespace: enterprise-agentgateway
   labels:
     app: agentgateway
 spec:
@@ -171,14 +171,14 @@ spec:
           - webhook:
               backendRef:
                 name: ai-guardrail-webhook
-                namespace: gloo-system
+                namespace: enterprise-agentgateway
                 kind: Service
                 port: 8000
         response:
           - webhook:
               backendRef:
                 name: ai-guardrail-webhook
-                namespace: gloo-system
+                namespace: enterprise-agentgateway
                 kind: Service
                 port: 8000
 EOF
@@ -203,12 +203,12 @@ curl -i "$GATEWAY_IP:8080/openai" \
 
 To see that the request went to the webhook endoint we can tail the logs of that service
 ```bash
-kubectl logs -n gloo-system deploy/ai-guardrail-webhook --tail 5
+kubectl logs -n enterprise-agentgateway deploy/ai-guardrail-webhook --tail 5
 ```
 
 Example output
 ```
-2025-09-23 18:50:54,285 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.gloo-system.svc.cluster.local:8000, content-length: 346
+2025-09-23 18:50:54,285 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.enterprise-agentgateway.svc.cluster.local:8000, content-length: 346
 2025-09-23 18:50:54,285 [INFO] 📥 Incoming /request webhook
 2025-09-23 18:50:54,286 [INFO] → Message[0] role=assistant: I don't have personal preferences, but one poem that many people admire is "The Road Not Taken" by Robert Frost. It evokes themes of choice and individuality, and its imagery resonates with a lot of readers. If you're interested in a particular type of poem or theme, I can suggest more!
 2025-09-23 18:50:54,286 [INFO] ✅ PassAction returned (request)
@@ -243,12 +243,12 @@ Rejected due to toxic language: matched phrase 'you are stupid'
 
 To see that the request went to the webhook endoint we can tail the logs of that service
 ```bash
-kubectl logs -n gloo-system deploy/ai-guardrail-webhook --tail 5
+kubectl logs -n enterprise-agentgateway deploy/ai-guardrail-webhook --tail 5
 ```
 
 Example logs
 ```
-2025-09-23 19:07:33,365 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.gloo-system.svc.cluster.local:8000, content-length: 89
+2025-09-23 19:07:33,365 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.enterprise-agentgateway.svc.cluster.local:8000, content-length: 89
 2025-09-23 19:07:33,366 [INFO] 📥 Incoming /request webhook
 2025-09-23 19:07:33,366 [INFO] → Message[0] role=user: You are stupid chatbot and i hate you
 2025-09-23 19:07:33,366 [WARNING] ⛔ RejectAction triggered: toxic phrase matched: 'you are stupid'
@@ -282,12 +282,12 @@ Rejected due to inappropriate content: matched word 'violence'
 
 To see that the request went to the webhook endoint we can tail the logs of that service
 ```bash
-kubectl logs -n gloo-system deploy/ai-guardrail-webhook --tail 15
+kubectl logs -n enterprise-agentgateway deploy/ai-guardrail-webhook --tail 15
 ```
 
 Example logs
 ```
-2025-09-23 19:08:31,886 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.gloo-system.svc.cluster.local:8000, content-length: 103
+2025-09-23 19:08:31,886 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.enterprise-agentgateway.svc.cluster.local:8000, content-length: 103
 2025-09-23 19:08:31,886 [INFO] 📥 Incoming /request webhook
 2025-09-23 19:08:31,886 [INFO] → Message[0] role=user: This story promotes violence and should be stopped.
 2025-09-23 19:08:31,886 [WARNING] ⛔ RejectAction triggered: banned word matched: 'violence'
@@ -316,12 +316,12 @@ The response should be masked
 
 To see that the request went to the webhook endoint we can tail the logs of that service
 ```bash
-kubectl logs -n gloo-system deploy/ai-guardrail-webhook --tail 15
+kubectl logs -n enterprise-agentgateway deploy/ai-guardrail-webhook --tail 15
 ```
 
 Example logs
 ```
-2025-09-23 19:09:14,306 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.gloo-system.svc.cluster.local:8000, content-length: 121
+2025-09-23 19:09:14,306 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.enterprise-agentgateway.svc.cluster.local:8000, content-length: 121
 2025-09-23 19:09:14,306 [INFO] 📥 Incoming /request webhook
 2025-09-23 19:09:14,306 [INFO] → Message[0] role=user: Repeat the following exactly: Here is my number: 4111 1111 1111 1111.
 2025-09-23 19:09:14,306 [INFO] 🔒 Matched PII pattern: \b(?:\d[ -]*?){13,16}\b
@@ -329,7 +329,7 @@ Example logs
 2025-09-23 19:09:14,307 [INFO] ✅ MaskAction returned (request)
 INFO:     10.42.0.10:56944 - "POST /request HTTP/1.1" 200 OK
 2025-09-23 19:09:15,375 [INFO] ✨ Adding trace for gloo-ai-request-webhook
-2025-09-23 19:09:15,379 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.gloo-system.svc.cluster.local:8000, content-length: 81
+2025-09-23 19:09:15,379 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.enterprise-agentgateway.svc.cluster.local:8000, content-length: 81
 2025-09-23 19:09:15,379 [INFO] 📥 Incoming /request webhook
 2025-09-23 19:09:15,379 [INFO] → Message[0] role=assistant: Here is my number: ****.
 2025-09-23 19:09:15,379 [INFO] ✅ PassAction returned (request)
@@ -358,12 +358,12 @@ The response should be masked
 
 To see that the request went to the webhook endoint we can tail the logs of that service
 ```bash
-kubectl logs -n gloo-system deploy/ai-guardrail-webhook --tail 15
+kubectl logs -n enterprise-agentgateway deploy/ai-guardrail-webhook --tail 15
 ```
 
 Example logs
 ```
-2025-09-23 19:10:13,428 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.gloo-system.svc.cluster.local:8000, content-length: 121
+2025-09-23 19:10:13,428 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.enterprise-agentgateway.svc.cluster.local:8000, content-length: 121
 2025-09-23 19:10:13,428 [INFO] 📥 Incoming /request webhook
 2025-09-23 19:10:13,428 [INFO] → Message[0] role=user: Repeat the following exactly: You can email me at support@example.com
 2025-09-23 19:10:13,428 [INFO] 🔒 Matched PII pattern: \b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b
@@ -371,7 +371,7 @@ Example logs
 2025-09-23 19:10:13,429 [INFO] ✅ MaskAction returned (request)
 INFO:     10.42.0.10:40274 - "POST /request HTTP/1.1" 200 OK
 2025-09-23 19:10:14,931 [INFO] ✨ Adding trace for gloo-ai-request-webhook
-2025-09-23 19:10:14,934 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.gloo-system.svc.cluster.local:8000, content-length: 81
+2025-09-23 19:10:14,934 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.enterprise-agentgateway.svc.cluster.local:8000, content-length: 81
 2025-09-23 19:10:14,934 [INFO] 📥 Incoming /request webhook
 2025-09-23 19:10:14,935 [INFO] → Message[0] role=assistant: You can email me at ****
 2025-09-23 19:10:14,935 [INFO] ✅ PassAction returned (request)
@@ -401,11 +401,11 @@ Example of a masked response trace in Jaeger
 
 ## Cleanup
 ```bash
-kubectl delete sa -n gloo-system ai-guardrail
-kubectl delete service -n gloo-system ai-guardrail-webhook
-kubectl delete deployment -n gloo-system ai-guardrail-webhook
-kubectl delete enterpriseagentgatewaypolicy -n gloo-system openai-prompt-guard
-kubectl delete httproute -n gloo-system openai
-kubectl delete agentgatewaybackend -n gloo-system openai-all-models
-kubectl delete secret -n gloo-system openai-secret
+kubectl delete sa -n enterprise-agentgateway ai-guardrail
+kubectl delete service -n enterprise-agentgateway ai-guardrail-webhook
+kubectl delete deployment -n enterprise-agentgateway ai-guardrail-webhook
+kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway openai-prompt-guard
+kubectl delete httproute -n enterprise-agentgateway openai
+kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
+kubectl delete secret -n enterprise-agentgateway openai-secret
 ```
