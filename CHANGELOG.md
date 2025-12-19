@@ -1,6 +1,6 @@
 # Changelog
 
-0.3.0 - (12-18-25)
+0.3.0 - (12-19-25)
   ---
   **Breaking Changes:**
   - Helm chart rename: `gloo-gateway` → `enterprise-agentgateway`, `gloo-gateway-crds` → `enterprise-agentgateway-crds`
@@ -23,6 +23,8 @@
   - Add new lab: `020-configure-basic-routing-to-azureopenai.md` for Azure OpenAI routing
   - Fixed Azure OpenAI endpoint configuration (hostname only, no `https://` scheme)
   - Updated config for OpenShift deploys
+  - add `000-image-list.md`
+  - add sharedExtension overrides in `001` install config (commented out as it is not working at the moment)
 
 0.2.3 - (11-21-25)
 ---

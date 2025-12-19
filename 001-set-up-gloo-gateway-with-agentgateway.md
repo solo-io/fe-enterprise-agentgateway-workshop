@@ -118,6 +118,30 @@ metadata:
   name: agentgateway-params
   namespace: enterprise-agentgateway
 spec:
+  ### -- uncomment to override shared extensions -- ###
+  #sharedExtensions:
+  #  extauth:
+  #    enabled: true
+  #    replicas: 2
+  #    container:
+  #      image:
+  #        registry: air-gapped-registry-for-example.solo.io
+  #        repository: ext-auth
+  #        tag: "0.0.1"
+  #  ratelimiter:
+  #    enabled: true
+  #    replicas: 2
+  #    container:
+  #      image:
+  #        registry: air-gapped-registry-for-example.solo.io
+  #        repository: rate-limiter
+  #        tag: "0.0.1"
+  #  extCache:
+  #    container:
+  #      image:
+  #        registry: air-gapped-registry-for-example.solo.io
+  #        repository: ext-cache
+  #        tag: "0.0.1"
   logging:
     level: info
   #--- Image overrides for deployment ---
