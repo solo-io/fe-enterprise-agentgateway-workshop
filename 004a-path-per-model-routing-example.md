@@ -4,7 +4,7 @@
 This lab assumes that you have completed the setup in `001`, and `002`, and `003`
 
 ## Lab Objectives
-- Configure `Backend` per model using model override parameter
+- Configure `AgentgatewayBackend` per model using model override parameter
 - Configure LLM routing example with path-per-model to access endpoint
 - Curl OpenAI endpoints through the agentgateway proxy
 - Validate path to model mapping
@@ -18,7 +18,7 @@ kubectl create secret generic openai-secret -n gloo-system \
 ```
 
 ### Configure LLM routing example with path-per-model to access endpoints
-Our previous `Backend` allows the user to specify any `model` parameter in the request body. In order to restrict access to specific models, we can configure a model override in the `Backend` 
+Our previous `AgentgatewayBackend` allows the user to specify any `model` parameter in the request body. In order to restrict access to specific models, we can configure a model override in the `AgentgatewayBackend`
 ```
 provider:
   openai:
@@ -26,15 +26,15 @@ provider:
 ```
 When a model override is configured, the gateway will override any user-input `model` parameter in the request body (e.g. if user supplies `model: gpt-5-2025-08-07` it will be overridden to `gpt-4o-mini`)
 
-With this option, we can create a `Backend` per model if we want more granular control of access to models. 
+With this option, we can create an `AgentgatewayBackend` per model if we want more granular control of access to models. 
 
 **Additionally, when model overrides are specified, the client does not have to supply a `model` parameter in the request body, since the gateway will inject it. The client can input a model in the request body, but effectively it will just be overwritten.**
 
-Lets create an OpenAI backend per specific-model
+Lets create an OpenAI `AgentgatewayBackend` per specific-model
 ```bash
 kubectl apply -f - <<EOF
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-3.5-turbo
@@ -50,7 +50,7 @@ spec:
       secretRef:
         name: openai-secret
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-4o-mini
@@ -66,7 +66,7 @@ spec:
       secretRef:
         name: openai-secret
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-4o
@@ -103,7 +103,7 @@ spec:
             value: /openai/gpt-3.5-turbo
       backendRefs:
         - name: openai-gpt-3.5-turbo
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
@@ -113,7 +113,7 @@ spec:
             value: /openai/gpt-4o-mini
       backendRefs:
         - name: openai-gpt-4o-mini
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
@@ -123,7 +123,7 @@ spec:
             value: /openai/gpt-4o
       backendRefs:
         - name: openai-gpt-4o
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"

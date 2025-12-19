@@ -5,8 +5,8 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Configure built-in guardrails
+- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Configure built-in guardrails using `EnterpriseAgentgatewayPolicy`
 - Validate guardrails are enforced
 
 Create openai api-key secret
@@ -35,12 +35,12 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
@@ -78,29 +78,27 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ## Reject inappropriate requests
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gloo.solo.io/v1alpha1
-kind: AgentgatewayEnterprisePolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: openai-prompt-guard
   namespace: gloo-system
-  labels:
-    app: agentgateway
 spec:
   targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: openai
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
   backend:
     ai:
       promptGuard:
         request:
-        - response:
-            message: "Rejected due to inappropriate content"
-            statusCode: 403
-          regex:
-            action: REJECT
-            matches:
-            - "credit card"
+          - response:
+              message: "Rejected due to inappropriate content"
+              statusCode: 403
+            regex:
+              action: REJECT
+              matches:
+                - "credit card"
 EOF
 ```
 
@@ -140,26 +138,24 @@ To avoid information from being leaked, we can also configure a prompt guard on 
 
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gloo.solo.io/v1alpha1
-kind: AgentgatewayEnterprisePolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: openai-prompt-guard
   namespace: gloo-system
-  labels:
-    app: agentgateway
 spec:
   targetRefs:
-  - group: gateway.networking.k8s.io
-    kind: HTTPRoute
-    name: openai
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
   backend:
     ai:
       promptGuard:
         response:
-        - regex:
-            action: MASK
-            builtins:
-            - "CREDIT_CARD"
+          - regex:
+              action: MASK
+              builtins:
+                - CreditCard
 EOF
 ```
 
@@ -180,7 +176,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 
 ## Cleanup
 ```bash
-kubectl delete agentgatewayenterprisepolicy -n gloo-system openai-prompt-guard
+kubectl delete enterpriseagentgatewaypolicy -n gloo-system openai-prompt-guard
 kubectl delete httproute -n gloo-system openai
 kubectl delete agentgatewaybackend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret

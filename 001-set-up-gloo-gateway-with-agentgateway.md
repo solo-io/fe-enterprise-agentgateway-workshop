@@ -1,6 +1,6 @@
-# Install Gloo Gateway with Agentgateway
+# Install Enterprise Agentgateway
 
-In this workshop, you’ll deploy Gloo Gateway V2 with Agentgateway and complete hands-on labs that showcase routing, security, observability, and Gen AI features.
+In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on labs that showcase routing, security, observability, and Gen AI features.
 
 ## Pre-requisites
 - Kubernetes > 1.30
@@ -8,14 +8,14 @@ In this workshop, you’ll deploy Gloo Gateway V2 with Agentgateway and complete
 
 ## Lab Objectives
 - Configure Kubernetes Gateway API CRDs
-- Configure Gloo Gateway CRDs
-- Install Gloo Gateway Controller
+- Configure Enterprise Agentgateway CRDs
+- Install Enterprise Agentgateway Controller
 - Configure agentgateway
 - Validate that components are installed
 
 ### Kubernetes Gateway API CRDs
 
-Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Gloo Gateway
+Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway
 
 ```bash
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
@@ -39,79 +39,71 @@ httproutes                        gateway.networking.k8s.io/v1        true      
 referencegrants      refgrant     gateway.networking.k8s.io/v1beta1   true         ReferenceGrant
 ```
 
-## Install Gloo Gateway
+## Install Enterprise Agentgateway
 
 ### Configure Required Variables
-Export your Gloo Trial license key variable and Gloo Gateway version
+Export your Gloo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export GLOO_TRIAL_LICENSE_KEY=$GLOO_TRIAL_LICENSE_KEY
-export GLOO_VERSION=2.1.0-beta.1
+export GLOO_VERSION=2.1.0-beta.2
 ```
 
-### Gloo Gateway CRDs
+### Enterprise Agentgateway CRDs
 ```bash
 kubectl create namespace gloo-system
 ```
 
 ```bash
 helm upgrade -i --create-namespace --namespace gloo-system \
-    --version $GLOO_VERSION gloo-gateway-crds \
-    oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/gloo-gateway-crds
+    --version $GLOO_VERSION enterprise-agentgateway-crds \
+    oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway-crds
 ```
 
-To check if the the Gloo Gateway CRDs are installed-
+To check if the the Enterprise Agentgateway CRDs are installed-
 
 ```bash
-kubectl get crds | grep -E "solo.io|kgateway" | awk '{ print $1 }'
+kubectl get crds | grep -E "solo.io|agentgateway" | awk '{ print $1 }'
 ```
 
 Expected output
 
 ```bash
+agentgatewaybackends.agentgateway.dev
+agentgatewayparameters.agentgateway.dev
+agentgatewaypolicies.agentgateway.dev
 authconfigs.extauth.solo.io
-backendconfigpolicies.gateway.kgateway.dev
-backends.gateway.kgateway.dev
-directresponses.gateway.kgateway.dev
-gatewayextensions.gateway.kgateway.dev
-gatewayparameters.gateway.kgateway.dev
-gloogatewayparameters.gloo.solo.io
-glootrafficpolicies.gloo.solo.io
-httplistenerpolicies.gateway.kgateway.dev
+enterpriseagentgatewayparameters.enterpriseagentgateway.solo.io
+enterpriseagentgatewaypolicies.enterpriseagentgateway.solo.io
 ratelimitconfigs.ratelimit.solo.io
-trafficpolicies.gateway.kgateway.dev
 ```
 
-## Install Gloo Gateway Controller
+## Install Enterprise Agentgateway Controller
 Using Helm:
 ```bash
-helm upgrade -i -n gloo-system gloo-gateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/gloo-gateway \
+helm upgrade -i -n gloo-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $GLOO_VERSION \
---set-string licensing.glooGatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
---set-string licensing.agentgatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
+--set-string licensing.licenseKey=$GLOO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 #--- Optional: global override for image registry/tag
 #image:
 #  registry: us-docker.pkg.dev/solo-public/gloo-gateway
 #  tag: "$GLOO_VERSION"
 #  pullPolicy: IfNotPresent
-#--- Enable integration with agentgateway ---
-agentgateway:
-  enabled: true
 EOF
 ```
 
-Check that the Gloo Gateway Controller is now running:
+Check that the Enterprise Agentgateway Controller is now running:
 
 ```bash
-kubectl get pods -n gloo-system -l app.kubernetes.io/name=gloo-gateway
+kubectl get pods -n gloo-system -l app.kubernetes.io/name=enterprise-agentgateway
 ```
 
 Expected Output:
 
 ```bash
-NAME                            READY   STATUS    RESTARTS   AGE
-gloo-gateway-64ff8f5c96-sjv7p   1/1     Running   0          3h17m
+NAME                                       READY   STATUS    RESTARTS   AGE
+enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 ```
 
 ## Configure agentgateway
@@ -182,29 +174,46 @@ data:
             # --- Capture the whole response body as JSON
             response.body: 'json(response.body)'
 ---
-apiVersion: gloo.solo.io/v1alpha1
-kind: GlooGatewayParameters
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayParameters
 metadata:
   name: agentgateway-params
   namespace: gloo-system
 spec:
-  kube:
-    agentgateway:
-      enabled: true
-      logLevel: info
-      customConfigMapName: agentgateway-config
-      #--- Image overrides for deployment ---
-      #image:  
-      #  tag: ""
-    #--- Adding sample annotation specific to AWS env ---
-    service:
-      extraAnnotations:
+  logging:
+    level: info
+  #--- Image overrides for deployment ---
+  #image:
+  #  tag: ""
+  #  registry: us-docker.pkg.dev/solo-public/gloo-gateway
+  service:
+    metadata:
+      annotations:
         service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    spec:
       type: LoadBalancer
-    #--- Uncomment to add gateway to ambient mesh ---
-    #podTemplate:
-    #  extraLabels:
-    #    istio.io/dataplane-mode: ambient
+  #--- Use rawConfig to inline custom configuration from ConfigMap ---
+  #rawConfig:
+  #  config:
+  #    logging:
+  #      fields:
+  #        add:
+  #          rq.headers.all: 'request.headers'
+  #          jwt: 'jwt'
+  #          request.body: json(request.body)
+  #          response.body: json(response.body)
+  #      format: json
+  #    tracing:
+  #      otlpProtocol: grpc
+  #      otlpEndpoint: http://tempo-distributor.monitoring.svc.cluster.local:4317
+  #      randomSampling: 'true'
+  #--- Uncomment to add gateway to ambient mesh ---
+  #deployment:
+  #  spec:
+  #    template:
+  #      metadata:
+  #        labels:
+  #          istio.io/dataplane-mode: ambient
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -212,12 +221,12 @@ metadata:
   name: agentgateway
   namespace: gloo-system
 spec:
-  gatewayClassName: agentgateway-enterprise
+  gatewayClassName: enterprise-agentgateway
   infrastructure:
     parametersRef:
       name: agentgateway-params
-      group: gloo.solo.io
-      kind: GlooGatewayParameters  
+      group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayParameters
   listeners:
     - name: http
       port: 8080
@@ -238,9 +247,8 @@ Expected Output:
 
 ```bash
 NAME                                                        READY   STATUS    RESTARTS   AGE
-agentgateway-55ccdfb97f-vgj4t                               1/1     Running   0          22s
-ext-auth-service-agentgateway-enterprise-76f699bd4d-8sm2b   1/1     Running   0          21s
-gloo-ext-cache-agentgateway-enterprise-6d9fb97dc8-dn75s     1/1     Running   0          22s
-gloo-gateway-6b589f4849-sqw6q                               1/1     Running   0          3m17s
-rate-limiter-agentgateway-enterprise-5cc6d9586b-rxj9r       1/1     Running   0          21s
+enterprise-agentgateway-5fc9d95758-n8vvb                    1/1     Running   0          11m
+ext-auth-service-enterprise-agentgateway-544c6565cf-t86ml   1/1     Running   0          5m4s
+ext-cache-enterprise-agentgateway-9ddc746d8-cb7t2           1/1     Running   0          5m4s
+rate-limiter-enterprise-agentgateway-6c8dd77b6b-n8v7m       1/1     Running   0          5m4s
 ```

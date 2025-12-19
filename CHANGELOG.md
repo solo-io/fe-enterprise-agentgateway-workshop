@@ -1,8 +1,8 @@
 # Changelog
 
-0.3.0 - (11-25-25)
+0.3.0 - (12-18-25)
 ---
-- Testing 2.1.0-beta.1
+- Testing 2.1.0-beta.2
 - Add new lab: `020-configure-basic-routing-to-azureopenai.md` to demonstrate routing to an Azure OpenAI as the backend LLM provider
 
 0.2.3 - (11-21-25)

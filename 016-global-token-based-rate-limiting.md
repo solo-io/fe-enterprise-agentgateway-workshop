@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
 - Create an initial RateLimitConfig to implement token-based rate limiting (input tokens) using a simple counter (e.g. all users get 10 tokens per hour)
 - Validate token-based rate limiting
 
@@ -35,12 +35,12 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
@@ -103,8 +103,8 @@ EOF
 Create GlooTrafficPolicy referencing the rate limit config we just created
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gloo.solo.io/v1alpha1
-kind: AgentgatewayEnterprisePolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: token-based-rate-limit
   namespace: gloo-system
@@ -170,6 +170,6 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 kubectl delete httproute -n gloo-system openai
 kubectl delete agentgatewaybackend -n gloo-system openai-all-models
 kubectl delete secret -n gloo-system openai-secret
-kubectl delete agentgatewayenterprisepolicy -n gloo-system token-based-rate-limit
+kubectl delete enterpriseagentgatewaypolicy -n gloo-system token-based-rate-limit
 kubectl delete rlc -n gloo-system token-based-rate-limit
 ```

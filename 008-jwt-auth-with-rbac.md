@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
 - Configure JWT Auth
 - Validate JWT Auth
 
@@ -16,7 +16,7 @@ kubectl create secret generic openai-secret -n gloo-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create openai route and backend
+Create openai route and `AgentgatewayBackend`
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -78,8 +78,8 @@ curl -i "$GATEWAY_IP:8080/openai" \
 Create agentgateway traffic policy
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: gloo.solo.io/v1alpha1
-kind: AgentgatewayEnterprisePolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: agentgateway-jwt-auth
   namespace: gloo-system
@@ -170,7 +170,7 @@ If you decode the JWT, you’ll see that agentgateway successfully verified it a
 ```
 
 Bonus Exercise:
-Update the CEL expression in the GlooTrafficPolicy to experiment with RBAC behavior. For example, adjust the claims in your JWT and resend the request to see when access is allowed or denied:
+Update the CEL expression in the EnterpriseAgentgatewayPolicy to experiment with RBAC behavior. For example, adjust the claims in your JWT and resend the request to see when access is allowed or denied:
 ```
 rbac:
     policy:
@@ -181,12 +181,28 @@ rbac:
 ## Dynamic JWT Auth
 
 
+Create an AgentgatewayBackend for the Okta JWKS endpoint
+```bash
+kubectl apply -f- <<EOF
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: okta-jwks
+  namespace: gloo-system
+spec:
+  static:
+    host: integrator-5513662.okta.com
+    port: 443
+  policies:
+    tls: {}
+EOF
+```
+
 Create agentgateway traffic policy
 ```bash
 kubectl apply -f- <<EOF
----
-apiVersion: gloo.solo.io/v1alpha1
-kind: AgentgatewayEnterprisePolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: agentgateway-jwt-auth
   namespace: gloo-system
@@ -202,7 +218,12 @@ spec:
         - issuer: https://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697
           jwks:
             remote:
-              uri: http://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697/v1/keys
+              backendRef:
+                name: okta-jwks
+                namespace: gloo-system
+                kind: AgentgatewayBackend
+                group: agentgateway.dev
+              jwksPath: /oauth2/ausxkvmeftgcdj6HA697/v1/keys
     authorization:
       policy:
         matchExpressions:
@@ -292,6 +313,7 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 ```bash
 kubectl delete httproute -n gloo-system openai
 kubectl delete agentgatewaybackend -n gloo-system openai-all-models
+kubectl delete agentgatewaybackend -n gloo-system okta-jwks
 kubectl delete secret -n gloo-system openai-secret
-kubectl delete agentgatewayenterprisepolicy -n gloo-system agentgateway-jwt-auth
+kubectl delete enterpriseagentgatewaypolicy -n gloo-system agentgateway-jwt-auth
 ```

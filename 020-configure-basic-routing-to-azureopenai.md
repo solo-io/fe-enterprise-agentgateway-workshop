@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our Azure OpenAI api-key credentials
-- Create a route to Azure OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Create a route to Azure OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
 - Curl Azure OpenAI through the agentgateway proxy
 - Validate the request went through the gateway in Grafana/Jaeger UI
 
@@ -15,9 +15,11 @@ Set the following environment variables to match your Azure OpenAI deployment.
 For reference, an endpoint typically follows this format:
 `https://${ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-01`
 
+**Note:** The ENDPOINT should be just the hostname without the `https://` scheme (e.g., `my-endpoint.openai.azure.com`)
+
 ```bash
 export AZURE_OPENAI_API_KEY="<API-KEY>"
-export ENDPOINT="<AZURE-OPENAI-ENDPOINT>"
+export ENDPOINT="<AZURE-OPENAI-ENDPOINT>"  # Just the hostname, no https://
 export DEPLOYMENT_NAME="<DEPLOYMENT-NAME>"
 ```
 
@@ -54,12 +56,12 @@ spec:
             value: /azure
       backendRefs:
         - name: azure-openai
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: azure-openai
@@ -70,7 +72,6 @@ spec:
       azureopenai:
         endpoint: "${ENDPOINT}"
         deploymentName: "${DEPLOYMENT_NAME}"
-        apiVersion: v1
   policies:
     auth:
       secretRef:

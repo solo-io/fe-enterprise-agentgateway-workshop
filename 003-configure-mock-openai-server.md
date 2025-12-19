@@ -100,12 +100,12 @@ spec:
             value: /openai
       backendRefs:
         - name: mock-openai
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mock-openai
@@ -194,7 +194,7 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 ## Cleanup
 ```bash
 kubectl delete httproute -n gloo-system mock-openai
-kubectl delete backend -n gloo-system mock-openai
+kubectl delete agentgatewaybackend -n gloo-system mock-openai
 kubectl delete -n gloo-system svc/mock-gpt-4o-svc
 kubectl delete -n gloo-system deploy/mock-gpt-4o
 ```

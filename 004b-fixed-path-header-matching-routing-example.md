@@ -16,11 +16,11 @@ kubectl create secret generic openai-secret -n gloo-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Lets create an OpenAI backend per specific-model if you haven't already
+Lets create an OpenAI `AgentgatewayBackend` per specific-model if you haven't already
 ```bash
 kubectl apply -f - <<EOF
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-3.5-turbo
@@ -36,7 +36,7 @@ spec:
       secretRef:
         name: openai-secret
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-4o-mini
@@ -52,7 +52,7 @@ spec:
       secretRef:
         name: openai-secret
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-gpt-4o
@@ -95,7 +95,7 @@ spec:
             value: gpt-3.5-turbo
       backendRefs:
         - name: openai-gpt-3.5-turbo
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
@@ -109,7 +109,7 @@ spec:
             value: gpt-4o-mini
       backendRefs:
         - name: openai-gpt-4o-mini
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
@@ -123,7 +123,7 @@ spec:
             value: gpt-4o
       backendRefs:
         - name: openai-gpt-4o
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"

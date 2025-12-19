@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our AWS Access Key credentials
-- Create a route to AWS Bedrock as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Create a route to AWS Bedrock as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
 - Curl AWS Bedrock through the agentgateway proxy
 - Validate the request went through the gateway in Jaeger UI
 
@@ -40,10 +40,10 @@ stringData:
 EOF
 ```
 
-Create AWS Bedrock route and backend. For this setup we will configure multiple `Backends` using a single provider (AWS Bedrock) in a path-per-model routing configuration
+Create AWS Bedrock route and `AgentgatewayBackend`. For this setup we will configure multiple `AgentgatewayBackends` using a single provider (AWS Bedrock) in a path-per-model routing configuration
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: bedrock-titan
@@ -56,10 +56,11 @@ spec:
         region: us-west-2
   policies:
     auth:
-      secretRef:
-        name: bedrock-secret
+      aws:
+        secretRef:
+          name: bedrock-secret
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: bedrock-haiku3.5
@@ -72,10 +73,11 @@ spec:
         region: us-west-2
   policies:
     auth:
-      secretRef:
-        name: bedrock-secret
+      aws:
+        secretRef:
+          name: bedrock-secret
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: bedrock-llama3-8b
@@ -88,8 +90,9 @@ spec:
         region: us-west-2
   policies:
     auth:
-      secretRef:
-        name: bedrock-secret
+      aws:
+        secretRef:
+          name: bedrock-secret
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -109,7 +112,7 @@ spec:
             value: /bedrock/haiku
       backendRefs:
         - name: bedrock-haiku3.5
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
@@ -119,7 +122,7 @@ spec:
             value: /bedrock/titan
       backendRefs:
         - name: bedrock-titan
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
@@ -129,7 +132,7 @@ spec:
             value: /bedrock/llama3-8b
       backendRefs:
         - name: bedrock-llama3-8b
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
@@ -140,7 +143,7 @@ spec:
             value: /bedrock
       backendRefs:
         - name: bedrock-titan
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"

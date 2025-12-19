@@ -5,8 +5,8 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Configure api-key AuthConfig to mask OpenAI api-key with an org-specific api-key 
+- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Configure api-key AuthConfig to mask OpenAI api-key with an org-specific api-key
 - Validate api-key masking use case
 
 Create openai api-key secret
@@ -16,7 +16,7 @@ kubectl create secret generic openai-secret -n gloo-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create openai route and backend
+Create openai route and `AgentgatewayBackend`
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -35,12 +35,12 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: gateway.kgateway.dev
+          group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: gateway.kgateway.dev/v1alpha1
+apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
@@ -124,8 +124,8 @@ spec:
           x-org:
             name: x-org
 ---
-apiVersion: gloo.solo.io/v1alpha1
-kind: AgentgatewayEnterprisePolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: api-key-auth
   namespace: gloo-system
@@ -206,7 +206,7 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you
 
 ## Cleanup
 ```bash
-kubectl delete agentgatewayenterprisepolicy -n gloo-system api-key-auth
+kubectl delete enterpriseagentgatewaypolicy -n gloo-system api-key-auth
 kubectl delete authconfig -n gloo-system apikey-auth
 kubectl delete secret -n gloo-system team1-apikey
 kubectl delete httproute -n gloo-system openai
