@@ -3,7 +3,7 @@
 In this workshop, you'll deploy Enterprise Agentgateway on OpenShift and complete hands-on labs that showcase routing, security, observability, and Gen AI features.
 
 ## Pre-requisites
-- Kubernetes > 1.29
+- Kubernetes > 1.30
 - Kubernetes Gateway API
 - OpenShift cluster
 
@@ -401,8 +401,9 @@ Expected Output:
 
 ```bash
 NAME                                                        READY   STATUS    RESTARTS   AGE
-enterprise-agentgateway-5fc9d95758-n8vvb                    1/1     Running   0          11m
-ext-auth-service-enterprise-agentgateway-544c6565cf-t86ml   1/1     Running   0          5m4s
-ext-cache-enterprise-agentgateway-9ddc746d8-cb7t2           1/1     Running   0          5m4s
-rate-limiter-enterprise-agentgateway-6c8dd77b6b-n8v7m       1/1     Running   0          5m4s
+agentgateway-778ff69fd4-wmcrv                               1/1     Running   0          34s
+enterprise-agentgateway-5fc9d95758-v5jqf                    1/1     Running   0          3m45s
+ext-auth-service-enterprise-agentgateway-544c6565cf-zwzzp   1/1     Running   0          33s
+ext-cache-enterprise-agentgateway-67c78bfd44-5lmv8          1/1     Running   0          34s
+rate-limiter-enterprise-agentgateway-666754f856-5gnjb       1/1     Running   0          34s
 ```
