@@ -146,13 +146,13 @@ spec:
             request.body: json(request.body)
             response.body: json(response.body)
             # --- Capture all request headers as individual keys (flattened)
-            #rq.headers: 'flatten(request.headers)'
+            rq.headers: 'flatten(request.headers)'
             # --- Capture a single header by name (example: x-foo)
-            #x-foo: 'request.headers["x-foo"]'
+            x-foo: 'request.headers["x-foo"]'
             # --- Capture entire request body
-            #request.body: json(request.body)
+            request.body: json(request.body)
             # --- Capture a field in the request body
-            #request.body.modelId: json(request.body).modelId
+            request.body.modelId: json(request.body).modelId
         format: json
       tracing:
         otlpProtocol: grpc
