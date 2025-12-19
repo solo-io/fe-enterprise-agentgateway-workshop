@@ -175,7 +175,73 @@ kubectl logs deploy/agentgateway -n gloo-system --tail 1 | jq .
 
 Example output
 ```
-2025-09-24T06:05:19.901893Z     info    request gateway=gloo-system/agentgateway listener=http route=gloo-system/openai endpoint=api.openai.com:443 src.addr=10.42.0.1:54955 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=200 trace.id=60488f5d01d8606cfe7ae7f57c20f981 span.id=be198303a1e1a64f llm.provider=openai llm.request.model=gpt-4o-mini llm.request.tokens=12 llm.response.model=gpt-4o-mini llm.response.tokens=46 duration=1669ms
+{
+  "level": "info",
+  "time": "2025-12-19T06:23:49.655336Z",
+  "scope": "request",
+  "gateway": "gloo-system/agentgateway",
+  "listener": "http",
+  "route": "gloo-system/mock-openai",
+  "endpoint": "mock-gpt-4o-svc.gloo-system.svc.cluster.local:8000",
+  "src.addr": "10.42.0.1:52000",
+  "http.method": "POST",
+  "http.host": "192.168.107.2",
+  "http.path": "/openai",
+  "http.version": "HTTP/1.1",
+  "http.status": 200,
+  "trace.id": "42d8b4df6a37562a3acfaabde69a16a8",
+  "span.id": "c8bcc8a3f650398e",
+  "protocol": "llm",
+  "gen_ai.operation.name": "chat",
+  "gen_ai.provider.name": "openai",
+  "gen_ai.request.model": "gpt-4o",
+  "gen_ai.response.model": "gpt-4o",
+  "gen_ai.usage.input_tokens": 5,
+  "gen_ai.usage.output_tokens": 31,
+  "duration": "0ms",
+  "request.body": {
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  },
+  "response.body": {
+    "do_remote_decode": false,
+    "remote_block_ids": null,
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "content": "I am your AI assistant, how can I help you today? Give a man a fish and you feed him for a day; teach a man to fish ",
+          "role": "assistant"
+        },
+        "finish_reason": "stop"
+      }
+    ],
+    "created": 1766125429,
+    "usage": {
+      "completion_tokens": 31,
+      "prompt_tokens": 5,
+      "total_tokens": 36
+    },
+    "remote_port": 0,
+    "do_remote_prefill": false,
+    "object": "chat.completion",
+    "id": "chatcmpl-f58ffb8c-95fc-4f78-8c66-9de4f55a0f58",
+    "remote_engine_id": "",
+    "remote_host": "",
+    "model": "gpt-4o"
+  },
+  "rq.headers.all": {
+    "accept": "*/*",
+    "content-length": "144",
+    "user-agent": "curl/8.7.1",
+    "content-type": "application/json"
+  }
+}
 ```
 
 ## Port-forward to Grafana UI to view traces

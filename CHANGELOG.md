@@ -1,9 +1,24 @@
 # Changelog
 
 0.3.0 - (12-18-25)
----
-- Testing 2.1.0-beta.2
-- Add new lab: `020-configure-basic-routing-to-azureopenai.md` to demonstrate routing to an Azure OpenAI as the backend LLM provider
+  ---
+  **Breaking Changes:**
+  - Helm chart rename: `gloo-gateway` → `enterprise-agentgateway`, `gloo-gateway-crds` → `enterprise-agentgateway-crds`
+  - Helm registry path change: charts now at `oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway*`
+  - License key flag: `licensing.glooGatewayLicenseKey` / `licensing.agentgatewayLicenseKey` → `licensing.licenseKey`
+  - API group migration: `gateway.kgateway.dev` → `agentgateway.dev` for AgentgatewayBackend
+  - API group migration: `gloo.solo.io` → `enterpriseagentgateway.solo.io` for policies
+  - CRD renames: `Backend` → `AgentgatewayBackend`, `GlooGatewayParameters` → `EnterpriseAgentgatewayParameters`, `GlooTrafficPolicy`/`AgentgatewayEnterprisePolicy` → `EnterpriseAgentgatewayPolicy`
+  - GatewayClass name: `agentgateway-enterprise` → `enterprise-agentgateway`
+  - Policy structure: traffic fields moved to `spec.traffic`, AI backend fields moved to `spec.backend`
+  - Backend structure: `spec.ai.llm` → `spec.ai.provider`, `authToken` → `policies.auth`
+
+  **Updates:**
+  - Updated all labs (001-020) to use new API versions and Helm charts
+  - Reorganized `/install-on-openshift` files to mirror root structure (001: full installation, 002: monitoring tools)
+  - Updated OpenShift deployment to use `EnterpriseAgentgatewayParameters` with proper security context configuration
+  - Add new lab: `020-configure-basic-routing-to-azureopenai.md` for Azure OpenAI routing
+  - Fixed Azure OpenAI endpoint configuration (hostname only, no `https://` scheme)
 
 0.2.3 - (11-21-25)
 ---

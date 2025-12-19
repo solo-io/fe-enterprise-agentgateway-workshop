@@ -1,20 +1,22 @@
-# Gloo Gateway with Agentgateway on OpenShift
+# Install Enterprise Agentgateway on OpenShift
 
-This minimal guide covers the installation and simple usage of Gloo Gateway with Agentgateway routing to OpenAI as a backend LLM
+In this workshop, you'll deploy Enterprise Agentgateway on OpenShift and complete hands-on labs that showcase routing, security, observability, and Gen AI features.
 
 ## Pre-requisites
 - Kubernetes > 1.30
 - Kubernetes Gateway API
+- OpenShift cluster
 
 ## Lab Objectives
 - Configure Kubernetes Gateway API CRDs
-- Configure Gloo Gateway CRDs
-- Install Gloo Gateway Controller
-- Install Jaeger
+- Configure Enterprise Agentgateway CRDs
+- Install Enterprise Agentgateway Controller
+- Configure agentgateway
+- Validate that components are installed
 
 ### Kubernetes Gateway API CRDs
 
-Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Gloo Gateway
+Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway
 
 ```bash
 kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
@@ -38,116 +40,221 @@ httproutes                        gateway.networking.k8s.io/v1        true      
 referencegrants      refgrant     gateway.networking.k8s.io/v1beta1   true         ReferenceGrant
 ```
 
+## Install Enterprise Agentgateway
+
 ### Configure Required Variables
-Export your Gloo Trial license key variable and Gloo Gateway version
+Export your Gloo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export GLOO_TRIAL_LICENSE_KEY=$GLOO_TRIAL_LICENSE_KEY
-export GLOO_VERSION=2.0.0
+export GLOO_VERSION=2.1.0-beta.2
 ```
 
-### Gloo Gateway CRDs
+### Enterprise Agentgateway CRDs
 ```bash
 kubectl create namespace gloo-system
 ```
 
 ```bash
 helm upgrade -i --create-namespace --namespace gloo-system \
---version $GLOO_VERSION gloo-gateway-crds \
-oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/gloo-gateway-crds
+    --version $GLOO_VERSION enterprise-agentgateway-crds \
+    oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway-crds
 ```
 
-To check if the the Gloo Gateway CRDs are installed-
+To check if the the Enterprise Agentgateway CRDs are installed-
 
 ```bash
-kubectl get crds | grep -E "solo.io|kgateway" | awk '{ print $1 }'
+kubectl get crds | grep -E "solo.io|agentgateway" | awk '{ print $1 }'
 ```
 
 Expected output
 
 ```bash
+agentgatewaybackends.agentgateway.dev
+agentgatewayparameters.agentgateway.dev
+agentgatewaypolicies.agentgateway.dev
 authconfigs.extauth.solo.io
-backendconfigpolicies.gateway.kgateway.dev
-backends.gateway.kgateway.dev
-directresponses.gateway.kgateway.dev
-gatewayextensions.gateway.kgateway.dev
-gatewayparameters.gateway.kgateway.dev
-gloogatewayparameters.gloo.solo.io
-glootrafficpolicies.gloo.solo.io
-httplistenerpolicies.gateway.kgateway.dev
+enterpriseagentgatewayparameters.enterpriseagentgateway.solo.io
+enterpriseagentgatewaypolicies.enterpriseagentgateway.solo.io
 ratelimitconfigs.ratelimit.solo.io
-trafficpolicies.gateway.kgateway.dev
 ```
 
-## Install Gloo Gateway Controller
-
+## Install Enterprise Agentgateway Controller
+Using Helm:
 ```bash
-helm upgrade -i -n gloo-system gloo-gateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/gloo-gateway \
+helm upgrade -i -n gloo-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $GLOO_VERSION \
---set licensing.glooGatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
---set licensing.agentgatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY \
+--set-string licensing.licenseKey=$GLOO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 #--- Optional: global override for image registry/tag
 #image:
 #  registry: us-docker.pkg.dev/solo-public/gloo-gateway
 #  tag: "$GLOO_VERSION"
 #  pullPolicy: IfNotPresent
-#--- Enable integration with agentgateway ---
-agentgateway:
-  enabled: true
 EOF
 ```
 
-Check that the Gloo Gateway Controller is now running:
+Check that the Enterprise Agentgateway Controller is now running:
 
 ```bash
-kubectl get pods -n gloo-system -l app.kubernetes.io/name=gloo-gateway
+kubectl get pods -n gloo-system -l app.kubernetes.io/name=enterprise-agentgateway
 ```
 
 Expected Output:
 
 ```bash
-NAME                            READY   STATUS    RESTARTS   AGE
-gloo-gateway-64ff8f5c96-sjv7p   1/1     Running   0          3h17m
+NAME                                       READY   STATUS    RESTARTS   AGE
+enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 ```
 
-## Install Jaeger
+## Configure agentgateway
 
-Openshift SCC:
+We configure Agentgateway by applying a `ConfigMap`, `EnterpriseAgentgatewayParameters`, and a `Gateway` resource. The example below includes inline comments showing where configuration can be customized
 ```bash
-oc adm policy add-scc-to-group anyuid system:serviceaccounts:observability
-```
-
-Install Jaeger on the cluster, since we will be enabling tracing for the AI Gateway in a later step
-```bash
-helm upgrade -i jaeger jaegertracing/jaeger \
-    -n observability \
-    --create-namespace \
-    -f - <<EOF
-provisionDataStore:
-  cassandra: false
-allInOne:
-  enabled: true
-storage:
-  type: memory
-agent:
-  enabled: false
-collector:
-  enabled: false
-query:
-  enabled: false
+kubectl apply -f- <<EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agentgateway-config
+  namespace: gloo-system
+data:
+  config.yaml: |-
+    config:
+      # --- Label all metrics using a value extracted from the request body
+      #metrics:
+      #  fields:
+      #    add:
+      #      modelId: json(request.body).modelId
+      logging:
+        fields:
+          add:
+            # --- Capture all request headers as a single map under rq.headers.all
+            rq.headers.all: 'request.headers'
+            # --- Capture claims from a verified JWT token if JWT policy is enabled
+            jwt: 'jwt'
+            # --- Capture all request headers as individual keys (flattened)
+            #rq.headers: 'flatten(request.headers)'
+            # --- Capture a single header by name (example: x-foo)
+            #x-foo: 'request.headers["x-foo"]'
+            # --- Capture entire request body
+            request.body: json(request.body)
+            # --- Capture a field in the request body
+            #request.body.modelId: json(request.body).modelId
+            # --- Capture entire response body
+            response.body: json(response.body)
+        format: json
+      tracing:
+        otlpProtocol: grpc
+        # Use the Jaeger endpoint (configured in lab 002)
+        otlpEndpoint: http://jaeger-collector.observability.svc.cluster.local:4317
+        randomSampling: 'true'
+        headers: {}
+        fields:
+          add:
+            gen_ai.operation.name: '"chat"'
+            gen_ai.system: 'llm.provider'
+            gen_ai.prompt: 'llm.prompt'
+            gen_ai.completion: 'llm.completion.map(c, {"role":"assistant", "content": c})'
+            gen_ai.usage.completion_tokens: 'llm.output_tokens'
+            gen_ai.usage.prompt_tokens: 'llm.input_tokens'
+            # Langfuse uses the wrong one here! Intentionally swap
+            gen_ai.request.model: 'llm.response_model'
+            gen_ai.response.model: 'llm.response_model'
+            gen_ai.request: 'flatten(llm.params)'
+            # --- Capture all request headers as a single map under rq.headers.all
+            rq.headers.all: 'request.headers'
+            # --- Capture claims from a verified JWT token if JWT policy is enabled
+            jwt: 'jwt'
+            # --- Capture entire request body
+            request.body: json(request.body)
+            # --- Capture a field in the request body
+            #request.body.modelId: json(request.body).modelId
+            # --- Capture the whole response body as JSON
+            response.body: 'json(response.body)'
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayParameters
+metadata:
+  name: agentgateway-params
+  namespace: gloo-system
+spec:
+  logging:
+    level: info
+  #--- Image overrides for deployment ---
+  #image:
+  #  tag: ""
+  #  registry: us-docker.pkg.dev/solo-public/gloo-gateway
+  #--- Required for OpenShift ---
+  deployment:
+    spec:
+      securityContext: {}
+      containers:
+      - name: agentgateway
+        securityContext: {}
+  service:
+    metadata:
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    spec:
+      type: LoadBalancer
+  #--- Use rawConfig to inline custom configuration from ConfigMap ---
+  #rawConfig:
+  #  config:
+  #    logging:
+  #      fields:
+  #        add:
+  #          rq.headers.all: 'request.headers'
+  #          jwt: 'jwt'
+  #          request.body: json(request.body)
+  #          response.body: json(response.body)
+  #      format: json
+  #    tracing:
+  #      otlpProtocol: grpc
+  #      otlpEndpoint: http://jaeger-collector.observability.svc.cluster.local:4317
+  #      randomSampling: 'true'
+  #--- Uncomment to add gateway to ambient mesh ---
+  #deployment:
+  #  spec:
+  #    template:
+  #      metadata:
+  #        labels:
+  #          istio.io/dataplane-mode: ambient
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agentgateway
+  namespace: gloo-system
+spec:
+  gatewayClassName: enterprise-agentgateway
+  infrastructure:
+    parametersRef:
+      name: agentgateway-params
+      group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayParameters
+  listeners:
+    - name: http
+      port: 8080
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
 EOF
 ```
 
-Check that the Gloo Gateway Controller is now running:
+Check that the Gloo Agentgateway Proxy is now running:
 
 ```bash
-kubectl get pods -n observability
+kubectl get pods -n gloo-system
 ```
 
 Expected Output:
 
 ```bash
-NAME                      READY   STATUS    RESTARTS   AGE
-jaeger-54b6c8b5d5-8s74n   1/1     Running   0          18m
+NAME                                                        READY   STATUS    RESTARTS   AGE
+enterprise-agentgateway-5fc9d95758-n8vvb                    1/1     Running   0          11m
+ext-auth-service-enterprise-agentgateway-544c6565cf-t86ml   1/1     Running   0          5m4s
+ext-cache-enterprise-agentgateway-9ddc746d8-cb7t2           1/1     Running   0          5m4s
+rate-limiter-enterprise-agentgateway-6c8dd77b6b-n8v7m       1/1     Running   0          5m4s
 ```

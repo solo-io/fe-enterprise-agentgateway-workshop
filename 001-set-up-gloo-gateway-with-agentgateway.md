@@ -112,68 +112,6 @@ We configure Agentgateway by applying a `ConfigMap`, `GlooGatewayParameters`, an
 ```bash
 kubectl apply -f- <<EOF
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: agentgateway-config
-  namespace: gloo-system
-data:
-  config.yaml: |-
-    config: 
-      # --- Label all metrics using a value extracted from the request body
-      #metrics:
-      #  fields:
-      #    add:
-      #      modelId: json(request.body).modelId
-      logging:
-        fields:
-          add:
-            # --- Capture all request headers as a single map under rq.headers.all
-            rq.headers.all: 'request.headers'
-            # --- Capture claims from a verified JWT token if JWT policy is enabled
-            jwt: 'jwt'
-            # --- Capture all request headers as individual keys (flattened)
-            #rq.headers: 'flatten(request.headers)'
-            # --- Capture a single header by name (example: x-foo)
-            #x-foo: 'request.headers["x-foo"]'
-            # --- Capture entire request body
-            request.body: json(request.body)
-            # --- Capture a field in the request body
-            #request.body.modelId: json(request.body).modelId
-            # --- Capture entire response body
-            response.body: json(response.body)
-        format: json
-      tracing: 
-        otlpProtocol: grpc
-        # Use the Jaeger endpoint
-        #otlpEndpoint: http://jaeger-collector.observability.svc.cluster.local:4317
-        # Use the Tempo distributor endpoint
-        otlpEndpoint: http://tempo-distributor.monitoring.svc.cluster.local:4317
-        randomSampling: 'true'
-        headers: {}
-        fields:
-          add:
-            gen_ai.operation.name: '"chat"'
-            gen_ai.system: 'llm.provider'
-            gen_ai.prompt: 'llm.prompt'
-            gen_ai.completion: 'llm.completion.map(c, {"role":"assistant", "content": c})'
-            gen_ai.usage.completion_tokens: 'llm.output_tokens'
-            gen_ai.usage.prompt_tokens: 'llm.input_tokens'
-            # Langfuse uses the wrong one here! Intentionally swap
-            gen_ai.request.model: 'llm.response_model'
-            gen_ai.response.model: 'llm.response_model'
-            gen_ai.request: 'flatten(llm.params)'
-            # --- Capture all request headers as a single map under rq.headers.all
-            rq.headers.all: 'request.headers'
-            # --- Capture claims from a verified JWT token if JWT policy is enabled
-            jwt: 'jwt'
-            # --- Capture entire request body
-            request.body: json(request.body)
-            # --- Capture a field in the request body
-            #request.body.modelId: json(request.body).modelId
-            # --- Capture the whole response body as JSON
-            response.body: 'json(response.body)'
----
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayParameters
 metadata:
@@ -193,20 +131,50 @@ spec:
     spec:
       type: LoadBalancer
   #--- Use rawConfig to inline custom configuration from ConfigMap ---
-  #rawConfig:
-  #  config:
-  #    logging:
-  #      fields:
-  #        add:
-  #          rq.headers.all: 'request.headers'
-  #          jwt: 'jwt'
-  #          request.body: json(request.body)
-  #          response.body: json(response.body)
-  #      format: json
-  #    tracing:
-  #      otlpProtocol: grpc
-  #      otlpEndpoint: http://tempo-distributor.monitoring.svc.cluster.local:4317
-  #      randomSampling: 'true'
+  rawConfig:
+    config:
+      # --- Label all metrics using a value extracted from the request body
+      #metrics:
+      #  fields:
+      #    add:
+      #      modelId: json(request.body).modelId
+      logging:
+        fields:
+          add:
+            rq.headers.all: 'request.headers'
+            jwt: 'jwt'
+            request.body: json(request.body)
+            response.body: json(response.body)
+            # --- Capture all request headers as individual keys (flattened)
+            #rq.headers: 'flatten(request.headers)'
+            # --- Capture a single header by name (example: x-foo)
+            #x-foo: 'request.headers["x-foo"]'
+            # --- Capture entire request body
+            #request.body: json(request.body)
+            # --- Capture a field in the request body
+            #request.body.modelId: json(request.body).modelId
+        format: json
+      tracing:
+        otlpProtocol: grpc
+        otlpEndpoint: http://tempo-distributor.monitoring.svc.cluster.local:4317
+        randomSampling: 'true'
+        fields:
+          add:
+            gen_ai.operation.name: '"chat"'
+            gen_ai.system: "llm.provider"
+            gen_ai.prompt: 'llm.prompt'
+            gen_ai.completion: 'llm.completion.map(c, {"role":"assistant", "content": c})'
+            gen_ai.request.model: "llm.requestModel"
+            gen_ai.response.model: "llm.responseModel"
+            gen_ai.usage.completion_tokens: "llm.outputTokens"
+            gen_ai.usage.prompt_tokens: "llm.inputTokens"
+            gen_ai.request: 'flatten(llm.params)'
+            # --- Capture all request headers as a single map under rq.headers.all
+            rq.headers.all: 'request.headers'
+            # --- Capture claims from a verified JWT token if JWT policy is enabled
+            jwt: 'jwt'
+            # --- Capture the whole response body as JSON
+            response.body: 'json(response.body)'
   #--- Uncomment to add gateway to ambient mesh ---
   #deployment:
   #  spec:
