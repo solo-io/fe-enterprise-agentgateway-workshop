@@ -24,7 +24,7 @@
   - Fixed Azure OpenAI endpoint configuration (hostname only, no `https://` scheme)
   - Updated config for OpenShift deploys
   - add `000-image-list.md`
-  - add sharedExtension overrides in `001` install config (commented out as it is not working at the moment)
+  - add optional air-gapped installation instruction steps to `001`
 
 0.2.3 - (11-21-25)
 ---
