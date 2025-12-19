@@ -22,6 +22,7 @@
   - Updated OpenShift deployment to use `EnterpriseAgentgatewayParameters` with proper security context configuration
   - Add new lab: `020-configure-basic-routing-to-azureopenai.md` for Azure OpenAI routing
   - Fixed Azure OpenAI endpoint configuration (hostname only, no `https://` scheme)
+  - Updated config for OpenShift deploys
 
 0.2.3 - (11-21-25)
 ---
