@@ -146,7 +146,7 @@ Local rate limiting shown in this lab is enforced directly on each proxy, with e
 
 Global rate limiting, by contrast, is enforced by a central service that all proxies consult. This allows requests across all proxies and replicas to share the same counter, enabling consistent, tenant-wide quotas and more fine-grained policies. Global limits can also incorporate request metadata such as headers or JWT claims for advanced API management scenarios.
 
-Next, we’ll explore how to configure global rate limiting using the Gloo Rate Limit server.
+Next, we’ll explore how to configure global rate limiting using the Enterprise Rate Limit server.
 
 
 ## Cleanup

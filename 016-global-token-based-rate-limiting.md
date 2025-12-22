@@ -100,7 +100,7 @@ spec:
 EOF
 ```
 
-Create GlooTrafficPolicy referencing the rate limit config we just created
+Create EnterpriseAgentgatewayPolicy referencing the rate limit config we just created
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1

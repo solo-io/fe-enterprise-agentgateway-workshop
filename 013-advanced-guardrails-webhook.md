@@ -79,7 +79,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 
 ## Deploy guardrails webhook
-The Gloo Documentation links to a [Sample Python Webhook Server to receive AI Gateway Guardrail Webook Calls](https://github.com/solo-io/gloo-gateway-use-cases/tree/main/ai-guardrail-webhook-server) which is meant to be extended and modified to create a working example. 
+The following documentation links to a [Sample Python Webhook Server to receive AI Gateway Guardrail Webook Calls](https://github.com/solo-io/gloo-gateway-use-cases/tree/main/ai-guardrail-webhook-server) which is meant to be extended and modified to create a working example. 
 
 Thie following simple example guardrail webhook below has been extended to implement the following guardrails
 - PII Patterns
