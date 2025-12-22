@@ -100,7 +100,7 @@ spec:
 EOF
 ```
 
-Create GlooTrafficPolicy referencing the rate limit config we just created
+Create EnterpriseAgentgatewayPolicy referencing the rate limit config we just created
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
@@ -145,7 +145,7 @@ kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 
 Example output, you should see that the `http.status=429`
 ```
-2025-09-24T18:24:36.916204Z     info    request gateway=enterprise-agentgateway/gloo-agentgateway listener=http route=enterprise-agentgateway/openai src.addr=10.42.0.1:41015 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=429 trace.id=0e107053e94f6759febedbd0992c95ce span.id=414ed2d771f63b5a duration=0ms
+2025-09-24T18:24:36.916204Z     info    request gateway=enterprise-agentgateway/agentgateway listener=http route=enterprise-agentgateway/openai src.addr=10.42.0.1:41015 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=429 trace.id=0e107053e94f6759febedbd0992c95ce span.id=414ed2d771f63b5a duration=0ms
 ```
 
 ## Port-forward to Grafana UI to view traces

@@ -77,7 +77,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 
 ## Apply response transformation
-We'll configure a `GlooTrafficPolicy` to capture a request header `x-user-id` and inject it into the response, demonstrating a basic response transformation using CEL expressions. Additionally, if no `x-user-id` is present, we will default to `x-user-id: anonymous`
+We'll configure a `EnterpriseAgentgatewayPolicy` to capture a request header `x-user-id` and inject it into the response, demonstrating a basic response transformation using CEL expressions. Additionally, if no `x-user-id` is present, we will default to `x-user-id: anonymous`
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1

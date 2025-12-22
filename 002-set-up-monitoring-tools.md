@@ -81,7 +81,7 @@ kubectl apply -f- <<EOF
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: data-plane-monitoring-gloo-ai-metrics
+  name: data-plane-monitoring-agentgateway-metrics
   namespace: enterprise-agentgateway
 spec:
   namespaceSelector:
@@ -144,7 +144,7 @@ query:
 EOF
 ```
 
-Check that the Gloo Gateway Controller is now running:
+Check that Jaeger is now running:
 
 ```bash
 kubectl get pods -n observability

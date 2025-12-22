@@ -42,10 +42,10 @@ referencegrants      refgrant     gateway.networking.k8s.io/v1beta1   true      
 ## Install Enterprise Agentgateway
 
 ### Configure Required Variables
-Export your Gloo Trial license key variable and Enterprise Agentgateway version
+Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
-export GLOO_TRIAL_LICENSE_KEY=$GLOO_TRIAL_LICENSE_KEY
-export GLOO_VERSION=2.1.0-beta.2
+export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
+export ENTERPRISE_AGW_VERSION=2.1.0-beta.2
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -55,7 +55,7 @@ kubectl create namespace enterprise-agentgateway
 
 ```bash
 helm upgrade -i --create-namespace --namespace enterprise-agentgateway \
-    --version $GLOO_VERSION enterprise-agentgateway-crds \
+    --version $ENTERPRISE_AGW_VERSION enterprise-agentgateway-crds \
     oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway-crds
 ```
 
@@ -82,13 +82,13 @@ Using Helm:
 ```bash
 helm upgrade -i -n enterprise-agentgateway enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway \
 --create-namespace \
---version $GLOO_VERSION \
---set-string licensing.licenseKey=$GLOO_TRIAL_LICENSE_KEY \
+--version $ENTERPRISE_AGW_VERSION \
+--set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 #--- Optional: override for image registry/tag for the controller
 image:
   registry: us-docker.pkg.dev/solo-public/gloo-gateway
-  tag: "$GLOO_VERSION"
+  tag: "$ENTERPRISE_AGW_VERSION"
   pullPolicy: IfNotPresent
 # --- Override the default Agentgateway parameters used by this GatewayClass
 # If the referenced parameters are not found, the controller will use the defaults
@@ -236,7 +236,7 @@ spec:
 EOF
 ```
 
-Check that the Gloo Agentgateway Proxy is now running:
+Check that the Agentgateway proxy is now running:
 
 ```bash
 kubectl get pods -n enterprise-agentgateway

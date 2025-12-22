@@ -1,7 +1,7 @@
-# Gloo Gateway V2 + Agentgateway Workshop
+# Enterprise Agentgateway Workshop
 
 # Labs
-- [001-set-up-gloo-gateway-with-agentgateway.md](001-set-up-gloo-gateway-with-agentgateway.md)
+- [001-set-up-enterprise-agentgateway.md](001-set-up-enterprise-agentgateway.md)
 - [002-set-up-monitoring-tools.md](002-set-up-monitoring-tools.md)
 - [003-configure-mock-openai-server.md](003-configure-mock-openai-server.md)
 - [004-configure-basic-routing-to-openai.md](004-configure-basic-routing-to-openai.md)
@@ -26,7 +26,7 @@
 
 # Use Cases
 - Support Kubernetes Gateway API
-- Install Gloo Gateway
+- Install Enterprise Agentgateway
 - Configure agentgateway for LLM, MCP, and A2A consumption
 - Unified access point for consumption of LLMs
     - In this repo:
@@ -52,7 +52,7 @@
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Gloo Gateway 2.0.0
+- Enterprise Agentgateway 2.1.0-beta2
 
 
 ## User Stories / Acceptance Criteria

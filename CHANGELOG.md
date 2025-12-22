@@ -1,5 +1,13 @@
 # Changelog
 
+0.3.2 - (12-22-25)
+---
+- Update references of "gloo" to "enterprise agentgateway"
+
+0.3.2 - (12-22-25)
+---
+- rename `001`
+
 0.3.1 - (12-22-25)
 ---
 - Update lab `001` for Openshift to simplify gateway class usage
@@ -98,7 +106,7 @@
 
 0.1.4 - (10-13-25)
 ---
-- Update `GLOO_VERSION=2.0.0`
+- Update `ENTERPRISE_AGW_VERSION=2.0.0`
 - Update GWAPI CRD version to `v1.4.0`
 - Update /install-on-openshift instructions to remove workarounds required in previous releases
 - update `rateLimitConfigRef` to `rateLimitConfigRefs` in 014-request-based-rate-limiting.md to reflect change of API in rc.3
@@ -148,7 +156,7 @@
 0.0.8 - (9-22-25)
 ---
 - Update repo to use `2.0.0-rc.1`
-- `2.0.0-rc.1` uses `--set` instead of `--set-string` for the license keys in the install. Updated lab to configure `--set licensing.glooGatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY` and `--set licensing.agentgatewayLicenseKey=$GLOO_TRIAL_LICENSE_KEY`
+- `2.0.0-rc.1` uses `--set` instead of `--set-string` for the license keys in the install. Updated lab to configure `--set licensing.glooGatewayLicenseKey=$SOLO_TRIAL_LICENSE_KEY` and `--set licensing.agentgatewayLicenseKey=$SOLO_TRIAL_LICENSE_KEY`
 - Update `agentGateway` to `agentgateway` across the repo
 - Remove `GatewayClass` from lab in 002 since this is now automatically generated
 - Update agentgateway `gatewayClassName` from `gloo-agentgateway` to `agentgateway-enterprise`
