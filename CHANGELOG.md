@@ -2,6 +2,11 @@
 
 0.3.1 - (12-22-25)
 ---
+- Update lab `001` for Openshift to simplify gateway class usage
+- Other minor fixes
+
+0.3.1 - (12-22-25)
+---
 - Updated lab `001` to simplify gateway class usage by configuring the default gateway class to reference custom `EnterpriseAgentgatewayParameters`, this enables extensibility without defining a new class
 - Removed reference to setup in `003` from prerequisites in `004a`, `004b`, and `004c`
 
