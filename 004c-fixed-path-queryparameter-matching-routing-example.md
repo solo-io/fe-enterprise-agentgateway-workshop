@@ -1,7 +1,7 @@
 # Configure Fixed Path + Query Parameter Matching Routing Example
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`, and `002`, and `003`
+This lab assumes that you have completed the setup in `001` and `002`
 
 ## Lab Objectives
 - Configure LLM routing example with fixed-path + queryparameter matcher to access endpoint

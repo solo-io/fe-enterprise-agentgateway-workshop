@@ -90,6 +90,14 @@ image:
   registry: us-docker.pkg.dev/solo-public/gloo-gateway
   tag: "$GLOO_VERSION"
   pullPolicy: IfNotPresent
+# --- Override the default Agentgateway parameters used by this GatewayClass
+# If the referenced parameters are not found, the controller will use the defaults
+gatewayClassParametersRefs:
+  enterprise-agentgateway:
+    group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayParameters
+    name: agentgateway-params
+    namespace: enterprise-agentgateway
 EOF
 ```
 
@@ -106,25 +114,11 @@ NAME                                       READY   STATUS    RESTARTS   AGE
 enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 ```
 
-## Air-gapped install (private repo images)
-The config below shows how to override images for an air-gapped environment with images sourced from a private repo. This requires a custom `GatewayClass` to be created, in this example it is named `enterprise-agentgateway-airgapped`. 
+## Deploy Agentgateway with customizations
+The configuration below demonstrates how to override container images for air-gapped environments by sourcing them from a private registry, along with other customizations exposed through `EnterpriseAgentgatewayParameters`, such as adding annotations or labels, modifying deployment and service settings, and extending observability capabilities. While this example uses the default public images, it illustrates how those images can be replaced with ones hosted in a private repository.
 
-If you do not have the requirement to use private images, **please skip to the next section to follow the standard install.**
-
-We configure Agentgateway by applying a custom `GatewayClass`, `EnterpriseAgentgatewayParameters`, and a `Gateway` resource. The example below includes inline comments showing where configuration can be customized
 ```bash
 kubectl apply -f- <<'EOF'
-apiVersion: gateway.networking.k8s.io/v1
-kind: GatewayClass
-metadata:
-  name: enterprise-agentgateway-airgapped
-spec:
-  controllerName: solo.io/enterprise-agentgateway
-  parametersRef:
-    group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-params
-    namespace: enterprise-agentgateway
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayParameters
@@ -231,104 +225,7 @@ metadata:
   name: agentgateway
   namespace: enterprise-agentgateway
 spec:
-  gatewayClassName: enterprise-agentgateway-airgapped
-  listeners:
-    - name: http
-      port: 8080
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-EOF
-```
-
-## Standard Installation (public images)
-
-**NOTE:** if you have already configured the setup from the air-gapped installation, please skip this step
-
-We configure Agentgateway by applying a `EnterpriseAgentgatewayParameters`, and a `Gateway` resource. The example below includes inline comments showing where configuration can be customized
-```bash
-kubectl apply -f- <<EOF
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayParameters
-metadata:
-  name: agentgateway-params
-  namespace: enterprise-agentgateway
-spec:
-  logging:
-    level: info
-  service:
-    metadata:
-      annotations:
-        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    spec:
-      type: LoadBalancer
-  #--- Use rawConfig to inline custom configuration from ConfigMap ---
-  rawConfig:
-    config:
-      # --- Label all metrics using a value extracted from the request body
-      #metrics:
-      #  fields:
-      #    add:
-      #      modelId: json(request.body).modelId
-      logging:
-        fields:
-          add:
-            rq.headers.all: 'request.headers'
-            jwt: 'jwt'
-            request.body: json(request.body)
-            response.body: json(response.body)
-            # --- Capture all request headers as individual keys (flattened)
-            rq.headers: 'flatten(request.headers)'
-            # --- Capture a single header by name (example: x-foo)
-            x-foo: 'request.headers["x-foo"]'
-            # --- Capture entire request body
-            request.body: json(request.body)
-            # --- Capture a field in the request body
-            request.body.modelId: json(request.body).modelId
-        format: json
-      tracing:
-        otlpProtocol: grpc
-        otlpEndpoint: http://tempo-distributor.monitoring.svc.cluster.local:4317
-        randomSampling: 'true'
-        fields:
-          add:
-            gen_ai.operation.name: '"chat"'
-            gen_ai.system: "llm.provider"
-            gen_ai.prompt: 'llm.prompt'
-            gen_ai.completion: 'llm.completion.map(c, {"role":"assistant", "content": c})'
-            gen_ai.request.model: "llm.requestModel"
-            gen_ai.response.model: "llm.responseModel"
-            gen_ai.usage.completion_tokens: "llm.outputTokens"
-            gen_ai.usage.prompt_tokens: "llm.inputTokens"
-            gen_ai.request: 'flatten(llm.params)'
-            # --- Capture all request headers as a single map under rq.headers.all
-            rq.headers.all: 'request.headers'
-            # --- Capture claims from a verified JWT token if JWT policy is enabled
-            jwt: 'jwt'
-            # --- Capture the whole response body as JSON
-            response.body: 'json(response.body)'
-  #--- Uncomment to add gateway to ambient mesh ---
-  #deployment:
-  #  spec:
-  #    template:
-  #      metadata:
-  #        labels:
-  #          istio.io/dataplane-mode: ambient
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: agentgateway
-  namespace: enterprise-agentgateway
-spec:
   gatewayClassName: enterprise-agentgateway
-  infrastructure:
-    parametersRef:
-      name: agentgateway-params
-      group: enterpriseagentgateway.solo.io
-      kind: EnterpriseAgentgatewayParameters
   listeners:
     - name: http
       port: 8080
@@ -349,9 +246,9 @@ Expected Output:
 
 ```bash
 NAME                                                        READY   STATUS    RESTARTS   AGE
-agentgateway-778ff69fd4-wmcrv                               1/1     Running   0          34s
-enterprise-agentgateway-5fc9d95758-v5jqf                    1/1     Running   0          3m45s
-ext-auth-service-enterprise-agentgateway-544c6565cf-zwzzp   1/1     Running   0          33s
-ext-cache-enterprise-agentgateway-67c78bfd44-5lmv8          1/1     Running   0          34s
-rate-limiter-enterprise-agentgateway-666754f856-5gnjb       1/1     Running   0          34s
+agentgateway-7d4c8c4d4b-lvdsq                               1/1     Running   0          11m
+enterprise-agentgateway-5f9c5b95b4-gjblt                    1/1     Running   0          11m
+ext-auth-service-enterprise-agentgateway-6fcc5bc989-22wgd   1/1     Running   0          11m
+ext-cache-enterprise-agentgateway-6bfcb8c87d-vjzxn          1/1     Running   0          11m
+rate-limiter-enterprise-agentgateway-589f66bb88-xz7nm       1/1     Running   0          11m
 ```
