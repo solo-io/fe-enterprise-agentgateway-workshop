@@ -328,7 +328,7 @@ Example logs
 2025-09-23 19:09:14,307 [INFO] 🔒 Masking content: Repeat the following exactly: Here is my number: 4111 1111 1111 1111. → Repeat the following exactly: Here is my number: ****.
 2025-09-23 19:09:14,307 [INFO] ✅ MaskAction returned (request)
 INFO:     10.42.0.10:56944 - "POST /request HTTP/1.1" 200 OK
-2025-09-23 19:09:15,375 [INFO] ✨ Adding trace for gloo-ai-request-webhook
+2025-09-23 19:09:15,375 [INFO] ✨ Adding trace for ai-request-webhook
 2025-09-23 19:09:15,379 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.enterprise-agentgateway.svc.cluster.local:8000, content-length: 81
 2025-09-23 19:09:15,379 [INFO] 📥 Incoming /request webhook
 2025-09-23 19:09:15,379 [INFO] → Message[0] role=assistant: Here is my number: ****.
@@ -370,7 +370,7 @@ Example logs
 2025-09-23 19:10:13,428 [INFO] 🔒 Masking content: Repeat the following exactly: You can email me at support@example.com → Repeat the following exactly: You can email me at ****
 2025-09-23 19:10:13,429 [INFO] ✅ MaskAction returned (request)
 INFO:     10.42.0.10:40274 - "POST /request HTTP/1.1" 200 OK
-2025-09-23 19:10:14,931 [INFO] ✨ Adding trace for gloo-ai-request-webhook
+2025-09-23 19:10:14,931 [INFO] ✨ Adding trace for ai-request-webhook
 2025-09-23 19:10:14,934 [INFO] 📬 Request headers: content-type: application/json, host: ai-guardrail-webhook.enterprise-agentgateway.svc.cluster.local:8000, content-length: 81
 2025-09-23 19:10:14,934 [INFO] 📥 Incoming /request webhook
 2025-09-23 19:10:14,935 [INFO] → Message[0] role=assistant: You can email me at ****
