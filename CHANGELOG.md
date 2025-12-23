@@ -1,5 +1,9 @@
 # Changelog
 
+0.3.3 - (12-23-25)
+---
+- Add new lab: `021-configure-basic-routing-to-vertexai.md` for Google VertexAI routing
+
 0.3.2 - (12-22-25)
 ---
 - Update references of "gloo" to "enterprise agentgateway"
