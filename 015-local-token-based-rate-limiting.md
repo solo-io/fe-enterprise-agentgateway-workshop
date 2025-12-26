@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
 - Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
-- Create an Local rate limit policy to implement token-based rate limiting (input tokens) using a simple counter (e.g. all users get 10 tokens per hour)
+- Create a local rate limit policy to implement token-based rate limiting (input tokens) counting LLM tokens per replica (e.g. 5 tokens per minute)
 - Validate token-based rate limiting
 
 Create openai api-key secret
@@ -75,8 +75,8 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-## Configure Local token-based rate limit of 10 input tokens per hour
-The following policy will allow 1 token per 100s
+## Configure Local token-based rate limit of 5 input tokens per minute
+The following policy will allow 5 tokens per minute
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
@@ -93,8 +93,8 @@ spec:
     rateLimit:
       local:
         - unit: Minutes
-          requests: 1
-          burst: 0          
+          tokens: 5
+          burst: 0
 EOF
 ```
 
@@ -113,7 +113,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-You should be rate limited on the second request to LLM because we will have hit our token-based rate limit of 1 input tokens per 100s
+You should be rate limited on the second request to LLM because we will have hit our token-based rate limit of 5 input tokens per minute (first request consumes 5 tokens)
 
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
