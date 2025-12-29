@@ -1,4 +1,5 @@
-# Configure OpenAI Embeddings with AI Routes
+# Configure OpenAI Embeddings
+Configure access to multiple OpenAI API endpoints such as for chat completions, embeddings, and models through the AgentgatewayBackend.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
@@ -61,17 +62,17 @@ spec:
     ai:
       routes:
         "/v1/chat/completions": "Completions"
-        "/v1/embeddings": "Embeddings"
-        "/v1/models": "Models"
+        "/v1/embeddings": "Passthrough"
+        "/v1/models": "Passthrough"
         "*": "Passthrough"
 EOF
 ```
 
 The `policies.ai.routes` configuration allows you to route different OpenAI API endpoints through the gateway:
-- `/v1/chat/completions` - Routes to OpenAI's chat completions endpoint
-- `/v1/embeddings` - Routes to OpenAI's embeddings endpoint for generating text embeddings
-- `/v1/models` - Routes to OpenAI's models listing endpoint
-- `*` - Passthrough for any other paths
+- `/v1/chat/completions`: `"Completions"` - The completions API is currently supported for AI gateway processing (metrics, logging, guardrails, prompt engineering)
+- `/v1/embeddings`: `"Passthrough"` - Proxies embeddings requests through the gateway
+- `/v1/models`: `"Passthrough"` - Proxies model listing requests through the gateway
+- `*`: `"Passthrough"` - Default passthrough for any other paths
 
 ## Test OpenAI Chat Completions and Embeddings
 
@@ -95,7 +96,7 @@ curl -i "$GATEWAY_IP:8080/v1/chat/completions" \
   }'
 ```
 
-### Test Embeddings
+### Test /embeddings endpoint
 ```bash
 curl -i "$GATEWAY_IP:8080/v1/embeddings" \
   -H "content-type: application/json" \
@@ -129,31 +130,13 @@ Example embeddings response:
 }
 ```
 
-## View all metrics
-All metrics
-```bash
-echo
-echo "Objective: curl /metrics endpoint and show all metrics"
-kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics && kill $!
-``` 
+## Test /models endpoint
 
-Filter for number of requests served through the gateway
+Test models listing using `/v1/models`:
 ```bash
-echo
-echo "Objective: curl /metrics endpoint and filter for number of requests served through the gateway"
-kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_requests_total && kill $!
-``` 
-
-Total input and output token usage through the gateway
-```bash
-echo
-echo "Objective: curl /metrics endpoint and filter for input/output token usage through the gateway"
-kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_gen_ai_client_token_usage_sum && kill $!
-``` 
-You can tell the difference between the two metrics from the `gen_ai_token_type="input/output"` label
+curl -i "$GATEWAY_IP:8080/v1/models" \
+  -H "content-type: application/json"
+```
 
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
