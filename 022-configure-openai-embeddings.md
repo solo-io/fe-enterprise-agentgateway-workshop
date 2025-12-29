@@ -315,6 +315,131 @@ Navigate to http://localhost:3000 or http://localhost:16686 in your browser. You
 - For chat completions: `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`
 - For embeddings: `gen_ai.operation.name=embeddings`, `llm.request.model`, input tokens, and more
 
+## Advanced: Using Path Rewrites
+
+The previous configuration requires clients to use the exact OpenAI API paths (`/v1/chat/completions`, `/v1/embeddings`). You can use path rewrites to create custom paths that get rewritten to the correct OpenAI endpoints.
+
+Update the existing HTTPRoute with path rewrite rules:
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: enterprise-agentgateway
+spec:
+  parentRefs:
+    - name: agentgateway
+      namespace: enterprise-agentgateway
+  rules:
+    # Custom path for chat completions: /openai/chat -> /v1/chat/completions
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai/chat
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1/chat/completions
+      backendRefs:
+        - name: openai-all-models
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "120s"
+    # Custom path for embeddings: /openai/embeddings -> /v1/embeddings
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai/embeddings
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1/embeddings
+      backendRefs:
+        - name: openai-all-models
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "120s"
+    # Custom path for models: /openai/models -> /v1/models
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai/models
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /v1/models
+      backendRefs:
+        - name: openai-all-models
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "120s"
+    # Default route for standard OpenAI paths (no rewrite needed)
+    - backendRefs:
+        - name: openai-all-models
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "120s"
+EOF
+```
+
+### Test with Rewritten Paths
+
+Now you can use the simplified custom paths:
+
+Test chat completions using `/openai/chat`:
+```bash
+curl -i "$GATEWAY_IP:8080/openai/chat" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+Test embeddings using `/openai/embeddings`:
+```bash
+curl -i "$GATEWAY_IP:8080/openai/embeddings" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "text-embedding-3-small",
+    "input": "The quick brown fox jumped over the lazy dog."
+  }'
+```
+
+Test models listing using `/openai/models`:
+```bash
+curl -i "$GATEWAY_IP:8080/openai/models" \
+  -H "content-type: application/json"
+```
+
+The gateway will rewrite these paths to the correct OpenAI API endpoints before forwarding the requests. The AI routes configuration in the backend will still match on the rewritten paths (`/v1/chat/completions`, `/v1/embeddings`, etc.).
+
+You can also still use the standard OpenAI paths directly thanks to the default rule:
+```bash
+curl -i "$GATEWAY_IP:8080/v1/chat/completions" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
 ## Cleanup
 ```bash
 kubectl delete httproute -n enterprise-agentgateway openai
