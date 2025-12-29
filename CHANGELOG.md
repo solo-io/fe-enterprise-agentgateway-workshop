@@ -1,5 +1,10 @@
 # Changelog
 
+0.3.4 - (12-29-25)
+---
+- Fix to policy in `015-local-token-based-rate-limiting.md`
+- Add new lab: `022-configure-openai-embeddings.md`
+
 0.3.3 - (12-23-25)
 ---
 - Add new lab: `021-configure-basic-routing-to-vertexai.md` for Google VertexAI routing
