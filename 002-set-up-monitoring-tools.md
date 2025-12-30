@@ -5,10 +5,9 @@ Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the
 This lab assumes that you have completed the setup in `001`
 
 ## Lab Objectives
-- Deploy tracing (Tempo, Jaeger)
+- Deploy tracing (Tempo)
 - Deploy metrics + logs (Prometheus, Grafana, Loki)
 - Configure Prometheus to scrape Agentgateway
-- Optional: Install Jaeger instead of Tempo
 
 ## Deploy tracing
 
@@ -150,44 +149,6 @@ tempo-ingester-2                                         1/1     Running   0    
 tempo-memcached-0                                        1/1     Running   0          6m17s
 tempo-querier-5888ff7f7f-zq8qs                           1/1     Running   0          6m17s
 tempo-query-frontend-96497bc8-p49cs                      1/1     Running   0          6m17s
-```
-
-## Install Jaeger
-
-Alternatively, you can deploy Jaeger if you only need tracing. The setup below is optional, and any configuration that references this deployment in later labs will remain commented out. Simply uncomment those sections if you prefer to use Jaeger instead of Tempo.
-```bash
-helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
-helm repo update jaegertracing
-helm upgrade -i jaeger jaegertracing/jaeger \
-    -n observability \
-    --create-namespace \
-    -f - <<EOF
-provisionDataStore:
-  cassandra: false
-allInOne:
-  enabled: true
-storage:
-  type: memory
-agent:
-  enabled: false
-collector:
-  enabled: false
-query:
-  enabled: false
-EOF
-```
-
-Check that Jaeger is now running:
-
-```bash
-kubectl get pods -n observability
-```
-
-Expected Output:
-
-```bash
-NAME                      READY   STATUS    RESTARTS   AGE
-jaeger-54b6c8b5d5-8s74n   1/1     Running   0          18m
 ```
 
 ## Access Grafana

@@ -8,7 +8,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 - Configure a mock LLM server that serves the OpenAI spec
 - Create a route to our mock server as our backend LLM provider using a `Backend` and `HTTPRoute`
 - Curl mock server through the agentgateway proxy
-- Validate the request went through the gateway in Jaeger UI
+- Validate the request went through the gateway in the Grafana UI
 
 ## Create a Mock vLLM Server
 Deploy the mock server using the manifest below.  
@@ -198,7 +198,7 @@ Example output shows comprehensive request details including model information, 
 
 ### (Optional) View Traces in Jaeger
 
-If you installed Jaeger in lab 002 instead of Tempo, you can view traces directly:
+If you installed Jaeger in lab `/install-on-openshift/002-set-up-monitoring-tools-ocp.md` instead of Tempo, you can view traces in the UI:
 
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686

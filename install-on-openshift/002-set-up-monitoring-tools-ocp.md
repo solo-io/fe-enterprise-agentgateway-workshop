@@ -52,5 +52,24 @@ NAME                      READY   STATUS    RESTARTS   AGE
 jaeger-54b6c8b5d5-8s74n   1/1     Running   0          18m
 ```
 
+## Access Jaeger UI
+
+To view traces throughout the workshop:
+
+```bash
+kubectl port-forward svc/jaeger-query -n observability 16686:16686
+```
+
+Navigate to http://localhost:16686 in your browser to view traces with LLM-specific spans including:
+- `gen_ai.completion` - The completion response from the LLM
+- `gen_ai.prompt` - The prompt sent to the LLM
+- `gen_ai.request.model` - The requested model
+- `gen_ai.response.model` - The actual model that responded
+- `gen_ai.usage.prompt_tokens` - Input token count
+- `gen_ai.usage.completion_tokens` - Output token count
+- `llm.provider` - The LLM provider (OpenAI, Bedrock, etc.)
+
+You can filter traces by service name, operation, and tags to find specific requests.
+
 ## Next Steps
 You should now be able to go back to the root directory and continue with `003`

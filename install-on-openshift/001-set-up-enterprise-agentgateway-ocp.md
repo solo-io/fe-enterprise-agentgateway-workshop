@@ -225,7 +225,6 @@ spec:
         format: json
       tracing:
         otlpProtocol: grpc
-        #otlpEndpoint: http://tempo-distributor.monitoring.svc.cluster.local:4317
         otlpEndpoint: http://jaeger-collector.observability.svc.cluster.local:4317
         randomSampling: 'true'
         fields:

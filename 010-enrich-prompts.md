@@ -8,7 +8,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 - Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
 - Curl OpenAI through the agentgateway proxy
 - Add prompt enrichment policy using `EnterpriseAgentgatewayPolicy`
-- Validate the request went through the gateway in Jaeger UI, and that the prompt has been enriched
+- Validate the request went through the gateway in the Grafana UI, and that the prompt has been enriched
 
 Create openai api-key secret
 ```bash

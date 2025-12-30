@@ -7,7 +7,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 - Create a Kubernetes secret that contains our AWS Access Key credentials
 - Create a route to AWS Bedrock as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
 - Curl AWS Bedrock through the agentgateway proxy
-- Validate the request went through the gateway in Jaeger UI
+- Validate the request went through the gateway in the Grafana UI
 
 ## Export AWS Credentials
 Log in to AWS console and export the following variables
@@ -254,7 +254,7 @@ Example output shows comprehensive request details including model information, 
 
 ### (Optional) View Traces in Jaeger
 
-If you installed Jaeger in lab 002 instead of Tempo, you can view traces directly:
+If you installed Jaeger in lab `/install-on-openshift/002-set-up-monitoring-tools-ocp.md` instead of Tempo, you can view traces in the UI:
 
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
