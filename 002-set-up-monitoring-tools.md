@@ -42,6 +42,11 @@ EOF
 
 ## Deploy metrics + logs
 
+(Optional) Set a custom Grafana admin password before installation:
+```bash
+export GRAFANA_ADMIN_PASSWORD="your-secure-password"
+```
+
 Install Grafana Prometheus and add Tempo as a data source
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -54,6 +59,7 @@ helm upgrade --install grafana-prometheus \
 alertmanager:
   enabled: false
 grafana:
+  adminPassword: "${GRAFANA_ADMIN_PASSWORD:-prom-operator}"
   service:
     type: ClusterIP
     port: 3000
@@ -63,6 +69,12 @@ grafana:
       access: proxy
       url: "http://tempo-query-frontend.monitoring.svc.cluster.local:3200"
       uid: 'local-tempo-uid'
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: monitoring
 nodeExporter:
   enabled: false
 prometheus:
@@ -94,6 +106,27 @@ spec:
       app.kubernetes.io/name: agentgateway
 EOF
 ```
+
+## Install AgentGateway Grafana Dashboard
+
+Install the AgentGateway dashboard that provides comprehensive metrics visualization including:
+- Core GenAI metrics (request rates, token usage, model breakdown)
+- Streaming metrics (TTFT, TPOT)
+- MCP metrics (tool calls, server requests)
+- Connection and runtime metrics
+
+```bash
+kubectl create configmap agentgateway-dashboard \
+  --from-file=agentgateway-overview.json=lib/observability/agentgateway-grafana-dashboard-v1.json \
+  --namespace monitoring \
+  --dry-run=client -o yaml | \
+kubectl label --local -f - \
+  grafana_dashboard="1" \
+  --dry-run=client -o yaml | \
+kubectl apply -f -
+```
+
+The dashboard will be automatically loaded by the Grafana sidecar. You can access it in Grafana under "Dashboards" > "AgentGateway Overview".
 
 Check that our observability tools are running:
 
@@ -156,3 +189,27 @@ Expected Output:
 NAME                      READY   STATUS    RESTARTS   AGE
 jaeger-54b6c8b5d5-8s74n   1/1     Running   0          18m
 ```
+
+## Access Grafana
+
+To access Grafana and view the AgentGateway dashboard:
+
+1. Port-forward to the Grafana service:
+```bash
+kubectl port-forward -n monitoring svc/grafana-prometheus 3000:3000
+```
+
+2. Open your browser and navigate to `http://localhost:3000`
+
+3. Login with credentials:
+   - Username: `admin`
+   - Password: Value of `$GRAFANA_ADMIN_PASSWORD` environment variable, or `admin` if not set
+
+   To set a custom password before installation, export the environment variable:
+   ```bash
+   export GRAFANA_ADMIN_PASSWORD="your-secure-password"
+   ```
+
+4. Navigate to Dashboards > AgentGateway Overview to view the dashboard
+
+Note: The dashboard includes a namespace filter that allows you to view metrics for specific namespaces. By default, it shows metrics for all namespaces where AgentGateway is deployed.

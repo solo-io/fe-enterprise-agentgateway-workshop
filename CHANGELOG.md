@@ -1,5 +1,10 @@
 # Changelog
 
+0.3.5 - (12-30-25)
+---
+- Add Agentgateway grafana dashboard at `/lib/observability`
+- Update `002-set-up-monitoring-tools.md` to include pre-built Agentgateway grafana dashboard setup instructions
+
 0.3.4 - (12-29-25)
 ---
 - Fix to policy in `015-local-token-based-rate-limiting.md`
