@@ -4,6 +4,7 @@
 ---
 - Add Agentgateway grafana dashboard at `/lib/observability`
 - Update `002-set-up-monitoring-tools.md` to include pre-built Agentgateway grafana dashboard setup instructions
+- Refactor labs to have a consistent "Observability" section
 
 0.3.4 - (12-29-25)
 ---
