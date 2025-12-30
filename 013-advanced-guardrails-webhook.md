@@ -10,7 +10,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 - Deploy guardrails webhook
 - Add advanced guardrails webhook policy
 - Validate that prompts are appropriately rejects or masked by the webhook endpoint
-- Validate the request went through the gateway in Jaeger UI, and that the prompt has been enriched
+- Validate the request went through the gateway in the Grafana UI, and that the prompt has been enriched
 
 Create openai api-key secret
 ```bash
@@ -377,27 +377,70 @@ INFO:     10.42.0.10:40274 - "POST /request HTTP/1.1" 200 OK
 2025-09-23 19:10:14,935 [INFO] ✅ PassAction returned (request)
 ```
 
-## Port-forward to Grafana UI to view traces
-Default credentials are admin:prom-operator
+## Observability
+
+### View Metrics Endpoint
+
+AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
+
+```bash
+kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
+sleep 1 && curl -s http://localhost:15020/metrics && kill $!
+```
+
+### View Metrics and Traces in Grafana
+
+For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in lab 002.
+
+1. Port-forward to the Grafana service:
 ```bash
 kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 ```
 
-## Port-forward to Jaeger UI to view traces
+2. Open http://localhost:3000 in your browser
+
+3. Login with credentials:
+   - Username: `admin`
+   - Password: Value of `$GRAFANA_ADMIN_PASSWORD` (default: `prom-operator`)
+
+4. Navigate to **Dashboards > AgentGateway Overview** to view metrics
+
+The dashboard provides real-time visualization of:
+- Core GenAI metrics (request rates, token usage by model)
+- Streaming metrics (TTFT, TPOT)
+- MCP metrics (tool calls, server requests)
+- Connection and runtime metrics
+
+### View Traces in Grafana
+
+To view distributed traces with LLM-specific spans:
+
+1. In Grafana, navigate to **Home > Explore**
+2. Select **Tempo** from the data source dropdown
+3. Click **Search** to see all traces
+4. Filter traces by service, operation, or trace ID to find AgentGateway requests
+
+Traces include LLM-specific spans with information like `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more.
+
+### View Access Logs
+
+AgentGateway automatically logs detailed information about LLM requests to stdout:
+
+```bash
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
+```
+
+Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
+
+### (Optional) View Traces in Jaeger
+
+If you installed Jaeger in lab `/install-on-openshift/002-set-up-monitoring-tools-ocp.md` instead of Tempo, you can view traces in the UI:
+
 ```bash
 kubectl port-forward svc/jaeger-query -n observability 16686:16686
 ```
 
-Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you should be able to see that our rejected responses have a `http.status` of `403` and for our masked responses the `gen_ai.completion` tag will show the masked value
-
-Example of a masked response trace in Jaeger
-```
-{
-  "key": "gen_ai.completion",
-  "type": "string",
-  "value": "[{\"content\": \"You can email me at ****\", \"role\": \"assistant\"}]"
-}
-```
+Navigate to http://localhost:16686 in your browser to see traces with LLM-specific spans including `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
 
 ## Cleanup
 ```bash

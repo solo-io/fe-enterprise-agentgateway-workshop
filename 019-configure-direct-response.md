@@ -63,46 +63,6 @@ date: Fri, 21 Nov 2025 18:17:00 GMT
 Status: Healthy
 ```
 
-## View access logs
-Agentgateway enterprise automatically logs information about the LLM request to stdout
-```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1 | jq .
-```
-
-Example output
-```
-{
-  "level": "info",
-  "time": "2025-11-21T18:19:00.300505Z",
-  "scope": "request",
-  "gateway": "enterprise-agentgateway/agentgateway",
-  "listener": "http",
-  "route": "enterprise-agentgateway/health-check",
-  "src.addr": "10.42.0.1:18982",
-  "http.method": "GET",
-  "http.host": "192.168.107.2",
-  "http.path": "/health",
-  "http.version": "HTTP/1.1",
-  "http.status": 200,
-  "trace.id": "6c04dab11b16c77aea2e22563ed2b60c",
-  "span.id": "9df7aaf95d1a271f",
-  "duration": "0ms"
-}
-```
-
-## Port-forward to Grafana UI to view traces
-Default credentials are admin:prom-operator
-```bash
-kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
-```
-
-## Port-forward to Jaeger UI to view traces
-```bash
-kubectl port-forward svc/jaeger-query -n observability 16686:16686
-```
-
-Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you should be able to see traces for agentgateway
-
 ## Cleanup
 ```bash
 kubectl delete agentgatewaypolicy -n enterprise-agentgateway health-response

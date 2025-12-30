@@ -5,10 +5,9 @@ Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the
 This lab assumes that you have completed the setup in `001`
 
 ## Lab Objectives
-- Deploy tracing (Tempo, Jaeger)
+- Deploy tracing (Tempo)
 - Deploy metrics + logs (Prometheus, Grafana, Loki)
 - Configure Prometheus to scrape Agentgateway
-- Optional: Install Jaeger instead of Tempo
 
 ## Deploy tracing
 
@@ -42,6 +41,11 @@ EOF
 
 ## Deploy metrics + logs
 
+(Optional) Set a custom Grafana admin password before installation:
+```bash
+export GRAFANA_ADMIN_PASSWORD="your-secure-password"
+```
+
 Install Grafana Prometheus and add Tempo as a data source
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
@@ -54,6 +58,7 @@ helm upgrade --install grafana-prometheus \
 alertmanager:
   enabled: false
 grafana:
+  adminPassword: "${GRAFANA_ADMIN_PASSWORD:-prom-operator}"
   service:
     type: ClusterIP
     port: 3000
@@ -63,6 +68,12 @@ grafana:
       access: proxy
       url: "http://tempo-query-frontend.monitoring.svc.cluster.local:3200"
       uid: 'local-tempo-uid'
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: monitoring
 nodeExporter:
   enabled: false
 prometheus:
@@ -95,6 +106,27 @@ spec:
 EOF
 ```
 
+## Install AgentGateway Grafana Dashboard
+
+Install the AgentGateway dashboard that provides comprehensive metrics visualization including:
+- Core GenAI metrics (request rates, token usage, model breakdown)
+- Streaming metrics (TTFT, TPOT)
+- MCP metrics (tool calls, server requests)
+- Connection and runtime metrics
+
+```bash
+kubectl create configmap agentgateway-dashboard \
+  --from-file=agentgateway-overview.json=lib/observability/agentgateway-grafana-dashboard-v1.json \
+  --namespace monitoring \
+  --dry-run=client -o yaml | \
+kubectl label --local -f - \
+  grafana_dashboard="1" \
+  --dry-run=client -o yaml | \
+kubectl apply -f -
+```
+
+The dashboard will be automatically loaded by the Grafana sidecar. You can access it in Grafana under "Dashboards" > "AgentGateway Overview".
+
 Check that our observability tools are running:
 
 ```bash
@@ -119,40 +151,26 @@ tempo-querier-5888ff7f7f-zq8qs                           1/1     Running   0    
 tempo-query-frontend-96497bc8-p49cs                      1/1     Running   0          6m17s
 ```
 
-## Install Jaeger
+## Access Grafana
 
-Alternatively, you can deploy Jaeger if you only need tracing. The setup below is optional, and any configuration that references this deployment in later labs will remain commented out. Simply uncomment those sections if you prefer to use Jaeger instead of Tempo.
+To access Grafana and view the AgentGateway dashboard:
+
+1. Port-forward to the Grafana service:
 ```bash
-helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
-helm repo update jaegertracing
-helm upgrade -i jaeger jaegertracing/jaeger \
-    -n observability \
-    --create-namespace \
-    -f - <<EOF
-provisionDataStore:
-  cassandra: false
-allInOne:
-  enabled: true
-storage:
-  type: memory
-agent:
-  enabled: false
-collector:
-  enabled: false
-query:
-  enabled: false
-EOF
+kubectl port-forward -n monitoring svc/grafana-prometheus 3000:3000
 ```
 
-Check that Jaeger is now running:
+2. Open your browser and navigate to `http://localhost:3000`
 
-```bash
-kubectl get pods -n observability
-```
+3. Login with credentials:
+   - Username: `admin`
+   - Password: Value of `$GRAFANA_ADMIN_PASSWORD` environment variable, or `admin` if not set
 
-Expected Output:
+   To set a custom password before installation, export the environment variable:
+   ```bash
+   export GRAFANA_ADMIN_PASSWORD="your-secure-password"
+   ```
 
-```bash
-NAME                      READY   STATUS    RESTARTS   AGE
-jaeger-54b6c8b5d5-8s74n   1/1     Running   0          18m
-```
+4. Navigate to Dashboards > AgentGateway Overview to view the dashboard
+
+Note: The dashboard includes a namespace filter that allows you to view metrics for specific namespaces. By default, it shows metrics for all namespaces where AgentGateway is deployed.

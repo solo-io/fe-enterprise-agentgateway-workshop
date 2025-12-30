@@ -9,7 +9,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 - Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
 - Configure AI routes to handle different OpenAI API endpoints (chat completions, embeddings, models)
 - Test both chat completions and embeddings through the agentgateway proxy
-- Validate the requests went through the gateway in Jaeger UI
+- Validate the requests went through the gateway in Grafana UI
 
 ### Configure Required Variables
 Replace with a valid OpenAI API key
@@ -283,20 +283,17 @@ Notice the `gen_ai.operation.name` field changes based on the endpoint:
 - `chat` for `/v1/chat/completions`
 - `embeddings` for `/v1/embeddings`
 
-## Port-forward to Grafana UI to view traces
-Default credentials are admin:prom-operator
+## Observability
+
+### View Access Logs
+
+AgentGateway automatically logs detailed information about LLM requests to stdout:
+
 ```bash
-kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
 ```
 
-## Port-forward to Jaeger UI to view traces
-```bash
-kubectl port-forward svc/jaeger-query -n observability 16686:16686
-```
-
-Navigate to http://localhost:3000 or http://localhost:16686 in your browser. You should be able to see traces for agentgateway that include information such as:
-- For chat completions: `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`
-- For embeddings: `gen_ai.operation.name=embeddings`, `llm.request.model`, input tokens, and more
+Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
 
 ## Advanced: Using Path Rewrites
 

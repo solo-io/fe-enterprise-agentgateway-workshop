@@ -138,33 +138,6 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 You should be rate limited after several requests to the LLM because we will have hit our token-based rate limit of 10 input tokens per hour
 
-## View access logs
-Agentgateway enterprise automatically logs information about the LLM request to stdout
-```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
-```
-
-Example output, you should see that the `http.status=429`
-```
-2025-09-24T18:24:36.916204Z     info    request gateway=enterprise-agentgateway/agentgateway listener=http route=enterprise-agentgateway/openai src.addr=10.42.0.1:41015 http.method=POST http.host=192.168.107.2 http.path=/openai http.version=HTTP/1.1 http.status=429 trace.id=0e107053e94f6759febedbd0992c95ce span.id=414ed2d771f63b5a duration=0ms
-```
-
-## Port-forward to Grafana UI to view traces
-Default credentials are admin:prom-operator
-```bash
-kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
-```
-
-## Port-forward to Jaeger UI to view traces
-```bash
-kubectl port-forward svc/jaeger-query -n observability 16686:16686
-```
-
-Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you should be able to see traces for our recent requests
-
-- The rate limited requests should have been rejected with a `http.status` of `429`
-
-
 ## Cleanup
 ```bash
 kubectl delete httproute -n enterprise-agentgateway openai

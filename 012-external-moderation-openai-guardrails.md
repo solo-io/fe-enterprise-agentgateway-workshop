@@ -135,21 +135,6 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 Verify that the request is denied with a 403 HTTP response code and the custom response message is returned.
 
-## Port-forward to Grafana UI to view traces
-Default credentials are admin:prom-operator
-```bash
-kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
-```
-
-## Port-forward to Jaeger UI to view traces
-```bash
-kubectl port-forward svc/jaeger-query -n observability 16686:16686
-```
-
-Navigate to http://localhost:3000 or http://localhost:16686 in your browser, you should be able to see traces for our recent requests
-
-- The request that triggered our guardrails policy should have been rejected with a `http.status` of `403`
-
 ## Cleanup
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway openai-prompt-guard
