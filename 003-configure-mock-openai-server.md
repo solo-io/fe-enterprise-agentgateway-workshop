@@ -15,7 +15,7 @@ Deploy the mock server using the manifest below.
 This mock server, called **vLLM Simulator**, is maintained by the [vLLM community](https://github.com/llm-d/llm-d-inference-sim).  
 It provides a lightweight implementation of the OpenAI-compatible `/v1/chat/completions` endpoint, which we’ll use throughout the labs to simulate LLM responses
 
-Mock server for gpt-4o
+Mock server for mock-gpt-4o
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: apps/v1
@@ -36,7 +36,7 @@ spec:
       containers:
       - args:
         - --model
-        - gpt-4o
+        - mock-gpt-4o
         - --port
         - "8000"
         - --max-loras
@@ -114,7 +114,7 @@ spec:
   ai:
     provider:
       openai:
-        model: "gpt-4o"
+        model: "mock-gpt-4o"
       host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
       port: 8000
       path: "/v1/chat/completions"
@@ -131,7 +131,7 @@ export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gatewa
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "mock-gpt-4o",
     "messages": [
       {
         "role": "user",

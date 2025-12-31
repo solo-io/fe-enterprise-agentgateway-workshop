@@ -1,5 +1,10 @@
 # Changelog
 
+0.3.6 - (12-31-25)
+---
+- Updated mock-openai demos and workshop to use 'mock-gpt-4o' model name for clarity
+- Updated Agentgateway dashboard
+
 0.3.5 - (12-30-25)
 ---
 - Add Agentgateway grafana dashboard at `/lib/observability`
