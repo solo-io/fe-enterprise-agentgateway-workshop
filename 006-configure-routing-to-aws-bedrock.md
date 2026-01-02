@@ -46,13 +46,13 @@ kubectl apply -f - <<EOF
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: bedrock-titan
+  name: bedrock-mistral
   namespace: enterprise-agentgateway
 spec:
   ai:
     provider:
       bedrock:
-        model: amazon.titan-tg1-large
+        model: mistral.voxtral-mini-3b-2507
         region: us-west-2
   policies:
     auth:
@@ -119,9 +119,9 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /bedrock/titan
+            value: /bedrock/mistral
       backendRefs:
-        - name: bedrock-titan
+        - name: bedrock-mistral
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -136,13 +136,13 @@ spec:
           kind: AgentgatewayBackend
       timeouts:
         request: "120s"
-    # catch-all will route to the bedrock titan upstream
+    # catch-all will route to the bedrock mistral upstream
     - matches:
         - path:
             type: Exact
             value: /bedrock
       backendRefs:
-        - name: bedrock-titan
+        - name: bedrock-mistral
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -150,11 +150,11 @@ spec:
 EOF
 ```
 
-## curl AWS Bedrock Titan endpoint
+## curl AWS Bedrock Mistral endpoint
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/bedrock/titan" \
+curl -i "$GATEWAY_IP:8080/bedrock/mistral" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -265,7 +265,7 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 ## Cleanup
 ```bash
 kubectl delete httproute -n enterprise-agentgateway bedrock
-kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-titan
+kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-mistral
 kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-haiku3.5
 kubectl delete agentgatewaybackend -n enterprise-agentgateway bedrock-llama3-8b
 kubectl delete secret -n enterprise-agentgateway bedrock-secret

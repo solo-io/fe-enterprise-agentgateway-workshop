@@ -9,6 +9,7 @@
     - New Agentgateway Control Plane panels
 - Set `replicas: 2` for agentgateway proxy deployment
 - Add CPU/MEM resource requests for agentgateway proxy deployment
+- Update `006-configure-routing-to-aws-bedrock.md` to replace titan models with mistral due to EOL of titan models
 
 0.3.6 - (12-31-25)
 ---
