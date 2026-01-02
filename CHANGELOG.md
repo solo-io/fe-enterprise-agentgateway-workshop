@@ -1,6 +1,6 @@
 # Changelog
 
-0.3.7 - (1-1-26)
+0.3.7 - (1-2-26)
 ---
 - Updates to Agentgateway dashboard at `/lib/observability/agentgateway-grafana-dashboard-v1.json`
   - Improved Overview section
