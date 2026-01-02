@@ -403,7 +403,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
    - Username: `admin`
    - Password: Value of `$GRAFANA_ADMIN_PASSWORD` (default: `prom-operator`)
 
-4. Navigate to **Dashboards > AgentGateway Overview** to view metrics
+4. Navigate to **Dashboards > AgentGateway Dashboard** to view metrics
 
 The dashboard provides real-time visualization of:
 - Core GenAI metrics (request rates, token usage by model)

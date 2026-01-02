@@ -171,6 +171,6 @@ kubectl port-forward -n monitoring svc/grafana-prometheus 3000:3000
    export GRAFANA_ADMIN_PASSWORD="your-secure-password"
    ```
 
-4. Navigate to Dashboards > AgentGateway Overview to view the dashboard
+4. Navigate to Dashboards > AgentGateway Dashboard to view the dashboard
 
 Note: The dashboard includes a namespace filter that allows you to view metrics for specific namespaces. By default, it shows metrics for all namespaces where AgentGateway is deployed.
