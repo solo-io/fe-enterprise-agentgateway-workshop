@@ -1,5 +1,15 @@
 # Changelog
 
+0.3.7 - (1-1-26)
+---
+- Updates to Agentgateway dashboard at `/lib/observability/agentgateway-grafana-dashboard-v1.json`
+  - Improved Overview section
+  - New Agentgateway Infrastructure Overview row
+    - New Agentgateway Data Plane panels
+    - New Agentgateway Control Plane panels
+- Set `replicas: 2` for agentgateway proxy deployment
+- Add CPU/MEM resource requests for agentgateway proxy deployment
+
 0.3.6 - (12-31-25)
 ---
 - Updated mock-openai demos and workshop to use 'mock-gpt-4o' model name for clarity
