@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 19,
+  "id": 27,
   "links": [],
   "panels": [
     {
@@ -1585,7 +1585,7 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
+        "w": 8,
         "x": 0,
         "y": 18
       },
@@ -1650,8 +1650,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 6,
-        "x": 6,
+        "w": 8,
+        "x": 8,
         "y": 18
       },
       "id": 54,
@@ -1723,8 +1723,8 @@
       },
       "gridPos": {
         "h": 4,
-        "w": 4,
-        "x": 12,
+        "w": 8,
+        "x": 16,
         "y": 18
       },
       "id": 56,
@@ -1798,8 +1798,8 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 16,
-        "y": 18
+        "x": 0,
+        "y": 22
       },
       "id": 75,
       "options": {
@@ -1833,7 +1833,147 @@
           "refId": "A"
         }
       ],
-      "title": "Agentgateway Proxy CPU Requests",
+      "title": "Agentgateway Proxy CPU Requests (per pod)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "cores"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 22
+      },
+      "id": 77,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"cpu\"})",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Agentgateway Proxy CPU Requests (total)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 22
+      },
+      "id": 79,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n    sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"}[$__rate_interval]))\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"cpu\"})\n  ) * 100",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Agentgateway Proxy Total CPU Utilization",
       "type": "stat"
     },
     {
@@ -1863,10 +2003,10 @@
       "gridPos": {
         "h": 4,
         "w": 4,
-        "x": 20,
-        "y": 18
+        "x": 12,
+        "y": 22
       },
-      "id": 76,
+      "id": 80,
       "options": {
         "colorMode": "value",
         "graphMode": "none",
@@ -1898,7 +2038,137 @@
           "refId": "A"
         }
       ],
-      "title": "Agentgateway Proxy MEM Requests",
+      "title": "Agentgateway Proxy MEM Requests (per pod)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "decbytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 22
+      },
+      "id": 76,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"memory\"})",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Agentgateway Proxy MEM Requests (total)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 22
+      },
+      "id": 78,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.3.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(\n    sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"})\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"memory\"})\n  ) * 100",
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Agentgateway Proxy Total MEM Utilization",
       "type": "stat"
     },
     {
@@ -1963,7 +2233,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 22
+        "y": 26
       },
       "id": 57,
       "options": {
@@ -2059,7 +2329,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 22
+        "y": 26
       },
       "id": 58,
       "options": {
@@ -2163,7 +2433,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 30
+        "y": 34
       },
       "id": 73,
       "options": {
@@ -2269,7 +2539,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 30
+        "y": 34
       },
       "id": 74,
       "options": {
@@ -2333,7 +2603,7 @@
         "h": 4,
         "w": 8,
         "x": 0,
-        "y": 38
+        "y": 42
       },
       "id": 68,
       "options": {
@@ -2398,7 +2668,7 @@
         "h": 4,
         "w": 8,
         "x": 8,
-        "y": 38
+        "y": 42
       },
       "id": 69,
       "options": {
@@ -2471,7 +2741,7 @@
         "h": 4,
         "w": 8,
         "x": 16,
-        "y": 38
+        "y": 42
       },
       "id": 70,
       "options": {
@@ -2570,7 +2840,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 42
+        "y": 46
       },
       "id": 71,
       "options": {
@@ -2668,7 +2938,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 42
+        "y": 46
       },
       "id": 72,
       "options": {
@@ -2710,7 +2980,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 50
+        "y": 54
       },
       "id": 13,
       "panels": [],
@@ -2746,7 +3016,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 51
+        "y": 55
       },
       "id": 30,
       "options": {
@@ -2849,7 +3119,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 51
+        "y": 55
       },
       "id": 29,
       "options": {
@@ -2946,7 +3216,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 59
+        "y": 63
       },
       "id": 14,
       "options": {
@@ -3041,7 +3311,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 59
+        "y": 63
       },
       "id": 28,
       "options": {
@@ -3151,7 +3421,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 67
+        "y": 71
       },
       "id": 26,
       "options": {
@@ -3295,7 +3565,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 76
+        "y": 80
       },
       "id": 16,
       "options": {
@@ -3409,7 +3679,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 84
+        "y": 88
       },
       "id": 37,
       "options": {
@@ -3505,7 +3775,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 92
+        "y": 96
       },
       "id": 34,
       "options": {
@@ -3600,7 +3870,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 92
+        "y": 96
       },
       "id": 32,
       "options": {
@@ -3695,7 +3965,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 100
+        "y": 104
       },
       "id": 33,
       "options": {
@@ -3792,7 +4062,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 100
+        "y": 104
       },
       "id": 35,
       "options": {
@@ -3831,7 +4101,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 108
+        "y": 112
       },
       "id": 38,
       "panels": [
@@ -4229,7 +4499,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 109
+        "y": 113
       },
       "id": 18,
       "panels": [
@@ -4433,7 +4703,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 110
+        "y": 114
       },
       "id": 27,
       "panels": [
@@ -4657,7 +4927,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 111
+        "y": 115
       },
       "id": 8,
       "panels": [
@@ -5119,7 +5389,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 112
+        "y": 116
       },
       "id": 21,
       "panels": [
