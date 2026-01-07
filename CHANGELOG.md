@@ -1,5 +1,9 @@
 # Changelog
 
+0.3.9 - (1-7-26)
+---
+- New `023-configure-timeouts-and-retries.md` lab
+
 0.3.8 - (1-7-26)
 ---
 - Quick update to `021a` to verify the active service account
