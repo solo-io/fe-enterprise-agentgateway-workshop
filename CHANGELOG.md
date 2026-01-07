@@ -1,5 +1,18 @@
 # Changelog
 
+0.3.7 - (1-6-26)
+---
+- Updates to Agentgateway dashboard at `/lib/observability/agentgateway-grafana-dashboard-v1.json`
+  - Improved Overview section
+  - New Agentgateway Infrastructure Overview row
+    - New Agentgateway Data Plane panels
+    - New Agentgateway Control Plane panels
+- Set `replicas: 2` for agentgateway proxy deployment
+- Add CPU/MEM resource requests for agentgateway proxy deployment
+- Update `006-configure-routing-to-aws-bedrock.md` to replace titan models with mistral due to EOL of titan models
+- New `006a-configure-routing-to-aws-bedrock-apikey.md` to showcase use of short-term and long-term API keys for AWS Bedrock
+- Update README.md
+
 0.3.6 - (12-31-25)
 ---
 - Updated mock-openai demos and workshop to use 'mock-gpt-4o' model name for clarity

@@ -210,13 +210,21 @@ spec:
             jwt: 'jwt'
             # --- Capture the whole response body as JSON
             response.body: 'json(response.body)'
-  #--- Uncomment to add gateway to ambient mesh ---
-  #deployment:
-  #  spec:
-  #    template:
-  #      metadata:
-  #        labels:
-  #          istio.io/dataplane-mode: ambient
+  deployment:
+    spec:
+      replicas: 2
+      template:
+        #--- Uncomment to add gateway to ambient mesh ---
+        #metadata:
+        #  labels:
+        #    istio.io/dataplane-mode: ambient
+        spec:
+          containers:
+          - name: agentgateway
+            resources:
+              requests:
+                cpu: 300m
+                memory: 128Mi
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway

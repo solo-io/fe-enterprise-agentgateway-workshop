@@ -10,6 +10,7 @@
 - [004c-fixed-path-queryparameter-matching-routing-example.md](004c-fixed-path-queryparameter-matching-routing-example.md)
 - [005-evaluate-openai-model-performance.md](005-evaluate-openai-model-performance.md)
 - [006-configure-routing-to-aws-bedrock.md](006-configure-routing-to-aws-bedrock.md)
+- [006a-configure-routing-to-aws-bedrock-apikey.md](006a-configure-routing-to-aws-bedrock-apikey.md)
 - [007-api-key-masking.md](007-api-key-masking.md)
 - [008-jwt-auth-with-rbac.md](008-jwt-auth-with-rbac.md)
 - [009-configure-basic-routing-to-anthropic.md](009-configure-basic-routing-to-anthropic.md)
@@ -23,29 +24,50 @@
 - [017-transformations.md](017-transformations.md)
 - [018-mcp.md](018-mcp.md)
 - [019-configure-direct-response.md](019-configure-direct-response.md)
+- [020-configure-basic-routing-to-azureopenai.md](020-configure-basic-routing-to-azureopenai.md)
+- [021-configure-basic-routing-to-vertexai.md](021-configure-basic-routing-to-vertexai.md)
+- [022-configure-openai-embeddings.md](022-configure-openai-embeddings.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
 - Install Enterprise Agentgateway
 - Configure agentgateway for LLM, MCP, and A2A consumption
 - Unified access point for consumption of LLMs
-    - In this repo:
+    - LLM Providers supported in this repo:
         - OpenAI
-        - AWS Bedrock
-        - Claude
+        - AWS Bedrock (IAM credentials and API keys)
+        - Anthropic (Claude)
+        - Azure OpenAI
+        - Google Vertex AI
+    - OpenAI Embeddings support
 - LLM API Key Management
+    - API Key masking in logs
 - Token-based metrics from LLM
 - LLM request/response metadata in Traces
-- Traffic Routing patterns (path, host, queryparameter)
-- AWS Bedrock provider support
+- Traffic Routing patterns (path, host, header, queryparameter)
 - Model Evaluations
-- Control access with org-specific API-key
-- Control access with JWT
-- Basic Prompt Guard - string, regex, builtin
+- Security & Access Control
+    - Control access with org-specific API-key
+    - Control access with JWT authentication
+    - JWT-based RBAC (Role-Based Access Control)
+- Prompt Guard & Content Moderation
+    - Basic Prompt Guard (string, regex, builtin)
+    - External moderation guardrails (OpenAI moderation API)
+    - Advanced Webhook Prompt Guard
 - Prompt Enrichment
-- Advanced Webhook Prompt Guard
-- Rate Limit on a per-request basis
-- Rate Limit on a per-token basis
+- Rate Limiting
+    - Rate Limit on a per-request basis
+    - Local token-based rate limiting
+    - Global token-based rate limiting
+- Request/Response Transformations
+    - Response transformations
+    - Header enrichment for observability
+- MCP (Model Context Protocol)
+    - Route to MCP servers
+    - Secure MCP servers with JWT auth
+    - Tool-level access control
+- Direct Response / Health Checks
+    - Configure fixed responses without backend calls
 
 ## WIP / to-do / Known Issues (999)
 - LLM Failover
