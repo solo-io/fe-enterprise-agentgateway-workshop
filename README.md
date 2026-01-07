@@ -26,6 +26,7 @@
 - [019-configure-direct-response.md](019-configure-direct-response.md)
 - [020-configure-basic-routing-to-azureopenai.md](020-configure-basic-routing-to-azureopenai.md)
 - [021-configure-basic-routing-to-vertexai.md](021-configure-basic-routing-to-vertexai.md)
+- [021a-configure-basic-routing-to-vertexai-service-account.md](021a-configure-basic-routing-to-vertexai-service-account.md)
 - [022-configure-openai-embeddings.md](022-configure-openai-embeddings.md)
 
 # Use Cases

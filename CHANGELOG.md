@@ -1,5 +1,9 @@
 # Changelog
 
+0.3.7 - (1-7-26)
+---
+- New `021a-configure-basic-routing-to-vertexai-service-account.md` to demonstrate using a GCP service account instead of User Auth for access to VertexAI
+
 0.3.7 - (1-6-26)
 ---
 - Updates to Agentgateway dashboard at `/lib/observability/agentgateway-grafana-dashboard-v1.json`
