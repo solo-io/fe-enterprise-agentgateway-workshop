@@ -55,6 +55,17 @@ gcloud auth activate-service-account \
   --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
 ```
 
+Verify that the service account is now the active identity:
+```bash
+# Show all authenticated accounts (active one is marked with *)
+gcloud auth list
+
+# Show the currently active account
+gcloud config get-value account
+```
+
+The output should show your service account email (e.g., `my-service-account@my-project.iam.gserviceaccount.com`) as the active account, not your user email.
+
 Retrieve an OAuth access token using the service account:
 ```bash
 export VERTEXAI_ACCESS_TOKEN=$(gcloud auth print-access-token)
