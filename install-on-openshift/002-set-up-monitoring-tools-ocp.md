@@ -57,7 +57,7 @@ jaeger-54b6c8b5d5-8s74n   1/1     Running   0          18m
 To view traces throughout the workshop:
 
 ```bash
-kubectl port-forward svc/jaeger-query -n observability 16686:16686
+kubectl port-forward svc/jaeger -n observability 16686:16686
 ```
 
 Navigate to http://localhost:16686 in your browser to view traces with LLM-specific spans including:

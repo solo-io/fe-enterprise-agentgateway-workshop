@@ -257,7 +257,7 @@ Example output shows comprehensive request details including model information, 
 If you installed Jaeger in lab `/install-on-openshift/002-set-up-monitoring-tools-ocp.md` instead of Tempo, you can view traces in the UI:
 
 ```bash
-kubectl port-forward svc/jaeger-query -n observability 16686:16686
+kubectl port-forward svc/jaeger -n observability 16686:16686
 ```
 
 Navigate to http://localhost:16686 in your browser to see traces with LLM-specific spans including `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
