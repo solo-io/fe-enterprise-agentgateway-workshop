@@ -1,5 +1,9 @@
 # Changelog
 
+0.3.8 - (1-7-26)
+---
+- Quick update to `021a` to verify the active service account
+
 0.3.7 - (1-7-26)
 ---
 - New `021a-configure-basic-routing-to-vertexai-service-account.md` to demonstrate using a GCP service account instead of User Auth for access to VertexAI
