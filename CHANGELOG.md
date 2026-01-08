@@ -1,5 +1,9 @@
 # Changelog
 
+0.4.1 - (1-7-26)
+---
+- New `025-load-testing-with-k6s.md` lab
+
 0.4.0 - (1-7-26)
 ---
 - Minor updates to `024-llm-failover.md`
