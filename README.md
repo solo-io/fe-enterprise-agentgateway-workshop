@@ -29,6 +29,7 @@
 - [021a-configure-basic-routing-to-vertexai-service-account.md](021a-configure-basic-routing-to-vertexai-service-account.md)
 - [022-configure-openai-embeddings.md](022-configure-openai-embeddings.md)
 - [023-configure-timeouts-and-retries.md](023-configure-timeouts-and-retries.md)
+- [024-llm-failover.md](024-llm-failover.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
@@ -71,9 +72,8 @@
 - Direct Response / Health Checks
     - Configure fixed responses without backend calls
 - Timeouts and Retries
-
-## WIP / to-do / Known Issues (999)
 - LLM Failover
+
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
