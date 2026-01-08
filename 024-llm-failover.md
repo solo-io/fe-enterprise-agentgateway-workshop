@@ -1,89 +1,101 @@
-# Configure Failover From HTTP 429 Server to OpenAI
+# Configure LLM Failover
 
-In this lab, you'll configure priority group failover using an HTTP 429 server as priority group 1 and OpenAI as priority group 2. When the primary backend returns rate limit errors, it's marked as unhealthy, causing subsequent requests to route to the secondary priority group
+In this lab, you'll configure priority group failover using the mock openai server from earlier labs that has been configured to return rate limit errors (priority group 1) and OpenAI (priority group 2). When the primary backend returns rate limit errors, it's marked as unhealthy, causing subsequent requests to route to the secondary priority group
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001` and `002`
 
 ## Lab Objectives
-- Deploy an HTTP 429 server that simulates rate limiting scenarios
-- Configure OpenAI as a failover backend
-- Create priority group failover configuration with http-429-server as priority 1 and OpenAI as priority 2
+- Deploy a mock openai server configured to always return 429 rate limit errors
+- Configure HTTPRoute with `ResponseHeaderModifier` to add `Retry-After` header (Agentgateway expects this header to trigger failover)
+- Configure an `AgentgatewayBackend` with priority groups
+- Create priority group failover configuration with mock-gpt-4o as priority 1 and OpenAI as priority 2
 - Test failover from rate-limited backend to healthy OpenAI backend
 - Observe failover behavior in logs and traces
 
-## Deploy HTTP 429 Server
+## Deploy Mock Server with Rate Limiting
 
-Deploy the HTTP 429 server using the manifest below. This server always returns a 429 response with a `Retry-After` header, simulating a rate-limited backend.
+Deploy the vllm-sim mock server configured to always return 429 rate limit errors. This uses the same deployment structure as lab 003, but adds failure injection flags:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: http-429-server
-  namespace: enterprise-agentgateway
-  labels:
-    app: http-429-server
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: http-429-server
+  name: mock-gpt-4o
   namespace: enterprise-agentgateway
-  labels:
-    app: http-429-server
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: http-429-server
+      app: mock-gpt-4o
   template:
     metadata:
       labels:
-        app: http-429-server
+        app: mock-gpt-4o
     spec:
-      serviceAccountName: http-429-server
       containers:
-      - name: http-429-server
-        image: ably7/http-429:0.1
+      - args:
+        - --model
+        - mock-gpt-4o
+        - --port
+        - "8000"
+        - --max-loras
+        - "2"
+        - --lora-modules
+        - '{"name": "food-review-1"}'
+        # Failure Injection - 100% rate limit errors
+        - --failure-injection-rate
+        - "100"
+        - --failure-types
+        - "rate_limit"
+        image: ghcr.io/llm-d/llm-d-inference-sim:latest
+        imagePullPolicy: IfNotPresent
+        name: vllm-sim
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
         ports:
-        - containerPort: 9959
+        - containerPort: 8000
+          name: http
           protocol: TCP
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "100m"
-          limits:
-            memory: "128Mi"
-            cpu: "200m"
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: http-429-server
+  name: mock-gpt-4o-svc
   namespace: enterprise-agentgateway
   labels:
-    app: http-429-server
+    app: mock-gpt-4o
 spec:
-  type: ClusterIP
-  ports:
-  - port: 9959
-    targetPort: 9959
-    protocol: TCP
-    name: http
   selector:
-    app: http-429-server
+    app: mock-gpt-4o
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      name: http
+  type: ClusterIP
 EOF
 ```
 
 Verify the deployment:
 ```bash
-kubectl get pods -n enterprise-agentgateway | grep http-429-server
-kubectl get svc -n enterprise-agentgateway | grep http-429-server
+kubectl get pods -n enterprise-agentgateway | grep mock-gpt-4o
+kubectl get svc -n enterprise-agentgateway | grep mock-gpt-4o-svc
 ```
 
-You should see the http-429-server pod running and its service available on port 9959.
+You should see the mock-gpt-4o pod running and its service available on port 8000.
+
+**Note:** The mock server is configured with `--failure-injection-rate 100` and `--failure-types rate_limit`, which means it will always return 429 rate limit errors for every request.
 
 ## Configure OpenAI Secret
 
@@ -99,14 +111,14 @@ kubectl create secret generic openai-secret -n enterprise-agentgateway \
 
 ## Create Priority Group Failover Configuration
 
-Configure the AgentgatewayBackend with priority groups and HTTPRoute. The backend will first attempt to use the http-429-server (priority group 1), and when it returns a 429 error it will be marked unhealthy, a second request will then fail over to OpenAI (priority group 2):
+Configure the AgentgatewayBackend with priority groups and HTTPRoute. The HTTPRoute includes a `ResponseHeaderModifier` filter to add the `Retry-After` header that the gateway needs to determine how long to mark the provider as unhealthy:
 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: http-429
+  name: mock-ratelimit-failover
   namespace: enterprise-agentgateway
 spec:
   parentRefs:
@@ -116,9 +128,15 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /http-429
+            value: /openai
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            add:
+              - name: Retry-After
+                value: "60"
       backendRefs:
-        - name: http-429
+        - name: mock-ratelimit-backend
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -127,19 +145,19 @@ spec:
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: http-429
+  name: mock-ratelimit-backend
   namespace: enterprise-agentgateway
 spec:
   ai:
     groups:
-      # Priority Group 1: HTTP 429 Server (always returns rate limit errors)
+      # Priority Group 1: Mock Server (always returns rate limit errors)
       - providers:
-          - name: http-429-provider
+          - name: mock-ratelimit-provider
             openai:
-              model: "gpt-5"
-            host: http-429-server.enterprise-agentgateway.svc.cluster.local
-            port: 9959
-            path: "/"
+              model: "mock-gpt-4o"
+            host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
+            port: 8000
+            path: "/v1/chat/completions"
             policies:
               auth:
                 passthrough: {}
@@ -155,6 +173,37 @@ spec:
 EOF
 ```
 
+**Key Configuration Points:**
+- The `ResponseHeaderModifier` filter adds `Retry-After: 60` to all responses to mimic a typical 429 response from LLM Providers, which tells the gateway to mark the provider as unhealthy for 60 seconds when it receives a 429
+- Priority group 1 uses the mock server that always returns 429 errors
+- Priority group 2 uses OpenAI as the failover backend
+
+## Configure Single Replica for Consistent Testing
+
+For this lab, it's important to use a single AgentGateway replica because **provider health state is local to each pod**. With multiple replicas, different pods maintain separate health states, which can lead to inconsistent failover behavior where some requests hit a pod that hasn't marked the provider as unhealthy yet.
+
+Update the EnterpriseAgentgatewayParameters to set replicas to 1:
+
+```bash
+kubectl patch enterpriseagentgatewayparameters agentgateway-params -n enterprise-agentgateway --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":1}}}}'
+
+kubectl rollout restart deployment/agentgateway -n enterprise-agentgateway
+```
+
+Wait for the deployment to roll out:
+
+```bash
+kubectl rollout status deployment/agentgateway -n enterprise-agentgateway
+```
+
+Verify only one pod is running:
+
+```bash
+kubectl get pods -n enterprise-agentgateway | grep "^agentgateway-"
+```
+
+You should see only one agentgateway pod in Running state.
+
 ## Test Priority Group Failover
 
 Now test the failover behavior. Priority group failover works across requests rather than within a single request.
@@ -164,12 +213,12 @@ Get the Gateway IP address:
 export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
-### First Request - Triggers Failover
+### Testing Failover Behavior
 
-Send the first request:
+Send multiple requests to observe the failover pattern:
 
 ```bash
-curl -v "$GATEWAY_IP:8080/http-429" \
+curl -v "$GATEWAY_IP:8080/openai" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "",
@@ -177,64 +226,22 @@ curl -v "$GATEWAY_IP:8080/http-429" \
   }'
 ```
 
-Expected output from first request:
+Note that the default response from the mock openai server will always be
 ```
-< HTTP/1.0 429 Too Many Requests
-< server: BaseHTTP/0.6 Python/3.11.14
-< retry-after: 60
-< content-type: application/json
-<
-{"error":{"message":"Rate limit exceeded","type":"rate_limit_error"}}
+{"error":{"message":"Rate limit reached for mock-gpt-4o in organization org-xxx on requests per min (RPM): Limit 3, Used 3, Requested 1.","type":"RateLimitError","param":null,"code":429}}
 ```
 
-**What happened:**
-- The gateway tried priority group 1 (http-429-server)
-- Received a 429 error
-- Returned the 429 to the client
-- **Marked the http-429-server provider as unhealthy/rate-limited**
+**Expected response pattern (with single replica):**
+- **Request 1**: `429 Too Many Requests` from mock-gpt-4o
+- **Request 2**: `200 OK` from OpenAI (failover successful)
+- **Request 3**: `200 OK` from OpenAI (continues using failover)
 
-### Second Request - Uses Failover Backend
-
-Immediately send a second request:
-
-```bash
-curl -v "$GATEWAY_IP:8080/http-429" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "",
-    "messages": [{"role": "user", "content": "What is 2+2?"}]
-  }'
-```
-
-Expected output from second request:
-```
-< HTTP/1.1 200 OK
-< Content-Type: application/json
-<
-{
-  "id": "chatcmpl-...",
-  "object": "chat.completion",
-  "created": ...,
-  "model": "gpt-4o-mini",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "2 + 2 equals 4."
-      },
-      "finish_reason": "stop"
-    }
-  ],
-  ...
-}
-```
-
-**What happened:**
-- The gateway detected that priority group 1 is unhealthy
-- Skipped priority group 1 and went directly to priority group 2 (OpenAI)
-- Received a successful 200 response from OpenAI
-- Subsequent requests will continue using priority group 2 until group 1 becomes healthy again
+**What's happening:**
+1. The first request hits the mock server and receives a 429 error with `Retry-After: 60` header
+2. The gateway marks the mock-gpt-4o provider as unhealthy for 60 seconds
+3. All subsequent requests are routed to priority group 2 (OpenAI) and receive successful 200 responses
+4. After 60 seconds, the gateway will retry the mock server to check if it has recovered
+5. Since the mock server always returns 429, the cycle repeats with the gateway periodically checking if the primary backend has recovered
 
 ## Observability
 
@@ -273,9 +280,9 @@ kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 50 | jq .
 In the access logs (entries with `"scope": "request"`), you can observe:
 
 **First Request (429 error):**
-- `"endpoint": "http-429-server.enterprise-agentgateway.svc.cluster.local:9959"`
+- `"endpoint": "mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local:8000"`
 - `"http.status": 429`
-- `"duration": "2ms"` (very fast since it's just returning an error)
+- `"duration": "~50ms"` (fast since mock server just returns an error)
 - `"response.body"` showing the rate limit error message
 
 **Second Request (successful failover):**
@@ -285,7 +292,7 @@ In the access logs (entries with `"scope": "request"`), you can observe:
 - `"gen_ai.response.model"`, `"gen_ai.usage.input_tokens"`, `"gen_ai.usage.output_tokens"` showing successful OpenAI response
 - `"response.body"` containing the actual LLM completion
 
-The change in `endpoint` field between requests clearly shows the failover from the http-429-server to OpenAI.
+The change in `endpoint` field between requests clearly shows the failover from the mock server to OpenAI.
 
 ### View Traces in Grafana
 
@@ -295,7 +302,7 @@ To view distributed traces and see failover behavior across requests:
 2. Select **Tempo** from the data source dropdown
 3. Click **Search** to see all traces
 4. Compare traces from your two requests:
-   - **First trace**: Shows attempt to http-429-server with 429 error span
+   - **First trace**: Shows attempt to mock-gpt-4o with 429 error span and Retry-After header
    - **Second trace**: Shows successful routing to OpenAI backend with 200 response
 5. You can see how the backend selection changes based on provider health
 
@@ -307,21 +314,48 @@ The priority group failover configuration demonstrates several key concepts:
 
 1. **Priority Ordering**: The gateway prefers providers in higher priority groups (group 1 over group 2, etc.)
 2. **Health-Based Failover**: When a provider returns certain error codes (like 429), it's marked as unhealthy
-   - The **first request** that encounters the error will fail with that error code
+   - The **first request** that encounters an error will fail with that error code
+   - The provider is marked as unhealthy after processing the error response
    - **Subsequent requests** will skip unhealthy providers and use the next priority group
-3. **Across-Request Failover**: Unlike retry policies that work within a single request, priority group failover works across multiple requests based on provider health state
-4. **Production Use Case**: This pattern is ideal for scenarios where you have:
+   - This is an across-request mechanism, not a within-request retry
+   - **Important**: Health state is local to each AgentGateway pod. With multiple replicas, you may see 1-2 failed requests before failover as different pods learn about the unhealthy state
+3. **Retry-After Header**: The `Retry-After` header tells the gateway how long to mark a provider as unhealthy
+   - In this lab, we use an HTTPRoute `ResponseHeaderModifier` to add this header
+   - The gateway honors this value and won't retry the unhealthy provider until the period expires
+   - After the period expires, the gateway will retry the primary backend to check if it has recovered
+4. **Across-Request Failover**: Unlike retry policies that work within a single request, priority group failover works across multiple requests based on provider health state
+   - With a single replica: expect 1 failed request, then failover to the next priority group
+   - With multiple replicas: expect 1-2 failed requests before all pods mark the provider as unhealthy
+   - Once a provider is marked unhealthy, all subsequent requests use the failover backend until the unhealthy period expires
+5. **Production Use Case**: This pattern is ideal for scenarios where you have:
    - Primary backends that may experience temporary rate limiting
    - Fallback backends as safety nets for subsequent requests
    - Different cost tiers (prefer cheaper model, fall back to more expensive when primary is unavailable)
    - Circuit-breaking behavior without explicit circuit breaker configuration
 
+### Using ResponseHeaderModifier
+
+The HTTPRoute's `ResponseHeaderModifier` filter is a powerful Gateway API feature that allows you to:
+- Add headers to responses from backends
+- Modify or remove existing headers
+- Implement cross-cutting concerns at the routing layer
+
+In this lab, we use it to add the `Retry-After` header that the mock server doesn't include by default, demonstrating how you can adapt third-party backends to work with your gateway's requirements without modifying the backend itself.
+
 ## Cleanup
+
+Delete the lab resources:
 ```bash
-kubectl delete httproute -n enterprise-agentgateway http-429
-kubectl delete agentgatewaybackend -n enterprise-agentgateway http-429
+kubectl delete httproute -n enterprise-agentgateway mock-ratelimit-failover
+kubectl delete agentgatewaybackend -n enterprise-agentgateway mock-ratelimit-backend
 kubectl delete secret -n enterprise-agentgateway openai-secret
-kubectl delete -n enterprise-agentgateway svc/http-429-server
-kubectl delete -n enterprise-agentgateway deploy/http-429-server
-kubectl delete -n enterprise-agentgateway serviceaccount/http-429-server
+kubectl delete -n enterprise-agentgateway svc/mock-gpt-4o-svc
+kubectl delete -n enterprise-agentgateway deploy/mock-gpt-4o
+```
+
+Restore the AgentGateway to the 2 replicas we originally set up:
+```bash
+kubectl patch enterpriseagentgatewayparameters agentgateway-params -n enterprise-agentgateway --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":2}}}}'
+
+kubectl rollout restart deployment/agentgateway -n enterprise-agentgateway
 ```
