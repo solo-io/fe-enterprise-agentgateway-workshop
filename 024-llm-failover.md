@@ -353,7 +353,7 @@ kubectl delete -n enterprise-agentgateway svc/mock-gpt-4o-svc
 kubectl delete -n enterprise-agentgateway deploy/mock-gpt-4o
 ```
 
-Restore the AgentGateway to 2 replicas:
+Restore the AgentGateway to the 2 replicas we originally set up:
 ```bash
 kubectl patch enterpriseagentgatewayparameters agentgateway-params -n enterprise-agentgateway --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":2}}}}'
 
