@@ -30,6 +30,7 @@
 - [022-configure-openai-embeddings.md](022-configure-openai-embeddings.md)
 - [023-configure-timeouts-and-retries.md](023-configure-timeouts-and-retries.md)
 - [024-llm-failover.md](024-llm-failover.md)
+- [025-load-testing-with-k6s.md](025-load-testing-with-k6s.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
@@ -72,7 +73,17 @@
 - Direct Response / Health Checks
     - Configure fixed responses without backend calls
 - Timeouts and Retries
+    - Request timeout configuration
+    - Retry policies on specific error codes (503, etc.)
+    - Observing how timeouts and retries interact together
 - LLM Failover
+    - Priority group failover between LLM providers
+    - Health-based routing across multiple backends
+    - Failover on rate limit errors (429)
+- Load Testing with K6s
+    - Performance testing with k6s load generator
+    - Ramping and constant load patterns
+    - Integration with Grafana and Prometheus metrics
 
 
 ## Validated on

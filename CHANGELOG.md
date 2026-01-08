@@ -3,6 +3,7 @@
 0.4.1 - (1-7-26)
 ---
 - New `025-load-testing-with-k6s.md` lab
+- Update README.md use cases section with updates and more detail
 
 0.4.0 - (1-7-26)
 ---
