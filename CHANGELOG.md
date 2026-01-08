@@ -1,5 +1,9 @@
 # Changelog
 
+0.4.0 - (1-7-26)
+---
+- Minor updates to `024-llm-failover.md`
+
 0.3.9 - (1-7-26)
 ---
 - New `023-configure-timeouts-and-retries.md` lab

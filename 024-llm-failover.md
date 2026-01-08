@@ -1,6 +1,6 @@
-# Configure Failover with HTTP 429 Server
+# Configure Failover From HTTP 429 Server to OpenAI
 
-In this lab, you'll deploy a server that always returns HTTP 429 (Rate Limit Exceeded) responses and configure AgentGateway to route requests to it. This setup enables testing of retry logic, failover behavior, and rate limit handling in AgentGateway.
+In this lab, you'll configure priority group failover using an HTTP 429 server as priority group 1 and OpenAI as priority group 2. When the primary backend returns rate limit errors, it's marked as unhealthy, causing subsequent requests to route to the secondary priority group
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001` and `002`
@@ -9,7 +9,7 @@ This lab assumes that you have completed the setup in `001` and `002`
 - Deploy an HTTP 429 server that simulates rate limiting scenarios
 - Configure OpenAI as a failover backend
 - Create priority group failover configuration with http-429-server as priority 1 and OpenAI as priority 2
-- Test automatic failover from rate-limited backend to healthy OpenAI backend
+- Test failover from rate-limited backend to healthy OpenAI backend
 - Observe failover behavior in logs and traces
 
 ## Deploy HTTP 429 Server
@@ -99,7 +99,7 @@ kubectl create secret generic openai-secret -n enterprise-agentgateway \
 
 ## Create Priority Group Failover Configuration
 
-Configure the AgentgatewayBackend with priority groups and HTTPRoute. The backend will first attempt to use the http-429-server (priority group 1), and when it returns a 429 error, automatically fail over to OpenAI (priority group 2):
+Configure the AgentgatewayBackend with priority groups and HTTPRoute. The backend will first attempt to use the http-429-server (priority group 1), and when it returns a 429 error it will be marked unhealthy, a second request will then fail over to OpenAI (priority group 2):
 
 ```bash
 kubectl apply -f - <<EOF
