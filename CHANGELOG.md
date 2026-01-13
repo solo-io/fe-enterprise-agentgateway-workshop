@@ -1,5 +1,9 @@
 # Changelog
 
+0.4.5 - (1-13-26)
+---
+- Updated `000-image-list.md` with enterprise agentgateway helm chart update
+
 0.4.4 - (1-13-26)
 ---
 - Added header-based and multi-header rate limiting examples to `016-global-token-based-rate-limiting.md`
