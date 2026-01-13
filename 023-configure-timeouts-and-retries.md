@@ -1,15 +1,16 @@
-# Configure Timeouts and Retries
+# Configure Timeouts and Retries with Backoff
 
-In this lab, you'll learn how timeout and retry policies interact together. You'll see how the gateway retries failed requests until the overall timeout is exceeded, demonstrating resilient request handling.
+In this lab, you'll learn how timeout, retry, and backoff policies interact together. You'll see how the gateway retries failed requests with configurable delays between attempts until the overall timeout is exceeded, demonstrating resilient request handling.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001` and `002`.
 
 ## Lab Objectives
 - Deploy a mock OpenAI server
-- Configure a combined timeout and retry policy
-- Observe how timeouts and retries work together
-- See `retry.attempt=10` in logs when retries exhaust the timeout
+- Configure a combined timeout and retry policy with backoff
+- Observe how timeouts, retries, and backoff work together
+- Test different backoff configurations to see their impact on retry behavior
+- See retry attempts in logs when retries exhaust the timeout
 
 ## Create a Mock vLLM Server
 
@@ -140,7 +141,7 @@ kubectl get deploy -n enterprise-agentgateway
 
 ## Configure Timeout and Retry Policy
 
-Create a combined policy with both timeout (100ms) and retry (10 attempts) configuration:
+Create a combined policy with timeout (100ms), retry (10 attempts), and backoff (25ms) configuration:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -159,6 +160,7 @@ spec:
       request: 100ms
     retry:
       attempts: 10
+      backoff: 25ms
       codes:
         - 503  # Service Unavailable
 EOF
@@ -180,7 +182,8 @@ enterprise-agentgateway   timeout-retry-policy   True       True
 
 - **Timeout**: 100ms total request timeout
 - **Retry attempts**: 10 retries on 503 errors
-- **How they interact**: The gateway will retry up to 10 times, but will stop when the 100ms timeout is exceeded
+- **Retry backoff**: 25ms delay between retry attempts
+- **How they interact**: The gateway will retry up to 10 times with a 25ms delay between each retry, but will stop when the 100ms timeout is exceeded. With the backoff, fewer retries will occur before the timeout.
 
 ## Test Baseline (Successful Request)
 
@@ -244,12 +247,12 @@ date: Wed, 07 Jan 2026 22:47:38 GMT
 request timeout
 ```
 
-Check the agentgateway logs, you should see that the request was retried 10 times before the timeout
+Check the agentgateway logs, you should see that the request was retried a few times before the timeout
 ```json
 {
-  "retry": 10,
+  "retry": 3,
   "status": 504,
-  "duration": "101ms",
+  "duration": "103ms",
   "error": "request timeout"
 }
 ```
@@ -259,9 +262,86 @@ Check the agentgateway logs, you should see that the request was retried 10 time
 1. **Request sent** to scaled-down backend (no pods available)
 2. **503 Service Unavailable** returned
 3. **Gateway retries** automatically (up to 10 attempts configured)
-4. **Retries continue** until the 100ms timeout is exceeded
-5. **504 Gateway Timeout** returned to client
-6. **All retry attempts logged** showing `retry.attempt=10`
+4. **Only 3 retries completed** - the 25ms backoff delays consume the timeout window quickly
+5. **100ms timeout exceeded** after retry attempt 3
+6. **504 Gateway Timeout** returned to client
+
+This demonstrates that with a short timeout (100ms) and backoff delays (25ms), the timeout is reached before the max retry attempts (10), limiting actual retries to just 3.
+
+## Test Retry Backoff with Longer Timeout
+
+Now let's configure a policy with a longer timeout to observe the backoff behavior more clearly:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: timeout-retry-policy
+  namespace: enterprise-agentgateway
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai
+  traffic:
+    timeouts:
+      request: 2s
+    retry:
+      attempts: 10
+      backoff: 200ms
+      codes:
+        - 503  # Service Unavailable
+EOF
+```
+
+This configuration sets:
+- **2s timeout**: Longer window to observe retry behavior
+- **10 retry attempts**: Maximum retries before giving up
+- **200ms backoff**: Observable delay between each retry attempt
+
+Make another request with the mock server still scaled to 0:
+
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "mock-gpt-4o",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Say hello"
+      }
+    ]
+  }'
+```
+
+Check the logs to see the retry attempts with backoff delays:
+
+```bash
+kubectl logs -f deploy/agentgateway -n enterprise-agentgateway | jq 'select(.["retry.attempt"]) | {retry: .["retry.attempt"], status: ."http.status", duration, error}'
+```
+
+You should see output similar to:
+```json
+{
+  "retry": 7,
+  "status": 504,
+  "duration": "2001ms",
+  "error": "request timeout"
+}
+```
+
+### Observing Backoff Behavior
+
+With a 200ms backoff and 2s timeout, the gateway will make approximately:
+- Initial request: 0ms
+- Retry 1: ~200ms
+- Retry 2: ~400ms
+- Retry 3: ~600ms
+- ...continuing until timeout
+
+The total time consumed = (retry attempts × backoff delay) + network latency. With 200ms backoff and 2s timeout, you should see around **7 retry attempts** before the timeout is reached, demonstrating that the timeout limit is hit before the configured 10 max attempts.
 
 ## Cleanup
 
