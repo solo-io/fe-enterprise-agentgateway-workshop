@@ -138,11 +138,193 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 You should be rate limited after several requests to the LLM because we will have hit our token-based rate limit of 10 input tokens per hour
 
+## Configure header-based token rate limiting
+Now let's configure a rate limit based on a custom header (X-User-ID) instead of a generic counter. This allows different users to have their own rate limit quotas.
+
+First, delete the previous rate limit config:
+```bash
+kubectl delete rlc -n enterprise-agentgateway token-based-rate-limit
+```
+
+Create a header-based rate limit config:
+```bash
+kubectl apply -f- <<EOF
+apiVersion: ratelimit.solo.io/v1alpha1
+kind: RateLimitConfig
+metadata:
+  name: openai-rate-limit
+  namespace: enterprise-agentgateway
+spec:
+  raw:
+    descriptors:
+    - key: X-User-ID
+      rateLimit:
+        unit: MINUTE
+        requestsPerUnit: 100
+    rateLimits:
+    - actions:
+      - requestHeaders:
+          descriptorKey: "X-User-ID"
+          headerName: "X-User-ID"
+      type: TOKEN
+EOF
+```
+
+Update the EnterpriseAgentgatewayPolicy to reference the new rate limit config:
+```bash
+kubectl apply -f- <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: token-based-rate-limit
+  namespace: enterprise-agentgateway
+spec:
+  targetRefs:
+    - name: agentgateway
+      group: gateway.networking.k8s.io
+      kind: Gateway
+  traffic:
+    entRateLimit:
+      global:
+        rateLimitConfigRefs:
+        - name: openai-rate-limit
+EOF
+```
+
+## Test header-based rate limiting
+Now curl with the X-User-ID header to test per-user rate limiting:
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "X-User-ID: user-123" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+Each user (identified by their X-User-ID header value) will have their own token quota of 100 input tokens per minute. Try using different user IDs to see separate rate limit counters:
+```bash
+# Test with different user
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "X-User-ID: user-456" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+## Configure multi-header based token rate limiting
+Now let's configure rate limiting based on multiple headers. This creates a composite key where the rate limit applies to the combination of both header values (e.g., user-123 in tenant-A has a separate quota from user-123 in tenant-B).
+
+First, delete the previous rate limit config:
+```bash
+kubectl delete rlc -n enterprise-agentgateway openai-rate-limit
+```
+
+Create a multi-header rate limit config that limits based on both X-User-ID and X-Tenant-ID:
+```bash
+kubectl apply -f- <<EOF
+apiVersion: ratelimit.solo.io/v1alpha1
+kind: RateLimitConfig
+metadata:
+  name: multi-header-rate-limit
+  namespace: enterprise-agentgateway
+spec:
+  raw:
+    descriptors:
+    - key: X-User-ID
+      descriptors:
+      - key: X-Tenant-ID
+        rateLimit:
+          unit: MINUTE
+          requestsPerUnit: 50
+    rateLimits:
+    - actions:
+      - requestHeaders:
+          descriptorKey: "X-User-ID"
+          headerName: "X-User-ID"
+      - requestHeaders:
+          descriptorKey: "X-Tenant-ID"
+          headerName: "X-Tenant-ID"
+      type: TOKEN
+EOF
+```
+
+Update the EnterpriseAgentgatewayPolicy to reference the new rate limit config:
+```bash
+kubectl apply -f- <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: token-based-rate-limit
+  namespace: enterprise-agentgateway
+spec:
+  targetRefs:
+    - name: agentgateway
+      group: gateway.networking.k8s.io
+      kind: Gateway
+  traffic:
+    entRateLimit:
+      global:
+        rateLimitConfigRefs:
+        - name: multi-header-rate-limit
+EOF
+```
+
+## Test multi-header rate limiting
+Test with user-123 in tenant-A:
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "X-User-ID: user-123" \
+  -H "X-Tenant-ID: tenant-A" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+Now test the same user-123 but in a different tenant (tenant-B). This should have a separate quota:
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "X-User-ID: user-123" \
+  -H "X-Tenant-ID: tenant-B" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+The rate limit is enforced on the combination of both headers. Each user-tenant combination gets its own quota of 50 input tokens per minute. If user-123 in tenant-A hits their limit, user-123 in tenant-B will still have their full quota available.
+
 ## Cleanup
 ```bash
 kubectl delete httproute -n enterprise-agentgateway openai
 kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
 kubectl delete secret -n enterprise-agentgateway openai-secret
 kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway token-based-rate-limit
-kubectl delete rlc -n enterprise-agentgateway token-based-rate-limit
+kubectl delete rlc -n enterprise-agentgateway token-based-rate-limit openai-rate-limit multi-header-rate-limit
 ```
