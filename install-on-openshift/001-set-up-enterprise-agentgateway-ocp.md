@@ -45,7 +45,7 @@ referencegrants      refgrant     gateway.networking.k8s.io/v1beta1   true      
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=2.1.0-beta.2
+export ENTERPRISE_AGW_VERSION=2.1.0-rc.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -56,7 +56,7 @@ kubectl create namespace enterprise-agentgateway
 ```bash
 helm upgrade -i --create-namespace --namespace enterprise-agentgateway \
     --version $ENTERPRISE_AGW_VERSION enterprise-agentgateway-crds \
-    oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway-crds
+    oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds
 ```
 
 To check if the the Enterprise Agentgateway CRDs are installed-
@@ -80,14 +80,14 @@ ratelimitconfigs.ratelimit.solo.io
 ## Install Enterprise Agentgateway Controller
 Using Helm:
 ```bash
-helm upgrade -i -n enterprise-agentgateway enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway \
+helm upgrade -i -n enterprise-agentgateway enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $ENTERPRISE_AGW_VERSION \
 --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 #--- Optional: override for image registry/tag for the controller
 image:
-  registry: us-docker.pkg.dev/solo-public/gloo-gateway
+  registry: us-docker.pkg.dev/solo-public/enterprise-agentgateway
   tag: "$ENTERPRISE_AGW_VERSION"
   pullPolicy: IfNotPresent
 # --- Override the default Agentgateway parameters used by this GatewayClass
@@ -114,14 +114,6 @@ NAME                                       READY   STATUS    RESTARTS   AGE
 enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 ```
 
-## Configure agentgateway
-
-**Note - SCC workaround for redis cache in 2.1.0-beta2**: For this beta release we will need to set `anyuid` for the redis cache until [#1235](https://github.com/solo-io/gloo-gateway/issues/1235) is completed
-
-```bash
-oc adm policy add-scc-to-user anyuid -z ext-cache-enterprise-agentgateway-enterprise-agentgateway -n enterprise-agentgateway
-```
-
 ## Deploy Agentgateway with customizations
 The configuration below demonstrates how to override container images for air-gapped environments by sourcing them from a private registry, along with other customizations exposed through `EnterpriseAgentgatewayParameters`, such as adding annotations or labels, modifying deployment and service settings, and extending observability capabilities, and configuration for deploying on Openshift. While this example uses the default public images, it illustrates how those images can be replaced with ones hosted in a private repository.
 
@@ -134,65 +126,97 @@ metadata:
   name: agentgateway-params
   namespace: enterprise-agentgateway
 spec:
-  #--- Required for Openshift---
+  #--- Required for Openshift: Delete securityContext to let OpenShift generate it based on SCC ---
   deployment:
     spec:
+      replicas: 2
       template:
         #--- Uncomment to add gateway to ambient mesh ---
         #metadata:
         #  labels:
         #    istio.io/dataplane-mode: ambient
         spec:
+          # Delete pod-level securityContext
+          securityContext:
+            $patch: delete
           containers:
           - name: agentgateway
+            # Delete container-level securityContext
             securityContext:
-              allowPrivilegeEscalation: false
-              capabilities:
-                add:
-                - NET_BIND_SERVICE
-                drop:
-                - ALL
-              readOnlyRootFilesystem: true
-              runAsNonRoot: true
-              runAsUser:
-                $patch: delete
-          securityContext:
-            sysctls:
-            - name: net.ipv4.ip_unprivileged_port_start
-              value: "0"
+              $patch: delete
+            resources:
+              requests:
+                cpu: 300m
+                memory: 128Mi
   ### -- uncomment to override shared extensions -- ###
   sharedExtensions:
     extauth:
       enabled: true
-      replicas: 1
-      container:
-        image:
-          registry: gcr.io
-          repository: gloo-mesh/ext-auth-service
-          tag: "0.71.4"
+      deployment:
+        spec:
+          replicas: 1
+          template:
+            spec:
+              # Delete pod-level securityContext for OpenShift
+              securityContext:
+                $patch: delete
+              containers:
+              - name: ext-auth-service
+                # Delete container-level securityContext for OpenShift
+                securityContext:
+                  $patch: delete
+      #--- Image overrides for deployment ---
+      #image:
+      #  registry: gcr.io
+      #  repository: gloo-mesh/ext-auth-service
+      #  tag: "0.71.4"
     ratelimiter:
       enabled: true
-      replicas: 1
-      container:
-        image:
-          registry: gcr.io
-          repository: gloo-mesh/rate-limiter
-          tag: "0.16.4"
+      deployment:
+        spec:
+          replicas: 1
+          template:
+            spec:
+              # Delete pod-level securityContext for OpenShift
+              securityContext:
+                $patch: delete
+              containers:
+              - name: rate-limiter
+                # Delete container-level securityContext for OpenShift
+                securityContext:
+                  $patch: delete
+      #--- Image overrides for deployment ---
+      #image:
+      #  registry: gcr.io
+      #  repository: gloo-mesh/rate-limiter
+      #  tag: "0.17.2"
     extCache:
       enabled: true
-      replicas: 1
-      container:
-        image:
-          registry: docker.io
-          repository: redis
-          tag: "7.2.4-alpine"
+      deployment:
+        spec:
+          replicas: 1
+          template:
+            spec:
+              # Delete pod-level securityContext for OpenShift
+              securityContext:
+                $patch: delete
+              containers:
+              - name: redis
+                # Delete container-level securityContext for OpenShift
+                securityContext:
+                  $patch: delete
+      #--- Image overrides for deployment ---
+      #image:
+      #  registry: docker.io
+      #  repository: redis
+      #  tag: "7.2.12-alpine"
   logging:
     level: info
   #--- Image overrides for deployment ---
-  image:
-    registry: ghcr.io
-    repository: agentgateway/agentgateway
-    tag: "0.11.0-alpha.5e5533a2c6bfb8914d69662b06aef48b4e7b85d5"
+  #image:
+  #  registry: ghcr.io
+  #  repository: agentgateway/agentgateway
+  #  tag: "0.11.0-alpha.5e5533a2c6bfb8914d69662b06aef48b4e7b85d5"
   service:
     metadata:
       annotations:
@@ -225,7 +249,7 @@ spec:
         format: json
       tracing:
         otlpProtocol: grpc
-        otlpEndpoint: http://jaeger-collector.observability.svc.cluster.local:4317
+        otlpEndpoint: http://jaeger.observability.svc.cluster.local:4317
         randomSampling: 'true'
         fields:
           add:

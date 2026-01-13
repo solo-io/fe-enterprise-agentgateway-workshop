@@ -88,7 +88,7 @@
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway 2.1.0-beta2
+- Enterprise Agentgateway 2.1.0-rc.1
 
 
 ## User Stories / Acceptance Criteria

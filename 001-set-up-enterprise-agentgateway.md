@@ -45,7 +45,7 @@ referencegrants      refgrant     gateway.networking.k8s.io/v1beta1   true      
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=2.1.0-beta.2
+export ENTERPRISE_AGW_VERSION=2.1.0-rc.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -56,7 +56,7 @@ kubectl create namespace enterprise-agentgateway
 ```bash
 helm upgrade -i --create-namespace --namespace enterprise-agentgateway \
     --version $ENTERPRISE_AGW_VERSION enterprise-agentgateway-crds \
-    oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway-crds
+    oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds
 ```
 
 To check if the the Enterprise Agentgateway CRDs are installed-
@@ -80,14 +80,14 @@ ratelimitconfigs.ratelimit.solo.io
 ## Install Enterprise Agentgateway Controller
 Using Helm:
 ```bash
-helm upgrade -i -n enterprise-agentgateway enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway \
+helm upgrade -i -n enterprise-agentgateway enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $ENTERPRISE_AGW_VERSION \
 --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 #--- Optional: override for image registry/tag for the controller
 image:
-  registry: us-docker.pkg.dev/solo-public/gloo-gateway
+  registry: us-docker.pkg.dev/solo-public/enterprise-agentgateway
   tag: "$ENTERPRISE_AGW_VERSION"
   pullPolicy: IfNotPresent
 # --- Override the default Agentgateway parameters used by this GatewayClass
@@ -130,35 +130,41 @@ spec:
   sharedExtensions:
     extauth:
       enabled: true
-      replicas: 1
-      container:
-        image:
-          registry: gcr.io
-          repository: gloo-mesh/ext-auth-service
-          tag: "0.71.4"
+      deployment:
+        spec:
+          replicas: 1
+      #--- Image overrides for deployment ---
+      #image:
+      #  registry: gcr.io
+      #  repository: gloo-mesh/ext-auth-service
+      #  tag: "0.71.4"
     ratelimiter:
       enabled: true
-      replicas: 1
-      container:
-        image:
-          registry: gcr.io
-          repository: gloo-mesh/rate-limiter
-          tag: "0.16.4"
+      deployment:
+        spec:
+          replicas: 1
+      #--- Image overrides for deployment ---
+      #image:
+      #  registry: gcr.io
+      #  repository: gloo-mesh/rate-limiter
+      #  tag: "0.17.2"
     extCache:
       enabled: true
-      replicas: 1
-      container:
-        image:
-          registry: docker.io
-          repository: redis
-          tag: "7.2.4-alpine"
+      deployment:
+        spec:
+          replicas: 1
+      #--- Image overrides for deployment ---
+      #image:
+      #  registry: docker.io
+      #  repository: redis
+      #  tag: "7.2.12-alpine"
   logging:
     level: info
   #--- Image overrides for deployment ---
-  image:
-    registry: ghcr.io
-    repository: agentgateway/agentgateway
-    tag: "0.11.0-alpha.5e5533a2c6bfb8914d69662b06aef48b4e7b85d5"
+  #image:
+  #  registry: ghcr.io
+  #  repository: agentgateway/agentgateway
+  #  tag: "0.11.0-alpha.5e5533a2c6bfb8914d69662b06aef48b4e7b85d5"
   service:
     metadata:
       annotations:
