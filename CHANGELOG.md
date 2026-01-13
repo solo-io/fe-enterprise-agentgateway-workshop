@@ -1,5 +1,10 @@
 # Changelog
 
+0.4.3 - (1-12-26)
+---
+- Update to `2.1.0-rc.1`
+- Update `000-image-list.md`
+
 0.4.2 - (1-8-26)
 ---
 - Update `024-llm-failover.md` to use the mock openai server from `003`
