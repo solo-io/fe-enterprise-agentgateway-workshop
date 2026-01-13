@@ -1,5 +1,10 @@
 # Changelog
 
+0.4.4 - (1-13-26)
+---
+- Added header-based and multi-header rate limiting examples to `016-global-token-based-rate-limiting.md`
+- Updated `000-image-list.md`
+
 0.4.3 - (1-12-26)
 ---
 - Update to `2.1.0-rc.1`
