@@ -15,10 +15,10 @@ In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on 
 
 ### Kubernetes Gateway API CRDs
 
-Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway
+Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway. We're using the experimental CRDs to enable advanced features like mTLS frontend validation (lab 026). If frontend mTLS is not a requirement, you can continue with the standard install.
 
 ```bash
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml
+kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml
 ```
 
 To check if the the Kubernetes Gateway API CRDS are installed
@@ -30,13 +30,16 @@ kubectl api-resources --api-group=gateway.networking.k8s.io
 Expected Output:
 
 ```bash
-NAME                 SHORTNAMES   APIVERSION                          NAMESPACED   KIND
-backendtlspolicies   btlspolicy   gateway.networking.k8s.io/v1        true         BackendTLSPolicy
-gatewayclasses       gc           gateway.networking.k8s.io/v1        false        GatewayClass
-gateways             gtw          gateway.networking.k8s.io/v1        true         Gateway
-grpcroutes                        gateway.networking.k8s.io/v1        true         GRPCRoute
-httproutes                        gateway.networking.k8s.io/v1        true         HTTPRoute
-referencegrants      refgrant     gateway.networking.k8s.io/v1beta1   true         ReferenceGrant
+NAME                 SHORTNAMES   APIVERSION                           NAMESPACED   KIND
+backendtlspolicies   btlspolicy   gateway.networking.k8s.io/v1         true         BackendTLSPolicy
+gatewayclasses       gc           gateway.networking.k8s.io/v1         false        GatewayClass
+gateways             gtw          gateway.networking.k8s.io/v1         true         Gateway
+grpcroutes                        gateway.networking.k8s.io/v1         true         GRPCRoute
+httproutes                        gateway.networking.k8s.io/v1         true         HTTPRoute
+referencegrants      refgrant     gateway.networking.k8s.io/v1beta1    true         ReferenceGrant
+tcproutes                         gateway.networking.k8s.io/v1alpha2   true         TCPRoute
+tlsroutes                         gateway.networking.k8s.io/v1alpha3   true         TLSRoute
+udproutes                         gateway.networking.k8s.io/v1alpha2   true         UDPRoute
 ```
 
 ## Install Enterprise Agentgateway

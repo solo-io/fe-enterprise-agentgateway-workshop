@@ -4,6 +4,9 @@
 ---
 - Added header-based and multi-header rate limiting examples to `016-global-token-based-rate-limiting.md`
 - Updated `000-image-list.md`
+- New `026-frontend-mtls.md` lab
+- Default to the experimental-install for Gateway API CRDs (required by frontend mTLS lab)
+- Use `--server-side` apply when configuring Gateway API CRDs
 
 0.4.3 - (1-12-26)
 ---
