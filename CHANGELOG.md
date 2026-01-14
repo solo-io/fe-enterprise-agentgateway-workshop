@@ -1,5 +1,12 @@
 # Changelog
 
+0.4.7 - (1-14-26)
+---
+- New lab added for tls termination with agentgateway
+- Update naming and numbering
+  - `026-tls-termination.md`
+  - `027-frontend-mtls.md`
+
 0.4.6 - (1-14-26)
 ---
 - Minor updates before making this repository public
