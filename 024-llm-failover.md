@@ -342,6 +342,201 @@ The HTTPRoute's `ResponseHeaderModifier` filter is a powerful Gateway API featur
 
 In this lab, we use it to add the `Retry-After` header that the mock server doesn't include by default, demonstrating how you can adapt third-party backends to work with your gateway's requirements without modifying the backend itself.
 
+## Extended Example: Intra-Priority-Group Failover
+
+The previous example showed failover between priority groups (group 1 to group 2). Now let's test a more advanced scenario: **failover between multiple backends within the same priority group**.
+
+### Why This Matters
+
+When you have multiple backends in a single priority group:
+- The gateway load balances between all healthy backends
+- When one backend fails, it's ejected from the pool
+- Traffic continues to healthy backends in the same priority group
+- The gateway only moves to a lower priority group when ALL backends in the current group are unhealthy
+
+This enables:
+- **Heterogeneous backends**: Mix different provider types or model tiers in the same priority group
+- **Partial failure handling**: Keep serving traffic even when some backends fail
+- **Quality preservation**: Stay in the preferred tier with better models as long as ANY backend is healthy
+- **Graceful degradation**: Fallback to lower-quality but functional models only when necessary
+
+### Test Scenario
+
+This example demonstrates a real-world graceful degradation pattern:
+
+**Priority Group 1 (Preferred):**
+1. Mock server (fails with 429)
+2. OpenAI gpt-4o (healthy, more capable model)
+
+**Priority Group 2 (Degraded Mode):**
+1. OpenAI gpt-4o-mini (less capable but faster/cheaper fallback)
+
+The key insight: Priority Group 2 uses a less proficient model (gpt-4o-mini) to ensure users get *some* response even if it's lower quality. However, since Priority Group 1 has a healthy backend (gpt-4o), Priority Group 2 should NOT be reached in this test.
+
+### Update Configuration
+
+First, restart the AgentGateway to clear any existing health state from previous tests:
+
+```bash
+kubectl rollout restart deployment/agentgateway -n enterprise-agentgateway
+kubectl rollout status deployment/agentgateway -n enterprise-agentgateway
+```
+
+Now update the backend configuration to have multiple providers in Priority Group 1:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mock-ratelimit-failover
+  namespace: enterprise-agentgateway
+spec:
+  parentRefs:
+    - name: agentgateway
+      namespace: enterprise-agentgateway
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            add:
+              - name: Retry-After
+                value: "60"
+      backendRefs:
+        - name: mock-ratelimit-backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "120s"
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: mock-ratelimit-backend
+  namespace: enterprise-agentgateway
+spec:
+  ai:
+    groups:
+      # Priority Group 1: Mock (fails) + OpenAI (healthy)
+      - providers:
+          # Mock Server (always returns rate limit errors)
+          - name: mock-ratelimit-provider
+            openai:
+              model: "mock-gpt-4o"
+            host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
+            port: 8000
+            path: "/v1/chat/completions"
+            policies:
+              auth:
+                passthrough: {}
+          # OpenAI (should failover to this within the same priority group)
+          - name: openai-provider-primary
+            openai:
+              model: "gpt-4o"
+            policies:
+              auth:
+                secretRef:
+                  name: openai-secret
+      # Priority Group 2: OpenAI fallback (should NOT be reached)
+      - providers:
+          - name: openai-provider-fallback
+            openai:
+              model: "gpt-4o-mini"
+            policies:
+              auth:
+                secretRef:
+                  name: openai-secret
+EOF
+```
+
+**Key differences from the basic example:**
+- Priority Group 1 now has TWO providers: mock-ratelimit-provider and openai-provider-primary (gpt-4o)
+- Priority Group 2 uses a less capable model (gpt-4o-mini) as a "degraded mode" fallback
+- This demonstrates graceful degradation: prefer the more capable model, but ensure users get *some* response (even if lower quality) if all preferred backends fail
+- In this test, Priority Group 2 should never be reached because Priority Group 1 has a healthy gpt-4o backend
+
+### Test Intra-Priority-Group Failover
+
+Send multiple requests to observe the failover pattern within Priority Group 1:
+
+```bash
+curl -s -w "\nHTTP Status: %{http_code}\n" \
+  "$GATEWAY_IP:8080/openai" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "", "messages": [{"role": "user", "content": "What is 2+2?"}]}'
+```
+
+**Expected output pattern:**
+
+Request 1:
+```json
+{"error":{"message":"Rate limit reached for mock-gpt-4o...","type":"RateLimitError","code":429}}
+HTTP Status: 429
+```
+
+Request 2:
+```json
+{"model":"gpt-4o-2024-08-06","choices":[{"message":{"content":"Four.",...}],...}
+HTTP Status: 200
+```
+
+Request 3:
+```json
+{"model":"gpt-4o-2024-08-06","choices":[{"message":{"content":"Four.",...}],...}
+HTTP Status: 200
+```
+
+### Verify Failover in Logs
+
+Check the AgentGateway logs to confirm which backends handled each request:
+
+```bash
+kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 10 | \
+  jq 'select(.scope == "request") | {status: ."http.status", endpoint: .endpoint, duration: .duration}'
+```
+
+**Expected log output:**
+
+```json
+{
+  "status": 429,
+  "endpoint": "mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local:8000",
+  "duration": "2ms"
+}
+{
+  "status": 200,
+  "endpoint": "api.openai.com:443",
+  "duration": "861ms"
+}
+{
+  "status": 200,
+  "endpoint": "api.openai.com:443",
+  "duration": "491ms"
+}
+```
+
+**Key observations:**
+- Request 1: Routed to `mock-gpt-4o-svc` → returned 429 → backend ejected
+- Requests 2-3: Routed to `api.openai.com` (Priority Group 1's healthy gpt-4o backend) → returned 200
+- The endpoint does NOT switch back to the mock server
+- Priority Group 2 (with gpt-4o-mini) is never reached because Priority Group 1 has a healthy backend
+- Users get responses from the more capable gpt-4o model, not the degraded gpt-4o-mini fallback
+
+### What This Proves
+
+This extended example demonstrates that:
+1. **Intra-pool failover**: Failover works correctly between backends within the same priority group
+2. **Backend ejection**: Unhealthy backends are ejected and not used in subsequent requests
+3. **Priority group preference**: The gateway stays within the current priority group as long as ANY backend is healthy
+4. **Graceful degradation**: Lower priority groups with less capable models (gpt-4o-mini) are only used when ALL backends in higher priority groups fail
+5. **Quality preservation**: Users get responses from the more capable model (gpt-4o) when available, ensuring the best possible user experience
+
+This pattern is crucial for building resilient AI gateway architectures that balance quality, cost, and availability. You can configure preferred high-quality models in Priority Group 1, while ensuring users still get *some* response (even if lower quality) from Priority Group 2 when the preferred tier is completely unavailable.
+
 ## Cleanup
 
 Delete the lab resources:
