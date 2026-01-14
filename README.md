@@ -39,6 +39,8 @@ Before starting this workshop, you will need:
 - [023-configure-timeouts-and-retries.md](023-configure-timeouts-and-retries.md)
 - [024-llm-failover.md](024-llm-failover.md)
 - [025-load-testing-with-k6s.md](025-load-testing-with-k6s.md)
+- [026-tls-termination.md](026-tls-termination.md)
+- [027-frontend-mtls.md](027-frontend-mtls.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
@@ -62,6 +64,8 @@ Before starting this workshop, you will need:
     - Control access with org-specific API-key
     - Control access with JWT authentication
     - JWT-based RBAC (Role-Based Access Control)
+    - Frontend TLS termination
+    - Frontend mTLS with client certificate validation
 - Prompt Guard & Content Moderation
     - Basic Prompt Guard (string, regex, builtin)
     - External moderation guardrails (OpenAI moderation API)
