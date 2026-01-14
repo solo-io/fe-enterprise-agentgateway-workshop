@@ -1,5 +1,9 @@
 # Changelog
 
+0.4.8 - (1-14-26)
+---
+- New `028-configure-openai-batches.md` lab
+
 0.4.7 - (1-14-26)
 ---
 - New lab added for tls termination with agentgateway
