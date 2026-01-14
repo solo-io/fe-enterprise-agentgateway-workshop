@@ -1,5 +1,9 @@
 # Changelog
 
+0.4.6 - (1-14-26)
+---
+- Minor updates before making this repository public
+
 0.4.5 - (1-13-26)
 ---
 - Updated `000-image-list.md` with enterprise agentgateway helm chart update

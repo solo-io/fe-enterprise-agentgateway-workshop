@@ -167,7 +167,7 @@ spec:
   #image:
   #  registry: ghcr.io
   #  repository: agentgateway/agentgateway
-  #  tag: "0.11.0-alpha.5e5533a2c6bfb8914d69662b06aef48b4e7b85d5"
+  #  tag: "0.11.1-patch1"
   service:
     metadata:
       annotations:
