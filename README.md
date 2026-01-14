@@ -41,6 +41,7 @@ Before starting this workshop, you will need:
 - [025-load-testing-with-k6s.md](025-load-testing-with-k6s.md)
 - [026-tls-termination.md](026-tls-termination.md)
 - [027-frontend-mtls.md](027-frontend-mtls.md)
+- [028-configure-openai-batches.md](028-configure-openai-batches.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
@@ -54,6 +55,7 @@ Before starting this workshop, you will need:
         - Azure OpenAI
         - Google Vertex AI
     - OpenAI Embeddings support
+    - OpenAI Batches API support (asynchronous batch processing)
 - LLM API Key Management
     - API Key masking in logs
 - Token-based metrics from LLM

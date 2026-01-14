@@ -3,6 +3,7 @@
 0.4.8 - (1-14-26)
 ---
 - New `028-configure-openai-batches.md` lab
+- Extend `024-llm-failover.md` with intra-pool failover example
 
 0.4.7 - (1-14-26)
 ---
