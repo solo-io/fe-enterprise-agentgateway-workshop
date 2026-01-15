@@ -1,5 +1,15 @@
 # Changelog
 
+0.5.0 - (1-14-26)
+---
+- Additional cost tracking panels
+  - Cost Rate ($/hour)
+  - Projected Monthly Cost (30d)
+  - Average Cost Per 1M Requests (Input) by Model
+  - Average Cost Per 1M Requests (Output) by Model
+  - Average Cost Per 1M Requests (Total) by Model
+- Set default pricing values according to [OpenAI Pricing](https://platform.openai.com/docs/pricing)
+
 0.4.9 - (1-14-26)
 ---
 - New `029-openai-streaming.md` lab
