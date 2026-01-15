@@ -1,5 +1,10 @@
 # Changelog
 
+0.4.9 - (1-14-26)
+---
+- New `029-openai-streaming.md` lab
+- Update `/lib/observability/agentgateway-grafana-dashboard-v1.json` with cost tracking
+
 0.4.8 - (1-14-26)
 ---
 - New `028-configure-openai-batches.md` lab
