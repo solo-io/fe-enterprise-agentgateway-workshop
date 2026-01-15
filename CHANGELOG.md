@@ -1,5 +1,9 @@
 # Changelog
 
+0.4.9 - (1-14-26)
+---
+- New `029-openai-streaming.md` lab
+
 0.4.8 - (1-14-26)
 ---
 - New `028-configure-openai-batches.md` lab
