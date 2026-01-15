@@ -183,32 +183,46 @@ The AgentGateway dashboard provides comprehensive observability into your AI gat
 
 The dashboard is organized into several key metric categories:
 
+**Overview**
+- High level summary of important details
+
+![overview-1.png](images/grafana-dashboard/overview-1.png)
+
+**Cost Tracking**
+- Cost Rate ($/hour)
+- Total Cost (1h, 24h, 7d)
+- Projected Monthly Cost (30d)
+- Average cost per 1M requests by Model (Input, Output, Total)
+
+![llm-cost-tracking-1.png](images/grafana-dashboard/llm-cost-tracking-1.png)
+
+**Infrastructure Overview**
+- Control Plane Health
+- Data Plane Health
+- CPU/MEM Resource Requests
+- CPU/MEM Utilization
+
+![infrastructure-overview-1.png](images/grafana-dashboard/infrastructure-overview-1.png)
+![infrastructure-overview-2.png](images/grafana-dashboard/infrastructure-overview-2.png)
+
 **Core GenAI Metrics**
 - Request rates and throughput across all routes
 - Token usage breakdown (input/output tokens)
 - Per-model request distribution and performance
 - Cost tracking and analysis
 
-**Streaming Metrics**
+![core-genai-metrics-1.png](images/grafana-dashboard/core-genai-metrics-1.png)
+![core-genai-metrics-2.png](images/grafana-dashboard/core-genai-metrics-2.png)
+![core-genai-metrics-3.png](images/grafana-dashboard/core-genai-metrics-3.png)
+
+**Streaming and Request Metrics**
 - Time to First Token (TTFT) - measures latency before streaming begins
 - Tokens Per Output Token (TPOT) - measures streaming throughput
 - Streaming request success rates
+
+![streaming-and-request-metrics-1.png](images/grafana-dashboard/streaming-and-request-metrics-1.png)
 
 **MCP (Model Context Protocol) Metrics**
 - Tool call frequency and patterns
 - MCP server request rates
 - Tool execution performance
-
-**System Metrics**
-- Active connections and connection pools
-- Gateway runtime health
-- Resource utilization
-
-### Example Visualizations
-
-Below are screenshots demonstrating the dashboard's capabilities. The dashboard includes a namespace filter, allowing you to focus on specific deployments or view metrics across all namespaces.
-
-#### Cost Tracking
-Real-time cost analysis showing spend breakdown by model, route, and time period:
-
-![llm-cost-tracking-1.png](images/llm-cost-tracking-1.png)
