@@ -174,3 +174,41 @@ kubectl port-forward -n monitoring svc/grafana-prometheus 3000:3000
 4. Navigate to Dashboards > AgentGateway Dashboard to view the dashboard
 
 Note: The dashboard includes a namespace filter that allows you to view metrics for specific namespaces. By default, it shows metrics for all namespaces where AgentGateway is deployed.
+
+## Agentgateway Dashboard Overview
+
+The AgentGateway dashboard provides comprehensive observability into your AI gateway operations. As you progress through these labs and send requests through the gateway, the dashboard panels will populate with real-time metrics. This section showcases what you can expect to visualize out-of-the-box.
+
+### Dashboard Capabilities
+
+The dashboard is organized into several key metric categories:
+
+**Core GenAI Metrics**
+- Request rates and throughput across all routes
+- Token usage breakdown (input/output tokens)
+- Per-model request distribution and performance
+- Cost tracking and analysis
+
+**Streaming Metrics**
+- Time to First Token (TTFT) - measures latency before streaming begins
+- Tokens Per Output Token (TPOT) - measures streaming throughput
+- Streaming request success rates
+
+**MCP (Model Context Protocol) Metrics**
+- Tool call frequency and patterns
+- MCP server request rates
+- Tool execution performance
+
+**System Metrics**
+- Active connections and connection pools
+- Gateway runtime health
+- Resource utilization
+
+### Example Visualizations
+
+Below are screenshots demonstrating the dashboard's capabilities. The dashboard includes a namespace filter, allowing you to focus on specific deployments or view metrics across all namespaces.
+
+#### Cost Tracking
+Real-time cost analysis showing spend breakdown by model, route, and time period:
+
+![llm-cost-tracking-1.png](images/llm-cost-tracking-1.png)

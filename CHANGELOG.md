@@ -10,6 +10,7 @@
   - Average Cost Per 1M Requests (Total) by Model
 - Set default pricing values according to [OpenAI Pricing](https://platform.openai.com/docs/pricing)
 - Add the mock-gpt-5.2 loadgenerator to `025-load-testing-with-k6s.md` lab
+- Update `002-set-up-monitoring-tools.md` with "Agentgateway Dashboard Overview" section with added visuals.
 
 0.4.9 - (1-14-26)
 ---
