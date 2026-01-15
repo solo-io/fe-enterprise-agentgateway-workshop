@@ -476,6 +476,83 @@ spec:
 EOF
 ```
 
+Deploy k6s job for mock-gpt-5.2:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6s-mock-gpt-5-2
+  namespace: loadgenerator
+spec:
+  completions: 1
+  parallelism: 1
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: k6s-loadgen
+      containers:
+      - name: k6
+        image: grafana/k6:0.54.0
+        command:
+        - "sh"
+        - "-c"
+        - |
+          ARGS="run"
+          if [ "\$DISABLE_TREND_STATS" != "true" ]; then
+            ARGS="\$ARGS --summary-trend-stats min,avg,med,max,p(95),p(99)"
+          fi
+          if [ "\$QUIET_MODE" = "true" ]; then
+            ARGS="\$ARGS --quiet"
+          fi
+          ARGS="\$ARGS --discard-response-bodies --tag test_run_id=mock-gpt-5.2 --tag service=agentgateway-mock-gpt-5.2 /scripts/http.js"
+          k6 \$ARGS
+        env:
+        - name: ENDPOINT
+          value: "http://agentgateway.enterprise-agentgateway.svc.cluster.local:8080/openai/gpt-5.2"
+        - name: MODEL
+          value: "mock-gpt-5-2"
+        - name: TIMEOUT
+          value: "30000"
+        - name: DURATION
+          value: "5m"
+        - name: RPS
+          value: "35"
+        - name: PRE_ALLOCATED_VUS
+          value: "5"
+        - name: MAX_VUS
+          value: "100"
+        - name: PROMPT
+          value: "Explain the benefits of using service mesh architecture in cloud-native applications"
+        - name: DISABLE_TREND_STATS
+          value: "false"
+        - name: QUIET_MODE
+          value: "false"
+        - name: LOAD_PATTERN
+          value: "ramping"
+        - name: RAMP_MIN_MULTIPLIER
+          value: "0.5"
+        - name: RAMP_MAX_MULTIPLIER
+          value: "1.5"
+        - name: RAMP_STAGE_DURATION
+          value: "45s"
+        volumeMounts:
+        - name: k6-script
+          mountPath: /scripts
+          readOnly: true
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          runAsNonRoot: true
+      volumes:
+      - name: k6-script
+        configMap:
+          name: k6s-test-script
+EOF
+```
+
 ## Monitor the Load Test
 
 Check the job status:
@@ -488,7 +565,11 @@ kubectl get pods -n loadgenerator
 View k6s logs:
 
 ```bash
+# View mock-gpt-4o logs
 kubectl logs -f job/k6s-mock-gpt-4o -n loadgenerator
+
+# View mock-gpt-5.2 logs
+kubectl logs -f job/k6s-mock-gpt-5-2 -n loadgenerator
 ```
 
 ### Access Grafana Dashboard
@@ -527,16 +608,25 @@ Useful metrics to query:
 kubectl logs deploy/agentgateway -n enterprise-agentgateway -f
 ```
 
-## Understanding the Load Pattern
+## Understanding the Load Patterns
 
-The ramping load pattern configured in this lab:
+This lab deploys two different load generators with distinct patterns so you can observe different behaviors in Grafana:
+
+### mock-gpt-4o Load Pattern
 - **Base RPS**: 50 requests per second
 - **Min RPS**: 40 RPS (80% of base, configured by `RAMP_MIN_MULTIPLIER: 0.8`)
 - **Max RPS**: 60 RPS (120% of base, configured by `RAMP_MAX_MULTIPLIER: 1.2`)
 - **Stage Duration**: 1 minute per ramp up/down
-- **Pattern**: Oscillates between 40 RPS and 60 RPS every minute
+- **Pattern**: Slow, gentle oscillations between 40 RPS and 60 RPS every minute
 
-This creates a realistic load pattern that simulates varying traffic conditions.
+### mock-gpt-5.2 Load Pattern
+- **Base RPS**: 35 requests per second
+- **Min RPS**: 17.5 RPS (50% of base, configured by `RAMP_MIN_MULTIPLIER: 0.5`)
+- **Max RPS**: 52.5 RPS (150% of base, configured by `RAMP_MAX_MULTIPLIER: 1.5`)
+- **Stage Duration**: 45 seconds per ramp up/down
+- **Pattern**: Faster, more dramatic oscillations between 17.5 RPS and 52.5 RPS every 45 seconds
+
+The different patterns create distinct lines in your Grafana dashboard, making it easy to distinguish between the two backends and observe how the system handles varying load profiles.
 
 ## Advanced Configuration
 
@@ -559,10 +649,11 @@ You can customize the k6s load test by modifying these environment variables:
 
 ## Cleanup
 
-Delete the k6s job and load generator resources:
+Delete the k6s jobs and load generator resources:
 
 ```bash
 kubectl delete job k6s-mock-gpt-4o -n loadgenerator
+kubectl delete job k6s-mock-gpt-5-2 -n loadgenerator
 kubectl delete configmap k6s-test-script -n loadgenerator
 kubectl delete serviceaccount k6s-loadgen -n loadgenerator
 kubectl delete namespace loadgenerator

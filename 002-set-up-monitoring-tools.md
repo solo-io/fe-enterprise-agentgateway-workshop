@@ -174,3 +174,55 @@ kubectl port-forward -n monitoring svc/grafana-prometheus 3000:3000
 4. Navigate to Dashboards > AgentGateway Dashboard to view the dashboard
 
 Note: The dashboard includes a namespace filter that allows you to view metrics for specific namespaces. By default, it shows metrics for all namespaces where AgentGateway is deployed.
+
+## Agentgateway Dashboard Overview
+
+The AgentGateway dashboard provides comprehensive observability into your AI gateway operations. As you progress through these labs and send requests through the gateway, the dashboard panels will populate with real-time metrics. This section showcases what you can expect to visualize out-of-the-box.
+
+### Dashboard Capabilities
+
+The dashboard is organized into several key metric categories:
+
+**Overview**
+- High level summary of important details
+
+![overview-1.png](images/grafana-dashboard/overview-1.png)
+
+**Cost Tracking**
+- Cost Rate ($/hour)
+- Total Cost (1h, 24h, 7d)
+- Projected Monthly Cost (30d)
+- Average cost per 1M requests by Model (Input, Output, Total)
+
+![llm-cost-tracking-1.png](images/grafana-dashboard/llm-cost-tracking-1.png)
+
+**Infrastructure Overview**
+- Control Plane Health
+- Data Plane Health
+- CPU/MEM Resource Requests
+- CPU/MEM Utilization
+
+![infrastructure-overview-1.png](images/grafana-dashboard/infrastructure-overview-1.png)
+![infrastructure-overview-2.png](images/grafana-dashboard/infrastructure-overview-2.png)
+
+**Core GenAI Metrics**
+- Request rates and throughput across all routes
+- Token usage breakdown (input/output tokens)
+- Per-model request distribution and performance
+- Cost tracking and analysis
+
+![core-genai-metrics-1.png](images/grafana-dashboard/core-genai-metrics-1.png)
+![core-genai-metrics-2.png](images/grafana-dashboard/core-genai-metrics-2.png)
+![core-genai-metrics-3.png](images/grafana-dashboard/core-genai-metrics-3.png)
+
+**Streaming and Request Metrics**
+- Time to First Token (TTFT) - measures latency before streaming begins
+- Tokens Per Output Token (TPOT) - measures streaming throughput
+- Streaming request success rates
+
+![streaming-and-request-metrics-1.png](images/grafana-dashboard/streaming-and-request-metrics-1.png)
+
+**MCP (Model Context Protocol) Metrics**
+- Tool call frequency and patterns
+- MCP server request rates
+- Tool execution performance
