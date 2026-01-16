@@ -110,6 +110,8 @@ EOF
 
 Install the AgentGateway dashboard that provides comprehensive metrics visualization including:
 - Core GenAI metrics (request rates, token usage, model breakdown)
+- Cost Tracking
+- Infrastructure Performance
 - Streaming metrics (TTFT, TPOT)
 - MCP metrics (tool calls, server requests)
 - Connection and runtime metrics
@@ -173,7 +175,12 @@ kubectl port-forward -n monitoring svc/grafana-prometheus 3000:3000
 
 4. Navigate to Dashboards > AgentGateway Dashboard to view the dashboard
 
-Note: The dashboard includes a namespace filter that allows you to view metrics for specific namespaces. By default, it shows metrics for all namespaces where AgentGateway is deployed.
+Note: 
+- The dashboard includes a namespace filter that allows you to view metrics for specific namespaces. By default, it shows metrics for all namespaces where AgentGateway is deployed.
+- This dashboard is compatible with both OSS and Enterprise Agentgateway. By default, it's configured for **Enterprise**. If you're using **OSS Agentgateway**, update the following template variables at the top of the dashboard to **OSS**:
+    - Proxy Deployment Naming Pattern
+    - Control Plane Deployment Naming Pattern
+    - Enterprise Add-on Exclusion Pattern
 
 ## Agentgateway Dashboard Overview
 

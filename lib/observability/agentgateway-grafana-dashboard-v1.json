@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Dashboard for monitoring AgentGateway - AI Gateway with rate limiting, content guardrails, and MCP support. Enhanced with organized metrics sections: Core GenAI metrics (all requests), Streaming metrics (requires stream=true), and Model-specific breakdowns.",
+  "description": "Unified dashboard for monitoring AgentGateway (OSS & Enterprise) - AI Gateway with rate limiting, content guardrails, and MCP support. Enhanced with organized metrics sections: Core GenAI metrics (all requests), Streaming metrics (requires stream=true), and Model-specific breakdowns.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -1579,7 +1579,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "| Model | Input (per 1M tokens) | Output (per 1M tokens) |\n|-------|----------------------|------------------------|\n| mock-gpt-4o | $${gpt4o_input_price} | $${gpt4o_output_price} |\n| mock-gpt-5.2 | $${gpt52_input_price} | $${gpt52_output_price} |\n| gpt-4o-mini-* | $${gpt4omini_input_price} | $${gpt4omini_output_price} |\n\n_Update prices using the variables at the top of the dashboard._\n\nReference: [OpenAI Pricing](https://platform.openai.com/docs/pricing)",
+        "content": "| Model | Input (per 1M tokens) | Output (per 1M tokens) |\n|-------|----------------------|------------------------|\n| mock-gpt-4o | $${gpt4o_input_price} | $${gpt4o_output_price} |\n| mock-gpt-5-2 | $${gpt52_input_price} | $${gpt52_output_price} |\n| gpt-4o-mini-* | $${gpt4omini_input_price} | $${gpt4omini_output_price} |\n\n_Update prices using the variables at the top of the dashboard._\n\nReference: [OpenAI Pricing](https://platform.openai.com/docs/pricing)",
         "mode": "markdown"
       },
       "pluginVersion": "12.3.0",
@@ -1688,8 +1688,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n  sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-5.2\"}[$__rate_interval])) * $gpt52_input_price / 1000000 +\n  sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-5.2\"}[$__rate_interval])) * $gpt52_output_price / 1000000\n) * 3600",
-          "legendFormat": "mock-gpt-5.2",
+          "expr": "(\n  sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"mock-gpt-5.2\"}[$__rate_interval])) * $gpt52_input_price / 1000000 +\n  sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"mock-gpt-5.2\"}[$__rate_interval])) * $gpt52_output_price / 1000000\n) * 3600",
+          "legendFormat": "mock-gpt-5-2",
           "range": true,
           "refId": "B"
         },
@@ -1773,7 +1773,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[1h])) or vector(0)) * $gpt4o_input_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[1h])) or vector(0)) * $gpt4o_output_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-5.2\"}[1h])) or vector(0)) * $gpt52_input_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-5.2\"}[1h])) or vector(0)) * $gpt52_output_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[1h])) or vector(0)) * $gpt4omini_input_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[1h])) or vector(0)) * $gpt4omini_output_price / 1000000\n) * 3600",
+          "expr": "(\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[1h])) or vector(0)) * $gpt4o_input_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[1h])) or vector(0)) * $gpt4o_output_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"mock-gpt-5.2\"}[1h])) or vector(0)) * $gpt52_input_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"mock-gpt-5.2\"}[1h])) or vector(0)) * $gpt52_output_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[1h])) or vector(0)) * $gpt4omini_input_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[1h])) or vector(0)) * $gpt4omini_output_price / 1000000\n) * 3600",
           "instant": true,
           "legendFormat": "",
           "refId": "A"
@@ -1847,7 +1847,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[24h])) or vector(0)) * $gpt4o_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[24h])) or vector(0)) * $gpt4o_output_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-5.2\"}[24h])) or vector(0)) * $gpt52_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-5.2\"}[24h])) or vector(0)) * $gpt52_output_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[24h])) or vector(0)) * $gpt4omini_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[24h])) or vector(0)) * $gpt4omini_output_price / 1000000\n)",
+          "expr": "(\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[24h])) or vector(0)) * $gpt4o_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[24h])) or vector(0)) * $gpt4o_output_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"mock-gpt-5.2\"}[24h])) or vector(0)) * $gpt52_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"mock-gpt-5.2\"}[24h])) or vector(0)) * $gpt52_output_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[24h])) or vector(0)) * $gpt4omini_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[24h])) or vector(0)) * $gpt4omini_output_price / 1000000\n)",
           "instant": true,
           "legendFormat": "",
           "refId": "A"
@@ -1921,7 +1921,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[7d])) or vector(0)) * $gpt4o_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[7d])) or vector(0)) * $gpt4o_output_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-5.2\"}[7d])) or vector(0)) * $gpt52_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-5.2\"}[7d])) or vector(0)) * $gpt52_output_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[7d])) or vector(0)) * $gpt4omini_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[7d])) or vector(0)) * $gpt4omini_output_price / 1000000\n)",
+          "expr": "(\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[7d])) or vector(0)) * $gpt4o_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[7d])) or vector(0)) * $gpt4o_output_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"mock-gpt-5.2\"}[7d])) or vector(0)) * $gpt52_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"mock-gpt-5.2\"}[7d])) or vector(0)) * $gpt52_output_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[7d])) or vector(0)) * $gpt4omini_input_price / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[7d])) or vector(0)) * $gpt4omini_output_price / 1000000\n)",
           "instant": true,
           "legendFormat": "",
           "refId": "A"
@@ -1996,7 +1996,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[24h])) or vector(0)) * $gpt4o_input_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[24h])) or vector(0)) * $gpt4o_output_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-5.2\"}[24h])) or vector(0)) * $gpt52_input_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-5.2\"}[24h])) or vector(0)) * $gpt52_output_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[24h])) or vector(0)) * $gpt4omini_input_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[24h])) or vector(0)) * $gpt4omini_output_price / 1000000\n  ) * 3600 * 24 * 30",
+          "expr": "(\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[24h])) or vector(0)) * $gpt4o_input_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[24h])) or vector(0)) * $gpt4o_output_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"mock-gpt-5.2\"}[24h])) or vector(0)) * $gpt52_input_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"mock-gpt-5.2\"}[24h])) or vector(0)) * $gpt52_output_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[24h])) or vector(0)) * $gpt4omini_input_price / 1000000 +\n    (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[24h])) or vector(0)) * $gpt4omini_output_price / 1000000\n  ) * 3600 * 24 * 30",
           "instant": true,
           "legendFormat": "",
           "refId": "A"
@@ -2106,8 +2106,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-5.2\"}[$__rate_interval])) or vector(0)) * $gpt52_input_price / 1000000 / sum(rate(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\", gen_ai_response_model=\"mock-gpt-5.2\"}[$__rate_interval])) * 1000000",
-          "legendFormat": "mock-gpt-5.2",
+          "expr": "(sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"mock-gpt-5.2\"}[$__rate_interval])) or vector(0)) * $gpt52_input_price / 1000000 / sum(rate(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\", gen_ai_response_model=~\"mock-gpt-5.2\"}[$__rate_interval])) * 1000000",
+          "legendFormat": "mock-gpt-5-2",
           "range": true,
           "refId": "B"
         },
@@ -2227,8 +2227,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-5.2\"}[$__rate_interval])) or vector(0)) * $gpt52_output_price / 1000000 / sum(rate(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\", gen_ai_response_model=\"mock-gpt-5.2\"}[$__rate_interval])) * 1000000",
-          "legendFormat": "mock-gpt-5.2",
+          "expr": "(sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"mock-gpt-5.2\"}[$__rate_interval])) or vector(0)) * $gpt52_output_price / 1000000 / sum(rate(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\", gen_ai_response_model=~\"mock-gpt-5.2\"}[$__rate_interval])) * 1000000",
+          "legendFormat": "mock-gpt-5-2",
           "range": true,
           "refId": "B"
         },
@@ -2348,8 +2348,8 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-5.2\"}[$__rate_interval])) or vector(0)) * $gpt52_input_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-5.2\"}[$__rate_interval])) or vector(0)) * $gpt52_output_price / 1000000\n) / sum(rate(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\", gen_ai_response_model=\"mock-gpt-5.2\"}[$__rate_interval])) * 1000000",
-          "legendFormat": "mock-gpt-5.2",
+          "expr": "(\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"mock-gpt-5.2\"}[$__rate_interval])) or vector(0)) * $gpt52_input_price / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"mock-gpt-5.2\"}[$__rate_interval])) or vector(0)) * $gpt52_output_price / 1000000\n) / sum(rate(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\", gen_ai_response_model=~\"mock-gpt-5.2\"}[$__rate_interval])) * 1000000",
+          "legendFormat": "mock-gpt-5-2",
           "range": true,
           "refId": "B"
         },
@@ -2437,7 +2437,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_deployment_status_replicas{namespace=~\"$namespace\", deployment=~\".*agentgateway.*\", deployment!~\".*(enterprise-agentgateway|ext-auth|ext-cache|rate-limiter).*\"})",
+          "expr": "sum(kube_deployment_status_replicas{namespace=~\"$namespace\", deployment=~\".*agentgateway.*\", deployment!~\"$deployment_exclusion\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -2502,7 +2502,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_deployment_status_replicas_available{namespace=~\"$namespace\", deployment=~\".*agentgateway.*\", deployment!~\".*(enterprise-agentgateway|ext-auth|ext-cache|rate-limiter).*\"})",
+          "expr": "sum(kube_deployment_status_replicas_available{namespace=~\"$namespace\", deployment=~\".*agentgateway.*\", deployment!~\"$deployment_exclusion\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -2575,7 +2575,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\".*agentgateway-.*\", pod!~\".*(enterprise-agentgateway|ext-auth|ext-cache|rate-limiter).*\"})",
+          "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -2649,7 +2649,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"cpu\"})",
+          "expr": "max(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\", resource=\"cpu\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -2723,7 +2723,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"cpu\"})",
+          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\", resource=\"cpu\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -2789,7 +2789,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n    sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"}[$__rate_interval]))\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"cpu\"})\n  ) * 100",
+          "expr": "(\n    sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\"}[$__rate_interval]))\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\", resource=\"cpu\"})\n  ) * 100",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -2854,7 +2854,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"memory\"})",
+          "expr": "max(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\", resource=\"memory\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -2919,7 +2919,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"memory\"})",
+          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\", resource=\"memory\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -2984,7 +2984,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n    sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"})\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"memory\"})\n  ) * 100",
+          "expr": "(\n    sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\"})\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\", resource=\"memory\"})\n  ) * 100",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -3081,7 +3081,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", cpu=\"total\"}[$__rate_interval])) by (pod)",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\", cpu=\"total\"}[$__rate_interval])) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }
@@ -3177,7 +3177,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"}) by (pod)",
+          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$proxy_pod_pattern\"}) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }
@@ -3453,7 +3453,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_deployment_status_replicas{namespace=~\"$namespace\", deployment=\"enterprise-agentgateway\"})",
+          "expr": "sum(kube_deployment_status_replicas{namespace=~\"$namespace\", deployment=\"$control_plane_deployment\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -3518,7 +3518,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_deployment_status_replicas_available{namespace=~\"$namespace\", deployment=\"enterprise-agentgateway\"})",
+          "expr": "sum(kube_deployment_status_replicas_available{namespace=~\"$namespace\", deployment=\"$control_plane_deployment\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -3591,7 +3591,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"enterprise-agentgateway-.*\"})",
+          "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -3689,7 +3689,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"enterprise-agentgateway-.*\", cpu=\"total\"}[$__rate_interval])) by (pod)",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", cpu=\"total\"}[$__rate_interval])) by (pod)",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
@@ -3787,7 +3787,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"enterprise-agentgateway-.*\"}) by (pod)",
+          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"}) by (pod)",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
@@ -6380,6 +6380,69 @@
       },
       {
         "current": {
+          "text": "Enterprise",
+          "value": "agentgateway-.*"
+        },
+        "description": "For OSS Agentgateway, select 'OSS'. All selections must match to work properly. Default: Enterprise",
+        "label": "Proxy Deployment Naming Pattern",
+        "name": "proxy_pod_pattern",
+        "options": [
+          {
+            "text": "OSS",
+            "value": "agentgateway-proxy-.*"
+          },
+          {
+            "text": "Enterprise",
+            "value": "agentgateway-.*"
+          }
+        ],
+        "query": "OSS : agentgateway-proxy-.*,Enterprise : agentgateway-.*",
+        "type": "custom"
+      },
+      {
+        "current": {
+          "text": "Enterprise",
+          "value": "enterprise-agentgateway"
+        },
+        "description": "For OSS Agentgateway, select 'OSS'. All selections must match to work properly. Default: Enterprise",
+        "label": "Control Plane Deployment Naming Pattern",
+        "name": "control_plane_deployment",
+        "options": [
+          {
+            "text": "OSS",
+            "value": "agentgateway"
+          },
+          {
+            "text": "Enterprise",
+            "value": "enterprise-agentgateway"
+          }
+        ],
+        "query": "OSS : agentgateway,Enterprise : enterprise-agentgateway",
+        "type": "custom"
+      },
+      {
+        "current": {
+          "text": "Enterprise",
+          "value": ".*(enterprise-agentgateway|ext-auth|ext-cache|rate-limiter).*"
+        },
+        "description": "Filters out Enterprise add-on deployments for accurate control plane/proxy metrics. Must match your deployment type above. For OSS Agentgateway, select 'OSS'. All selections must match to work properly. Default: Enterprise",
+        "label": "Enterprise Add-on Exclusion Pattern",
+        "name": "deployment_exclusion",
+        "options": [
+          {
+            "text": "OSS",
+            "value": "agentgateway"
+          },
+          {
+            "text": "Enterprise",
+            "value": ".*(enterprise-agentgateway|ext-auth|ext-cache|rate-limiter).*"
+          }
+        ],
+        "query": "OSS : agentgateway,Enterprise : .*(enterprise-agentgateway|ext-auth|ext-cache|rate-limiter).*",
+        "type": "custom"
+      },
+      {
+        "current": {
           "text": "2.50",
           "value": "2.50"
         },
@@ -6403,7 +6466,7 @@
           "text": "1.75",
           "value": "1.75"
         },
-        "label": "mock-gpt-5.2 Input Price (per 1M tokens)",
+        "label": "mock-gpt-5-2 Input Price (per 1M tokens)",
         "name": "gpt52_input_price",
         "query": "1.75",
         "type": "textbox"
@@ -6413,7 +6476,7 @@
           "text": "14.00",
           "value": "14.00"
         },
-        "label": "mock-gpt-5.2 Output Price (per 1M tokens)",
+        "label": "mock-gpt-5-2 Output Price (per 1M tokens)",
         "name": "gpt52_output_price",
         "query": "14.00",
         "type": "textbox"

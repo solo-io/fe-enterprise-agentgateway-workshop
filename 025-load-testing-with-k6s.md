@@ -84,7 +84,7 @@ spec:
       containers:
       - args:
         - --model
-        - mock-gpt-5-2
+        - mock-gpt-5.2
         - --port
         - "8000"
         - --max-loras
@@ -155,7 +155,7 @@ spec:
   ai:
     provider:
       openai:
-        model: "mock-gpt-5-2"
+        model: "mock-gpt-5.2"
       host: mock-gpt-5-2-svc.enterprise-agentgateway.svc.cluster.local
       port: 8000
       path: "/v1/chat/completions"
@@ -222,7 +222,7 @@ curl -i "$GATEWAY_IP:8080/openai/gpt-4o" \
 curl -i "$GATEWAY_IP:8080/openai/gpt-5.2" \
   -H "content-type: application/json" \
   -d '{
-    "model": "mock-gpt-5-2",
+    "model": "mock-gpt-5.2",
     "messages": [
       {
         "role": "user",
@@ -513,7 +513,7 @@ spec:
         - name: ENDPOINT
           value: "http://agentgateway.enterprise-agentgateway.svc.cluster.local:8080/openai/gpt-5.2"
         - name: MODEL
-          value: "mock-gpt-5-2"
+          value: "mock-gpt-5.2"
         - name: TIMEOUT
           value: "30000"
         - name: DURATION
