@@ -110,6 +110,8 @@ EOF
 
 Install the AgentGateway dashboard that provides comprehensive metrics visualization including:
 - Core GenAI metrics (request rates, token usage, model breakdown)
+- Cost Tracking
+- Infrastructure Performance
 - Streaming metrics (TTFT, TPOT)
 - MCP metrics (tool calls, server requests)
 - Connection and runtime metrics

@@ -1,5 +1,11 @@
 # Changelog
 
+0.5.2 - (1-16-26)
+---
+- Update `/lib/observability/agentgateway-grafana-dashboard-v1.json` to use a unified dashboard that supports OSS and Enterprise with drop down values
+- Update `025-load-testing-with-k6s.md` to use correct model name `mock-gpt-5.2` to match label picked up by grafana dashboard
+- Minor update to dashboard description in `002-set-up-monitoring-tools.md`
+
 0.5.1 - (1-15-26)
 ---
 - Update `ENTERPRISE_AGW_VERSION` to `2.1.0`
