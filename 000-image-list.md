@@ -1,6 +1,6 @@
 ## Image list for Enterprise Agentgateway
 
-**2.1.0-rc.1:**
+**2.1.0:**
 
 # Enterprise Agentgateway CRD Helm chart
 - oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds
@@ -9,7 +9,7 @@
 - oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway
 
 # controller
-- us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2.1.0-rc.1
+- us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2.1.0
 
 # agentgateway proxy
 - ghcr.io/solo-io/agentgateway-enterprise:0.11.1-patch1
