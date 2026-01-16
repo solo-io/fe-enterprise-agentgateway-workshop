@@ -48,7 +48,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=2.1.0-rc.1
+export ENTERPRISE_AGW_VERSION=2.1.0
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -166,7 +166,7 @@ spec:
   #--- Image overrides for deployment ---
   #image:
   #  registry: ghcr.io
-  #  repository: agentgateway/agentgateway
+  #  repository: solo-io/agentgateway-enterprise
   #  tag: "0.11.1-patch1"
   service:
     metadata:

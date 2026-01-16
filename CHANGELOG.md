@@ -1,5 +1,11 @@
 # Changelog
 
+0.5.1 - (1-15-26)
+---
+- Update `ENTERPRISE_AGW_VERSION` to `2.1.0`
+- Update 000-image-list.md
+- Update image overrides with latest
+
 0.5.0 - (1-15-26)
 ---
 - Additional cost tracking panels

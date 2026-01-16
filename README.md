@@ -104,7 +104,7 @@ Before starting this workshop, you will need:
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway 2.1.0-rc.1
+- Enterprise Agentgateway 2.1.0
 
 
 ## User Stories / Acceptance Criteria
