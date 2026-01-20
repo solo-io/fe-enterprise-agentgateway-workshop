@@ -65,19 +65,20 @@ helm upgrade -i --create-namespace --namespace enterprise-agentgateway \
 To check if the the Enterprise Agentgateway CRDs are installed-
 
 ```bash
-kubectl get crds | grep -E "solo.io|agentgateway" | awk '{ print $1 }'
+kubectl api-resources | awk 'NR==1 || /enterpriseagentgateway\.solo\.io|agentgateway\.dev|ratelimit\.solo\.io|extauth\.solo\.io/'
 ```
 
 Expected output
 
 ```bash
-agentgatewaybackends.agentgateway.dev
-agentgatewayparameters.agentgateway.dev
-agentgatewaypolicies.agentgateway.dev
-authconfigs.extauth.solo.io
-enterpriseagentgatewayparameters.enterpriseagentgateway.solo.io
-enterpriseagentgatewaypolicies.enterpriseagentgateway.solo.io
-ratelimitconfigs.ratelimit.solo.io
+NAME                                SHORTNAMES        APIVERSION                                NAMESPACED   KIND
+agentgatewaybackends                agbe              agentgateway.dev/v1alpha1                 true         AgentgatewayBackend
+agentgatewayparameters              agpar             agentgateway.dev/v1alpha1                 true         AgentgatewayParameters
+agentgatewaypolicies                agpol             agentgateway.dev/v1alpha1                 true         AgentgatewayPolicy
+enterpriseagentgatewayparameters    eagpar            enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
+enterpriseagentgatewaypolicies      eagpol            enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
+authconfigs                         ac                extauth.solo.io/v1                        true         AuthConfig
+ratelimitconfigs                    rlc               ratelimit.solo.io/v1alpha1                true         RateLimitConfig
 ```
 
 ## Install Enterprise Agentgateway Controller
