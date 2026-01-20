@@ -166,7 +166,7 @@ kubectl port-forward -n monitoring svc/grafana-prometheus 3000:3000
 
 3. Login with credentials:
    - Username: `admin`
-   - Password: Value of `$GRAFANA_ADMIN_PASSWORD` environment variable, or `admin` if not set
+   - Password: Value of `$GRAFANA_ADMIN_PASSWORD` environment variable, or `prom-operator` if not set
 
    To set a custom password before installation, export the environment variable:
    ```bash
