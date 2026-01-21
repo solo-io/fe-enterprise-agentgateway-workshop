@@ -1,5 +1,9 @@
 # Changelog
 
+0.5.4 - (1-21-26)
+---
+- Comment out enterprise-agentgateway controller image override in `001`
+
 0.5.3 - (1-21-26)
 ---
 - Update `/lib/observability/agentgateway-grafana-dashboard-v1.json` with cost tracking for Claude models
