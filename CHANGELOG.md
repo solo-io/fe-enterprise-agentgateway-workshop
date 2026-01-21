@@ -1,5 +1,9 @@
 # Changelog
 
+0.5.3 - (1-21-26)
+---
+- Update `/lib/observability/agentgateway-grafana-dashboard-v1.json` with cost tracking for Claude models
+
 0.5.2 - (1-16-26)
 ---
 - Update `/lib/observability/agentgateway-grafana-dashboard-v1.json` to use a unified dashboard that supports OSS and Enterprise with drop down values
