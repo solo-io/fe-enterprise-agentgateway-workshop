@@ -1,6 +1,6 @@
 # Changelog
 
-0.5.4 - (1-21-26)
+0.5.4 - (1-22-26)
 ---
 - Comment out enterprise-agentgateway controller image override in `001`
 - Remove logging/tracing `rq.headers.all` as this can potentially log sensitive information in the headers like API-keys, recommended to only specifically filter and log required information
