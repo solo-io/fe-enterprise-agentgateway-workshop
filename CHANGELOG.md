@@ -1,5 +1,12 @@
 # Changelog
 
+0.5.4 - (1-22-26)
+---
+- Comment out enterprise-agentgateway controller image override in `001`
+- Remove logging/tracing `rq.headers.all` as this can potentially log sensitive information in the headers like API-keys, recommended to only specifically filter and log required information
+- Add new lab: `030-claude-code.md`
+- Update README.md
+
 0.5.3 - (1-21-26)
 ---
 - Update `/lib/observability/agentgateway-grafana-dashboard-v1.json` with cost tracking for Claude models
