@@ -43,6 +43,7 @@ Before starting this workshop, you will need:
 - [027-frontend-mtls.md](027-frontend-mtls.md)
 - [028-configure-openai-batches.md](028-configure-openai-batches.md)
 - [029-openai-streaming.md](029-openai-streaming.md)
+- [030-claude-code.md](030-claude-code.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
@@ -58,6 +59,7 @@ Before starting this workshop, you will need:
     - OpenAI Embeddings support
     - OpenAI Batches API support (asynchronous batch processing)
     - Streaming responses support for real-time token generation
+    - Claude Code CLI integration with full observability
 - LLM API Key Management
     - API Key masking in logs
 - Token-based metrics from LLM
