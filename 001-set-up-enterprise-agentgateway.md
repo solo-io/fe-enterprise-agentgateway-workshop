@@ -186,12 +186,9 @@ spec:
       logging:
         fields:
           add:
-            rq.headers.all: 'request.headers'
             jwt: 'jwt'
             request.body: json(request.body)
             response.body: json(response.body)
-            # --- Capture all request headers as individual keys (flattened)
-            rq.headers: 'flatten(request.headers)'
             # --- Capture a single header by name (example: x-foo)
             x-foo: 'request.headers["x-foo"]'
             # --- Capture entire request body
@@ -214,12 +211,12 @@ spec:
             gen_ai.usage.completion_tokens: "llm.outputTokens"
             gen_ai.usage.prompt_tokens: "llm.inputTokens"
             gen_ai.request: 'flatten(llm.params)'
-            # --- Capture all request headers as a single map under rq.headers.all
-            rq.headers.all: 'request.headers'
             # --- Capture claims from a verified JWT token if JWT policy is enabled
             jwt: 'jwt'
             # --- Capture the whole response body as JSON
             response.body: 'json(response.body)'
+            # --- Capture a single header by name (example: x-foo)
+            x-foo: 'request.headers["x-foo"]'
   deployment:
     spec:
       replicas: 2
