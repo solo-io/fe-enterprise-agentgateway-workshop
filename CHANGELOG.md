@@ -1,5 +1,10 @@
 # Changelog
 
+0.5.5 - (1-23-26)
+---
+- Add new lab: `031-SNI-matching.md`
+- Update README.md
+
 0.5.4 - (1-22-26)
 ---
 - Comment out enterprise-agentgateway controller image override in `001`

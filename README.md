@@ -44,6 +44,7 @@ Before starting this workshop, you will need:
 - [028-configure-openai-batches.md](028-configure-openai-batches.md)
 - [029-openai-streaming.md](029-openai-streaming.md)
 - [030-claude-code.md](030-claude-code.md)
+- [031-SNI-matching.md](031-SNI-matching.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
@@ -72,6 +73,7 @@ Before starting this workshop, you will need:
     - JWT-based RBAC (Role-Based Access Control)
     - Frontend TLS termination
     - Frontend mTLS with client certificate validation
+    - SNI (Server Name Indication) matching for multi-domain HTTPS
 - Prompt Guard & Content Moderation
     - Basic Prompt Guard (string, regex, builtin)
     - External moderation guardrails (OpenAI moderation API)
