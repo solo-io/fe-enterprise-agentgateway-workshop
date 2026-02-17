@@ -30,7 +30,8 @@ Before starting this workshop, you will need:
 - [015-local-token-based-rate-limiting.md](015-local-token-based-rate-limiting.md)
 - [016-global-token-based-rate-limiting.md](016-global-token-based-rate-limiting.md)
 - [017-transformations.md](017-transformations.md)
-- [018-mcp.md](018-mcp.md)
+- [018-in-cluster-mcp.md](018-in-cluster-mcp.md)
+- [018a-remote-mcp.md](018a-remote-mcp.md)
 - [019-configure-direct-response.md](019-configure-direct-response.md)
 - [020-configure-basic-routing-to-azureopenai.md](020-configure-basic-routing-to-azureopenai.md)
 - [021-configure-basic-routing-to-vertexai.md](021-configure-basic-routing-to-vertexai.md)
@@ -87,9 +88,11 @@ Before starting this workshop, you will need:
     - Response transformations
     - Header enrichment for observability
 - MCP (Model Context Protocol)
-    - Route to MCP servers
+    - Route to in-cluster MCP servers
+    - Route to external/remote MCP servers through AgentGateway
     - Secure MCP servers with JWT auth
     - Tool-level access control
+    - Integration with Claude Code CLI
 - Direct Response / Health Checks
     - Configure fixed responses without backend calls
 - Timeouts and Retries
