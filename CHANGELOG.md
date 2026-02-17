@@ -1,5 +1,12 @@
 # Changelog
 
+0.5.6 - (2-17-26)
+---
+- Rename `018` to `018-in-cluster-mcp.md`
+- Add new lab: `018a-remote-mcp.md` - Route to external Solo.io docs MCP server through AgentGateway
+- Updated agentgateway dashboard at `/lib/observability/agentgateway-grafana-dashboard-v1.json` with additional panels for MCP
+- Update `ENTERPRISE_AGW_VERSION` to `2.2.0-beta.1`
+
 0.5.5 - (1-23-26)
 ---
 - Add new lab: `031-SNI-matching.md`
