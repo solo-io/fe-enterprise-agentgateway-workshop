@@ -96,7 +96,7 @@ spec:
               message: "Rejected due to inappropriate content"
               statusCode: 403
             regex:
-              action: REJECT
+              action: Reject
               matches:
                 - "credit card"
 EOF
@@ -153,7 +153,7 @@ spec:
       promptGuard:
         response:
           - regex:
-              action: MASK
+              action: Mask
               builtins:
                 - CreditCard
 EOF

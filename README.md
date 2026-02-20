@@ -1,5 +1,7 @@
 # Enterprise Agentgateway Workshop
 
+![agentgateway-architecture.gif](images/agentgateway-architecture.gif)
+
 ## Prerequisites
 
 Before starting this workshop, you will need:

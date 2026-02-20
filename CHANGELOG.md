@@ -1,5 +1,10 @@
 # Changelog
 
+0.5.7 - (2-20-26)
+---
+- Minor fix in 011: `action: MASK` > `action: Mask` and `action: REJECT` to `action: Reject`
+- Added a GIF to README.md
+
 0.5.6 - (2-17-26)
 ---
 - Rename `018` to `018-in-cluster-mcp.md`
