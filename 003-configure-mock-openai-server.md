@@ -22,7 +22,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-gpt-4o
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   replicas: 1
   selector:
@@ -66,7 +66,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-gpt-4o-svc
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
   labels:
     app: mock-gpt-4o
 spec:
@@ -88,11 +88,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -109,13 +109,13 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mock-openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
       openai:
         model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
+      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
       port: 8000
       path: "/v1/chat/completions"
   policies:
@@ -126,7 +126,7 @@ EOF
 
 ## curl mock openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -148,7 +148,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
 
 ```bash
-kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ```
 
@@ -191,7 +191,7 @@ Traces include LLM-specific spans with information like `gen_ai.completion`, `ge
 AgentGateway automatically logs detailed information about LLM requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1 | jq .
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1 | jq .
 ```
 
 Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
@@ -208,8 +208,8 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n enterprise-agentgateway mock-openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway mock-openai
-kubectl delete -n enterprise-agentgateway svc/mock-gpt-4o-svc
-kubectl delete -n enterprise-agentgateway deploy/mock-gpt-4o
+kubectl delete httproute -n agentgateway-system mock-openai
+kubectl delete agentgatewaybackend -n agentgateway-system mock-openai
+kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
+kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```

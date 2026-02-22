@@ -23,7 +23,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-gpt-4o
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   replicas: 1
   selector:
@@ -72,7 +72,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-gpt-4o-svc
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
   labels:
     app: mock-gpt-4o
 spec:
@@ -89,8 +89,8 @@ EOF
 
 Verify the deployment:
 ```bash
-kubectl get pods -n enterprise-agentgateway | grep mock-gpt-4o
-kubectl get svc -n enterprise-agentgateway | grep mock-gpt-4o-svc
+kubectl get pods -n agentgateway-system | grep mock-gpt-4o
+kubectl get svc -n agentgateway-system | grep mock-gpt-4o-svc
 ```
 
 You should see the mock-gpt-4o pod running and its service available on port 8000.
@@ -104,7 +104,7 @@ Create a Kubernetes secret with your OpenAI API key for the failover backend:
 ```bash
 export OPENAI_API_KEY=$OPENAI_API_KEY
 
-kubectl create secret generic openai-secret -n enterprise-agentgateway \
+kubectl create secret generic openai-secret -n agentgateway-system \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -119,11 +119,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-ratelimit-failover
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -146,7 +146,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mock-ratelimit-backend
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     groups:
@@ -155,7 +155,7 @@ spec:
           - name: mock-ratelimit-provider
             openai:
               model: "mock-gpt-4o"
-            host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
+            host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
             port: 8000
             path: "/v1/chat/completions"
             policies:
@@ -185,21 +185,21 @@ For this lab, it's important to use a single AgentGateway replica because **prov
 Update the EnterpriseAgentgatewayParameters to set replicas to 1:
 
 ```bash
-kubectl patch enterpriseagentgatewayparameters agentgateway-params -n enterprise-agentgateway --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":1}}}}'
+kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":1}}}}'
 
-kubectl rollout restart deployment/agentgateway -n enterprise-agentgateway
+kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
 ```
 
 Wait for the deployment to roll out:
 
 ```bash
-kubectl rollout status deployment/agentgateway -n enterprise-agentgateway
+kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
 ```
 
 Verify only one pod is running:
 
 ```bash
-kubectl get pods -n enterprise-agentgateway | grep "^agentgateway-"
+kubectl get pods -n agentgateway-system | grep "^agentgateway-"
 ```
 
 You should see only one agentgateway pod in Running state.
@@ -210,7 +210,7 @@ Now test the failover behavior. Priority group failover works across requests ra
 
 Get the Gateway IP address:
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
 ### Testing Failover Behavior
@@ -274,13 +274,13 @@ The Grafana dashboard provides aggregated metrics including:
 Check AgentGateway logs to see the failover behavior:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 50 | jq .
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 50 | jq .
 ```
 
 In the access logs (entries with `"scope": "request"`), you can observe:
 
 **First Request (429 error):**
-- `"endpoint": "mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local:8000"`
+- `"endpoint": "mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000"`
 - `"http.status": 429`
 - `"duration": "~50ms"` (fast since mock server just returns an error)
 - `"response.body"` showing the rate limit error message
@@ -378,8 +378,8 @@ The key insight: Priority Group 2 uses a less proficient model (gpt-4o-mini) to 
 First, restart the AgentGateway to clear any existing health state from previous tests:
 
 ```bash
-kubectl rollout restart deployment/agentgateway -n enterprise-agentgateway
-kubectl rollout status deployment/agentgateway -n enterprise-agentgateway
+kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
+kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
 ```
 
 Now update the backend configuration to have multiple providers in Priority Group 1:
@@ -390,11 +390,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-ratelimit-failover
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -417,7 +417,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mock-ratelimit-backend
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     groups:
@@ -427,7 +427,7 @@ spec:
           - name: mock-ratelimit-provider
             openai:
               model: "mock-gpt-4o"
-            host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
+            host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
             port: 8000
             path: "/v1/chat/completions"
             policies:
@@ -495,7 +495,7 @@ HTTP Status: 200
 Check the AgentGateway logs to confirm which backends handled each request:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 10 | \
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 10 | \
   jq 'select(.scope == "request") | {status: ."http.status", endpoint: .endpoint, duration: .duration}'
 ```
 
@@ -504,7 +504,7 @@ kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 10 | \
 ```json
 {
   "status": 429,
-  "endpoint": "mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local:8000",
+  "endpoint": "mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000",
   "duration": "2ms"
 }
 {
@@ -541,16 +541,16 @@ This pattern is crucial for building resilient AI gateway architectures that bal
 
 Delete the lab resources:
 ```bash
-kubectl delete httproute -n enterprise-agentgateway mock-ratelimit-failover
-kubectl delete agentgatewaybackend -n enterprise-agentgateway mock-ratelimit-backend
-kubectl delete secret -n enterprise-agentgateway openai-secret
-kubectl delete -n enterprise-agentgateway svc/mock-gpt-4o-svc
-kubectl delete -n enterprise-agentgateway deploy/mock-gpt-4o
+kubectl delete httproute -n agentgateway-system mock-ratelimit-failover
+kubectl delete agentgatewaybackend -n agentgateway-system mock-ratelimit-backend
+kubectl delete secret -n agentgateway-system openai-secret
+kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
+kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```
 
 Restore the AgentGateway to the 2 replicas we originally set up:
 ```bash
-kubectl patch enterpriseagentgatewayparameters agentgateway-params -n enterprise-agentgateway --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":2}}}}'
+kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":2}}}}'
 
-kubectl rollout restart deployment/agentgateway -n enterprise-agentgateway
+kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
 ```

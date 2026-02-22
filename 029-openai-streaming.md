@@ -29,7 +29,7 @@ Create an OpenAI secret and routing configuration (same as lab 004):
 ```bash
 export OPENAI_API_KEY=$OPENAI_API_KEY
 
-kubectl create secret generic openai-secret -n enterprise-agentgateway \
+kubectl create secret generic openai-secret -n agentgateway-system \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -42,11 +42,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -63,7 +63,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
@@ -77,7 +77,7 @@ EOF
 
 Get the Gateway IP:
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
 ## Test Streaming Response
@@ -155,7 +155,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 Check AgentGateway logs to see streaming request details:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 20 | jq 'select(.scope == "request")'
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20 | jq 'select(.scope == "request")'
 ```
 
 For streaming requests, you'll see:
@@ -198,7 +198,7 @@ Streaming traces show timing for:
 
 Delete the lab resources:
 ```bash
-kubectl delete httproute -n enterprise-agentgateway openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
-kubectl delete secret -n enterprise-agentgateway openai-secret
+kubectl delete httproute -n agentgateway-system openai
+kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete secret -n agentgateway-system openai-secret
 ```

@@ -24,7 +24,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-gpt-4o
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   replicas: 1
   selector:
@@ -68,7 +68,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-gpt-4o-svc
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
   labels:
     app: mock-gpt-4o
 spec:
@@ -90,13 +90,13 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mock-openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
       openai:
         model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
+      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
       port: 8000
       path: "/v1/chat/completions"
   policies:
@@ -131,11 +131,11 @@ openssl x509 -req -sha256 -days 365 -CA example_certs/glootest.com.crt -CAkey ex
 
 Store the credentials for the mock-openai-foo.glootest.com domain in a Kubernetes secret.
 ```bash
-kubectl create -n enterprise-agentgateway secret tls foo \
+kubectl create -n agentgateway-system secret tls foo \
 --key=example_certs/mock-openai-foo.glootest.com.key \
 --cert=example_certs/mock-openai-foo.glootest.com.crt
 
-kubectl create -n enterprise-agentgateway secret tls bar \
+kubectl create -n agentgateway-system secret tls bar \
 --key=example_certs/mock-openai-bar.glootest.com.key \
 --cert=example_certs/mock-openai-bar.glootest.com.crt
 ```
@@ -149,8 +149,8 @@ kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway
-  namespace: enterprise-agentgateway
+  name: agentgateway-proxy
+  namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
   listeners:
@@ -192,13 +192,13 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-openai-foo-route
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   hostnames:
   - "mock-openai-foo.glootest.com"
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -215,13 +215,13 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-openai-bar-route
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   hostnames:
   - "mock-openai-bar.glootest.com"
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -238,13 +238,13 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-openai-baz-route
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   hostnames:
   - "mock-openai-baz.glootest.com"
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -263,7 +263,7 @@ EOF
 
 curl mock-openai-foo over https:
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -ikv --resolve "mock-openai-foo.glootest.com:443:${GATEWAY_IP}" https://mock-openai-foo.glootest.com:443/ \
   -H "content-type: application/json" \
@@ -368,15 +368,15 @@ curl: (35) LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to mock-openai-
 Clean up objects created in this lab
 ```bash
 rm -rf example_certs
-kubectl delete gateway -n enterprise-agentgateway agentgateway
-kubectl delete httproute -n enterprise-agentgateway mock-openai-bar-route
-kubectl delete httproute -n enterprise-agentgateway mock-openai-baz-route
-kubectl delete httproute -n enterprise-agentgateway mock-openai-foo-route
-kubectl delete agentgatewaybackend -n enterprise-agentgateway mock-openai
-kubectl delete secret -n enterprise-agentgateway foo
-kubectl delete secret -n enterprise-agentgateway bar
-kubectl delete -n enterprise-agentgateway svc/mock-gpt-4o-svc
-kubectl delete -n enterprise-agentgateway deploy/mock-gpt-4o
+kubectl delete gateway -n agentgateway-system agentgateway
+kubectl delete httproute -n agentgateway-system mock-openai-bar-route
+kubectl delete httproute -n agentgateway-system mock-openai-baz-route
+kubectl delete httproute -n agentgateway-system mock-openai-foo-route
+kubectl delete agentgatewaybackend -n agentgateway-system mock-openai
+kubectl delete secret -n agentgateway-system foo
+kubectl delete secret -n agentgateway-system bar
+kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
+kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```
 
 Deploy the default `Gateway` from lab `001`
@@ -386,8 +386,8 @@ kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway
-  namespace: enterprise-agentgateway
+  name: agentgateway-proxy
+  namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
   listeners:

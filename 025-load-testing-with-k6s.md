@@ -22,7 +22,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-gpt-4o
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   replicas: 1
   selector:
@@ -55,7 +55,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-gpt-4o-svc
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   selector:
     app: mock-gpt-4o
@@ -70,7 +70,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-gpt-5-2
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   replicas: 1
   selector:
@@ -103,7 +103,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-gpt-5-2-svc
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   selector:
     app: mock-gpt-5-2
@@ -119,8 +119,8 @@ EOF
 Wait for the deployments to be ready:
 
 ```bash
-kubectl rollout status deployment/mock-gpt-4o -n enterprise-agentgateway
-kubectl rollout status deployment/mock-gpt-5-2 -n enterprise-agentgateway
+kubectl rollout status deployment/mock-gpt-4o -n agentgateway-system
+kubectl rollout status deployment/mock-gpt-5-2 -n agentgateway-system
 ```
 
 ## Configure Routing to Mock Backends
@@ -133,13 +133,13 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mock-gpt-4o
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
       openai:
         model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
+      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
       port: 8000
       path: "/v1/chat/completions"
   policies:
@@ -150,13 +150,13 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mock-gpt-5-2
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
       openai:
         model: "mock-gpt-5.2"
-      host: mock-gpt-5-2-svc.enterprise-agentgateway.svc.cluster.local
+      host: mock-gpt-5-2-svc.agentgateway-system.svc.cluster.local
       port: 8000
       path: "/v1/chat/completions"
   policies:
@@ -173,11 +173,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -203,7 +203,7 @@ EOF
 Verify both routes are working:
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 # Test mock-gpt-4o route
 curl -i "$GATEWAY_IP:8080/openai/gpt-4o" \
@@ -237,12 +237,12 @@ curl -i "$GATEWAY_IP:8080/openai/gpt-5.2" \
 For load testing, reduce AgentGateway log verbosity to prevent disk pressure:
 
 ```bash
-kubectl patch enterpriseagentgatewayparameters agentgateway-params -n enterprise-agentgateway \
+kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
   --type=merge \
   -p '{"spec":{"logging":{"level":"warn"}}}'
 
-kubectl rollout restart deployment/agentgateway -n enterprise-agentgateway
-kubectl rollout status deployment/agentgateway -n enterprise-agentgateway
+kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
+kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
 ```
 
 ## Deploy k6s Load Generator
@@ -434,7 +434,7 @@ spec:
           k6 \$ARGS
         env:
         - name: ENDPOINT
-          value: "http://agentgateway.enterprise-agentgateway.svc.cluster.local:8080/openai/gpt-4o"
+          value: "http://agentgateway.agentgateway-system.svc.cluster.local:8080/openai/gpt-4o"
         - name: MODEL
           value: "mock-gpt-4o"
         - name: TIMEOUT
@@ -511,7 +511,7 @@ spec:
           k6 \$ARGS
         env:
         - name: ENDPOINT
-          value: "http://agentgateway.enterprise-agentgateway.svc.cluster.local:8080/openai/gpt-5.2"
+          value: "http://agentgateway.agentgateway-system.svc.cluster.local:8080/openai/gpt-5.2"
         - name: MODEL
           value: "mock-gpt-5.2"
         - name: TIMEOUT
@@ -605,7 +605,7 @@ Useful metrics to query:
 ### View AgentGateway Logs
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway -f
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system -f
 ```
 
 ## Understanding the Load Patterns
@@ -662,26 +662,26 @@ kubectl delete namespace loadgenerator
 Delete the routing configuration:
 
 ```bash
-kubectl delete httproute -n enterprise-agentgateway mock-openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway mock-gpt-4o
-kubectl delete agentgatewaybackend -n enterprise-agentgateway mock-gpt-5-2
+kubectl delete httproute -n agentgateway-system mock-openai
+kubectl delete agentgatewaybackend -n agentgateway-system mock-gpt-4o
+kubectl delete agentgatewaybackend -n agentgateway-system mock-gpt-5-2
 ```
 
 Delete the mock services:
 
 ```bash
-kubectl delete deployment -n enterprise-agentgateway mock-gpt-4o
-kubectl delete deployment -n enterprise-agentgateway mock-gpt-5-2
-kubectl delete service -n enterprise-agentgateway mock-gpt-4o-svc
-kubectl delete service -n enterprise-agentgateway mock-gpt-5-2-svc
+kubectl delete deployment -n agentgateway-system mock-gpt-4o
+kubectl delete deployment -n agentgateway-system mock-gpt-5-2
+kubectl delete service -n agentgateway-system mock-gpt-4o-svc
+kubectl delete service -n agentgateway-system mock-gpt-5-2-svc
 ```
 
 Restore AgentGateway logging level (if you changed it):
 
 ```bash
-kubectl patch enterpriseagentgatewayparameters agentgateway-params -n enterprise-agentgateway \
+kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
   --type=merge \
   -p '{"spec":{"logging":{"level":"info"}}}'
 
-kubectl rollout restart deployment/agentgateway -n enterprise-agentgateway
+kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
 ```

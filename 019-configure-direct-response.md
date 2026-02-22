@@ -19,11 +19,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: health-check
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -34,7 +34,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
 metadata:
   name: health-response
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
@@ -49,7 +49,7 @@ EOF
 
 ## curl our agentgateway endpoint
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/health"
 ```
@@ -65,6 +65,6 @@ Status: Healthy
 
 ## Cleanup
 ```bash
-kubectl delete agentgatewaypolicy -n enterprise-agentgateway health-response
-kubectl delete httproute -n enterprise-agentgateway health-check
+kubectl delete agentgatewaypolicy -n agentgateway-system health-response
+kubectl delete httproute -n agentgateway-system health-check
 ```

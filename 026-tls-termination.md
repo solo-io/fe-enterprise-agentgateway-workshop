@@ -27,7 +27,7 @@ openssl x509 -req -sha256 -days 365 -CA example_certs/glootest.com.crt -CAkey ex
 
 Create a Kubernetes secret to store your gateway TLS certificate.
 ```bash
-kubectl create secret tls -n enterprise-agentgateway https \
+kubectl create secret tls -n agentgateway-system https \
   --key example_certs/gateway.key \
   --cert example_certs/gateway.crt
 ```
@@ -42,8 +42,8 @@ kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway
-  namespace: enterprise-agentgateway
+  name: agentgateway-proxy
+  namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
   listeners:
@@ -71,7 +71,7 @@ export OPENAI_API_KEY=$OPENAI_API_KEY
 
 Create OpenAI api-key secret
 ```bash
-kubectl create secret generic openai-secret -n enterprise-agentgateway \
+kubectl create secret generic openai-secret -n agentgateway-system \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -83,11 +83,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -104,7 +104,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
@@ -121,7 +121,7 @@ EOF
 Try to access the gateway over HTTP without TLS. This should fail because the gateway only accepts HTTPS connections on port 443.
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -ik "http://$GATEWAY_IP/openai" \
   -H "content-type: application/json" \
@@ -145,7 +145,7 @@ curl: (7) Failed to connect to 192.168.64.2 port 80 after 5 ms: Couldn't connect
 
 curl OpenAI over HTTPS using the gateway certificate
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -ik "https://$GATEWAY_IP/openai" \
   -H "content-type: application/json" \
@@ -208,15 +208,15 @@ Open http://localhost:3000 in your browser and navigate to **Dashboards > AgentG
 
 AgentGateway logs detailed information about LLM requests:
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 5
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 5
 ```
 
 ## Cleanup
 ```bash
 rm -rf example_certs
-kubectl delete httproute -n enterprise-agentgateway openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
-kubectl delete secret -n enterprise-agentgateway openai-secret https
+kubectl delete httproute -n agentgateway-system openai
+kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete secret -n agentgateway-system openai-secret https
 ```
 
 Restore the default Gateway from lab `001`
@@ -226,8 +226,8 @@ kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway
-  namespace: enterprise-agentgateway
+  name: agentgateway-proxy
+  namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
   listeners:

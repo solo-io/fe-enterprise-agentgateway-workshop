@@ -1,5 +1,12 @@
 # Changelog
 
+0.5.8 - (2-22-26)
+---
+- Update naming conventions to align with official documentation
+  - `agentgateway-system` as the namespace                                                      
+  - `agentgateway-proxy` as the name for the proxy defined in the `Gateway` resource              
+  - `agentgateway-config` for the name of the `EnterpriseAgentgatewayparameters`
+
 0.5.7 - (2-20-26)
 ---
 - Minor fix in 011: `action: MASK` > `action: Mask` and `action: REJECT` to `action: Reject`

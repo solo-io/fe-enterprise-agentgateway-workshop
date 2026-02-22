@@ -11,7 +11,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n enterprise-agentgateway \
+kubectl create secret generic openai-secret -n agentgateway-system \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -23,11 +23,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -44,7 +44,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
@@ -60,7 +60,7 @@ EOF
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -83,7 +83,7 @@ apiVersion: ratelimit.solo.io/v1alpha1
 kind: RateLimitConfig
 metadata:
   name: token-based-rate-limit
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   raw:
     descriptors:
@@ -107,10 +107,10 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: token-based-rate-limit
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
-    - name: agentgateway
+    - name: agentgateway-proxy
       group: gateway.networking.k8s.io
       kind: Gateway
   traffic:
@@ -143,7 +143,7 @@ Now let's configure a rate limit based on a custom header (X-User-ID) instead of
 
 First, delete the previous rate limit config:
 ```bash
-kubectl delete rlc -n enterprise-agentgateway token-based-rate-limit
+kubectl delete rlc -n agentgateway-system token-based-rate-limit
 ```
 
 Create a header-based rate limit config:
@@ -153,7 +153,7 @@ apiVersion: ratelimit.solo.io/v1alpha1
 kind: RateLimitConfig
 metadata:
   name: openai-rate-limit
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   raw:
     descriptors:
@@ -177,10 +177,10 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: token-based-rate-limit
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
-    - name: agentgateway
+    - name: agentgateway-proxy
       group: gateway.networking.k8s.io
       kind: Gateway
   traffic:
@@ -230,7 +230,7 @@ Now let's configure rate limiting based on multiple headers. This creates a comp
 
 First, delete the previous rate limit config:
 ```bash
-kubectl delete rlc -n enterprise-agentgateway openai-rate-limit
+kubectl delete rlc -n agentgateway-system openai-rate-limit
 ```
 
 Create a multi-header rate limit config that limits based on both X-User-ID and X-Tenant-ID:
@@ -240,7 +240,7 @@ apiVersion: ratelimit.solo.io/v1alpha1
 kind: RateLimitConfig
 metadata:
   name: multi-header-rate-limit
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   raw:
     descriptors:
@@ -269,10 +269,10 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: token-based-rate-limit
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
-    - name: agentgateway
+    - name: agentgateway-proxy
       group: gateway.networking.k8s.io
       kind: Gateway
   traffic:
@@ -322,9 +322,9 @@ The rate limit is enforced on the combination of both headers. Each user-tenant 
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n enterprise-agentgateway openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
-kubectl delete secret -n enterprise-agentgateway openai-secret
-kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway token-based-rate-limit
-kubectl delete rlc -n enterprise-agentgateway token-based-rate-limit openai-rate-limit multi-header-rate-limit
+kubectl delete httproute -n agentgateway-system openai
+kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete secret -n agentgateway-system openai-secret
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system token-based-rate-limit
+kubectl delete rlc -n agentgateway-system token-based-rate-limit openai-rate-limit multi-header-rate-limit
 ```

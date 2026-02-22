@@ -19,7 +19,7 @@ export OPENAI_API_KEY=$OPENAI_API_KEY
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n enterprise-agentgateway \
+kubectl create secret generic openai-secret -n agentgateway-system \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -31,11 +31,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - backendRefs:
         - name: openai-all-models
@@ -48,7 +48,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
@@ -78,7 +78,7 @@ The `policies.ai.routes` configuration allows you to route different OpenAI API 
 
 Export the gateway IP:
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
 ### Test Chat Completions
@@ -141,7 +141,7 @@ curl -i "$GATEWAY_IP:8080/v1/models" \
 ## View access logs
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 5
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 5
 ```
 
 Example output for chat completions:
@@ -150,9 +150,9 @@ Example output for chat completions:
     "level": "info",
     "time": "2025-12-29T19:19:05.858661Z",
     "scope": "request",
-    "gateway": "enterprise-agentgateway/agentgateway",
+    "gateway": "agentgateway-system/agentgateway-proxy",
     "listener": "http",
-    "route": "enterprise-agentgateway/openai",
+    "route": "agentgateway-system/openai",
     "endpoint": "api.openai.com:443",
     "src.addr": "10.42.0.1:37349",
     "http.method": "POST",
@@ -228,9 +228,9 @@ Example output for embeddings:
     "level": "info",
     "time": "2025-12-29T19:19:07.905670Z",
     "scope": "request",
-    "gateway": "enterprise-agentgateway/agentgateway",
+    "gateway": "agentgateway-system/agentgateway-proxy",
     "listener": "http",
-    "route": "enterprise-agentgateway/openai",
+    "route": "agentgateway-system/openai",
     "endpoint": "api.openai.com:443",
     "src.addr": "10.42.0.1:18322",
     "http.method": "POST",
@@ -290,7 +290,7 @@ Notice the `gen_ai.operation.name` field changes based on the endpoint:
 AgentGateway automatically logs detailed information about LLM requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
 ```
 
 Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
@@ -306,11 +306,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     # Custom path for chat completions: /openai/chat -> /v1/chat/completions
     - matches:
@@ -422,7 +422,7 @@ curl -i "$GATEWAY_IP:8080/v1/chat/completions" \
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n enterprise-agentgateway openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
-kubectl delete secret -n enterprise-agentgateway openai-secret
+kubectl delete httproute -n agentgateway-system openai
+kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete secret -n agentgateway-system openai-secret
 ```

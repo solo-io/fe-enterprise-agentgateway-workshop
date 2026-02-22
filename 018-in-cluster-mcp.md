@@ -18,7 +18,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mcp-website-fetcher
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   selector:
     matchLabels:
@@ -37,7 +37,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mcp-website-fetcher
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
   labels:
     app: mcp-website-fetcher
 spec:
@@ -57,13 +57,13 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mcp-backend
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   mcp:
     targets:
     - name: mcp-target
       static:
-        host: mcp-website-fetcher.enterprise-agentgateway.svc.cluster.local
+        host: mcp-website-fetcher.agentgateway-system.svc.cluster.local
         port: 80
         protocol: SSE
 ---
@@ -71,10 +71,10 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mcp
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-  - name: agentgateway
+  - name: agentgateway-proxy
   rules:
     - backendRefs:
       - name: mcp-backend
@@ -85,14 +85,14 @@ EOF
 
 ### Get gateway IP
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 echo $GATEWAY_IP
 ``` 
 
 ### Run the MCP Inspector
 ```bash
-npx modelcontextprotocol/inspector#0.16.2
+npx modelcontextprotocol/inspector@0.16.2
 ```
 
 In the MCP Inspector menu, connect to your agentgateway
@@ -113,7 +113,7 @@ In the MCP Inspector menu, connect to your agentgateway
 AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
 
 ```bash
-kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ```
 
@@ -156,7 +156,7 @@ Traces include MCP-specific spans with information like `mcp.method`, `mcp.resou
 AgentGateway automatically logs detailed information about MCP requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
 ```
 
 Example output shows comprehensive request details including MCP-specific information like `mcp.method`, `mcp.resource`, `mcp.resource.name`, `mcp.target`, and trace IDs for correlation with distributed traces in Grafana.
@@ -180,12 +180,12 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: jwt
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: agentgateway
+      name: agentgateway-proxy
   traffic:
     jwtAuthentication:
       mode: Strict
@@ -215,7 +215,7 @@ MCP error -32001: Error POSTing to endpoint (HTTP 403): authentication failure: 
 
 We should also be able to see this error in the access logs `authentication failure: no bearer token found` with an `http.status: 403`
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
 ```
 
 ### Provide a valid JWT
@@ -240,12 +240,12 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: jwt-rbac
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: agentgateway
+      name: agentgateway-proxy
   traffic:
     authorization:
       policy:
@@ -282,12 +282,12 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: jwt-rbac
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: agentgateway
+      name: agentgateway-proxy
   traffic:
     authorization:
       policy:
@@ -300,10 +300,10 @@ Now, if you try to run the `fetch` tool again it should result in `Tool Result: 
 
 ## Cleanup
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway jwt
-kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway jwt-rbac
-kubectl delete deployment -n enterprise-agentgateway mcp-website-fetcher
-kubectl delete service -n enterprise-agentgateway mcp-website-fetcher
-kubectl delete agentgatewaybackend -n enterprise-agentgateway mcp-backend
-kubectl delete httproute -n enterprise-agentgateway mcp
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt-rbac
+kubectl delete deployment -n agentgateway-system mcp-website-fetcher
+kubectl delete service -n agentgateway-system mcp-website-fetcher
+kubectl delete agentgatewaybackend -n agentgateway-system mcp-backend
+kubectl delete httproute -n agentgateway-system mcp
 ```
