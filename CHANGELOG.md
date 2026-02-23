@@ -1,6 +1,6 @@
 # Changelog
 
-0.5.8 - (2-22-26)
+0.5.8 - (2-23-26)
 ---
 - Update naming conventions to align with official documentation
   - `agentgateway-system` as the namespace                                                      
