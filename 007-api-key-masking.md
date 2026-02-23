@@ -11,7 +11,7 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n enterprise-agentgateway \
+kubectl create secret generic openai-secret -n agentgateway-system \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -23,11 +23,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -44,7 +44,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
@@ -60,7 +60,7 @@ EOF
 
 ## curl openai
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 
 curl -i "$GATEWAY_IP:8080/openai" \
@@ -95,14 +95,14 @@ metadata:
   labels:
     llm-provider: openai
   name: team1-apikey
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 type: extauth.solo.io/apikey
 ---
 apiVersion: extauth.solo.io/v1
 kind: AuthConfig
 metadata:
   name: apikey-auth
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   configs:
     - apiKeyAuth:
@@ -116,7 +116,7 @@ spec:
           # can also directly reference specific secret by name
           apiKeySecretRefs:
             - name: team1-apikey
-              namespace: enterprise-agentgateway
+              namespace: agentgateway-system
         # additional headers to inject from secret entries
         # key is the header name to add to the request
         # value.name is the key in the secret to read the value from
@@ -128,17 +128,17 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: api-key-auth
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
-    - name: agentgateway
+    - name: agentgateway-proxy
       group: gateway.networking.k8s.io
       kind: Gateway
   traffic:
     entExtAuth:
       authConfigRef:
         name: apikey-auth
-        namespace: enterprise-agentgateway
+        namespace: agentgateway-system
 EOF
 ```
 
@@ -186,17 +186,17 @@ This request should succeed
 AgentGateway automatically logs detailed information about LLM requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
 ```
 
 Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
 
 ## Cleanup
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway api-key-auth
-kubectl delete authconfig -n enterprise-agentgateway apikey-auth
-kubectl delete secret -n enterprise-agentgateway team1-apikey
-kubectl delete httproute -n enterprise-agentgateway openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
-kubectl delete secret -n enterprise-agentgateway openai-secret
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system api-key-auth
+kubectl delete authconfig -n agentgateway-system apikey-auth
+kubectl delete secret -n agentgateway-system team1-apikey
+kubectl delete httproute -n agentgateway-system openai
+kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete secret -n agentgateway-system openai-secret
 ```

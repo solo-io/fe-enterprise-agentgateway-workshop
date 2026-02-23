@@ -22,7 +22,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-gpt-4o
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   replicas: 1
   selector:
@@ -66,7 +66,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-gpt-4o-svc
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
   labels:
     app: mock-gpt-4o
 spec:
@@ -91,11 +91,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: mock-openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -110,13 +110,13 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: mock-openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
       openai:
         model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.enterprise-agentgateway.svc.cluster.local
+      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
       port: 8000
       path: "/v1/chat/completions"
   policies:
@@ -130,13 +130,13 @@ EOF
 To make log observation easier, scale the AgentGateway deployment to 1 replica:
 
 ```bash
-kubectl patch enterpriseagentgatewayparameters -n enterprise-agentgateway agentgateway-params \
+kubectl patch enterpriseagentgatewayparameters -n agentgateway-system agentgateway-config \
   --type='json' \
   -p='[{"op": "replace", "path": "/spec/deployment/spec/replicas", "value": 1}]'
 
-kubectl rollout restart deploy/agentgateway -n enterprise-agentgateway
+kubectl rollout restart deploy/agentgateway-proxy -n agentgateway-system
 
-kubectl get deploy -n enterprise-agentgateway
+kubectl get deploy -n agentgateway-system
 ```
 
 ## Configure Timeout and Retry Policy
@@ -149,7 +149,7 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: timeout-retry-policy
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
@@ -169,13 +169,13 @@ EOF
 Verify the policy is attached:
 
 ```bash
-kubectl get enterpriseagentgatewaypolicies -n enterprise-agentgateway
+kubectl get enterpriseagentgatewaypolicies -n agentgateway-system
 ```
 
 Expected output:
 ```
 NAMESPACE                 NAME                   ACCEPTED   ATTACHED
-enterprise-agentgateway   timeout-retry-policy   True       True
+agentgateway-system   timeout-retry-policy   True       True
 ```
 
 ### Understanding the Configuration
@@ -190,7 +190,7 @@ enterprise-agentgateway   timeout-retry-policy   True       True
 Verify the mock server is working:
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -212,13 +212,13 @@ You should receive a successful `200 OK` response.
 Start tailing the AgentGateway logs in one terminal:
 
 ```bash
-kubectl logs -f deploy/agentgateway -n enterprise-agentgateway | jq 'select(.["retry.attempt"]) | {retry: .["retry.attempt"], status: ."http.status", duration, error}'
+kubectl logs -f deploy/agentgateway-proxy -n agentgateway-system | jq 'select(.["retry.attempt"]) | {retry: .["retry.attempt"], status: ."http.status", duration, error}'
 ```
 
 Back in the original terminal, scale the mock server deployment to 0 to trigger 503 errors:
 
 ```bash
-kubectl scale deployment/mock-gpt-4o -n enterprise-agentgateway --replicas=0
+kubectl scale deployment/mock-gpt-4o -n agentgateway-system --replicas=0
 ```
 
 Make a request:
@@ -278,7 +278,7 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: timeout-retry-policy
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
@@ -319,7 +319,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 Check the logs to see the retry attempts with backoff delays:
 
 ```bash
-kubectl logs -f deploy/agentgateway -n enterprise-agentgateway | jq 'select(.["retry.attempt"]) | {retry: .["retry.attempt"], status: ."http.status", duration, error}'
+kubectl logs -f deploy/agentgateway-proxy -n agentgateway-system | jq 'select(.["retry.attempt"]) | {retry: .["retry.attempt"], status: ."http.status", duration, error}'
 ```
 
 You should see output similar to:
@@ -348,19 +348,19 @@ The total time consumed = (retry attempts × backoff delay) + network latency. W
 Scale AgentGateway back to 2 replicas:
 
 ```bash
-kubectl patch enterpriseagentgatewayparameters -n enterprise-agentgateway agentgateway-params \
+kubectl patch enterpriseagentgatewayparameters -n agentgateway-system agentgateway-config \
   --type='json' \
   -p='[{"op": "replace", "path": "/spec/deployment/spec/replicas", "value": 2}]'
 
-kubectl rollout restart deploy/agentgateway -n enterprise-agentgateway
+kubectl rollout restart deploy/agentgateway-proxy -n agentgateway-system
 ```
 
 Delete the lab resources:
 
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway timeout-retry-policy
-kubectl delete httproute -n enterprise-agentgateway mock-openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway mock-openai
-kubectl delete -n enterprise-agentgateway svc/mock-gpt-4o-svc
-kubectl delete -n enterprise-agentgateway deploy/mock-gpt-4o
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system timeout-retry-policy
+kubectl delete httproute -n agentgateway-system mock-openai
+kubectl delete agentgatewaybackend -n agentgateway-system mock-openai
+kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
+kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```

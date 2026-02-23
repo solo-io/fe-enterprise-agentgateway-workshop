@@ -50,11 +50,11 @@ export ENTERPRISE_AGW_VERSION=2.2.0-beta.1
 
 ### Enterprise Agentgateway CRDs
 ```bash
-kubectl create namespace enterprise-agentgateway
+kubectl create namespace agentgateway-system
 ```
 
 ```bash
-helm upgrade -i --create-namespace --namespace enterprise-agentgateway \
+helm upgrade -i --create-namespace --namespace agentgateway-system \
     --version $ENTERPRISE_AGW_VERSION enterprise-agentgateway-crds \
     oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds
 ```
@@ -80,7 +80,7 @@ ratelimitconfigs.ratelimit.solo.io
 ## Install Enterprise Agentgateway Controller
 Using Helm:
 ```bash
-helm upgrade -i -n enterprise-agentgateway enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $ENTERPRISE_AGW_VERSION \
 --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
@@ -96,15 +96,15 @@ gatewayClassParametersRefs:
   enterprise-agentgateway:
     group: enterpriseagentgateway.solo.io
     kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-params
-    namespace: enterprise-agentgateway
+    name: agentgateway-config
+    namespace: agentgateway-system
 EOF
 ```
 
 Check that the Enterprise Agentgateway Controller is now running:
 
 ```bash
-kubectl get pods -n enterprise-agentgateway -l app.kubernetes.io/name=enterprise-agentgateway
+kubectl get pods -n agentgateway-system -l app.kubernetes.io/name=enterprise-agentgateway
 ```
 
 Expected Output:
@@ -123,8 +123,8 @@ kubectl apply -f- <<'EOF'
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayParameters
 metadata:
-  name: agentgateway-params
-  namespace: enterprise-agentgateway
+  name: agentgateway-config
+  namespace: agentgateway-system
 spec:
   #--- Required for Openshift: Delete securityContext to let OpenShift generate it based on SCC ---
   deployment:
@@ -272,8 +272,8 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway
-  namespace: enterprise-agentgateway
+  name: agentgateway-proxy
+  namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
   listeners:
@@ -289,14 +289,14 @@ EOF
 Check that the Agentgateway proxy is now running:
 
 ```bash
-kubectl get pods -n enterprise-agentgateway
+kubectl get pods -n agentgateway-system
 ```
 
 Expected Output:
 
 ```bash
 NAME                                                        READY   STATUS    RESTARTS   AGE
-agentgateway-7d4c8c4d4b-lvdsq                               1/1     Running   0          11m
+agentgateway-proxy-7d4c8c4d4b-lvdsq                               1/1     Running   0          11m
 enterprise-agentgateway-5f9c5b95b4-gjblt                    1/1     Running   0          11m
 ext-auth-service-enterprise-agentgateway-6fcc5bc989-22wgd   1/1     Running   0          11m
 ext-cache-enterprise-agentgateway-6bfcb8c87d-vjzxn          1/1     Running   0          11m

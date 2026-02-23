@@ -37,7 +37,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: soloio-docs-mcp-backend
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   mcp:
     targets:
@@ -53,10 +53,10 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: soloio-docs-mcp
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-  - name: agentgateway
+  - name: agentgateway-proxy
   rules:
     - matches:
       - path:
@@ -85,7 +85,7 @@ When `policies.tls` is set, AgentGateway will:
 ### Get Gateway IP
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 echo $GATEWAY_IP
 ```
@@ -173,7 +173,7 @@ The fact that you see `soloio-docs-mcp` as the tool source confirms that Claude 
 AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
 
 ```bash
-kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics | grep mcp && kill $!
 ```
 
@@ -221,7 +221,7 @@ Traces include MCP-specific spans with information like `mcp.method`, `mcp.resou
 AgentGateway automatically logs detailed information about MCP requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 20 | grep mcp
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20 | grep mcp
 ```
 
 Example output shows comprehensive request details including MCP-specific information like:
@@ -241,12 +241,12 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: jwt
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: agentgateway
+      name: agentgateway-proxy
   traffic:
     jwtAuthentication:
       mode: Strict
@@ -280,7 +280,7 @@ MCP error -32001: Error POSTing to endpoint (HTTP 403): authentication failure: 
 We should also be able to see this error in the access logs `authentication failure: no bearer token found` with an `http.status: 403`:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 1
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
 ```
 
 ### Provide a Valid JWT
@@ -308,12 +308,12 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: jwt-rbac
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: agentgateway
+      name: agentgateway-proxy
   traffic:
     authorization:
       policy:
@@ -355,12 +355,12 @@ apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: jwt-rbac
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io
       kind: Gateway
-      name: agentgateway
+      name: agentgateway-proxy
   traffic:
     authorization:
       policy:
@@ -381,10 +381,10 @@ You can create complex authorization rules based on any JWT claim:
 Remove Kubernetes resources:
 
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway jwt
-kubectl delete enterpriseagentgatewaypolicy -n enterprise-agentgateway jwt-rbac
-kubectl delete agentgatewaybackend -n enterprise-agentgateway soloio-docs-mcp-backend
-kubectl delete httproute -n enterprise-agentgateway soloio-docs-mcp
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt-rbac
+kubectl delete agentgatewaybackend -n agentgateway-system soloio-docs-mcp-backend
+kubectl delete httproute -n agentgateway-system soloio-docs-mcp
 ```
 
 Remove the MCP server from Claude Code and restore the direct connection:

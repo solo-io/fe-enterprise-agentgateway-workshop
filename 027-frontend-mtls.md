@@ -26,14 +26,14 @@ openssl x509 -req -sha256 -days 365 -CA example_certs/glootest.com.crt -CAkey ex
 
 Create a Kubernetes secret to store your gateway TLS certificate.
 ```bash
-kubectl create secret tls -n enterprise-agentgateway https \
+kubectl create secret tls -n agentgateway-system https \
   --key example_certs/gateway.key \
   --cert example_certs/gateway.crt
 ```
 
 Create a ConfigMap to store the CA certificate for mTLS client validation.
 ```bash
-kubectl create configmap -n enterprise-agentgateway ca-cert \
+kubectl create configmap -n agentgateway-system ca-cert \
   --from-file=ca.crt=example_certs/glootest.com.crt
 ```
 
@@ -54,8 +54,8 @@ kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway
-  namespace: enterprise-agentgateway
+  name: agentgateway-proxy
+  namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
   tls:
@@ -92,7 +92,7 @@ export OPENAI_API_KEY=$OPENAI_API_KEY
 
 Create OpenAI api-key secret
 ```bash
-kubectl create secret generic openai-secret -n enterprise-agentgateway \
+kubectl create secret generic openai-secret -n agentgateway-system \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -104,11 +104,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -125,7 +125,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-all-models
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
@@ -141,7 +141,7 @@ EOF
 
 curl OpenAI without a client cert, this should fail with a TLS handshake error
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -ikv "https://$GATEWAY_IP/openai" \
   -H "content-type: application/json" \
@@ -178,7 +178,7 @@ curl: (35) OpenSSL/3.0.2: error:0A00045C:SSL routines::tlsv13 alert certificate 
 
 curl OpenAI with the valid client cert that we created earlier, this should succeed
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -ik "https://$GATEWAY_IP/openai" \
   -H "content-type: application/json" \
@@ -243,16 +243,16 @@ Open http://localhost:3000 in your browser and navigate to **Dashboards > AgentG
 
 AgentGateway logs detailed information about LLM requests:
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 5
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 5
 ```
 
 ## Cleanup
 ```bash
 rm -rf example_certs
-kubectl delete httproute -n enterprise-agentgateway openai
-kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-all-models
-kubectl delete secret -n enterprise-agentgateway openai-secret https
-kubectl delete configmap -n enterprise-agentgateway ca-cert
+kubectl delete httproute -n agentgateway-system openai
+kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete secret -n agentgateway-system openai-secret https
+kubectl delete configmap -n agentgateway-system ca-cert
 ```
 
 Restore the default Gateway from lab `001`
@@ -262,8 +262,8 @@ kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway
-  namespace: enterprise-agentgateway
+  name: agentgateway-proxy
+  namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
   listeners:

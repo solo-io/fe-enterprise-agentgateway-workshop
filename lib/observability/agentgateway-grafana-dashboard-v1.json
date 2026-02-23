@@ -6929,7 +6929,7 @@
       {
         "current": {
           "text": "Enterprise",
-          "value": "agentgateway-.*"
+          "value": "agentgateway-proxy-.*"
         },
         "description": "For OSS Agentgateway, select 'OSS'. All selections must match to work properly. Default: Enterprise",
         "label": "Proxy Deployment Naming Pattern",
@@ -6941,10 +6941,10 @@
           },
           {
             "text": "Enterprise",
-            "value": "agentgateway-.*"
+            "value": "agentgateway-proxy-.*"
           }
         ],
-        "query": "OSS : agentgateway-proxy-.*,Enterprise : agentgateway-.*",
+        "query": "OSS : agentgateway-proxy-.*,Enterprise : agentgateway-proxy-.*",
         "type": "custom"
       },
       {

@@ -19,7 +19,7 @@ export OPENAI_API_KEY=$OPENAI_API_KEY
 
 Create openai api-key secret
 ```bash
-kubectl create secret generic openai-secret -n enterprise-agentgateway \
+kubectl create secret generic openai-secret -n agentgateway-system \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -31,11 +31,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: openai-batches
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - backendRefs:
         - name: openai-batches-backend
@@ -48,7 +48,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: openai-batches-backend
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
@@ -88,7 +88,7 @@ The Batches API allows you to send asynchronous groups of requests with 50% lowe
 
 Export the gateway IP:
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
 ### Step 1: Create a Batch Request File
@@ -296,7 +296,7 @@ curl -i "$GATEWAY_IP:8080/v1/files/$FILE_ID" \
 AgentGateway automatically logs information about the batch API requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 5
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 5
 ```
 
 Example output for batch creation:
@@ -305,9 +305,9 @@ Example output for batch creation:
   "level": "info",
   "time": "2026-01-14T19:20:15.123456Z",
   "scope": "request",
-  "gateway": "enterprise-agentgateway/agentgateway",
+  "gateway": "agentgateway-system/agentgateway-proxy",
   "listener": "http",
-  "route": "enterprise-agentgateway/openai-batches",
+  "route": "agentgateway-system/openai-batches",
   "endpoint": "api.openai.com:443",
   "src.addr": "10.42.0.1:45678",
   "http.method": "POST",
@@ -359,7 +359,7 @@ AgentGateway automatically logs detailed information about batch API requests in
 
 Check the logs:
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway --tail 20
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20
 ```
 
 ## Cleanup
@@ -382,7 +382,7 @@ curl -X DELETE "$GATEWAY_IP:8080/v1/files/$OUTPUT_FILE_ID" \
 rm -f batch_requests.jsonl batch_results.jsonl
 
 # Delete Kubernetes resources
-kubectl delete httproute -n enterprise-agentgateway openai-batches
-kubectl delete agentgatewaybackend -n enterprise-agentgateway openai-batches-backend
-kubectl delete secret -n enterprise-agentgateway openai-secret
+kubectl delete httproute -n agentgateway-system openai-batches
+kubectl delete agentgatewaybackend -n agentgateway-system openai-batches-backend
+kubectl delete secret -n agentgateway-system openai-secret
 ```

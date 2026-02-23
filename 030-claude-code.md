@@ -27,7 +27,7 @@ export CLAUDE_API_KEY=<your-anthropic-api-key>
 
 Create anthropic api-key secret
 ```bash
-kubectl create secret generic anthropic-secret -n enterprise-agentgateway \
+kubectl create secret generic anthropic-secret -n agentgateway-system \
 --from-literal="Authorization=$CLAUDE_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
@@ -41,11 +41,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: claude-passthrough
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway
-      namespace: enterprise-agentgateway
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
     - matches:
         - path:
@@ -68,7 +68,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
   name: anthropic-passthrough
-  namespace: enterprise-agentgateway
+  namespace: agentgateway-system
 spec:
   ai:
     provider:
@@ -94,7 +94,7 @@ The `policies.ai.routes` configuration allows you to route different Anthropic A
 
 Export the gateway IP:
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n enterprise-agentgateway --selector=gateway.networking.k8s.io/gateway-name=agentgateway -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
 Test the Anthropic native `/v1/messages` endpoint:
@@ -187,7 +187,7 @@ Traces include LLM-specific spans with information like `gen_ai.completion`, `ge
 AgentGateway automatically logs detailed information about LLM requests to stdout. You can tail the logs to see Claude Code traffic flowing through:
 
 ```bash
-kubectl logs deploy/agentgateway -n enterprise-agentgateway -f | jq .
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system -f | jq .
 ```
 
 Example output shows comprehensive request details including:
@@ -202,7 +202,7 @@ Example output shows comprehensive request details including:
 AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
 
 ```bash
-kubectl port-forward -n enterprise-agentgateway deployment/agentgateway 15020:15020 & \
+kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
 sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ```
 
@@ -223,7 +223,7 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n enterprise-agentgateway claude-passthrough
-kubectl delete agentgatewaybackend -n enterprise-agentgateway anthropic-passthrough
-kubectl delete secret -n enterprise-agentgateway anthropic-secret
+kubectl delete httproute -n agentgateway-system claude-passthrough
+kubectl delete agentgatewaybackend -n agentgateway-system anthropic-passthrough
+kubectl delete secret -n agentgateway-system anthropic-secret
 ```
