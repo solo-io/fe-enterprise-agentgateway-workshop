@@ -1,5 +1,9 @@
 # Changelog
 
+0.5.9 - (2-24-26)
+---
+- Fix comments for `EnterpriseAgentgatewayParameters` logging and tracing fields in `001`
+
 0.5.8 - (2-23-26)
 ---
 - Update naming conventions to align with official documentation
