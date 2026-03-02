@@ -1,8 +1,9 @@
 # Changelog
 
-0.5.9 - (2-24-26)
+0.5.9 - (3-2-26)
 ---
 - Fix comments for `EnterpriseAgentgatewayParameters` logging and tracing fields in `001`
+- Replaced basic guardrails lab with comprehensive built-in guardrails covering 8 request guards (prompt injection, jailbreak, system prompt extraction, PII, credentials, harmful content, encoding evasion, dangerous advisory) and 2 response masking guards; renamed lab file to `011-builtin-guardrails.md`
 
 0.5.8 - (2-23-26)
 ---
