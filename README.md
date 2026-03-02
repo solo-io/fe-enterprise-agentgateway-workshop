@@ -25,7 +25,7 @@ Before starting this workshop, you will need:
 - [008-jwt-auth-with-rbac.md](008-jwt-auth-with-rbac.md)
 - [009-configure-basic-routing-to-anthropic.md](009-configure-basic-routing-to-anthropic.md)
 - [010-enrich-prompts.md](010-enrich-prompts.md)
-- [011-basic-guardrails.md](011-basic-guardrails.md)
+- [011-builtin-guardrails.md](011-builtin-guardrails.md)
 - [012-external-moderation-openai-guardrails.md](012-external-moderation-openai-guardrails.md)
 - [013-advanced-guardrails-webhook.md](013-advanced-guardrails-webhook.md)
 - [014-request-based-rate-limiting.md](014-request-based-rate-limiting.md)
@@ -78,7 +78,7 @@ Before starting this workshop, you will need:
     - Frontend mTLS with client certificate validation
     - SNI (Server Name Indication) matching for multi-domain HTTPS
 - Prompt Guard & Content Moderation
-    - Basic Prompt Guard (string, regex, builtin)
+    - Comprehensive built-in Prompt Guard (prompt injection, jailbreak, PII, secrets, harmful content, encoding evasion, and more)
     - External moderation guardrails (OpenAI moderation API)
     - Advanced Webhook Prompt Guard
 - Prompt Enrichment

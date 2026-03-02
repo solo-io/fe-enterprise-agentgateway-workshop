@@ -186,13 +186,14 @@ spec:
       logging:
         fields:
           add:
+            # --- Capture the claims from a verified JWT token if JWT policy is enabled
             jwt: 'jwt'
-            request.body: json(request.body)
-            response.body: json(response.body)
-            # --- Capture a single header by name (example: x-foo)
+            # --- Capture a single request header by name (example: x-foo)
             x-foo: 'request.headers["x-foo"]'
-            # --- Capture entire request body
+            # --- Capture entire request body and parse it as JSON
             request.body: json(request.body)
+            # --- Capture entire response body and parse it as JSON
+            response.body: json(response.body)
             # --- Capture a field in the request body
             request.body.modelId: json(request.body).modelId
         format: json
@@ -211,11 +212,11 @@ spec:
             gen_ai.usage.completion_tokens: "llm.outputTokens"
             gen_ai.usage.prompt_tokens: "llm.inputTokens"
             gen_ai.request: 'flatten(llm.params)'
-            # --- Capture claims from a verified JWT token if JWT policy is enabled
+            # --- Capture the claims from a verified JWT token if JWT policy is enabled
             jwt: 'jwt'
-            # --- Capture the whole response body as JSON
+            # --- Capture entire response body and parse it as JSON
             response.body: 'json(response.body)'
-            # --- Capture a single header by name (example: x-foo)
+            # --- Capture a single request header by name (example: x-foo)
             x-foo: 'request.headers["x-foo"]'
   deployment:
     spec:
