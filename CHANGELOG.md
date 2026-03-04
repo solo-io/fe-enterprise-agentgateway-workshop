@@ -1,5 +1,10 @@
 # Changelog
 
+0.6.0 - (3-3-26)
+---
+- Add new lab: `032-crewai-with-agentgateway.md`
+- Add new lab: `033-langchain-with-agentgateway.md`
+
 0.5.9 - (3-2-26)
 ---
 - Fix comments for `EnterpriseAgentgatewayParameters` logging and tracing fields in `001`
