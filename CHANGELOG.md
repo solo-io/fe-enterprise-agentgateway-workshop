@@ -1,5 +1,13 @@
 # Changelog
 
+0.6.1 - (3-3-26)
+---
+- Update `013-advanced-guardrails-webhook.md` lab with more sophisticated scenarios to showcase the value of an LLM-based guardrail over static rules. Use cases now include:
+  - Existing innocent request, harassment, jailbreak (regex), PII masking (credit cards), PII masking (email) use cases now fed through an LLM-as-a-judge
+  - False positive avoidance - LLM understands context
+  - Indirect jailbreak - catches what regex misses
+  - Live policy update (add rule about medical advice) via ConfigMap using natural language for new rules
+
 0.6.0 - (3-3-26)
 ---
 - Add new lab: `032-crewai-with-agentgateway.md`
