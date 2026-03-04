@@ -1,0 +1,183 @@
+# CrewAI Multi-Agent Workflow with AgentGateway
+
+## Pre-requisites
+This lab assumes that you have completed the setup in `001` and `002`
+
+## Lab Objectives
+- Create a Kubernetes secret that contains your OpenAI API key credentials
+- Create a route to OpenAI as the backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Run a CrewAI two-agent crew (Researcher + Writer) whose LLM calls route through agentgateway
+- Validate proxied requests in Grafana and access logs
+
+## Overview
+
+This lab shows how to run a [CrewAI](https://www.crewai.com/) multi-agent workflow through Enterprise AgentGateway. A two-agent crew — a **Researcher** and a **Writer** — collaborate sequentially to produce a short blog post on a chosen topic. All OpenAI API calls are intercepted by agentgateway, which:
+
+- Injects the real OpenAI API key from a Kubernetes Secret
+- Emits OpenTelemetry traces, metrics, and access logs for every LLM call
+- Enables enforcement of rate limits, guardrails, and other policies — transparently, without any changes to the CrewAI application
+
+## Configure Required Variables
+
+Export your OpenAI API key:
+```bash
+export OPENAI_API_KEY=<your-openai-api-key>
+```
+
+Create the OpenAI API key secret:
+```bash
+kubectl create secret generic openai-secret -n agentgateway-system \
+  --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
+  --dry-run=client -oyaml | kubectl apply -f -
+```
+
+## Create OpenAI Route and Backend
+
+Apply the `AgentgatewayBackend` and `HTTPRoute`:
+```bash
+kubectl apply -f - <<EOF
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: openai-all-models
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai: {}
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+      backendRefs:
+        - name: openai-all-models
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "120s"
+EOF
+```
+
+The `AgentgatewayBackend` matches requests on the `/openai` path prefix, rewrites the path to `/v1/chat/completions`, and forwards the request to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret.
+
+## Get the Gateway IP
+
+```bash
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
+  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
+  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+
+echo "Gateway IP: $GATEWAY_IP"
+```
+
+## Run the CrewAI Two-Agent Crew
+
+The crew script and its dependencies live in `lib/crewai/`. Install them in a local virtual environment.
+
+> **Note:** `crewai` depends on `tiktoken`, which requires Python ≤3.12 for pre-built wheels. Use `python3.12` or `python3.11` — Python 3.13+ will attempt to compile `tiktoken` from source and fail without a Rust toolchain.
+
+```bash
+python3.12 -m venv lib/crewai/.venv
+lib/crewai/.venv/bin/pip install --upgrade pip -q
+lib/crewai/.venv/bin/pip install -r lib/crewai/requirements.txt
+```
+
+If `python3.12` is not available, try `python3.11`:
+```bash
+python3.11 -m venv lib/crewai/.venv
+```
+
+Run the crew with your chosen topic:
+```bash
+GATEWAY_IP="$GATEWAY_IP" \
+CREW_TOPIC="AI Gateway key patterns and concepts" \
+CREWAI_TRACING_ENABLED=false \
+lib/crewai/.venv/bin/python3 lib/crewai/crew.py
+```
+
+You should see both agents work sequentially — the Researcher produces bullet-point findings, then the Writer turns them into a polished blog post. All LLM calls flow through agentgateway.
+
+Try a different topic:
+```bash
+GATEWAY_IP="$GATEWAY_IP" \
+CREW_TOPIC="Service Mesh key patterns and concepts" \
+CREWAI_TRACING_ENABLED=false \
+lib/crewai/.venv/bin/python3 lib/crewai/crew.py
+```
+
+## Observability
+
+### View access logs
+
+Tail agentgateway logs to see the proxied OpenAI calls:
+```bash
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20 | jq .
+```
+
+Each CrewAI agent generates at least one request. You should see two sets of entries — one for the Researcher and one for the Writer — showing model name, token counts, and latency.
+
+### View Metrics and Traces in Grafana
+
+1. Port-forward to Grafana:
+```bash
+kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
+```
+
+2. Open http://localhost:3000 in your browser
+
+3. Login with credentials:
+   - Username: `admin`
+   - Password: Value of `$GRAFANA_ADMIN_PASSWORD` (default: `prom-operator`)
+
+4. Navigate to **Dashboards > AgentGateway Dashboard**
+
+The dashboard shows real-time data from the crew run, including:
+- Token usage broken down by request type (input vs. output)
+- Per-model request latency
+- Total proxied request counts
+
+### View Traces in Grafana
+
+To see distributed traces for individual agent LLM calls:
+
+1. In Grafana, navigate to **Home > Explore**
+2. Select **Tempo** from the data source dropdown
+3. Click **Search** to see all traces
+
+Each agent invocation produces a trace with LLM-specific spans containing `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, and token counts.
+
+### View the Prometheus metrics endpoint
+
+```bash
+kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
+sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_gen_ai && kill $!
+```
+
+Useful metrics:
+- `agentgateway_gen_ai_client_token_usage` — token usage per agent call
+- `agentgateway_gen_ai_server_request_duration` — latency per request
+- `agentgateway_requests_total` — total proxied requests
+
+## Cleanup
+
+```bash
+kubectl delete httproute -n agentgateway-system openai
+kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete secret -n agentgateway-system openai-secret
+rm -rf lib/crewai/.venv
+```

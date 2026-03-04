@@ -48,6 +48,8 @@ Before starting this workshop, you will need:
 - [029-openai-streaming.md](029-openai-streaming.md)
 - [030-claude-code.md](030-claude-code.md)
 - [031-SNI-matching.md](031-SNI-matching.md)
+- [032-crewai-with-agentgateway.md](032-crewai-with-agentgateway.md)
+- [033-langchain-with-agentgateway.md](033-langchain-with-agentgateway.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
@@ -64,6 +66,8 @@ Before starting this workshop, you will need:
     - OpenAI Batches API support (asynchronous batch processing)
     - Streaming responses support for real-time token generation
     - Claude Code CLI integration with full observability
+    - CrewAI multi-agent workflow integration
+    - LangChain multi-agent pipeline integration
 - LLM API Key Management
     - API Key masking in logs
 - Token-based metrics from LLM
