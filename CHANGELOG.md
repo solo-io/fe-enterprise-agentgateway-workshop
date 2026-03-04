@@ -1,5 +1,9 @@
 # Changelog
 
+0.6.2 - (3-4-26)
+---
+- Minor updates to `013-advanced-guardrails-webhook.md` lab
+
 0.6.1 - (3-3-26)
 ---
 - Update `013-advanced-guardrails-webhook.md` lab with more sophisticated scenarios to showcase the value of an LLM-based guardrail over static rules. Use cases now include:
