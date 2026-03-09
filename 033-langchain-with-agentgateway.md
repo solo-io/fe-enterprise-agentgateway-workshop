@@ -21,7 +21,7 @@ This lab shows how to run a [LangChain](https://www.langchain.com/) multi-agent 
 
 Export your OpenAI API key:
 ```bash
-export OPENAI_API_KEY=<your-openai-api-key>
+export OPENAI_API_KEY=$OPENAI_API_KEY
 ```
 
 Create the OpenAI API key secret:
@@ -84,6 +84,26 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
 
 echo "Gateway IP: $GATEWAY_IP"
 ```
+
+## Verify the Endpoint
+
+Before running the pipeline, confirm the gateway is routing to OpenAI correctly:
+
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Say hello"
+      }
+    ]
+  }'
+```
+
+You should receive a `200 OK` response with a JSON body containing a `choices` array. If you see an error, check that the `openai-secret` was created correctly and the `HTTPRoute` is admitted.
 
 ## Run the LangChain Two-Agent Pipeline
 

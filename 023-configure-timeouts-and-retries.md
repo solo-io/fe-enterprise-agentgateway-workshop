@@ -134,8 +134,6 @@ kubectl patch enterpriseagentgatewayparameters -n agentgateway-system agentgatew
   --type='json' \
   -p='[{"op": "replace", "path": "/spec/deployment/spec/replicas", "value": 1}]'
 
-kubectl rollout restart deploy/agentgateway-proxy -n agentgateway-system
-
 kubectl get deploy -n agentgateway-system
 ```
 
@@ -351,8 +349,6 @@ Scale AgentGateway back to 2 replicas:
 kubectl patch enterpriseagentgatewayparameters -n agentgateway-system agentgateway-config \
   --type='json' \
   -p='[{"op": "replace", "path": "/spec/deployment/spec/replicas", "value": 2}]'
-
-kubectl rollout restart deploy/agentgateway-proxy -n agentgateway-system
 ```
 
 Delete the lab resources:
