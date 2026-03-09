@@ -1,5 +1,11 @@
 # Changelog
 
+0.6.3 - (3-9-26)
+---
+- Update `install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md`
+  - Update `ENTERPRISE_AGW_VERSION` to `v2.2.0-rc.1`
+  - Update GWAPI CRD version to `v1.5.0`
+
 0.6.2 - (3-9-26)
 ---
 - Minor updates to `013-advanced-guardrails-webhook.md` lab
