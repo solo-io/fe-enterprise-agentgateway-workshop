@@ -1,6 +1,6 @@
 # Image list for Enterprise Agentgateway
 
-**2.1.0**
+**2.2.0-rc.1**
 
 ## Helm Charts
 
@@ -21,13 +21,13 @@ oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-ag
 ### controller
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2.1.0
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2.2.0-rc.1
 ```
 
 ### agentgateway proxy
 
 ```bash
-ghcr.io/solo-io/agentgateway-enterprise:0.11.1-patch1
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/agentgateway-enterprise:2.2.0-rc.1
 ```
 
 ### ext-cache (redis)
@@ -39,7 +39,7 @@ docker.io/redis:7.2.12-alpine
 ### ext-auth-service
 
 ```bash
-gcr.io/gloo-mesh/ext-auth-service:0.71.4
+gcr.io/gloo-mesh/ext-auth-service:0.72.2
 ```
 
 ### rate-limiter

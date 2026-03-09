@@ -1,5 +1,18 @@
 # Changelog
 
+0.6.2 - (3-9-26)
+---
+- Minor updates to `013-advanced-guardrails-webhook.md` lab
+- Update `ENTERPRISE_AGW_VERSION` to `v2.2.0-rc.1`
+  - Breaking change, we now expect `v` as the prefix to the version
+- Update `000-image-list.md`
+- Update GWAPI CRD version to `v1.5.0`
+- Minor update in `008-jwt-auth-with-rbac.md` to update the text around the dynamic jwt example
+- Minor update in `018-in-cluster-mcp.md` to fix npx command
+- Minor update in `023-configure-timeouts-and-retries.md` no longer needs to rollout restart to update the AGW proxy replicas
+- Minor update in `032-crewai-with-agentgateway.md`
+- Minor update in `033-langchain-with-agentgateway.md`
+
 0.6.1 - (3-3-26)
 ---
 - Update `013-advanced-guardrails-webhook.md` lab with more sophisticated scenarios to showcase the value of an LLM-based guardrail over static rules. Use cases now include:

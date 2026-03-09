@@ -269,9 +269,13 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 
 ## curl with valid token
-```bash
-export VALID_TOKEN="eyJraWQiOiJUbFoxcm0xX2h0cTV3ZWhtT09aTGVhNEFEZWZWOUZzLXNPckhwWHRJSkhJIiwiYWxnIjoiUlMyNTYifQ.eyJ2ZXIiOjEsImp0aSI6IkFULjRzb1A3MmlBelljdEFrUlhLVjYtMXVDbW9TSDlqZkJDU1IxelFoYjdON00iLCJpc3MiOiJodHRwczovL2ludGVncmF0b3ItNTUxMzY2Mi5va3RhLmNvbS9vYXV0aDIvYXVzeGt2bWVmdGdjZGo2SEE2OTciLCJhdWQiOiJhcGk6Ly9zb2xvIiwiaWF0IjoxNzY1NDA0Mjg3LCJleHAiOjE3NjU0MDc4ODcsImNpZCI6IjBvYXhrc2hrbDJsaDBlOHZjNjk3Iiwic2NwIjpbImFwaS5yZWFkIl0sInN1YiI6IjBvYXhrc2hrbDJsaDBlOHZjNjk3In0.kLfNG5OzT8hKTVgEJ2B3DYu9D3xL6hPwcXDRTt6N5vy5FW4BELyHeBZX1pRLdzVEvyKP2gDgP2H0pNdQgwk8A6lopnRtZv47SG2t3FWDeGUEj9PKQn-R1bZRrECg6vBsLgt71g-Ph3YD3PUxb97-hgNLk6U-baLXHC3rOAc_SLvQj7FWKuhE9NTkTGIqpJdfiiLiDa3Amda1QaJTZaZRHv3bkvfn-8sDCN5mqOZ4KHKzkM3C6q9WZkK0Cbr0oeqn-t1q8g4GjoF3n-fM7XDYAiywdU4zOZ9c1W4aujYgdVTBP0XNXA9fNipMTDL8pv0irSrDgAT4oyzR7tL7FlFjNQ"
 
+This example requires a valid token from `https://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697/v1/token`. If you do not have access to generating a token from this auth server, then simply use this as a reference example or replace the config above with a valid OIDC endpoint
+```bash
+export VALID_TOKEN=""
+```
+
+```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $VALID_TOKEN" \

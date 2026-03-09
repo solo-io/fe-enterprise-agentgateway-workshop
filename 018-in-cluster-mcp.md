@@ -92,7 +92,7 @@ echo $GATEWAY_IP
 
 ### Run the MCP Inspector
 ```bash
-npx modelcontextprotocol/inspector@0.16.2
+npx @modelcontextprotocol/inspector@0.16.2
 ```
 
 In the MCP Inspector menu, connect to your agentgateway

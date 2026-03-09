@@ -18,7 +18,7 @@ In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on 
 Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway. We're using the experimental CRDs to enable advanced features like mTLS frontend validation (lab 026). If frontend mTLS is not a requirement, you can continue with the standard install.
 
 ```bash
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml
+kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/experimental-install.yaml
 ```
 
 To check if the the Kubernetes Gateway API CRDS are installed
@@ -36,9 +36,10 @@ gatewayclasses       gc           gateway.networking.k8s.io/v1         false    
 gateways             gtw          gateway.networking.k8s.io/v1         true         Gateway
 grpcroutes                        gateway.networking.k8s.io/v1         true         GRPCRoute
 httproutes                        gateway.networking.k8s.io/v1         true         HTTPRoute
-referencegrants      refgrant     gateway.networking.k8s.io/v1beta1    true         ReferenceGrant
+listenersets         lset         gateway.networking.k8s.io/v1         true         ListenerSet
+referencegrants      refgrant     gateway.networking.k8s.io/v1         true         ReferenceGrant
 tcproutes                         gateway.networking.k8s.io/v1alpha2   true         TCPRoute
-tlsroutes                         gateway.networking.k8s.io/v1alpha3   true         TLSRoute
+tlsroutes                         gateway.networking.k8s.io/v1         true         TLSRoute
 udproutes                         gateway.networking.k8s.io/v1alpha2   true         UDPRoute
 ```
 
@@ -48,7 +49,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=2.2.0-beta.1
+export ENTERPRISE_AGW_VERSION=v2.2.0-rc.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -90,10 +91,11 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.p
 --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 #--- Optional: override for image registry/tag for the controller
-#image:
-#  registry: us-docker.pkg.dev/solo-public/enterprise-agentgateway
-#  tag: "$ENTERPRISE_AGW_VERSION"
-#  pullPolicy: IfNotPresent
+#controller:
+#  image:
+#    registry: us-docker.pkg.dev/solo-public/enterprise-agentgateway
+#    tag: "$ENTERPRISE_AGW_VERSION"
+#    pullPolicy: IfNotPresent
 # --- Override the default Agentgateway parameters used by this GatewayClass
 # If the referenced parameters are not found, the controller will use the defaults
 gatewayClassParametersRefs:
@@ -141,7 +143,7 @@ spec:
       #image:
       #  registry: gcr.io
       #  repository: gloo-mesh/ext-auth-service
-      #  tag: "0.72.2"
+      #  tag: ""
     ratelimiter:
       enabled: true
       deployment:
@@ -151,7 +153,7 @@ spec:
       #image:
       #  registry: gcr.io
       #  repository: gloo-mesh/rate-limiter
-      #  tag: "0.17.2"
+      #  tag: ""
     extCache:
       enabled: true
       deployment:
@@ -161,14 +163,14 @@ spec:
       #image:
       #  registry: docker.io
       #  repository: redis
-      #  tag: "7.2.12-alpine"
+      #  tag: ""
   logging:
     level: info
   #--- Image overrides for deployment ---
   #image:
-  #  registry: ghcr.io
-  #  repository: solo-io/agentgateway-enterprise
-  #  tag: "0.11.2-patch1"
+  #  registry: us-docker.pkg.dev
+  #  repository: solo-public/enterprise-agentgateway/agentgateway-enterprise
+  #  tag: ""
   service:
     metadata:
       annotations:
