@@ -1,5 +1,11 @@
 # Changelog
 
+0.6.4 - (3-10-26)
+---
+- Extend `008-jwt-auth-with-rbac.md` with PreRouting transformation for JWT claim extraction and header-based routing
+- Update `ENTERPRISE_AGW_VERSION` to `v2.2.0-rc.3`
+- Update GWAPI CRD version to `v1.5.0` standard instead of experimental channel
+
 0.6.3 - (3-9-26)
 ---
 - Update `install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md`
