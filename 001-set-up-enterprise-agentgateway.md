@@ -18,7 +18,7 @@ In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on 
 Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway. We're using the experimental CRDs to enable advanced features like mTLS frontend validation (lab 026). If frontend mTLS is not a requirement, you can continue with the standard install.
 
 ```bash
-kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/experimental-install.yaml
+kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
 ```
 
 To check if the the Kubernetes Gateway API CRDS are installed
@@ -49,7 +49,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2.2.0-rc.1
+export ENTERPRISE_AGW_VERSION=v2.2.0-rc.3
 ```
 
 ### Enterprise Agentgateway CRDs
