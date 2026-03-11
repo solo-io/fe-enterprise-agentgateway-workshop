@@ -1,5 +1,10 @@
 # Changelog
 
+0.6.5 - (3-11-26)
+---
+- Update `ENTERPRISE_AGW_VERSION` to `v2.2.0-rc.5`
+- Update `013-advanced-guardrails-webhook.md` lab to use `ably7/ai-guardrail-webhook-server:0.1.2`
+
 0.6.4 - (3-10-26)
 ---
 - Extend `008-jwt-auth-with-rbac.md` with PreRouting transformation for JWT claim extraction and header-based routing

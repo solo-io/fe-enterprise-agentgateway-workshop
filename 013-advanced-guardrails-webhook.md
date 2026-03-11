@@ -222,7 +222,7 @@ spec:
       serviceAccountName: ai-guardrail
       containers:
       - name: webhook
-        image: ably7/ai-guardrail-webhook-server:0.1.1
+        image: ably7/ai-guardrail-webhook-server:0.1.2
         ports:
         - containerPort: 8000
         env:
