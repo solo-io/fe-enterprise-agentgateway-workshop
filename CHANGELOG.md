@@ -1,5 +1,9 @@
 # Changelog
 
+0.6.6 - (3-11-26)
+---
+- Update `ENTERPRISE_AGW_VERSION` to `v2.2.0`
+
 0.6.5 - (3-11-26)
 ---
 - Update `ENTERPRISE_AGW_VERSION` to `v2.2.0-rc.5`
