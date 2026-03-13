@@ -107,19 +107,19 @@ You should receive a `200 OK` response with a JSON body containing a `choices` a
 
 ## Run the CrewAI Two-Agent Crew
 
-The crew script and its dependencies live in `lib/crewai/`. Install them in a local virtual environment.
+The crew script and its dependencies live in `lib/crewai/multi-agent-researcher-writer/`. Install them in a local virtual environment.
 
 > **Note:** `crewai` depends on `tiktoken`, which requires Python ≤3.12 for pre-built wheels. Use `python3.12` or `python3.11` — Python 3.13+ will attempt to compile `tiktoken` from source and fail without a Rust toolchain.
 
 ```bash
-python3.12 -m venv lib/crewai/.venv
-lib/crewai/.venv/bin/pip install --upgrade pip -q
-lib/crewai/.venv/bin/pip install -r lib/crewai/requirements.txt
+python3.12 -m venv lib/crewai/multi-agent-researcher-writer/.venv
+lib/crewai/multi-agent-researcher-writer/.venv/bin/pip install --upgrade pip -q
+lib/crewai/multi-agent-researcher-writer/.venv/bin/pip install -r lib/crewai/multi-agent-researcher-writer/requirements.txt
 ```
 
 If `python3.12` is not available, try `python3.11`:
 ```bash
-python3.11 -m venv lib/crewai/.venv
+python3.11 -m venv lib/crewai/multi-agent-researcher-writer/.venv
 ```
 
 Run the crew with your chosen topic:
@@ -127,7 +127,7 @@ Run the crew with your chosen topic:
 GATEWAY_IP="$GATEWAY_IP" \
 CREW_TOPIC="AI Gateway key patterns and concepts" \
 CREWAI_TRACING_ENABLED=false \
-lib/crewai/.venv/bin/python3 lib/crewai/crew.py
+lib/crewai/multi-agent-researcher-writer/.venv/bin/python3 lib/crewai/multi-agent-researcher-writer/crew.py
 ```
 
 You should see both agents work sequentially — the Researcher produces bullet-point findings, then the Writer turns them into a polished blog post. All LLM calls flow through agentgateway.
@@ -137,7 +137,7 @@ Try a different topic:
 GATEWAY_IP="$GATEWAY_IP" \
 CREW_TOPIC="Service Mesh key patterns and concepts" \
 CREWAI_TRACING_ENABLED=false \
-lib/crewai/.venv/bin/python3 lib/crewai/crew.py
+lib/crewai/multi-agent-researcher-writer/.venv/bin/python3 lib/crewai/multi-agent-researcher-writer/crew.py
 ```
 
 ## Observability
@@ -199,5 +199,5 @@ Useful metrics:
 kubectl delete httproute -n agentgateway-system openai
 kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
-rm -rf lib/crewai/.venv
+rm -rf lib/crewai/multi-agent-researcher-writer/.venv
 ```

@@ -50,6 +50,8 @@ Before starting this workshop, you will need:
 - [031-SNI-matching.md](031-SNI-matching.md)
 - [032-crewai-with-agentgateway.md](032-crewai-with-agentgateway.md)
 - [033-langchain-with-agentgateway.md](033-langchain-with-agentgateway.md)
+- [034-obo-token-exchange-fundamentals.md](034-obo-token-exchange-fundamentals.md)
+- [035-obo-crewai-agent-with-mcp.md](035-obo-crewai-agent-with-mcp.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
@@ -68,6 +70,9 @@ Before starting this workshop, you will need:
     - Claude Code CLI integration with full observability
     - CrewAI multi-agent workflow integration
     - LangChain multi-agent pipeline integration
+- Identity & Delegation
+    - OBO (On-Behalf-Of) token exchange fundamentals (impersonation + delegation)
+    - CrewAI agent with MCP tools secured by OBO delegation
 - LLM API Key Management
     - API Key masking in logs
 - Token-based metrics from LLM

@@ -1,5 +1,14 @@
 # Changelog
 
+0.6.7 - (3-12-26)
+---
+- Add new lab: `034-obo-token-exchange-fundamentals.md` which demonstrates OBO token exchange using a self-managed keycloak instance
+- Add new lab: `035-obo-crewai-agent-with-mcp.md` — CrewAI agent with DeepWiki + Solo.io Docs MCP tools, secured end-to-end with OBO delegation (Keycloak login → agentgateway STS → delegated OBO token, JWT policy on `/openai` and `/agw-copilot/mcp`)
+- Add keycloak deployment example in `/lib/keycloak`
+- Restructure `lib/`: `lib/crewai/` → `lib/crewai/multi-agent-researcher-writer/`, `lib/langchain/` → `lib/langchain/multi-agent-researcher-writer/`, add `lib/crewai/agentgateway-copilot-with-obo/`
+- Update `README.md` with new lab entries and Identity & Delegation use case section
+- Update .gitignore
+
 0.6.6 - (3-11-26)
 ---
 - Update `ENTERPRISE_AGW_VERSION` to `v2.2.0`
