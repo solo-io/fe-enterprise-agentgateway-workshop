@@ -7,6 +7,7 @@
 - Add keycloak deployment example in `/lib/keycloak`
 - Restructure `lib/`: `lib/crewai/` → `lib/crewai/multi-agent-researcher-writer/`, `lib/langchain/` → `lib/langchain/multi-agent-researcher-writer/`, add `lib/crewai/agentgateway-copilot-with-obo/`
 - Update `README.md` with new lab entries and Identity & Delegation use case section
+- Update .gitignore
 
 0.6.6 - (3-11-26)
 ---

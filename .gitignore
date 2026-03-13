@@ -31,6 +31,9 @@ Thumbs.db
 *.swo
 *~
 
+# Python virtual environments
+**/.venv/
+
 # Node modules (if any)
 node_modules/
 

@@ -494,16 +494,22 @@ Expected Output:
 ## Step 11 — Demo Walkthrough
 
 1. Open **http://localhost:8501** in your browser.
-2. In the sidebar, enter `testuser` / `testuser` and click **Log in**.
-3. The sidebar displays two decoded tokens side by side:
+2. Before logging in, enter a question in the main form and click **Ask Expert**. The UI shows:
+   - `Log in with Keycloak first (sidebar →)`
+   - `Agentgateway rejected the request: HTTP 401`
+   - `authentication failure: no bearer token found`
+
+   This confirms the JWT policy is active — unauthenticated requests are rejected at the gateway before reaching the backend.
+3. In the sidebar, enter `testuser` / `testuser` and click **Log in**.
+4. The sidebar displays two decoded tokens side by side:
    - **User JWT** — issued by Keycloak (`iss` = `http://keycloak.keycloak.svc.cluster.local:8080/realms/obo-realm`), no `act` claim.
    - **OBO token** — issued by the agentgateway STS (`iss` = `enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777`), `sub` = original Keycloak user UUID, `act.sub` = `system:serviceaccount:agentgateway-system:obo-agent`.
-4. Click **Probe gateway with both tokens**:
+5. Click **Probe gateway with both tokens**:
    - **User JWT (Keycloak)** column → `HTTP 401` — the gateway rejects it because it is not signed by the STS.
    - **OBO token (STS)** column → `HTTP 200` — accepted.
-5. In the main form, enter a question (default: `What is agentgateway?`) and click **Ask Expert**.
-6. Watch the **Agent Activity** panel: the agent invokes `deepwiki_read_wiki_structure`, `deepwiki_ask_question`, and `soloiodocs_search` — all MCP tool calls route through agentgateway at `/agw-copilot/mcp`, authenticated with the OBO token.
-7. The **Answer** section renders the final response with YAML examples, source citations, and confidence scores.
+6. In the main form, enter a question (default: `What is agentgateway?`) and click **Ask Expert**.
+7. Watch the **Agent Activity** panel: the agent invokes `deepwiki_read_wiki_structure`, `deepwiki_ask_question`, and `soloiodocs_search` — all MCP tool calls route through agentgateway at `/agw-copilot/mcp`, authenticated with the OBO token.
+8. The **Answer** section renders the final response with YAML examples, source citations, and confidence scores.
 
 ---
 
@@ -512,10 +518,16 @@ Expected Output:
 Inspect the proxy access log to confirm the STS JWT policy is validating tokens on every request:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20 | jq .
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20
 ```
 
-> **Note:** Look for `"reason": "JwtAuth"` entries in the log output — these confirm that the JWT policy evaluated (and accepted or rejected) each inbound request.
+Look for `error=authentication failure` on rejected requests and `http.status=200` on accepted ones. Example:
+
+```
+request gateway=default/agentgateway-proxy listener=http route=default/openai src.addr=127.0.0.1:59068
+http.method=POST http.host=localhost http.path=/openai http.version=HTTP/1.1 http.status=401
+error=authentication failure: no bearer token found duration=0ms
+```
 
 ---
 
