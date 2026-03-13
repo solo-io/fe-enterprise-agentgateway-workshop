@@ -1,0 +1,4 @@
+crewai[mcp]
+crewai-tools[mcp]
+streamlit
+requests

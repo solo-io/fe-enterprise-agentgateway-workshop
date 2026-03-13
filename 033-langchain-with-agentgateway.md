@@ -107,19 +107,19 @@ You should receive a `200 OK` response with a JSON body containing a `choices` a
 
 ## Run the LangChain Two-Agent Pipeline
 
-The agent script and its dependencies live in `lib/langchain/`. Install them in a local virtual environment:
+The agent script and its dependencies live in `lib/langchain/multi-agent-researcher-writer/`. Install them in a local virtual environment:
 
 ```bash
-python3 -m venv lib/langchain/.venv
-lib/langchain/.venv/bin/pip install --upgrade pip -q
-lib/langchain/.venv/bin/pip install -r lib/langchain/requirements.txt
+python3 -m venv lib/langchain/multi-agent-researcher-writer/.venv
+lib/langchain/multi-agent-researcher-writer/.venv/bin/pip install --upgrade pip -q
+lib/langchain/multi-agent-researcher-writer/.venv/bin/pip install -r lib/langchain/multi-agent-researcher-writer/requirements.txt
 ```
 
 Run the pipeline with your chosen topic:
 ```bash
 GATEWAY_IP="$GATEWAY_IP" \
 AGENT_TOPIC="AI Gateway key patterns and concepts" \
-lib/langchain/.venv/bin/python3 lib/langchain/agent.py
+lib/langchain/multi-agent-researcher-writer/.venv/bin/python3 lib/langchain/multi-agent-researcher-writer/agent.py
 ```
 
 You should see the Researcher chain produce bullet-point findings, followed by the Writer chain turning them into a polished blog post. All LLM calls flow through agentgateway.
@@ -128,7 +128,7 @@ Try a different topic:
 ```bash
 GATEWAY_IP="$GATEWAY_IP" \
 AGENT_TOPIC="Service Mesh key patterns and concepts" \
-lib/langchain/.venv/bin/python3 lib/langchain/agent.py
+lib/langchain/multi-agent-researcher-writer/.venv/bin/python3 lib/langchain/multi-agent-researcher-writer/agent.py
 ```
 
 ## Observability
@@ -190,5 +190,5 @@ Useful metrics:
 kubectl delete httproute -n agentgateway-system openai
 kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
-rm -rf lib/langchain/.venv
+rm -rf lib/langchain/multi-agent-researcher-writer/.venv
 ```
