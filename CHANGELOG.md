@@ -1,5 +1,10 @@
 # Changelog
 
+0.6.7 - (3-12-26)
+---
+- Add new lab: `034-OBO-token-exchange.md` which demonstrates OBO token exchange using a self-managed keycloak instance
+- Add keycloak deployment example in `/lib/keycloak`
+
 0.6.6 - (3-11-26)
 ---
 - Update `ENTERPRISE_AGW_VERSION` to `v2.2.0`
