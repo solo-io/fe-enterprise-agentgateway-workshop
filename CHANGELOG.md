@@ -1,5 +1,12 @@
 # Changelog
 
+0.6.8 - (3-13-26)
+---
+- `035-obo-crewai-agent-with-mcp.md`: Update lab to reflect agent-performed OBO exchange — login now stores only the Keycloak JWT, agent calls STS at the start of each run
+- Update demo walkthrough (Step 11) to match new UI flow: sidebar shows "awaiting agent exchange", live steps log shows STS call, inline token comparison with `iat`/`exp`/`ttl` and raw JWT appears in main area
+- Remove data plane proxy restart from Step 5 — replaced with `kubectl rollout status` on control plane only
+- Sync `lib/crewai/agentgateway-copilot-with-obo/app.py` with all UI changes: agent STS exchange, `obo_placeholder` separate from `final_placeholder`, timestamp on OBO token, raw JWT display, `timeout=10` on Keycloak and STS requests
+
 0.6.7 - (3-12-26)
 ---
 - Add new lab: `034-obo-token-exchange-fundamentals.md` which demonstrates OBO token exchange using a self-managed keycloak instance

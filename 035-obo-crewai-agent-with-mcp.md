@@ -7,11 +7,11 @@ This lab assumes that you have completed the setup in `001` and `002`.
 - Deploy Keycloak as the in-cluster identity provider
 - Upgrade the controller to enable the agentgateway STS (port 7777) for OBO token exchange
 - Secure an OpenAI route and two MCP routes with JWT policies requiring STS-signed OBO tokens
-- Run a Streamlit UI where a user logs in, receives a delegated OBO token, and drives a CrewAI agent entirely through agentgateway
+- Run a Streamlit UI where a user logs in, and the CrewAI agent performs the OBO token exchange itself before making any LLM or MCP calls
 
 ## Overview
 
-This lab demonstrates the full identity delegation flow in a production-style scenario. A Streamlit UI logs in with Keycloak and exchanges the raw user JWT plus a Kubernetes service account (obo-agent) token at the agentgateway STS (port 7777). The STS issues a delegated OBO token (RFC 8693) where `sub` carries the user's identity and `act.sub` carries the agent's service account identity. That OBO token is the only credential the CrewAI agent ever uses: it is passed as both the OpenAI API key (agentgateway strips it and injects the real key from a backend secretRef) and as the `Authorization` header on every MCP tool call (DeepWiki and Solo.io Docs, both multiplexed through agentgateway). Every route — `/openai`, `/agw-copilot/mcp` — is protected by an `EnterpriseAgentgatewayPolicy` requiring tokens signed by the STS; raw Keycloak JWTs are rejected with HTTP 401. The Streamlit sidebar shows the decoded before (Keycloak JWT) and after (OBO token with `act` claim) side by side, and a **Probe gateway with both tokens** button lets you confirm the 401 vs 200 live.
+This lab demonstrates the full identity delegation flow in a production-style scenario. A Streamlit UI logs the user in with Keycloak — storing only the raw user JWT. The **agent** is the actor, so the OBO exchange happens inside `run_crew()` at the start of each run: the agent calls the agentgateway STS (port 7777) with the user JWT plus its own Kubernetes service account (`obo-agent`) token to obtain a delegated OBO token (RFC 8693). The OBO token's `sub` carries the user's identity and `act.sub` carries the agent's service account identity. That token is the only credential the agent ever uses: it is passed as both the OpenAI API key (agentgateway strips it and injects the real key from a backend secretRef) and as the `Authorization` header on every MCP tool call (DeepWiki and Solo.io Docs, both multiplexed through agentgateway). Every route — `/openai`, `/agw-copilot/mcp` — is protected by an `EnterpriseAgentgatewayPolicy` requiring tokens signed by the STS; raw Keycloak JWTs are rejected with HTTP 401. The main area displays the before/after token comparison (Keycloak JWT vs OBO token with `act`, `iat`, `exp`, `ttl`) inline as the agent runs, and a **Probe gateway with both tokens** button in the sidebar lets you confirm the 401 vs 200 live.
 
 ---
 
@@ -193,12 +193,13 @@ tokenExchange:
 EOF
 ```
 
-Restart the data plane proxy pods so they pick up the new STS JWKS endpoint:
+Wait for the control plane to finish rolling out with the new config:
 
 ```bash
-kubectl rollout restart deployment -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=agentgateway-proxy
-kubectl rollout status deployment -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=agentgateway-proxy
+kubectl rollout status deployment/enterprise-agentgateway -n agentgateway-system
 ```
+
+> **Note:** Only the control plane needs to restart. The data plane proxies pick up the new STS JWT issuer config dynamically via xDS push — no proxy restart is required.
 
 ---
 
@@ -494,22 +495,46 @@ Expected Output:
 ## Step 11 — Demo Walkthrough
 
 1. Open **http://localhost:8501** in your browser.
+
 2. Before logging in, enter a question in the main form and click **Ask Expert**. The UI shows:
    - `Log in with Keycloak first (sidebar →)`
    - `Agentgateway rejected the request: HTTP 401`
    - `authentication failure: no bearer token found`
 
    This confirms the JWT policy is active — unauthenticated requests are rejected at the gateway before reaching the backend.
+
 3. In the sidebar, enter `testuser` / `testuser` and click **Log in**.
-4. The sidebar displays two decoded tokens side by side:
-   - **User JWT** — issued by Keycloak (`iss` = `http://keycloak.keycloak.svc.cluster.local:8080/realms/obo-realm`), no `act` claim.
-   - **OBO token** — issued by the agentgateway STS (`iss` = `enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777`), `sub` = original Keycloak user UUID, `act.sub` = `system:serviceaccount:agentgateway-system:obo-agent`.
-5. Click **Probe gateway with both tokens**:
-   - **User JWT (Keycloak)** column → `HTTP 401` — the gateway rejects it because it is not signed by the STS.
-   - **OBO token (STS)** column → `HTTP 200` — accepted.
+
+4. The sidebar shows **"Logged in — awaiting agent exchange"** and displays the decoded Keycloak JWT claims (`iss`, `sub`). No OBO token exists yet — login only stores the user JWT.
+
+5. Click **Probe gateway with both tokens** (before running the agent):
+   - **User JWT (Keycloak)** column → `HTTP 401` — the gateway rejects it because it is not signed by the STS and carries no `act` claim.
+   - **OBO token (STS)** column → `OBO token not yet obtained — run 'Ask Expert' first`.
+
+   This is the key demonstration: the raw Keycloak JWT is not sufficient, even for an authenticated user.
+
 6. In the main form, enter a question (default: `What is agentgateway?`) and click **Ask Expert**.
-7. Watch the **Agent Activity** panel: the agent invokes `deepwiki_read_wiki_structure`, `deepwiki_ask_question`, and `soloiodocs_search` — all MCP tool calls route through agentgateway at `/agw-copilot/mcp`, authenticated with the OBO token.
-8. The **Answer** section renders the final response with YAML examples, source citations, and confidence scores.
+
+7. Watch the **Live steps** panel. The first two lines show the agent performing the OBO exchange:
+   ```
+   → Agent calling STS: POST http://localhost:7777/token (token-exchange grant)
+   ← STS exchange successful — OBO token obtained (HTTP 200)
+   ```
+
+8. Immediately below, the UI displays the before/after token comparison inline:
+   - **User JWT (Keycloak)** — `iss` = Keycloak, `sub` = user UUID, no `act` claim.
+   - **OBO token (agentgateway STS)** — `iss` = STS, `sub` = user UUID, `act.sub` = `system:serviceaccount:agentgateway-system:obo-agent`, plus `iat`, `exp`, and `ttl`.
+   - The raw OBO token JWT string is shown below — you can see it changes on each run as the STS issues a fresh token.
+
+9. The agent then invokes `deepwiki_read_wiki_structure`, `deepwiki_ask_question`, and `soloiodocs_search` — all MCP tool calls route through agentgateway at `/agw-copilot/mcp`, authenticated with the OBO token.
+
+10. The **Answer** section renders the final response with YAML examples, source citations, and confidence scores.
+
+11. Return to the sidebar and click **Probe gateway with both tokens** again:
+    - **User JWT (Keycloak)** column → `HTTP 401` — still rejected.
+    - **OBO token (STS — obtained by agent at HH:MM:SS)** column → `HTTP 200` — accepted.
+
+    The timestamp in the caption confirms the token was obtained by the agent, not the login flow.
 
 ---
 

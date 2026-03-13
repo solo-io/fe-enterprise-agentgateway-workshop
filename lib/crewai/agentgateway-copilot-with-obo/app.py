@@ -6,6 +6,7 @@ import queue
 import re
 import sys
 import threading
+import time
 
 # Suppress CrewAI's interactive prompts before any crewai import.
 os.environ.setdefault("CREWAI_TRACING_ENABLED", "false")
@@ -95,7 +96,7 @@ with st.sidebar:
             st.error("ACTOR_TOKEN env var is not set. Start the demo via demo-script.sh.")
         else:
             try:
-                # Step 1: Get user JWT from Keycloak
+                # Get user JWT from Keycloak; agent will perform OBO exchange on first run
                 token_resp = requests.post(
                     f"{keycloak_url}/realms/obo-realm/protocol/openid-connect/token",
                     data={
@@ -105,28 +106,11 @@ with st.sidebar:
                         "client_id": "agw-client",
                         "client_secret": "agw-client-secret",
                     },
+                    timeout=10,
                 )
                 token_resp.raise_for_status()
                 user_jwt = token_resp.json()["access_token"]
-
-                # Step 2: Exchange user JWT + k8s SA actor token for delegated OBO token
-                sts_resp = requests.post(
-                    "http://localhost:7777/token",
-                    headers={"Content-Type": "application/x-www-form-urlencoded"},
-                    data={
-                        "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
-                        "subject_token": user_jwt,
-                        "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
-                        "actor_token": actor_token,
-                        "actor_token_type": "urn:ietf:params:oauth:token-type:jwt",
-                    },
-                )
-                sts_resp.raise_for_status()
-                obo_jwt = sts_resp.json()["access_token"]
-
-                # Step 3: Store both tokens so the sidebar can show the before/after
                 user_payload = _decode_jwt_payload(user_jwt)
-                st.session_state["obo_jwt"] = obo_jwt
                 st.session_state["user_jwt"] = user_jwt
                 st.session_state["user_iss"] = user_payload.get("iss", "")
                 st.session_state["user_sub"] = user_payload.get("sub", "")
@@ -134,21 +118,13 @@ with st.sidebar:
             except Exception as exc:
                 st.error(f"Login failed: {exc}")
 
-    if "obo_jwt" in st.session_state:
-        obo_payload = _decode_jwt_payload(st.session_state["obo_jwt"])
-        st.success("Logged in — OBO token active")
+    if "user_jwt" in st.session_state:
+        st.success("Logged in — awaiting agent exchange")
 
         st.caption("User JWT (from Keycloak)")
         st.json({
             "iss": st.session_state.get("user_iss", ""),
             "sub": st.session_state.get("user_sub", ""),
-        })
-
-        st.caption("OBO token (from agentgateway STS)")
-        st.json({
-            "iss": obo_payload.get("iss", ""),
-            "sub": obo_payload.get("sub", ""),
-            "act": obo_payload.get("act", {}),
         })
 
         st.divider()
@@ -173,23 +149,28 @@ with st.sidebar:
                 except Exception as e:
                     st.error(str(e))
             with col2:
-                st.caption("OBO token (STS)")
-                try:
-                    r = requests.post(probe_url, headers={
-                        "Content-Type": "application/json",
-                        "Authorization": f"Bearer {st.session_state['obo_jwt']}",
-                    }, json=probe_body, timeout=5)
-                    if r.status_code == 200:
-                        st.success(f"HTTP {r.status_code}")
-                    else:
-                        st.error(f"HTTP {r.status_code}")
-                        st.code(r.text[:300])
-                except Exception as e:
-                    st.error(str(e))
+                obtained_at = st.session_state.get("obo_jwt_obtained_at", "")
+                st.caption(f"OBO token (STS — obtained by agent{f' at {obtained_at}' if obtained_at else ''})")
+                obo_jwt_probe = st.session_state.get("obo_jwt", "")
+                if not obo_jwt_probe:
+                    st.info("OBO token not yet obtained — run 'Ask Expert' first")
+                else:
+                    try:
+                        r = requests.post(probe_url, headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {obo_jwt_probe}",
+                        }, json=probe_body, timeout=5)
+                        if r.status_code == 200:
+                            st.success(f"HTTP {r.status_code}")
+                        else:
+                            st.error(f"HTTP {r.status_code}")
+                            st.code(r.text[:300])
+                    except Exception as e:
+                        st.error(str(e))
 
         st.divider()
         if st.button("Log out"):
-            for key in ("obo_jwt", "user_jwt", "user_iss", "user_sub"):
+            for key in ("user_jwt", "user_iss", "user_sub", "obo_jwt", "obo_jwt_obtained_at"):
                 st.session_state.pop(key, None)
             st.rerun()
 
@@ -209,7 +190,7 @@ with st.form("crew_form"):
     submitted = st.form_submit_button("Ask Expert", type="primary")
 
 if submitted:
-    if "obo_jwt" not in st.session_state:
+    if "user_jwt" not in st.session_state:
         st.warning("Log in with Keycloak first (sidebar →)")
         if gateway_ip:
             # Fire an unauthenticated request to show the JWT policy rejecting it live.
@@ -236,7 +217,8 @@ if submitted:
 
     # Capture session state values on the main thread before spawning the background thread;
     # st.session_state is not safely accessible from non-Streamlit threads.
-    obo_jwt = st.session_state["obo_jwt"]
+    user_jwt = st.session_state["user_jwt"]
+    actor_token = os.environ.get("ACTOR_TOKEN", "")
 
     output_queue: queue.Queue = queue.Queue()
 
@@ -246,6 +228,30 @@ if submitted:
         output_queue.put(("task", (agent, description)))
 
     def run_crew():
+        # Agent performs OBO token exchange: user JWT + SA actor token → delegated OBO token
+        try:
+            output_queue.put(("step", "→ Agent calling STS: POST http://localhost:7777/token (token-exchange grant)"))
+            sts_resp = requests.post(
+                "http://localhost:7777/token",
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                data={
+                    "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+                    "subject_token": user_jwt,
+                    "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+                    "actor_token": actor_token,
+                    "actor_token_type": "urn:ietf:params:oauth:token-type:jwt",
+                },
+                timeout=10,
+            )
+            sts_resp.raise_for_status()
+            obo_jwt = sts_resp.json()["access_token"]
+            output_queue.put(("step", f"← STS exchange successful — OBO token obtained (HTTP {sts_resp.status_code})"))
+            output_queue.put(("obo_token", obo_jwt))
+        except Exception as exc:
+            output_queue.put(("error", f"OBO token exchange failed: {exc}"))
+            output_queue.put(("done", None))
+            return
+
         # Subscribe to crewai tool events to capture full tool arguments.
         try:
             from crewai.utilities.events import crewai_event_bus
@@ -362,6 +368,7 @@ if submitted:
     with st.expander("Tools called", expanded=True):
         tools_placeholder = st.empty()
 
+    obo_placeholder = st.empty()
     final_placeholder = st.empty()
 
     steps: list[str] = []
@@ -404,6 +411,32 @@ if submitted:
         elif msg_type == "tool_exec":
             tool_log.append(content)
             _render_tools()
+        elif msg_type == "obo_token":
+            st.session_state["obo_jwt"] = content
+            obtained_at = time.strftime("%H:%M:%S")
+            st.session_state["obo_jwt_obtained_at"] = obtained_at
+            obo_payload = _decode_jwt_payload(content)
+            with obo_placeholder.container():
+                st.info(f"Agent performed OBO token exchange at {obtained_at}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.caption("User JWT (Keycloak)")
+                    st.json({"iss": st.session_state.get("user_iss", ""), "sub": st.session_state.get("user_sub", "")})
+                with col2:
+                    st.caption("OBO token (agentgateway STS)")
+                    iat = obo_payload.get("iat")
+                    exp = obo_payload.get("exp")
+                    ttl = f"{exp - iat}s" if iat and exp else "unknown"
+                    st.json({
+                        "iss": obo_payload.get("iss", ""),
+                        "sub": obo_payload.get("sub", ""),
+                        "act": obo_payload.get("act", {}),
+                        "iat": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(iat)) if iat else None,
+                        "exp": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(exp)) if exp else None,
+                        "ttl": ttl,
+                    })
+                st.caption("Raw OBO token (JWT)")
+                st.code(content, language=None)
         elif msg_type == "task":
             agent, description = content
             completed_tasks.append(content)
