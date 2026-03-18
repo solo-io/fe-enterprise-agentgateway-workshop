@@ -1,5 +1,9 @@
 # Changelog
 
+0.7.0 - (3-18-26)
+---
+- Remove some unnecessary trace fields from `001`
+
 0.6.9 - (3-18-26)
 ---
 - Add new lab: `036-msft-entra-obo.md` which demonstrates OBO token exchange using Azure Entra ID

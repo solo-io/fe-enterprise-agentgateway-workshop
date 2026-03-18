@@ -258,15 +258,6 @@ spec:
         randomSampling: 'true'
         fields:
           add:
-            gen_ai.operation.name: '"chat"'
-            gen_ai.system: "llm.provider"
-            gen_ai.prompt: 'llm.prompt'
-            gen_ai.completion: 'llm.completion.map(c, {"role":"assistant", "content": c})'
-            gen_ai.request.model: "llm.requestModel"
-            gen_ai.response.model: "llm.responseModel"
-            gen_ai.usage.completion_tokens: "llm.outputTokens"
-            gen_ai.usage.prompt_tokens: "llm.inputTokens"
-            gen_ai.request: 'flatten(llm.params)'
             # --- Capture all request headers as a single map under rq.headers.all
             rq.headers.all: 'request.headers'
             # --- Capture claims from a verified JWT token if JWT policy is enabled
