@@ -1,5 +1,9 @@
 # Changelog
 
+0.6.9 - (3-18-26)
+---
+- Add new lab: `036-msft-entra-obo.md` which demonstrates OBO token exchange using Azure Entra ID
+
 0.6.8 - (3-13-26)
 ---
 - `035-obo-crewai-agent-with-mcp.md`: Update lab to reflect agent-performed OBO exchange — login now stores only the Keycloak JWT, agent calls STS at the start of each run
