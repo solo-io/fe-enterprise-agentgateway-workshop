@@ -1,8 +1,9 @@
 # Changelog
 
-0.7.0 - (3-18-26)
+0.7.0 - (3-30-26)
 ---
 - Remove some unnecessary trace fields from `001`
+- Update access log attributes in `001`
 
 0.6.9 - (3-18-26)
 ---
