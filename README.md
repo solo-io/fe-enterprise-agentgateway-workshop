@@ -33,6 +33,9 @@ Before starting this workshop, you will need:
 - [001 — Install Enterprise Agentgateway](001-install-enterprise-agentgateway.md)
 - [002 — Set Up Monitoring Tools](002-set-up-monitoring-tools.md)
 
+> **OpenShift users:** Use the OpenShift-specific versions instead:
+> [001 — Install Enterprise Agentgateway (OCP)](install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md) · [002 — Set Up Monitoring Tools (OCP)](install-on-openshift/002-set-up-monitoring-tools-ocp.md)
+
 ---
 
 ## Routing
