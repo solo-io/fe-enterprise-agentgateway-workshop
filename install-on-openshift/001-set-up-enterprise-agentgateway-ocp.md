@@ -239,18 +239,26 @@ spec:
       logging:
         fields:
           add:
-            rq.headers.all: 'request.headers'
-            jwt: 'jwt'
-            request.body: json(request.body)
-            response.body: json(response.body)
-            # --- Capture all request headers as individual keys (flattened)
-            rq.headers: 'flatten(request.headers)'
-            # --- Capture a single header by name (example: x-foo)
-            x-foo: 'request.headers["x-foo"]'
-            # --- Capture entire request body
-            request.body: json(request.body)
+            # --- Capture all JWT claims (use to discover available fields, then narrow down)
+            jwt.all: 'jwt'
+            # Streaming vs buffered — useful for debugging latency differences
+            llm.streaming: 'llm.streaming'
+            # Cache efficiency — shows cost savings from prompt caching
+            llm.cached_tokens: 'llm.cachedInputTokens'
+            # Reasoning tokens — relevant for o1/o3 models
+            llm.reasoning_tokens: 'llm.reasoningTokens'
+            # Full prompt conversation (has perf impact for large prompts)
+            llm.prompt: 'llm.prompt'
+            # LLM response content
+            llm.completion: 'llm.completion[0]'
+            # --- Capture a single request header by name (example: x-foo)
+            #x-foo: 'request.headers["x-foo"]'
+            # --- Capture entire request body and parse it as JSON
+            #request.body: json(request.body)
+            # --- Capture entire response body and parse it as JSON
+            #response.body: json(response.body)
             # --- Capture a field in the request body
-            request.body.modelId: json(request.body).modelId
+            #request.body.modelId: json(request.body).modelId
         format: json
       tracing:
         otlpProtocol: grpc
@@ -258,15 +266,6 @@ spec:
         randomSampling: 'true'
         fields:
           add:
-            gen_ai.operation.name: '"chat"'
-            gen_ai.system: "llm.provider"
-            gen_ai.prompt: 'llm.prompt'
-            gen_ai.completion: 'llm.completion.map(c, {"role":"assistant", "content": c})'
-            gen_ai.request.model: "llm.requestModel"
-            gen_ai.response.model: "llm.responseModel"
-            gen_ai.usage.completion_tokens: "llm.outputTokens"
-            gen_ai.usage.prompt_tokens: "llm.inputTokens"
-            gen_ai.request: 'flatten(llm.params)'
             # --- Capture all request headers as a single map under rq.headers.all
             rq.headers.all: 'request.headers'
             # --- Capture claims from a verified JWT token if JWT policy is enabled
