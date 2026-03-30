@@ -153,8 +153,8 @@ Now that we’ve validated a basic header transformation, let’s enrich the res
 
 Here is the expected behavior of the transformation policy below
 - add `x-user-id` to capture the user identifier (defaulting to `anonymous` if missing)
-- add `x-llm-provider` to confirm which backend handled the request
-- add `x-llm-request-model` to capture what model was requested
+- add `x-llm-request-model` to capture what model the client requested (read from the request body)
+- add `x-llm-response-model` to capture the exact model version the backend used (read from the response body — this may differ from the requested model, e.g. `gpt-4o-mini` → `gpt-4o-mini-2024-07-18`)
 - add `x-request-method` for API behavior analysis
 - add `x-request-path` to help distinguish which route processed the call
 
@@ -176,10 +176,10 @@ spec:
         set:
           - name: x-user-id
             value: default(request.headers["x-user-id"], "anonymous")
-          - name: x-llm-provider
-            value: llm.provider
           - name: x-llm-request-model
-            value: llm.requestModel
+            value: json(request.body).model
+          - name: x-llm-response-model
+            value: json(response.body).model
           - name: x-request-method
             value: request.method
           - name: x-request-path
@@ -205,8 +205,8 @@ curl -i "$GATEWAY_IP:8080/openai" \
 We should see the response headers we applied in the transformation policy
 ```
 x-user-id: anonymous
-x-llm-provider: openai
 x-llm-request-model: gpt-4o-mini
+x-llm-response-model: gpt-4o-mini-2024-07-18
 x-request-method: POST
 x-request-path: /openai
 ```

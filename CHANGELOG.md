@@ -1,5 +1,12 @@
 # Changelog
 
+0.7.1 - (3-30-26)
+---
+- Reorganize workshop labs: strip numeric prefixes from 36 lab filenames (keeping `001-` and `002-` for installation labs)
+- Rewrite `README.md` with 11-section Table of Contents: Installation, Routing, Security, Rate Limiting, Guardrails, Transformations, MCP, Agent Frameworks, Identity & Delegation, Evaluations, Load Testing
+- Update cross-references in 17 lab files from "lab NNN" text to named markdown links
+- Update `transformations.md` lab
+
 0.7.0 - (3-30-26)
 ---
 - Remove some unnecessary trace fields from `001`

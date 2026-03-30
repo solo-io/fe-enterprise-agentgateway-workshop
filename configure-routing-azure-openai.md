@@ -1,93 +1,49 @@
-# Configure Mock OpenAI Server
-In this lab, you’ll deploy a lightweight OpenAI compatible mock server to validate core routing, metrics, and tracing AI Gateway features without needing real OpenAI credentials. Later labs will use OpenAI as the backend, but this mock server can be swapped in with minimal changes.
+# Configure Basic Routing to Azure OpenAI
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
-- Configure a mock LLM server that serves the OpenAI spec
-- Create a route to our mock server as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Curl mock server through the agentgateway proxy
+- Create a Kubernetes secret that contains our Azure OpenAI api-key credentials
+- Create a route to Azure OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Curl Azure OpenAI through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
-## Create a Mock vLLM Server
-Deploy the mock server using the manifest below.  
-This mock server, called **vLLM Simulator**, is maintained by the [vLLM community](https://github.com/llm-d/llm-d-inference-sim).  
-It provides a lightweight implementation of the OpenAI-compatible `/v1/chat/completions` endpoint, which we’ll use throughout the labs to simulate LLM responses
+### Configure Required Variables
 
-Mock server for mock-gpt-4o
+Set the following environment variables to match your Azure OpenAI deployment.
+For reference, an endpoint typically follows this format:
+`https://${ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-01`
+
+**Note:** The ENDPOINT should be just the hostname without the `https://` scheme (e.g., `my-endpoint.openai.azure.com`)
+
+```bash
+export AZURE_OPENAI_API_KEY="<API-KEY>"
+export ENDPOINT="<AZURE-OPENAI-ENDPOINT>"  # Just the hostname, no https://
+export DEPLOYMENT_NAME="<DEPLOYMENT-NAME>"
+```
+
+Create azure openai api-key secret
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mock-gpt-4o
-  namespace: agentgateway-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mock-gpt-4o
-  template:
-    metadata:
-      labels:
-        app: mock-gpt-4o
-    spec:
-      containers:
-      - args:
-        - --model
-        - mock-gpt-4o
-        - --port
-        - "8000"
-        - --max-loras
-        - "2"
-        - --lora-modules
-        - '{"name": "food-review-1"}'
-        image: ghcr.io/llm-d/llm-d-inference-sim:latest
-        imagePullPolicy: IfNotPresent
-        name: vllm-sim
-        env:
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                apiVersion: v1
-                fieldPath: metadata.name
-          - name: POD_NAMESPACE
-            valueFrom:
-              fieldRef:
-                apiVersion: v1
-                fieldPath: metadata.namespace
-        ports:
-        - containerPort: 8000
-          name: http
-          protocol: TCP
----
 apiVersion: v1
-kind: Service
+kind: Secret
 metadata:
-  name: mock-gpt-4o-svc
-  namespace: agentgateway-system
-  labels:
-    app: mock-gpt-4o
-spec:
-  selector:
-    app: mock-gpt-4o
-  ports:
-    - protocol: TCP
-      port: 8000
-      targetPort: 8000
-      name: http
-  type: ClusterIP
+  name: azureopenai-secret
+  namespace: agentgateway-system # Putting in same ns where the redis, ext auth is getting deployed
+type: Opaque
+stringData:
+  Authorization: "Bearer ${AZURE_OPENAI_API_KEY}"
 EOF
 ```
 
-Create mock server route and backend
+Create azure openai route and backend
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: mock-openai
+  name: azure-openai
   namespace: agentgateway-system
 spec:
   parentRefs:
@@ -97,9 +53,9 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /openai
+            value: /azure
       backendRefs:
-        - name: mock-openai
+        - name: azure-openai
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -108,30 +64,29 @@ spec:
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: mock-openai
+  name: azure-openai
   namespace: agentgateway-system
 spec:
   ai:
     provider:
-      openai:
-        model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-      port: 8000
-      path: "/v1/chat/completions"
+      azureopenai:
+        endpoint: "${ENDPOINT}"
+        deploymentName: "${DEPLOYMENT_NAME}"
   policies:
     auth:
-      passthrough: {}
+      secretRef:
+        name: azureopenai-secret
 EOF
 ```
 
-## curl mock openai
+## curl azure openai
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/azure" \
   -H "content-type: application/json" \
   -d '{
-    "model": "mock-gpt-4o",
+    "model": "gpt-4o-mini",
     "messages": [
       {
         "role": "user",
@@ -154,7 +109,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in lab 002.
+For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in the [monitoring tools lab](002-set-up-monitoring-tools.md).
 
 1. Port-forward to the Grafana service:
 ```bash
@@ -191,7 +146,7 @@ Traces include LLM-specific spans with information like `gen_ai.completion`, `ge
 AgentGateway automatically logs detailed information about LLM requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1 | jq .
+kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
 ```
 
 Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
@@ -208,8 +163,7 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n agentgateway-system mock-openai
-kubectl delete agentgatewaybackend -n agentgateway-system mock-openai
-kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
-kubectl delete -n agentgateway-system deploy/mock-gpt-4o
+kubectl delete httproute -n agentgateway-system azure-openai
+kubectl delete agentgatewaybackend -n agentgateway-system azure-openai
+kubectl delete secret -n agentgateway-system azureopenai-secret
 ```
