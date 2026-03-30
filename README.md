@@ -10,49 +10,118 @@ Before starting this workshop, you will need:
 - kubectl CLI installed and configured
 - helm CLI installed
 
-# Labs
-- [001-set-up-enterprise-agentgateway.md](001-set-up-enterprise-agentgateway.md)
-- [002-set-up-monitoring-tools.md](002-set-up-monitoring-tools.md)
-- [003-configure-mock-openai-server.md](003-configure-mock-openai-server.md)
-- [004-configure-basic-routing-to-openai.md](004-configure-basic-routing-to-openai.md)
-- [004a-path-per-model-routing-example.md](004a-path-per-model-routing-example.md)
-- [004b-fixed-path-header-matching-routing-example.md](004b-fixed-path-header-matching-routing-example.md)
-- [004c-fixed-path-queryparameter-matching-routing-example.md](004c-fixed-path-queryparameter-matching-routing-example.md)
-- [005-evaluate-openai-model-performance.md](005-evaluate-openai-model-performance.md)
-- [006-configure-routing-to-aws-bedrock.md](006-configure-routing-to-aws-bedrock.md)
-- [006a-configure-routing-to-aws-bedrock-apikey.md](006a-configure-routing-to-aws-bedrock-apikey.md)
-- [007-api-key-masking.md](007-api-key-masking.md)
-- [008-jwt-auth-with-rbac.md](008-jwt-auth-with-rbac.md)
-- [009-configure-basic-routing-to-anthropic.md](009-configure-basic-routing-to-anthropic.md)
-- [010-enrich-prompts.md](010-enrich-prompts.md)
-- [011-builtin-guardrails.md](011-builtin-guardrails.md)
-- [012-external-moderation-openai-guardrails.md](012-external-moderation-openai-guardrails.md)
-- [013-advanced-guardrails-webhook.md](013-advanced-guardrails-webhook.md)
-- [014-request-based-rate-limiting.md](014-request-based-rate-limiting.md)
-- [015-local-token-based-rate-limiting.md](015-local-token-based-rate-limiting.md)
-- [016-global-token-based-rate-limiting.md](016-global-token-based-rate-limiting.md)
-- [017-transformations.md](017-transformations.md)
-- [018-in-cluster-mcp.md](018-in-cluster-mcp.md)
-- [018a-remote-mcp.md](018a-remote-mcp.md)
-- [019-configure-direct-response.md](019-configure-direct-response.md)
-- [020-configure-basic-routing-to-azureopenai.md](020-configure-basic-routing-to-azureopenai.md)
-- [021-configure-basic-routing-to-vertexai.md](021-configure-basic-routing-to-vertexai.md)
-- [021a-configure-basic-routing-to-vertexai-service-account.md](021a-configure-basic-routing-to-vertexai-service-account.md)
-- [022-configure-openai-embeddings.md](022-configure-openai-embeddings.md)
-- [023-configure-timeouts-and-retries.md](023-configure-timeouts-and-retries.md)
-- [024-llm-failover.md](024-llm-failover.md)
-- [025-load-testing-with-k6s.md](025-load-testing-with-k6s.md)
-- [026-tls-termination.md](026-tls-termination.md)
-- [027-frontend-mtls.md](027-frontend-mtls.md)
-- [028-configure-openai-batches.md](028-configure-openai-batches.md)
-- [029-openai-streaming.md](029-openai-streaming.md)
-- [030-claude-code.md](030-claude-code.md)
-- [031-SNI-matching.md](031-SNI-matching.md)
-- [032-crewai-with-agentgateway.md](032-crewai-with-agentgateway.md)
-- [033-langchain-with-agentgateway.md](033-langchain-with-agentgateway.md)
-- [034-obo-token-exchange-fundamentals.md](034-obo-token-exchange-fundamentals.md)
-- [035-obo-crewai-agent-with-mcp.md](035-obo-crewai-agent-with-mcp.md)
-- [036-msft-entra-obo.md](036-msft-entra-obo.md)
+# Table of Contents
+
+- [Installation](#installation)
+- [Routing](#routing)
+- [Security](#security)
+- [Rate Limiting](#rate-limiting)
+- [Guardrails](#guardrails)
+- [Transformations](#transformations)
+- [MCP (Model Context Protocol)](#mcp-model-context-protocol)
+- [Agent Frameworks](#agent-frameworks)
+- [Identity & Delegation](#identity--delegation)
+- [Evaluations](#evaluations)
+- [Load Testing](#load-testing)
+
+---
+
+## Installation
+
+> **Start here.** All other labs depend on these two.
+
+- [001 — Install Enterprise Agentgateway](001-install-enterprise-agentgateway.md)
+- [002 — Set Up Monitoring Tools](002-set-up-monitoring-tools.md)
+
+---
+
+## Routing
+
+- [Configure Mock OpenAI Server](configure-mock-openai-server.md) _(OpenAI)_
+- [Basic Routing to OpenAI](configure-routing-openai.md) _(OpenAI)_
+- [Path-per-Model Routing](routing-path-per-model.md) _(OpenAI)_
+- [Header Matching Routing](routing-header-matching.md) _(OpenAI)_
+- [Query Parameter Matching Routing](routing-query-parameter-matching.md) _(OpenAI)_
+- [Routing to AWS Bedrock](configure-routing-aws-bedrock.md) _(AWS Bedrock)_
+- [Routing to AWS Bedrock via API Keys](configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
+- [Routing to Anthropic](configure-routing-anthropic.md) _(Anthropic)_
+- [Routing to Azure OpenAI](configure-routing-azure-openai.md) _(Azure OpenAI)_
+- [Routing to Google Vertex AI](configure-routing-vertexai.md) _(Google Vertex AI)_
+- [Routing to Google Vertex AI via Service Account](configure-routing-vertexai-service-account.md) _(Google Vertex AI)_
+- [OpenAI Embeddings](configure-openai-embeddings.md) _(OpenAI)_
+- [OpenAI Batch API](configure-openai-batches.md) _(OpenAI)_
+- [OpenAI Streaming](openai-streaming.md) _(OpenAI)_
+- [Direct Response](direct-response.md)
+- [Timeouts and Retries](timeouts-and-retries.md)
+- [LLM Failover](llm-failover.md)
+
+---
+
+## Security
+
+- [API Key Masking](api-key-masking.md)
+- [JWT Auth with RBAC](jwt-auth-with-rbac.md)
+- [TLS Termination](tls-termination.md)
+- [Frontend mTLS](frontend-mtls.md)
+- [SNI Matching](sni-matching.md)
+
+---
+
+## Rate Limiting
+
+- [Request-Based Rate Limiting](request-based-rate-limiting.md)
+- [Local Token-Based Rate Limiting](local-token-rate-limiting.md)
+- [Global Token-Based Rate Limiting](global-token-rate-limiting.md)
+
+---
+
+## Guardrails
+
+- [Built-in Guardrails](builtin-guardrails.md)
+- [External Moderation (OpenAI)](external-moderation-guardrails.md)
+- [Advanced Guardrails Webhook](advanced-guardrails-webhook.md)
+
+---
+
+## Transformations
+
+- [Prompt Enrichment](prompt-enrichment.md)
+- [Request/Response Transformations](transformations.md)
+
+---
+
+## MCP (Model Context Protocol)
+
+- [In-Cluster MCP](in-cluster-mcp.md)
+- [Remote MCP](remote-mcp.md)
+
+---
+
+## Agent Frameworks
+
+- [Claude Code](claude-code.md)
+- [CrewAI](crewai-with-agentgateway.md)
+- [LangChain](langchain-with-agentgateway.md)
+
+---
+
+## Identity & Delegation
+
+- [OBO Token Exchange Fundamentals](obo-token-exchange-fundamentals.md)
+- [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md)
+- [Microsoft Entra ID OBO](msft-entra-obo.md)
+
+---
+
+## Evaluations
+
+- [Evaluate OpenAI Model Performance](evaluate-openai-model-performance.md)
+
+---
+
+## Load Testing
+
+- [Load Testing with k6s](load-testing-k6s.md)
 
 # Use Cases
 - Support Kubernetes Gateway API

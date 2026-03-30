@@ -21,7 +21,7 @@ Configure the middle-tier app to have the **delegated permission** for the downs
 - `az` CLI (or any MSAL-capable tool) to obtain a user access token
 - `jq` for decoding JWTs in the verification steps
 
-> **Note:** This lab modifies the controller's `tokenExchange` configuration. If you have completed lab 034, run the cleanup from that lab first, or simply proceed — the Helm upgrade in Step 2 will replace whatever tokenExchange config is currently set.
+> **Note:** This lab modifies the controller's `tokenExchange` configuration. If you have completed the [OBO Token Exchange Fundamentals lab](obo-token-exchange-fundamentals.md), run the cleanup from that lab first, or simply proceed — the Helm upgrade in Step 2 will replace whatever tokenExchange config is currently set.
 
 ---
 
@@ -66,7 +66,7 @@ Backend
   │  (6) Receives request with Authorization: Bearer <exchanged token>
 ```
 
-**Contrast with lab 034 (Keycloak OBO):** In lab 034 the STS issues its own signed token (the backend validates against the STS JWKS). In this lab, the STS calls the Entra `/oauth2/token` endpoint and forwards the Entra-issued exchanged token directly — so the backend receives a real Entra token, not an STS-issued one. This is configured via `spec.backend.tokenExchange.entra` in the policy (rather than the internal STS exchange path used by Keycloak OBO).
+**Contrast with the [OBO Token Exchange Fundamentals lab](obo-token-exchange-fundamentals.md) (Keycloak OBO):** In that lab the STS issues its own signed token (the backend validates against the STS JWKS). In this lab, the STS calls the Entra `/oauth2/token` endpoint and forwards the Entra-issued exchanged token directly — so the backend receives a real Entra token, not an STS-issued one. This is configured via `spec.backend.tokenExchange.entra` in the policy (rather than the internal STS exchange path used by Keycloak OBO).
 
 ---
 
@@ -132,7 +132,7 @@ tokenExchange:
 EOF
 ```
 
-> **Note:** The STS token exchange path for Entra OBO is `/oauth2/token` — this is the path used by the `EnterpriseAgentgatewayParameters` STS URI (Step 5). Do not confuse this with the internal RFC 8693 path `/oauth2/token/exchange` used in Keycloak OBO (lab 034).
+> **Note:** The STS token exchange path for Entra OBO is `/oauth2/token` — this is the path used by the `EnterpriseAgentgatewayParameters` STS URI (Step 5). Do not confuse this with the internal RFC 8693 path `/oauth2/token/exchange` used in Keycloak OBO (the [OBO Token Exchange Fundamentals lab](obo-token-exchange-fundamentals.md)).
 
 ---
 

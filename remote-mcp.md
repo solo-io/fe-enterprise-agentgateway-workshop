@@ -15,7 +15,7 @@ This lab assumes that you have completed the setup in `001` and `002`
 
 In this lab, we'll route to the **external** Solo.io documentation MCP server (`https://search.solo.io/mcp`) through AgentGateway. This demonstrates how to proxy external MCP servers and apply enterprise policies like authentication, authorization, and observability.
 
-Unlike lab 018 which deployed an MCP server in your cluster, this lab routes to an existing remote server.
+Unlike the [in-cluster MCP lab](in-cluster-mcp.md) which deployed an MCP server in your cluster, this lab routes to an existing remote server.
 
 ### Why Route Through AgentGateway?
 
@@ -184,7 +184,7 @@ You should see MCP-specific metrics like:
 
 ### View Metrics and Traces in Grafana
 
-For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in lab 002.
+For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in the [monitoring tools lab](002-set-up-monitoring-tools.md).
 
 1. Port-forward to the Grafana service:
 ```bash

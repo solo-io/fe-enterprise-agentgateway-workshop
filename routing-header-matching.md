@@ -193,7 +193,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in lab 002.
+For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in the [monitoring tools lab](002-set-up-monitoring-tools.md).
 
 1. Port-forward to the Grafana service:
 ```bash

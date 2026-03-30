@@ -24,7 +24,7 @@ AgentGateway automatically supports streaming for all LLM providers without spec
 
 ## Configure OpenAI Route
 
-Create an OpenAI secret and routing configuration (same as lab 004):
+Create an OpenAI secret and routing configuration (same as the [Basic Routing to OpenAI lab](configure-routing-openai.md)):
 
 ```bash
 export OPENAI_API_KEY=$OPENAI_API_KEY

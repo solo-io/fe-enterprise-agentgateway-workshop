@@ -104,7 +104,7 @@ EOF
 ## Create AWS Bedrock Route and AgentgatewayBackends
 Create AWS Bedrock route and `AgentgatewayBackend` resources. For this setup we will configure multiple `AgentgatewayBackends` using a single provider (AWS Bedrock) in a path-per-model routing configuration.
 
-Note the key difference from lab 006: we use `spec.policies.auth.secretRef` instead of `spec.policies.auth.aws` for API key authentication.
+Note the key difference from the [AWS Bedrock routing lab](configure-routing-aws-bedrock.md): we use `spec.policies.auth.secretRef` instead of `spec.policies.auth.aws` for API key authentication.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -274,7 +274,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in lab 002.
+For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in the [monitoring tools lab](002-set-up-monitoring-tools.md).
 
 1. Port-forward to the Grafana service:
 ```bash

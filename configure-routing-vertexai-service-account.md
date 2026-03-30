@@ -1,26 +1,72 @@
-# Configure Basic Routing to Vertex AI
+# Configure Basic Routing to Vertex AI (Service Account Auth)
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`, and `002`
 
 ## Lab Objectives
-- Create a Kubernetes secret that contains our Vertex AI OAuth credentials
+- Create a Kubernetes secret that contains our Vertex AI OAuth credentials using a GCP service account
 - Create a route to Vertex AI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
 - Curl Vertex AI through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
+
+### Benefits of Service Account Authentication
+
+- **Explicit and reproducible identity**: Authentication is tied to a specific service account, not a local user.
+- **CI/CD friendly**: Works consistently across machines, environments, and automation pipelines.
+- **Least-privilege access**: Permissions are controlled through IAM roles assigned to the service account.
+- **Production-aligned**: Mirrors how AI Gateways typically authenticate to cloud providers in real deployments.
+- **Auditable and predictable**: All requests are clearly attributable to a known service account.
+
+### Caveats to Service Account Authentication
+
+- **Requires credential management**: Service account keys must be created, stored securely, and rotated, which adds operational overhead compared to user-based authentication.
 
 ### Configure Required Variables
 
 Set the following environment variables to match your GCP Vertex AI project.
 
-**Note:** This demo uses the currently active `gcloud auth login` user identity to mint an OAuth access token for routing requests to Vertex AI through the AI Gateway.
+**Note:** This demo uses a GCP service account with a JSON key file to mint an OAuth access token for routing requests to Vertex AI through the AI Gateway.
 
 ```bash
 export GCP_PROJECT_ID="<YOUR-GCP-PROJECT-ID>"
 export GCP_REGION="us-central1"  # or your preferred region
 ```
 
-Retrieve an OAuth access token using gcloud:
+### Set up Service Account Authentication
+
+Set the path to your service account key file:
+```bash
+export VERTEX_SA_KEY="./.vertex-ai-gcp.json"  # or your custom path
+```
+
+If you don't have a service account key yet, create one:
+1. Go to the [GCP Console](https://console.cloud.google.com/iam-admin/serviceaccounts)
+2. Select your project
+3. Create a new service account or select an existing one
+4. Grant the service account the "Vertex AI User" role
+5. Create and download a JSON key file
+6. Save it to the path specified in `VERTEX_SA_KEY`
+
+Activate the service account and set credentials:
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="$VERTEX_SA_KEY"
+
+gcloud auth activate-service-account \
+  --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+```
+
+Verify that the service account is now the active identity:
+```bash
+# Show all authenticated accounts (active one is marked with *)
+gcloud auth list
+
+# Show the currently active account
+gcloud config get-value account
+```
+
+The output should show your service account email (e.g., `my-service-account@my-project.iam.gserviceaccount.com`) as the active account, not your user email.
+
+Retrieve an OAuth access token using the service account:
 ```bash
 export VERTEXAI_ACCESS_TOKEN=$(gcloud auth print-access-token)
 ```
@@ -105,7 +151,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in lab 002.
+For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in the [monitoring tools lab](002-set-up-monitoring-tools.md).
 
 1. Port-forward to the Grafana service:
 ```bash

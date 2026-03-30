@@ -150,7 +150,7 @@ Try asking Claude Code a question to generate some traffic:
 
 ### View Metrics and Traces in Grafana
 
-For a comprehensive view of Claude Code traffic metrics and traces, use the AgentGateway Grafana dashboard installed in lab 002.
+For a comprehensive view of Claude Code traffic metrics and traces, use the AgentGateway Grafana dashboard installed in the [monitoring tools lab](002-set-up-monitoring-tools.md).
 
 1. Port-forward to the Grafana service:
 ```bash

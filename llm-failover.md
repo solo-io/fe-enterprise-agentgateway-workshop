@@ -15,7 +15,7 @@ This lab assumes that you have completed the setup in `001` and `002`
 
 ## Deploy Mock Server with Rate Limiting
 
-Deploy the vllm-sim mock server configured to always return 429 rate limit errors. This uses the same deployment structure as lab 003, but adds failure injection flags:
+Deploy the vllm-sim mock server configured to always return 429 rate limit errors. This uses the same deployment structure as the [Mock OpenAI Server lab](configure-mock-openai-server.md), but adds failure injection flags:
 
 ```bash
 kubectl apply -f - <<EOF
