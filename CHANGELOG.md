@@ -1,5 +1,9 @@
 # Changelog
 
+0.7.3 - (3-31-26)
+---
+- `README.md`: list `obo-crewai-agent-with-mcp.md` in both MCP and Identity & Delegation sections with mutual cross-references
+
 0.7.2 - (3-31-26)
 ---
 - Add new lab: `dynamic-mcp.md` which covers dynamic MCP backends using label selectors, deploying `mcp-server-everything` to a dedicated `mcp` namespace, scaling example without modifying the `AgentgatewayBackend`

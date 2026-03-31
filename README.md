@@ -98,6 +98,7 @@ Before starting this workshop, you will need:
 - [In-Cluster MCP](in-cluster-mcp.md)
 - [Remote MCP](remote-mcp.md)
 - [Dynamic MCP](dynamic-mcp.md)
+- [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
 
 ---
 
@@ -112,7 +113,7 @@ Before starting this workshop, you will need:
 ## Identity & Delegation
 
 - [OBO Token Exchange Fundamentals](obo-token-exchange-fundamentals.md)
-- [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md)
+- [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: MCP)_
 - [Microsoft Entra ID OBO](msft-entra-obo.md)
 
 ---
