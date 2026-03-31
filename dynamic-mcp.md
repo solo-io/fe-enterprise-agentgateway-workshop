@@ -49,7 +49,6 @@ AgentGateway watches the cluster for Services matching those labels and automati
 | Concern | Static Backend | Dynamic Backend |
 |---|---|---|
 | Update MCP server image | Must also update Backend if service name changes | Deploy new pods — gateway auto-discovers them |
-| Blue/green deployment | Requires Backend update to cut over | Swap labels on the Service — no gateway change |
 | Scale to multiple replicas | Single target, no built-in replica awareness | AgentGateway load-balances across all matching pods |
 | Ownership boundary | Platform and app teams both touch Backend resource | Platform team owns Backend, app team owns Service labels |
 | GitOps stability | Gateway config drifts with every app deployment | Gateway config stays static; app manifests change independently |
@@ -61,11 +60,10 @@ This is particularly valuable in enterprise environments where gateway configura
 In this lab we'll use `@modelcontextprotocol/server-everything` — the official MCP reference implementation that provides a comprehensive set of tools for testing and exploration:
 
 - **echo** — returns a message back to the caller
-- **add** — adds two numbers
-- **printEnv** — returns server environment variables
-- **longRunningOperation** — simulates a long-running task with progress notifications
-- **getTinyImage** — returns a small base64-encoded image
-- **sampleLLM** — proxies a simple LLM completion request
+- **get-sum** — adds two numbers
+- **get-env** — returns server environment variables
+- **trigger-long-running-operation** — simulates a long-running task with progress notifications
+- **get-tiny-image** — returns a small base64-encoded image
 
 These tools make it easy to verify connectivity, test streaming behavior, and explore the full MCP protocol — making it an ideal server for learning and validation.
 
@@ -204,7 +202,7 @@ EOF
 
 **Key configuration details:**
 
-- `selector.services.matchLabels` — AgentGateway uses this to find matching Services in the same namespace
+- `selector.services.matchLabels` — AgentGateway uses this to find matching Services in the cluster
 - The `AgentgatewayBackend` itself does not reference any hostname or port — those are resolved dynamically from the discovered Service
 - Path prefix `/mcp` isolates this backend from other MCP routes on the same gateway
 
@@ -238,13 +236,13 @@ Connect to your AgentGateway:
 5. Click **Run Tool**
 6. Verify the response echoes your message back
 
-Try the **add** tool as well — enter two numbers and confirm the result is returned.
+Try the **get-sum** tool as well — enter two numbers and confirm the result is returned.
 
 ---
 
 ## Step 4: Observe Dynamic Discovery in Action
 
-This step demonstrates the core value of dynamic backends: updating the MCP server without modifying the Backend resource.
+This step demonstrates the core value of dynamic backends: updating the MCP server without modifying the Backend resource. It also shows how AgentGateway handles session stickiness across replicas.
 
 ### Scale the deployment
 
@@ -259,7 +257,25 @@ Verify both pods are running:
 kubectl get pods -n mcp -l app=mcp-server-everything
 ```
 
-Run the **echo** or **printEnv** tool in MCP Inspector multiple times and confirm requests are served. No Backend or HTTPRoute change was required.
+### Tail both pod logs
+
+Open a second terminal and stream logs from both pods simultaneously so you can see which pod handles each request:
+
+```bash
+kubectl logs -n mcp -l app=mcp-server-everything --prefix --follow
+```
+
+The `--prefix` flag prepends the pod name to each log line so you can tell them apart.
+
+### Observe session stickiness
+
+In MCP Inspector, connect and run **echo** or **get-env** several times. Watch the logs — all requests from your current session land on the same pod. AgentGateway encodes the backend endpoint into the session token at connection time, so a client stays pinned to one pod for the lifetime of that session.
+
+### Observe load balancing on reconnect
+
+Disconnect from MCP Inspector and reconnect. AgentGateway assigns a new session token, this time potentially routing to the other replica. Run **echo** again and check the logs — you may now see the second pod handling requests. Reconnect a few times to observe the distribution across both pods.
+
+No Backend or HTTPRoute change was required at any point.
 
 ---
 
@@ -304,12 +320,3 @@ kubectl delete deployment -n mcp mcp-server-everything
 kubectl delete service -n mcp mcp-server-everything
 ```
 
----
-
-## Key Takeaways
-
-- **Dynamic backends decouple gateway config from app deployments.** The `AgentgatewayBackend` uses label selectors instead of hard-coded host/port values, so it survives service renames, pod churn, and blue/green swaps without modification.
-- **Platform and application teams can operate independently.** Platform teams manage the stable `AgentgatewayBackend` and `HTTPRoute`; application teams control what gets selected by managing labels on their Services.
-- **AgentGateway auto-discovers replicas.** Scaling a Deployment automatically updates the set of endpoints AgentGateway routes to — no manual backend update required.
-- **`appProtocol: kgateway.dev/mcp` is required.** This annotation on the Service port tells AgentGateway to use the MCP protocol when connecting, regardless of whether the backend is static or dynamic.
-- **The `mcp-server-everything` server is a useful reference.** Its broad set of tools (echo, add, printEnv, longRunningOperation, getTinyImage) makes it ideal for validating MCP connectivity and exploring gateway behavior end-to-end.

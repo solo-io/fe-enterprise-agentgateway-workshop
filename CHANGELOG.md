@@ -2,6 +2,7 @@
 
 0.7.3 - (3-31-26)
 ---
+- `dynamic-mcp.md`: rewrite Step 1 deployment to use plain `mcp-server-everything` (no version labels); update tool names to match current `@modelcontextprotocol/server-everything` release (`get-sum`, `get-env`, `get-tiny-image`); expand Step 4 with dual-pod log tailing and session stickiness/reconnect exercise; remove Key Takeaways section
 - `README.md`: list `obo-crewai-agent-with-mcp.md` in both MCP and Identity & Delegation sections with mutual cross-references
 - `001-install-enterprise-agentgateway.md`, `install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md`: add commented-out `imagePullSecrets` for all components (controller helm values, agentgateway, extauth, ratelimiter, extCache)
 - `002-set-up-monitoring-tools.md`: add commented-out image overrides and `imagePullSecrets` for tempo-distributed (tempo, memcached) and kube-prometheus-stack (grafana, prometheus, prometheusOperator, kube-state-metrics)
