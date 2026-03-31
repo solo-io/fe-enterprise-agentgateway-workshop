@@ -83,6 +83,17 @@ spec:
 EOF
 ```
 
+> **Note — SSE session affinity limitation**
+>
+> This lab configures the backend with `protocol: SSE`. SSE (Server-Sent Events) uses a persistent, long-lived TCP connection that is established once between the proxy and the MCP server. Because the connection is stateful, **every request in a session must be handled by the same AgentGateway proxy pod** — if a follow-up request is load-balanced to a different replica, the session breaks.
+>
+> For this reason, you may need to scale the AgentGateway proxy down to a single replica while working through this lab:
+> ```bash
+> kubectl scale deployment agentgateway-proxy -n agentgateway-system --replicas=1
+> ```
+>
+> This is a fundamental constraint of the SSE transport — not an AgentGateway-specific limitation. The [Dynamic MCP lab](dynamic-mcp.md) addresses this by switching to **Streamable HTTP**, where each tool call is an independent HTTP request with no persistent connection. That lets the proxy scale freely and distribute load across replicas without breaking sessions.
+
 ### Get gateway IP
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
@@ -92,7 +103,7 @@ echo $GATEWAY_IP
 
 ### Run the MCP Inspector
 ```bash
-npx @modelcontextprotocol/inspector@0.16.2
+npx @modelcontextprotocol/inspector@0.21.1
 ```
 
 In the MCP Inspector menu, connect to your agentgateway

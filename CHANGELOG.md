@@ -1,5 +1,10 @@
 # Changelog
 
+0.7.2 - (3-31-26)
+---
+- Add new lab: `dynamic-mcp.md` which covers dynamic MCP backends using label selectors, deploying `mcp-server-everything` to a dedicated `mcp` namespace, scaling, and blue/green service swaps without modifying the `AgentgatewayBackend`
+- `in-cluster-mcp.md`: add SSE session affinity limitation callout — explains why AGW proxy must run at 1 replica with SSE transport and links to `dynamic-mcp.md` (Streamable HTTP) as the solution
+
 0.7.1 - (3-30-26)
 ---
 - Reorganize workshop labs: strip numeric prefixes from 36 lab filenames (keeping `001-` and `002-` for installation labs)
