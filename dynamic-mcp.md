@@ -261,69 +261,6 @@ kubectl get pods -n mcp -l app=mcp-server-everything
 
 Run the **echo** or **printEnv** tool in MCP Inspector multiple times and confirm requests are served. No Backend or HTTPRoute change was required.
 
-### Scale back down
-```bash
-kubectl scale deployment mcp-server-everything -n mcp --replicas=1
-```
-
-### Simulate a backend swap (blue/green)
-
-This is the core demonstration of dynamic Service discovery. Deploy a second, independent MCP server with its own Deployment and pod labels. The Service for the v2 server carries the `app: mcp-server-everything` label so the dynamic backend discovers it — but the Service's `spec.selector` routes only to the v2 pods, keeping the two implementations isolated:
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mcp-server-everything-v2
-  namespace: mcp
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mcp-server-everything-v2
-  template:
-    metadata:
-      labels:
-        app: mcp-server-everything-v2
-    spec:
-      containers:
-        - name: mcp-server-everything
-          image: node:20-alpine
-          command: ["npx"]
-          args: ["-y", "@modelcontextprotocol/server-everything", "streamableHttp"]
-          ports:
-            - containerPort: 3001
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mcp-server-everything-v2
-  namespace: mcp
-  labels:
-    app: mcp-server-everything   # matches the dynamic backend selector
-spec:
-  selector:
-    app: mcp-server-everything-v2  # routes only to v2 pods
-  ports:
-    - protocol: TCP
-      port: 3001
-      targetPort: 3001
-      appProtocol: kgateway.dev/mcp
-  type: ClusterIP
-EOF
-```
-
-The dynamic backend now discovers both `mcp-server-everything` and `mcp-server-everything-v2` Services (both carry the `app: mcp-server-everything` label). AgentGateway routes to both — **no change to the Backend or HTTPRoute was required**.
-
-To complete the cutover and remove v1 from rotation, you would remove or relabel the v1 Service. The gateway configuration never changes.
-
-Clean up the v2 resources:
-```bash
-kubectl delete deployment mcp-server-everything-v2 -n mcp
-kubectl delete service mcp-server-everything-v2 -n mcp
-```
-
 ---
 
 ## Observability
@@ -364,6 +301,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 kubectl delete httproute -n agentgateway-system mcp-everything
 kubectl delete agentgatewaybackend -n agentgateway-system mcp-everything-backend
 kubectl delete deployment -n mcp mcp-server-everything
+kubectl delete deployment -n mcp mcp-server-everything-v2
 kubectl delete service -n mcp mcp-server-everything
 ```
 
