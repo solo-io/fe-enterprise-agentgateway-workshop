@@ -301,7 +301,6 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 kubectl delete httproute -n agentgateway-system mcp-everything
 kubectl delete agentgatewaybackend -n agentgateway-system mcp-everything-backend
 kubectl delete deployment -n mcp mcp-server-everything
-kubectl delete deployment -n mcp mcp-server-everything-v2
 kubectl delete service -n mcp mcp-server-everything
 ```
 

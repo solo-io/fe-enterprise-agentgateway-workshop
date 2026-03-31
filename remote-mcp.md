@@ -61,7 +61,7 @@ spec:
     - matches:
       - path:
           type: PathPrefix
-          value: /soloio-docs-mcp
+          value: /mcp
       backendRefs:
       - name: soloio-docs-mcp-backend
         group: agentgateway.dev
@@ -75,7 +75,7 @@ EOF
 - `port: 443` - HTTPS port
 - `protocol: StreamableHTTP` - HTTP-based MCP protocol (not SSE)
 - `policies.tls: {}` - Enables TLS to the upstream server
-- `value: /soloio-docs-mcp` - Custom path prefix for routing
+- `value: /mcp` - Custom path prefix for routing
 
 When `policies.tls` is set, AgentGateway will:
 - Initiate TLS to the backend
@@ -98,7 +98,7 @@ npx @modelcontextprotocol/inspector@0.21.1
 
 In the MCP Inspector menu, connect to your AgentGateway:
 - **Transport Type**: Select `Streamable HTTP`
-- **URL**: Enter `http://$GATEWAY_IP:8080/soloio-docs-mcp` (replace with your actual IP)
+- **URL**: Enter `http://$GATEWAY_IP:8080/mcp` (replace with your actual IP)
 - Click **Connect**
 
 ### Search Solo.io Documentation
@@ -127,7 +127,7 @@ If you have Claude Code you can configure it to use this MCP server through Agen
 claude mcp remove soloio-docs-mcp
 
 # Add via AgentGateway
-claude mcp add --transport http soloio-docs-mcp http://$GATEWAY_IP:8080/soloio-docs-mcp
+claude mcp add --transport http soloio-docs-mcp http://$GATEWAY_IP:8080/mcp
 ```
 
 Replace `$GATEWAY_IP` with your actual gateway IP.
@@ -288,11 +288,13 @@ kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
 Go back to the MCP Inspector tool and expand the **Authentication** section. Enter the following details in the **API Token Authentication** card:
 
 - **Header Name**: Enter `Authorization`
-- **Bearer Token**: Enter the following valid JWT token for our user:
+- **Bearer Token**: Enter `Bearer ` followed by the JWT token below. The MCP Inspector sends this value as-is in the Authorization header, so the `Bearer ` prefix is required.
 
 ```
 eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw
 ```
+
+After entering the token, click **Reconnect** in the MCP Inspector to re-establish the connection with the new credentials.
 
 Now, if you try to run the `search` tool again it should result in **Tool Result: Success**
 

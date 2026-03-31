@@ -6,6 +6,8 @@
 - `001-install-enterprise-agentgateway.md`, `install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md`: add commented-out `imagePullSecrets` for all components (controller helm values, agentgateway, extauth, ratelimiter, extCache)
 - `002-set-up-monitoring-tools.md`: add commented-out image overrides and `imagePullSecrets` for tempo-distributed (tempo, memcached) and kube-prometheus-stack (grafana, prometheus, prometheusOperator, kube-state-metrics)
 - `install-on-openshift/002-set-up-monitoring-tools-ocp.md`: add commented-out image override and `imagePullSecrets` for jaeger allInOne
+- `in-cluster-mcp.md`: clarify Bearer token format requires `Bearer <token>` prefix in MCP Inspector; add note to click Reconnect after entering credentials
+- `remote-mcp.md`: change HTTPRoute path to `/mcp`; add same Bearer token and Reconnect notes
 
 0.7.2 - (3-31-26)
 ---
