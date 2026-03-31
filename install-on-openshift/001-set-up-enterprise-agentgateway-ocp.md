@@ -95,6 +95,8 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.p
 #    registry: us-docker.pkg.dev/solo-public/enterprise-agentgateway
 #    tag: "$ENTERPRISE_AGW_VERSION"
 #    pullPolicy: IfNotPresent
+#  imagePullSecrets:
+#  - name: my-registry-secret
 # --- Override the default Agentgateway parameters used by this GatewayClass
 # If the referenced parameters are not found, the controller will use the defaults
 gatewayClassParametersRefs:
@@ -144,6 +146,9 @@ spec:
           # Delete pod-level securityContext
           securityContext:
             $patch: delete
+          #--- imagePullSecrets for private registry ---
+          #imagePullSecrets:
+          #- name: my-registry-secret
           containers:
           - name: agentgateway
             # Delete container-level securityContext
@@ -165,6 +170,9 @@ spec:
               # Delete pod-level securityContext for OpenShift
               securityContext:
                 $patch: delete
+              #--- imagePullSecrets for private registry ---
+              #imagePullSecrets:
+              #- name: my-registry-secret
               containers:
               - name: ext-auth-service
                 # Delete container-level securityContext for OpenShift
@@ -185,6 +193,9 @@ spec:
               # Delete pod-level securityContext for OpenShift
               securityContext:
                 $patch: delete
+              #--- imagePullSecrets for private registry ---
+              #imagePullSecrets:
+              #- name: my-registry-secret
               containers:
               - name: rate-limiter
                 # Delete container-level securityContext for OpenShift
@@ -205,6 +216,9 @@ spec:
               # Delete pod-level securityContext for OpenShift
               securityContext:
                 $patch: delete
+              #--- imagePullSecrets for private registry ---
+              #imagePullSecrets:
+              #- name: my-registry-secret
               containers:
               - name: redis
                 # Delete container-level securityContext for OpenShift

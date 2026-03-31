@@ -21,6 +21,21 @@ grafana/tempo-distributed \
 --create-namespace \
 --wait \
 --values - <<EOF
+#--- Image overrides for private registry ---
+#tempo:
+#  image:
+#    registry: docker.io
+#    repository: grafana/tempo
+#    tag: ""
+#memcached:
+#  image:
+#    registry: docker.io
+#    repository: memcached
+#    tag: ""
+#--- imagePullSecrets for private registry ---
+#global:
+#  imagePullSecrets:
+#  - name: my-registry-secret
 minio:
   enabled: false
 traces:
@@ -55,9 +70,18 @@ helm upgrade --install grafana-prometheus \
   --version 80.4.2 \
   --namespace monitoring \
   --values - <<EOF
+#--- imagePullSecrets for private registry ---
+#global:
+#  imagePullSecrets:
+#  - name: my-registry-secret
 alertmanager:
   enabled: false
 grafana:
+  #--- Image override for private registry ---
+  #image:
+  #  registry: docker.io
+  #  repository: grafana/grafana
+  #  tag: ""
   adminPassword: "${GRAFANA_ADMIN_PASSWORD:-prom-operator}"
   service:
     type: ClusterIP
@@ -80,9 +104,25 @@ prometheus:
   service:
     type: ClusterIP
   prometheusSpec:
+    #--- Image override for private registry ---
+    #image:
+    #  registry: quay.io
+    #  repository: prometheus/prometheus
+    #  tag: ""
     ruleSelectorNilUsesHelmValues: false
     serviceMonitorSelectorNilUsesHelmValues: false
     podMonitorSelectorNilUsesHelmValues: false
+#--- Image overrides for private registry ---
+#prometheusOperator:
+#  image:
+#    registry: quay.io
+#    repository: prometheus-operator/prometheus-operator
+#    tag: ""
+#kube-state-metrics:
+#  image:
+#    registry: registry.k8s.io
+#    repository: kube-state-metrics/kube-state-metrics
+#    tag: ""
 EOF
 ```
 

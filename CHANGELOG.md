@@ -1,5 +1,15 @@
 # Changelog
 
+0.7.3 - (3-31-26)
+---
+- `dynamic-mcp.md`: rewrite Step 1 deployment to use plain `mcp-server-everything` (no version labels); update tool names to match current `@modelcontextprotocol/server-everything` release (`get-sum`, `get-env`, `get-tiny-image`); expand Step 4 with dual-pod log tailing and session stickiness/reconnect exercise; remove Key Takeaways section
+- `README.md`: list `obo-crewai-agent-with-mcp.md` in both MCP and Identity & Delegation sections with mutual cross-references
+- `001-install-enterprise-agentgateway.md`, `install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md`: add commented-out `imagePullSecrets` for all components (controller helm values, agentgateway, extauth, ratelimiter, extCache)
+- `002-set-up-monitoring-tools.md`: add commented-out image overrides and `imagePullSecrets` for tempo-distributed (tempo, memcached) and kube-prometheus-stack (grafana, prometheus, prometheusOperator, kube-state-metrics)
+- `install-on-openshift/002-set-up-monitoring-tools-ocp.md`: add commented-out image override and `imagePullSecrets` for jaeger allInOne
+- `in-cluster-mcp.md`: clarify Bearer token format requires `Bearer <token>` prefix in MCP Inspector; add note to click Reconnect after entering credentials
+- `remote-mcp.md`: change HTTPRoute path to `/mcp`; add same Bearer token and Reconnect notes
+
 0.7.2 - (3-31-26)
 ---
 - Add new lab: `dynamic-mcp.md` which covers dynamic MCP backends using label selectors, deploying `mcp-server-everything` to a dedicated `mcp` namespace, scaling example without modifying the `AgentgatewayBackend`

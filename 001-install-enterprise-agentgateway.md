@@ -96,6 +96,8 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.p
 #    registry: us-docker.pkg.dev/solo-public/enterprise-agentgateway
 #    tag: "$ENTERPRISE_AGW_VERSION"
 #    pullPolicy: IfNotPresent
+#  imagePullSecrets:
+#  - name: my-registry-secret
 # --- Override the default Agentgateway parameters used by this GatewayClass
 # If the referenced parameters are not found, the controller will use the defaults
 gatewayClassParametersRefs:
@@ -139,6 +141,11 @@ spec:
       deployment:
         spec:
           replicas: 1
+          #--- imagePullSecrets for private registry ---
+          #template:
+          #  spec:
+          #    imagePullSecrets:
+          #    - name: my-registry-secret
       #--- Image overrides for deployment ---
       #image:
       #  registry: gcr.io
@@ -149,6 +156,11 @@ spec:
       deployment:
         spec:
           replicas: 1
+          #--- imagePullSecrets for private registry ---
+          #template:
+          #  spec:
+          #    imagePullSecrets:
+          #    - name: my-registry-secret
       #--- Image overrides for deployment ---
       #image:
       #  registry: gcr.io
@@ -159,6 +171,11 @@ spec:
       deployment:
         spec:
           replicas: 1
+          #--- imagePullSecrets for private registry ---
+          #template:
+          #  spec:
+          #    imagePullSecrets:
+          #    - name: my-registry-secret
       #--- Image overrides for deployment ---
       #image:
       #  registry: docker.io
@@ -230,6 +247,9 @@ spec:
         #  labels:
         #    istio.io/dataplane-mode: ambient
         spec:
+          #--- imagePullSecrets for private registry ---
+          #imagePullSecrets:
+          #- name: my-registry-secret
           containers:
           - name: agentgateway
             resources:

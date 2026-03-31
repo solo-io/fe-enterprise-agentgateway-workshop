@@ -28,6 +28,14 @@ provisionDataStore:
   cassandra: false
 allInOne:
   enabled: true
+  #--- Image override for private registry ---
+  #image:
+  #  registry: docker.io
+  #  repository: jaegertracing/all-in-one
+  #  tag: ""
+  #--- imagePullSecrets for private registry ---
+  #imagePullSecrets:
+  #- name: my-registry-secret
 storage:
   type: memory
 agent:
