@@ -13,12 +13,16 @@ This lab assumes that you have completed the setup in `001`, and `002`
 
 ### Configure MCP server
 ```bash
+kubectl create namespace mcp
+```
+
+```bash
 kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mcp-website-fetcher
-  namespace: agentgateway-system
+  namespace: mcp
 spec:
   selector:
     matchLabels:
@@ -37,7 +41,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mcp-website-fetcher
-  namespace: agentgateway-system
+  namespace: mcp
   labels:
     app: mcp-website-fetcher
 spec:
@@ -63,7 +67,7 @@ spec:
     targets:
     - name: mcp-target
       static:
-        host: mcp-website-fetcher.agentgateway-system.svc.cluster.local
+        host: mcp-website-fetcher.mcp.svc.cluster.local
         port: 80
         protocol: SSE
 ---
@@ -83,6 +87,17 @@ spec:
 EOF
 ```
 
+> **Note — SSE session affinity limitation**
+>
+> This lab configures the backend with `protocol: SSE`. SSE (Server-Sent Events) uses a persistent, long-lived TCP connection that is established once between the proxy and the MCP server. Because the connection is stateful, **every request in a session must be handled by the same AgentGateway proxy pod** — if a follow-up request is load-balanced to a different replica, the session breaks.
+>
+> For this reason, you may need to scale the AgentGateway proxy down to a single replica while working through this lab:
+> ```bash
+> kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":1}}}}'
+> ```
+>
+> This is a fundamental constraint of the SSE transport — not an AgentGateway-specific limitation. The [Dynamic MCP lab](dynamic-mcp.md) addresses this by switching to **Streamable HTTP**, where each tool call is an independent HTTP request with no persistent connection. That lets the proxy scale freely and distribute load across replicas without breaking sessions.
+
 ### Get gateway IP
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
@@ -92,7 +107,7 @@ echo $GATEWAY_IP
 
 ### Run the MCP Inspector
 ```bash
-npx @modelcontextprotocol/inspector@0.16.2
+npx @modelcontextprotocol/inspector@0.21.1
 ```
 
 In the MCP Inspector menu, connect to your agentgateway
@@ -302,8 +317,9 @@ Now, if you try to run the `fetch` tool again it should result in `Tool Result: 
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt-rbac
-kubectl delete deployment -n agentgateway-system mcp-website-fetcher
-kubectl delete service -n agentgateway-system mcp-website-fetcher
+kubectl delete deployment -n mcp mcp-website-fetcher
+kubectl delete service -n mcp mcp-website-fetcher
 kubectl delete agentgatewaybackend -n agentgateway-system mcp-backend
 kubectl delete httproute -n agentgateway-system mcp
+kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":2}}}}'
 ```

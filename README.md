@@ -97,6 +97,7 @@ Before starting this workshop, you will need:
 
 - [In-Cluster MCP](in-cluster-mcp.md)
 - [Remote MCP](remote-mcp.md)
+- [Dynamic MCP](dynamic-mcp.md)
 
 ---
 
