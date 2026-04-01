@@ -3,9 +3,8 @@
 0.7.4 - (3-31-26)
 ---
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0-beta.8`; update tracing `otlpEndpoint` to `solo-enterprise-telemetry-collector.agentgateway-system.svc.cluster.local:4317`
-- Rename `002-set-up-monitoring-tools.md` → `002-set-up-ui-and-monitoring-tools.md`; replace Tempo install with Gloo UI (`management` Helm chart, `AGW_UI_VERSION=0.3.10`); remove Tempo datasource from Grafana values; remove Tempo pods from expected output; add "Access Gloo UI" section (port-forward to `solo-enterprise-ui 4000:80`); update all cross-references across 14 lab files
-- `002-set-up-ui-and-monitoring-tools.md`: update H1 to "Set up UI and monitoring tools"; update `README.md` link text to match
-- Update observability callout in 13 lab files: clarify Grafana provides metrics dashboard, AgentGateway UI provides traces
+- Rename `002-set-up-monitoring-tools.md` → `002-set-up-ui-and-monitoring-tools.md`; replace Tempo install with Gloo UI (`management` Helm chart, `AGW_UI_VERSION=0.3.12`); remove Tempo datasource from Grafana values; remove Tempo pods from expected output; add "Access Gloo UI" section (port-forward to `solo-enterprise-ui 4000:80`); add `global.image` override comments for Solo-owned images (UI, OTEL collector); move `imagePullSecrets` under `global.imagePullSecrets` (propagates to subcharts); add ClickHouse image override comments with note on missing registry key; update H1 and `README.md` link text; update all cross-references across all lab files
+- Update observability callout in all lab files: clarify Grafana provides metrics dashboard, AgentGateway UI provides traces
 - Update pre-requisites in all lab files: mark `002` as optional, recommended for observability
 
 0.7.3 - (3-31-26)

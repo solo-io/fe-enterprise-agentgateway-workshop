@@ -14,15 +14,23 @@ This lab assumes that you have completed the setup in `001`
 The Gloo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
 
 ```bash
-export AGW_UI_VERSION=0.3.10
+export AGW_UI_VERSION=0.3.12
 helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
 --namespace agentgateway-system \
 --create-namespace \
 --version "$AGW_UI_VERSION" \
 -f - <<EOF
-imagePullSecrets: []
 global:
   imagePullPolicy: IfNotPresent
+  #--- imagePullSecrets for private registry (propagated to all subcharts) ---
+  #imagePullSecrets:
+  #- name: my-registry-secret
+  imagePullSecrets: []
+  #--- Image overrides for all Solo-owned images (UI, OTEL collector) ---
+  #image:
+  #  registry: my-registry.example.com
+  #  repository: solo-enterprise
+  #  tag: ""
 service:
   type: ClusterIP
   clusterIP: ""
@@ -38,6 +46,10 @@ products:
     enabled: false
 clickhouse:
   enabled: true
+  #--- Image override for ClickHouse (no registry key — embed registry in repository if needed) ---
+  #image:
+  #  repository: clickhouse/clickhouse-server
+  #  tag: ""
 tracing:
   verbose: true
 EOF
