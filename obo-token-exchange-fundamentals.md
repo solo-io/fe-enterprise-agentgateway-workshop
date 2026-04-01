@@ -1,7 +1,7 @@
 # OBO Token Exchange with Keycloak
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`, and `002`
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Deploy Keycloak in-cluster as the identity provider

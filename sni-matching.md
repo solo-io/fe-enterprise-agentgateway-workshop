@@ -2,7 +2,7 @@
 In this guide, you learn how to set up an HTTPS Gateway that serves two different domains, `mock-openai-foo.glootest.com` and `mock-openai-bar.glootest.com` on the same port 443. When sending a request to the Gateway, you indicate the hostname you want to connect to. Based on the selected hostname, the Gateway presents the hostname-specific certificate.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001` and `002`
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Deploy a mock OpenAI server for testing

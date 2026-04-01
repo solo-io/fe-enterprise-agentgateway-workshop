@@ -1,7 +1,7 @@
 # Transformations using Agentgateway
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`, and `002`
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials

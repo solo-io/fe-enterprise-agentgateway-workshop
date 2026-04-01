@@ -3,7 +3,7 @@
 In this lab, you'll configure priority group failover using the mock openai server from earlier labs that has been configured to return rate limit errors (priority group 1) and OpenAI (priority group 2). When the primary backend returns rate limit errors, it's marked as unhealthy, causing subsequent requests to route to the secondary priority group
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001` and `002`
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Deploy a mock openai server configured to always return 429 rate limit errors

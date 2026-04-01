@@ -1,71 +1,67 @@
-# Set up monitoring tools
-Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the box. In this lab, we’ll deploy Grafana, Loki, Tempo, and Prometheus to collect, store, and visualize this observability data in later labs
+# Set up UI and monitoring tools
+Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the box. In this lab, we’ll deploy the Gloo UI (with its built-in OTEL collector) for tracing, and Grafana + Prometheus for metrics visualization.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`
 
 ## Lab Objectives
-- Deploy tracing (Tempo)
-- Deploy metrics + logs (Prometheus, Grafana, Loki)
+- Deploy Gloo UI with OTEL collector (for tracing)
+- Deploy metrics (Prometheus, Grafana)
 - Configure Prometheus to scrape Agentgateway
 
-## Deploy tracing
+## Deploy Gloo UI
 
-Install Tempo:
+The Gloo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
+
 ```bash
-helm repo add grafana https://grafana.github.io/helm-charts
-helm repo update grafana
-helm upgrade --install tempo \
-grafana/tempo-distributed \
---namespace monitoring \
+export AGW_UI_VERSION=0.3.10
+helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
+--namespace agentgateway-system \
 --create-namespace \
---wait \
---values - <<EOF
-#--- Image overrides for private registry ---
-#tempo:
-#  image:
-#    registry: docker.io
-#    repository: grafana/tempo
-#    tag: ""
-#memcached:
-#  image:
-#    registry: docker.io
-#    repository: memcached
-#    tag: ""
-#--- imagePullSecrets for private registry ---
-#global:
-#  imagePullSecrets:
-#  - name: my-registry-secret
-minio:
-  enabled: false
-traces:
-  otlp:
-    grpc:
-      enabled: true
-    http:
-      enabled: true
-  zipkin:
+--version "$AGW_UI_VERSION" \
+-f - <<EOF
+imagePullSecrets: []
+global:
+  imagePullPolicy: IfNotPresent
+service:
+  type: ClusterIP
+  clusterIP: ""
+products:
+  kagent:
     enabled: false
-  jaeger:
-    thriftHttp:
-      enabled: false
-  opencensus:
+  agentgateway:
+    enabled: true
+    namespace: agentgateway-system
+  mesh:
     enabled: false
+  agentregistry:
+    enabled: false
+clickhouse:
+  enabled: true
+tracing:
+  verbose: true
 EOF
 ```
 
-## Deploy metrics + logs
+Check that the Gloo UI components are running:
+
+```bash
+kubectl get pods -n agentgateway-system -l app.kubernetes.io/instance=management
+```
+
+## Deploy metrics
 
 (Optional) Set a custom Grafana admin password before installation:
 ```bash
 export GRAFANA_ADMIN_PASSWORD="your-secure-password"
 ```
 
-Install Grafana Prometheus and add Tempo as a data source
+Install Grafana and Prometheus
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm repo update prometheus-community
 helm upgrade --install grafana-prometheus \
+--create-namespace \
   prometheus-community/kube-prometheus-stack \
   --version 80.4.2 \
   --namespace monitoring \
@@ -86,12 +82,6 @@ grafana:
   service:
     type: ClusterIP
     port: 3000
-  additionalDataSources:
-    - name: Tempo
-      type: tempo
-      access: proxy
-      url: "http://tempo-query-frontend.monitoring.svc.cluster.local:3200"
-      uid: 'local-tempo-uid'
   sidecar:
     dashboards:
       enabled: true
@@ -183,15 +173,18 @@ grafana-prometheus-fbdf9c69f-p9qq5                       3/3     Running   0    
 grafana-prometheus-kube-pr-operator-857d774dbf-djxch     1/1     Running   0          2m54s
 grafana-prometheus-kube-state-metrics-7c6d5ff8f6-77hkl   1/1     Running   0          2m54s
 prometheus-grafana-prometheus-kube-pr-prometheus-0       2/2     Running   0          2m50s
-tempo-compactor-6648b659d4-wdkrj                         1/1     Running   0          6m17s
-tempo-distributor-8454cf454-lsd7f                        1/1     Running   0          6m17s
-tempo-ingester-0                                         1/1     Running   0          6m17s
-tempo-ingester-1                                         1/1     Running   0          6m17s
-tempo-ingester-2                                         1/1     Running   0          6m17s
-tempo-memcached-0                                        1/1     Running   0          6m17s
-tempo-querier-5888ff7f7f-zq8qs                           1/1     Running   0          6m17s
-tempo-query-frontend-96497bc8-p49cs                      1/1     Running   0          6m17s
 ```
+
+## Access Gloo UI
+
+To access the Gloo UI and view traces:
+
+1. Port-forward to the Gloo UI service:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
+
+2. Open your browser and navigate to `http://localhost:4000`
 
 ## Access Grafana
 

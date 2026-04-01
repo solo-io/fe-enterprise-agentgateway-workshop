@@ -2,7 +2,7 @@
 In this lab, you'll configure a direct response action that returns a fixed HTTP response without calling a backend LLM. This is useful when you need to quickly override an endpoint's behavior, such as for health checks or temporarily isolating a problematic route
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`, and `002`
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Configure a direct response using `AgentgatewayPolicy`
