@@ -2,6 +2,8 @@
 
 0.7.4 - (3-31-26)
 ---
+- Add new lab: `configure-body-based-routing.md` — routes requests to OpenAI (`gpt-4o-mini`) or mock LLM (`mock-gpt-4o`) based on the `model` field in the JSON request body; uses `AgentgatewayPolicy` with `phase: PreRouting` to extract `x-gateway-model-name` and `x-gateway-model-status` headers via CEL expressions; `HTTPRoute` header-matches on those headers with a fallback rule for `x-gateway-model-status: unspecified`
+- `README.md`: add `configure-body-based-routing.md` to Routing section
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0-beta.8`; update tracing `otlpEndpoint` to `solo-enterprise-telemetry-collector.agentgateway-system.svc.cluster.local:4317`
 - Rename `002-set-up-monitoring-tools.md` → `002-set-up-ui-and-monitoring-tools.md`; replace Tempo install with Gloo UI (`management` Helm chart, `AGW_UI_VERSION=0.3.12`); remove Tempo datasource from Grafana values; remove Tempo pods from expected output; add "Access Gloo UI" section (port-forward to `solo-enterprise-ui 4000:80`); add `global.image` override comments for Solo-owned images (UI, OTEL collector); move `imagePullSecrets` under `global.imagePullSecrets` (propagates to subcharts); add ClickHouse image override comments with note on missing registry key; update H1 and `README.md` link text; update all cross-references across all lab files
 - Update observability callout in all lab files: clarify Grafana provides metrics dashboard, AgentGateway UI provides traces
