@@ -49,7 +49,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2.2.0
+export ENTERPRISE_AGW_VERSION=v2.3.0-beta.8
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -228,7 +228,7 @@ spec:
         format: json
       tracing:
         otlpProtocol: grpc
-        otlpEndpoint: http://tempo-distributor.monitoring.svc.cluster.local:4317
+        otlpEndpoint: http://solo-enterprise-telemetry-collector.agentgateway-system.svc.cluster.local:4317
         randomSampling: 'true'
         fields:
           add:

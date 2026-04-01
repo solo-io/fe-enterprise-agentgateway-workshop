@@ -31,7 +31,7 @@ Before starting this workshop, you will need:
 > **Start here.** All other labs depend on these two.
 
 - [001 — Install Enterprise Agentgateway](001-install-enterprise-agentgateway.md)
-- [002 — Set Up Monitoring Tools](002-set-up-monitoring-tools.md)
+- [002 — Set Up UI and Monitoring Tools](002-set-up-ui-and-monitoring-tools.md)
 
 > **OpenShift users:** Use the OpenShift-specific versions instead:
 > [001 — Install Enterprise Agentgateway (OCP)](install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md) · [002 — Set Up Monitoring Tools (OCP)](install-on-openshift/002-set-up-monitoring-tools-ocp.md)
@@ -45,6 +45,7 @@ Before starting this workshop, you will need:
 - [Path-per-Model Routing](routing-path-per-model.md) _(OpenAI)_
 - [Header Matching Routing](routing-header-matching.md) _(OpenAI)_
 - [Query Parameter Matching Routing](routing-query-parameter-matching.md) _(OpenAI)_
+- [Body-Based Routing](configure-body-based-routing.md) _(OpenAI + Mock LLM)_
 - [Routing to AWS Bedrock](configure-routing-aws-bedrock.md) _(AWS Bedrock)_
 - [Routing to AWS Bedrock via API Keys](configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
 - [Routing to Anthropic](configure-routing-anthropic.md) _(Anthropic)_

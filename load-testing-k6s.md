@@ -3,7 +3,7 @@
 In this lab, you'll learn how to perform load testing on the AgentGateway using k6s, a modern load testing tool. You'll deploy mock OpenAI services, configure routing, and generate sustained load with ramping patterns to validate performance and observe metrics.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001` and `002`.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Deploy mock OpenAI services for load testing

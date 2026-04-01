@@ -1,7 +1,7 @@
 # Configure Routing to AWS Bedrock Provider (Using short/long term API Keys)
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`, and `002`
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Configure `AmazonBedrockLimitedAccess` IAM permission for AWS Bedrock access (required for short-term API keys)
@@ -274,7 +274,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For a comprehensive view of metrics and traces, use the AgentGateway Grafana dashboard installed in the [monitoring tools lab](002-set-up-monitoring-tools.md).
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash
