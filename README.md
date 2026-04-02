@@ -52,6 +52,7 @@ Before starting this workshop, you will need:
 - [Body-Based Routing](configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
 - [Routing to AWS Bedrock](configure-routing-aws-bedrock.md) _(AWS Bedrock)_
 - [Routing to AWS Bedrock via API Keys](configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
+- [AWS Bedrock Titan Embeddings](configure-bedrock-titan-embeddings.md) _(AWS Bedrock)_
 - [Routing to Anthropic](configure-routing-anthropic.md) _(Anthropic)_
 - [Routing to Azure OpenAI](configure-routing-azure-openai.md) _(Azure OpenAI)_
 - [Routing to Google Vertex AI](configure-routing-vertexai.md) _(Google Vertex AI)_

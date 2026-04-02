@@ -3,6 +3,8 @@
 0.7.6 - (4-1-26)
 ---
 - `README.md`: add `configure-body-based-routing.md` to Transformations section; add `_(see also: Routing)_` / `_(see also: Transformations)_` cross-references on both entries
+- Add new lab: `configure-bedrock-titan-embeddings.md` — routes embedding requests to Amazon Titan Embed Text v2 via `Passthrough` route type; `HTTPRoute` rewrites `/bedrock/titan-embed` to `bedrock-runtime.us-east-1.amazonaws.com/model/amazon.titan-embed-text-v2:0/invoke`
+- `README.md`: add `configure-bedrock-titan-embeddings.md` to Routing section under AWS Bedrock entries
 
 0.7.5 - (4-1-26)
 ---
