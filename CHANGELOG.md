@@ -1,5 +1,10 @@
 # Changelog
 
+0.7.5 - (4-1-26)
+---
+- Minor README.md formatting
+- Add new lab: `production-observability-alerting-and-scaling.md` in Observability section
+
 0.7.4 - (3-31-26)
 ---
 - Add new lab: `configure-body-based-routing.md` — routes requests to OpenAI (`gpt-4o-mini`) or mock LLM (`mock-gpt-4o`) based on the `model` field in the JSON request body; uses `AgentgatewayPolicy` with `phase: PreRouting` to extract `x-gateway-model-name` and `x-gateway-model-status` headers via CEL expressions; `HTTPRoute` header-matches on those headers with a fallback rule for `x-gateway-model-status: unspecified`

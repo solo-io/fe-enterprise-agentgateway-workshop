@@ -23,6 +23,7 @@ Before starting this workshop, you will need:
 - [Identity & Delegation](#identity--delegation)
 - [Evaluations](#evaluations)
 - [Load Testing](#load-testing)
+- [Observability](#observability)
 
 ---
 
@@ -34,7 +35,10 @@ Before starting this workshop, you will need:
 - [002 — Set Up UI and Monitoring Tools](002-set-up-ui-and-monitoring-tools.md)
 
 > **OpenShift users:** Use the OpenShift-specific versions instead:
-> [001 — Install Enterprise Agentgateway (OCP)](install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md) · [002 — Set Up Monitoring Tools (OCP)](install-on-openshift/002-set-up-monitoring-tools-ocp.md)
+>
+> [001 — Install Enterprise Agentgateway (OCP)](install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md)
+>
+> [002 — Set Up Monitoring Tools (OCP)](install-on-openshift/002-set-up-monitoring-tools-ocp.md)
 
 ---
 
@@ -128,6 +132,12 @@ Before starting this workshop, you will need:
 ## Load Testing
 
 - [Load Testing with k6s](load-testing-k6s.md)
+
+---
+
+## Observability
+
+- [Production Observability, Alerting, and Scaling](production-observability-alerting-and-scaling.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
