@@ -49,7 +49,7 @@ Before starting this workshop, you will need:
 - [Path-per-Model Routing](routing-path-per-model.md) _(OpenAI)_
 - [Header Matching Routing](routing-header-matching.md) _(OpenAI)_
 - [Query Parameter Matching Routing](routing-query-parameter-matching.md) _(OpenAI)_
-- [Body-Based Routing](configure-body-based-routing.md) _(OpenAI + Mock LLM)_
+- [Body-Based Routing](configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
 - [Routing to AWS Bedrock](configure-routing-aws-bedrock.md) _(AWS Bedrock)_
 - [Routing to AWS Bedrock via API Keys](configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
 - [Routing to Anthropic](configure-routing-anthropic.md) _(Anthropic)_
@@ -95,6 +95,7 @@ Before starting this workshop, you will need:
 
 - [Prompt Enrichment](prompt-enrichment.md)
 - [Request/Response Transformations](transformations.md)
+- [Body-Based Routing](configure-body-based-routing.md) _(see also: Routing)_
 
 ---
 

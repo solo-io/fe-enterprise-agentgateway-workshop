@@ -1,5 +1,9 @@
 # Changelog
 
+0.7.6 - (4-1-26)
+---
+- `README.md`: add `configure-body-based-routing.md` to Transformations section; add `_(see also: Routing)_` / `_(see also: Transformations)_` cross-references on both entries
+
 0.7.5 - (4-1-26)
 ---
 - Minor README.md formatting
