@@ -3,6 +3,7 @@
 0.7.5 - (4-1-26)
 ---
 - Minor README.md formatting
+- Add new lab: `production-observability-alerting-and-scaling.md` in Observability section
 
 0.7.4 - (3-31-26)
 ---

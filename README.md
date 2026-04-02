@@ -23,6 +23,7 @@ Before starting this workshop, you will need:
 - [Identity & Delegation](#identity--delegation)
 - [Evaluations](#evaluations)
 - [Load Testing](#load-testing)
+- [Observability](#observability)
 
 ---
 
@@ -131,6 +132,12 @@ Before starting this workshop, you will need:
 ## Load Testing
 
 - [Load Testing with k6s](load-testing-k6s.md)
+
+---
+
+## Observability
+
+- [Production Observability, Alerting, and Scaling](production-observability-alerting-and-scaling.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
