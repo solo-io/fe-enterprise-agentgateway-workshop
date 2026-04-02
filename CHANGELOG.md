@@ -1,5 +1,9 @@
 # Changelog
 
+0.7.7 - (4-1-26)
+---
+- Change lab name to `configure-routing-aws-bedrock-titan-embeddings.md` to match other AWS Bedrock labs
+
 0.7.6 - (4-1-26)
 ---
 - `README.md`: add `configure-body-based-routing.md` to Transformations section; add `_(see also: Routing)_` / `_(see also: Transformations)_` cross-references on both entries
