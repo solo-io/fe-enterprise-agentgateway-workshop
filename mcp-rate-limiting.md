@@ -6,9 +6,9 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 ## Lab Objectives
 - Deploy the `mcp-server-everything` reference MCP server
 - Understand how MCP tool calls map to HTTP requests
-- Create a `RateLimitConfig` with per-tool CEL rules (`get-env`: 3 calls/min, all others: 10 calls/min)
+- Create a `RateLimitConfig` that limits the `get-env` tool to 3 calls per minute
 - Apply the rate limit via `EnterpriseAgentgatewayPolicy` targeting the MCP HTTPRoute
-- Verify independent counters — exhausting `get-env`'s budget does not affect `echo`
+- Verify that `get-env` is rate limited while other tools like `echo` are unaffected
 
 ## Overview
 
@@ -25,7 +25,7 @@ A typical MCP client session produces approximately 3–5 HTTP POSTs:
 
 This means a limit of "5 requests per minute" translates to roughly 1 tool call session per minute — not 5 individual calls. Size your limits in sessions, not raw HTTP requests.
 
-To apply different limits per tool, use CEL descriptors to inspect the JSON-RPC request body. The CEL expressions extract the `method` field and the `params.name` field, so each tool gets its own independent counter bucket. Operations like `initialize` and `tools/list` are never throttled because they don't match the `tools/call` method.
+To target a specific tool, use a CEL descriptor to inspect the JSON-RPC request body and extract the tool name from `params.name`. Only requests matching the configured tool name are counted — all other tools and MCP operations like `initialize` and `tools/list` pass through without restriction.
 
 ## Deploy the MCP Server
 
