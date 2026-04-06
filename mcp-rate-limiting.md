@@ -6,9 +6,9 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 ## Lab Objectives
 - Deploy the `mcp-server-everything` reference MCP server
 - Understand how MCP tool calls map to HTTP requests
-- Create a `RateLimitConfig` with per-tool CEL rules (expensive tools: 3 calls/min, standard tools: 10 calls/min)
+- Create a `RateLimitConfig` with per-tool CEL rules (`get-env`: 3 calls/min, all others: 10 calls/min)
 - Apply the rate limit via `EnterpriseAgentgatewayPolicy` targeting the MCP HTTPRoute
-- Verify that each tool has an independent counter — exhausting one tool's budget does not affect others
+- Verify independent counters — exhausting `get-env`'s budget does not affect `echo`
 
 ## Overview
 
@@ -176,11 +176,11 @@ In the MCP Inspector menu, connect to your AgentGateway:
 From the **Tools** tab, click **List Tools** and verify the `mcp-server-everything` tools are available:
 - `echo` — returns a message back to the caller
 - `get-sum` — adds two numbers
-- `trigger-long-running-operation` — simulates a long-running task
+- `get-env` — returns server environment variables
 
 ## Configure Per-Tool Rate Limiting
 
-Create a `RateLimitConfig` with per-tool CEL rules. The following example limits `trigger-long-running-operation` to 3 calls per minute and all other tool calls to 10 calls per minute:
+Create a `RateLimitConfig` with per-tool CEL rules. The following example limits `get-env` to 3 calls per minute and all other tool calls to 10 calls per minute:
 
 ```bash
 kubectl apply -f- <<EOF
@@ -197,12 +197,7 @@ spec:
       value: "tools/call"
       descriptors:
       - key: tool_name
-        value: "trigger-long-running-operation"
-        rateLimit:
-          requestsPerUnit: 3
-          unit: MINUTE
-      - key: tool_name
-        value: "sampleLLMCall"
+        value: "get-env"
         rateLimit:
           requestsPerUnit: 3
           unit: MINUTE
@@ -221,12 +216,10 @@ spec:
 EOF
 ```
 
-The `sampleLLMCall` entry demonstrates how to add additional expensive tools. It is not a tool provided by `mcp-server-everything`, but shows how you would add another tool to the same limit tier in a real deployment.
-
 The CEL expressions inspect the JSON-RPC body on every request:
 
 - **`mcp_method`**: Returns `"tools/call"` only when the JSON-RPC `method` field matches exactly. For other MCP operations like `initialize` or `tools/list`, it returns `"other"`, which has no configured limit — those operations are never throttled.
-- **`tool_name`**: Extracts the tool name from `params.name` so each tool gets its own counter bucket. Combined with `mcp_method`, the rate limit service receives a two-key descriptor like `mcp_method=tools/call, tool_name=trigger-long-running-operation` and looks up the matching rule.
+- **`tool_name`**: Extracts the tool name from `params.name` so each tool gets its own counter bucket. Combined with `mcp_method`, the rate limit service receives a two-key descriptor like `mcp_method=tools/call, tool_name=get-env` and looks up the matching rule.
 
 Apply the rate limit by referencing the `RateLimitConfig` in an `EnterpriseAgentgatewayPolicy` that targets the MCP HTTPRoute:
 
@@ -260,78 +253,31 @@ Both `Accepted` and `Attached` conditions must be `True` before testing.
 
 ## Test Per-Tool Rate Limits
 
-### Hit the limit on an expensive tool
+### Hit the limit on a rate-limited tool
 
-Call `trigger-long-running-operation` 5 times in a loop. The 3/min limit means the 4th call should be rate limited:
+> **Note:** `get-env` is not actually an expensive tool, but imagine it as one that returns sensitive environment data you want to tightly control — for example, a tool that reads secrets, calls a paid external API, or triggers a long-running backend job.
 
-```bash
-for i in $(seq 1 5); do
-  npx @modelcontextprotocol/inspector \
-    --cli "http://$GATEWAY_IP:8080/mcp" \
-    --transport http \
-    --method tools/call \
-    --tool-name trigger-long-running-operation \
-    --tool-arg duration=1 \
-    --tool-arg steps=1
-done
-```
+In the MCP Inspector, call the `get-env` tool 4 times:
 
-Expected output:
+1. From the **Tools** tab, click **List Tools** and select the `get-env` tool
+2. Leave the parameters empty (no input required) and click **Run Tool**
+3. Repeat 3 more times
+
+The first 3 calls will succeed. On the 4th call you should see an error:
 
 ```
-{
-  "content": [{ "type": "text", "text": "Operation started..." }]
-}
-{
-  "content": [{ "type": "text", "text": "Operation started..." }]
-}
-{
-  "content": [{ "type": "text", "text": "Operation started..." }]
-}
-Failed to call tool trigger-long-running-operation: Failed to list tools: Streamable HTTP error: Error POSTing to endpoint: rate limit exceeded
-
-Failed with exit code: 1
-Failed to call tool trigger-long-running-operation: Failed to list tools: Streamable HTTP error: Error POSTing to endpoint: rate limit exceeded
-
-Failed with exit code: 1
+MCP error -32001: Error POSTing to endpoint (HTTP 429): rate limit exceeded
 ```
 
 ### Verify independent counters with a standard tool
 
-Now call `echo` 5 times. Even though `trigger-long-running-operation` has hit its limit, `echo` has its own independent counter (10/min) and all 5 calls should succeed:
+Even though `get-env` has hit its 3/min limit, `echo` has its own independent counter (10/min) and should still succeed:
 
-```bash
-for i in $(seq 1 5); do
-  npx @modelcontextprotocol/inspector \
-    --cli "http://$GATEWAY_IP:8080/mcp" \
-    --transport http \
-    --method tools/call \
-    --tool-name echo \
-    --tool-arg message='Hello World!'
-done
-```
+1. From the **Tools** tab, select the `echo` tool
+2. Enter any message (e.g. `Hello World!`) and click **Run Tool**
+3. Verify you get back `Echo: Hello World!`
 
-Expected output:
-
-```
-{
-  "content": [{ "type": "text", "text": "Echo: Hello World!" }]
-}
-{
-  "content": [{ "type": "text", "text": "Echo: Hello World!" }]
-}
-{
-  "content": [{ "type": "text", "text": "Echo: Hello World!" }]
-}
-{
-  "content": [{ "type": "text", "text": "Echo: Hello World!" }]
-}
-{
-  "content": [{ "type": "text", "text": "Echo: Hello World!" }]
-}
-```
-
-Exhausting the budget for `trigger-long-running-operation` has no effect on `echo` because they have separate rate limit counters.
+Exhausting the budget for `get-env` has no effect on `echo` because they have separate rate limit counters.
 
 ## Cleanup
 
