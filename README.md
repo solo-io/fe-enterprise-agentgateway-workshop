@@ -83,7 +83,7 @@ Before starting this workshop, you will need:
 - [Local Token-Based Rate Limiting](local-token-rate-limiting.md)
 - [Global Token-Based Rate Limiting](global-token-rate-limiting.md)
 - [Virtual Keys](virtual-keys.md) _(see also: Security)_
-- [MCP Rate Limiting](mcp-rate-limiting.md) _(see also: MCP)_
+- [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: MCP)_
 
 ---
 
@@ -108,7 +108,7 @@ Before starting this workshop, you will need:
 - [In-Cluster MCP](in-cluster-mcp.md)
 - [Remote MCP](remote-mcp.md)
 - [Dynamic MCP](dynamic-mcp.md)
-- [MCP Rate Limiting](mcp-rate-limiting.md) _(see also: Rate Limiting)_
+- [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
 - [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
 
 ---

@@ -1,4 +1,4 @@
-# Rate Limiting for MCP
+# MCP Tool Rate Limiting
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -253,7 +253,7 @@ In the MCP Inspector, call the `get-env` tool 4 times:
 The first 3 calls will succeed. On the 4th call you should see an error:
 
 ```
-MCP error -32001: Error POSTing to endpoint (HTTP 429): rate limit exceeded
+MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: 
 ```
 
 ### Verify independent counters with a standard tool
