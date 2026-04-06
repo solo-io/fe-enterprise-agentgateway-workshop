@@ -141,6 +141,7 @@ Before starting this workshop, you will need:
 
 ## Observability
 
+- [LLM Cost Tracking](llm-cost-tracking.md) _(see also: Security, Rate Limiting)_
 - [Production Observability, Alerting, and Scaling](production-observability-alerting-and-scaling.md)
 
 # Use Cases
