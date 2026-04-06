@@ -49,7 +49,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2.3.0-beta.8
+export ENTERPRISE_AGW_VERSION=v2.3.0-rc.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -198,10 +198,11 @@ spec:
   rawConfig:
     config:
       # --- Label all metrics using a value extracted from the request body
-      #metrics:
-      #  fields:
-      #    add:
-      #      modelId: json(request.body).modelId
+      metrics:
+        fields:
+          add:
+            user_id: 'request.headers["x-user-id"]'
+            #modelId: json(request.body).modelId
       logging:
         fields:
           add:

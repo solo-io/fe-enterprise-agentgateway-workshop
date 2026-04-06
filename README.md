@@ -69,6 +69,7 @@ Before starting this workshop, you will need:
 ## Security
 
 - [API Key Masking](api-key-masking.md)
+- [Virtual Keys](virtual-keys.md) _(see also: Rate Limiting)_
 - [JWT Auth with RBAC](jwt-auth-with-rbac.md)
 - [TLS Termination](tls-termination.md)
 - [Frontend mTLS](frontend-mtls.md)
@@ -81,6 +82,8 @@ Before starting this workshop, you will need:
 - [Request-Based Rate Limiting](request-based-rate-limiting.md)
 - [Local Token-Based Rate Limiting](local-token-rate-limiting.md)
 - [Global Token-Based Rate Limiting](global-token-rate-limiting.md)
+- [Virtual Keys](virtual-keys.md) _(see also: Security)_
+- [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: MCP)_
 
 ---
 
@@ -105,6 +108,7 @@ Before starting this workshop, you will need:
 - [In-Cluster MCP](in-cluster-mcp.md)
 - [Remote MCP](remote-mcp.md)
 - [Dynamic MCP](dynamic-mcp.md)
+- [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
 - [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
 
 ---
@@ -139,6 +143,7 @@ Before starting this workshop, you will need:
 
 ## Observability
 
+- [LLM Cost Tracking](llm-cost-tracking.md) _(see also: Security, Rate Limiting)_
 - [Production Observability, Alerting, and Scaling](production-observability-alerting-and-scaling.md)
 
 # Use Cases
