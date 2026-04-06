@@ -8,6 +8,8 @@
 - `README.md`: add `virtual-keys.md` to Security (after API Key Masking) and Rate Limiting (after Global Token-Based Rate Limiting) with mutual cross-references
 - Add new lab: `llm-cost-tracking.md` — per-user token usage via access logs and Prometheus PromQL queries for consumption and cumulative cost
 - `README.md`: add `llm-cost-tracking.md` to Observability section with `_(see also: Security, Rate Limiting)_` cross-reference
+- Add new lab: `mcp-tool-rate-limiting.md` — per-tool rate limiting for MCP traffic using `RateLimitConfig` with a CEL descriptor that extracts the tool name from the JSON-RPC body; limits `get-env` (Print Environment Tool) to 3 calls/min while all other tools are unrestricted; validation via MCP Inspector GUI
+- `README.md`: add `mcp-tool-rate-limiting.md` to Rate Limiting and MCP sections with mutual cross-references
 
 0.7.7 - (4-1-26)
 ---
