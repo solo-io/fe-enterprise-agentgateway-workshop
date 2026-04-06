@@ -180,7 +180,7 @@ From the **Tools** tab, click **List Tools** and verify the `mcp-server-everythi
 
 ## Configure Per-Tool Rate Limiting
 
-Create a `RateLimitConfig` with per-tool CEL rules. The following example limits `get-env` to 3 calls per minute and all other tool calls to 10 calls per minute:
+Create a `RateLimitConfig` that limits `get-env` to 3 calls per minute. All other tools are unaffected:
 
 ```bash
 kubectl apply -f- <<EOF
@@ -193,33 +193,20 @@ spec:
   raw:
     domain: "mcp-tools"
     descriptors:
-    - key: mcp_method
-      value: "tools/call"
-      descriptors:
-      - key: tool_name
-        value: "get-env"
-        rateLimit:
-          requestsPerUnit: 3
-          unit: MINUTE
-      - key: tool_name
-        rateLimit:
-          requestsPerUnit: 10
-          unit: MINUTE
+    - key: tool_name
+      value: "get-env"
+      rateLimit:
+        requestsPerUnit: 3
+        unit: MINUTE
     rateLimits:
     - actions:
-      - cel:
-          expression: 'json(request.body).with(body, body.method == "tools/call" ? "tools/call" : "other")'
-          key: "mcp_method"
       - cel:
           expression: 'json(request.body).with(body, body.method == "tools/call" ? string(body.params.name) : "none")'
           key: "tool_name"
 EOF
 ```
 
-The CEL expressions inspect the JSON-RPC body on every request:
-
-- **`mcp_method`**: Returns `"tools/call"` only when the JSON-RPC `method` field matches exactly. For other MCP operations like `initialize` or `tools/list`, it returns `"other"`, which has no configured limit — those operations are never throttled.
-- **`tool_name`**: Extracts the tool name from `params.name` so each tool gets its own counter bucket. Combined with `mcp_method`, the rate limit service receives a two-key descriptor like `mcp_method=tools/call, tool_name=get-env` and looks up the matching rule.
+The CEL expression extracts the tool name from the JSON-RPC body for `tools/call` requests. For `initialize`, `tools/list`, and other MCP operations where `params.name` doesn't exist, it returns `"none"` — which matches no descriptor and is never rate limited. Only requests where `tool_name=get-env` are counted against the 3/min limit.
 
 Apply the rate limit by referencing the `RateLimitConfig` in an `EnterpriseAgentgatewayPolicy` that targets the MCP HTTPRoute:
 
