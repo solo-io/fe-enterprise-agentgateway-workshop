@@ -122,6 +122,9 @@ spec:
     targets:
     - name: mcp-target
       selector:
+        namespaces:
+          matchLabels:
+            kubernetes.io/metadata.name: mcp
         services:
           matchLabels:
             app: mcp-server-everything
@@ -134,6 +137,7 @@ metadata:
 spec:
   parentRefs:
   - name: agentgateway-proxy
+    namespace: agentgateway-system
   rules:
     - matches:
       - path:
@@ -143,6 +147,8 @@ spec:
       - name: mcp-backend
         group: agentgateway.dev
         kind: AgentgatewayBackend
+      timeouts:
+        request: "0s"
 EOF
 ```
 
@@ -164,7 +170,7 @@ npx @modelcontextprotocol/inspector@0.21.1
 
 In the MCP Inspector menu, connect to your AgentGateway:
 - **Transport Type**: Select `Streamable HTTP`
-- **URL**: Enter `http://$GATEWAY_IP:8080/mcp` (replace with your actual IP)
+- **URL**: Enter `http://$GATEWAY_IP:8080/mcp` (use the value exported above)
 - Click **Connect**
 
 From the **Tools** tab, click **List Tools** and verify the `mcp-server-everything` tools are available:
@@ -214,6 +220,8 @@ spec:
           key: "tool_name"
 EOF
 ```
+
+The `sampleLLMCall` entry demonstrates how to add additional expensive tools. It is not a tool provided by `mcp-server-everything`, but shows how you would add another tool to the same limit tier in a real deployment.
 
 The CEL expressions inspect the JSON-RPC body on every request:
 
@@ -280,6 +288,9 @@ Expected output:
 {
   "content": [{ "type": "text", "text": "Operation started..." }]
 }
+Failed to call tool trigger-long-running-operation: Failed to list tools: Streamable HTTP error: Error POSTing to endpoint: rate limit exceeded
+
+Failed with exit code: 1
 Failed to call tool trigger-long-running-operation: Failed to list tools: Streamable HTTP error: Error POSTing to endpoint: rate limit exceeded
 
 Failed with exit code: 1
