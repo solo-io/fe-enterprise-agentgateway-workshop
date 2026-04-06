@@ -1,5 +1,9 @@
 # Changelog
 
+0.7.8 - (4-6-26)
+---
+- `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0-rc.1`
+
 0.7.7 - (4-1-26)
 ---
 - Change lab name to `configure-routing-aws-bedrock-titan-embeddings.md` to match other AWS Bedrock labs
