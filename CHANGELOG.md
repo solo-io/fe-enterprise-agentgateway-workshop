@@ -3,6 +3,9 @@
 0.7.8 - (4-6-26)
 ---
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0-rc.1`
+- Add new lab: `virtual-keys.md` — per-user API key auth with independent token budgets, budget isolation testing, and advanced patterns: multi-tenant virtual keys, tiered budgets via `headersFromMetadataEntry`, and per-user Prometheus observability
+- `001-install-enterprise-agentgateway.md`: enable `metrics.fields.add.user_id` from `request.headers["x-user-id"]` in `EnterpriseAgentgatewayParameters` rawConfig to populate `user_id` label on `agentgateway_gen_ai_client_token_usage` metrics
+- `README.md`: add `virtual-keys.md` to Security (after API Key Masking) and Rate Limiting (after Global Token-Based Rate Limiting) with mutual cross-references
 
 0.7.7 - (4-1-26)
 ---

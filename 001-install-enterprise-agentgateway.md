@@ -198,10 +198,11 @@ spec:
   rawConfig:
     config:
       # --- Label all metrics using a value extracted from the request body
-      #metrics:
-      #  fields:
-      #    add:
-      #      modelId: json(request.body).modelId
+      metrics:
+        fields:
+          add:
+            user_id: 'request.headers["x-user-id"]'
+            #modelId: json(request.body).modelId
       logging:
         fields:
           add:
