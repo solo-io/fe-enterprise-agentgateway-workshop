@@ -259,7 +259,7 @@ Both `Accepted` and `Attached` conditions must be `True` before testing.
 
 In the MCP Inspector, call the `get-env` tool 4 times:
 
-1. From the **Tools** tab, click **List Tools** and select the `get-env` tool
+1. From the **Tools** tab, click **List Tools** and select the **Print Environment Tool** (`get-env`)
 2. Leave the parameters empty (no input required) and click **Run Tool**
 3. Repeat 3 more times
 
