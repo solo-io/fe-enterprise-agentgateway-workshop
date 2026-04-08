@@ -242,26 +242,6 @@ spec:
         service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     spec:
       type: LoadBalancer
-  #--- Use rawConfig to inline custom configuration from ConfigMap ---
-  rawConfig:
-    config:
-      # --- Label all metrics using a value extracted from the request body
-      #metrics:
-      #  fields:
-      #    add:
-      #      modelId: json(request.body).modelId
-      tracing:
-        otlpProtocol: grpc
-        otlpEndpoint: http://jaeger.observability.svc.cluster.local:4317
-        randomSampling: 'true'
-        fields:
-          add:
-            # --- Capture all request headers as a single map under rq.headers.all
-            rq.headers.all: 'request.headers'
-            # --- Capture claims from a verified JWT token if JWT policy is enabled
-            jwt: 'jwt'
-            # --- Capture the whole response body as JSON
-            response.body: 'json(response.body)'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -347,6 +327,44 @@ spec:
         # --- Capture a field in the request body
         #- name: request.body.modelId
         #  expression: json(request.body).modelId
+EOF
+```
+
+## Configure tracing
+
+Apply an `EnterpriseAgentgatewayPolicy` to export traces to the Jaeger collector deployed in `002`. Skip this step if you are not setting up Jaeger.
+
+```bash
+kubectl apply -f- <<'EOF'
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: tracing
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: agentgateway-proxy
+  frontend:
+    tracing:
+      backendRef:
+        name: jaeger
+        namespace: observability
+        port: 4317
+      protocol: GRPC
+      randomSampling: "true"
+      attributes:
+        add:
+        # --- Capture all request headers as a single map under rq.headers.all
+        - name: rq.headers.all
+          expression: request.headers
+        # --- Capture claims from a verified JWT token if JWT policy is enabled
+        - name: jwt
+          expression: jwt
+        # --- Capture the whole response body as JSON
+        - name: response.body
+          expression: json(response.body)
 EOF
 ```
 

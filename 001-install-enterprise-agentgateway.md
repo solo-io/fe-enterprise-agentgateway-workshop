@@ -203,18 +203,6 @@ spec:
           add:
             user_id: 'request.headers["x-user-id"]'
             #modelId: json(request.body).modelId
-      tracing:
-        otlpProtocol: grpc
-        otlpEndpoint: http://solo-enterprise-telemetry-collector.agentgateway-system.svc.cluster.local:4317
-        randomSampling: 'true'
-        fields:
-          add:
-            # --- Capture the claims from a verified JWT token if JWT policy is enabled
-            jwt: 'jwt'
-            # --- Capture entire response body and parse it as JSON
-            response.body: 'json(response.body)'
-            # --- Capture a single request header by name (example: x-foo)
-            x-foo: 'request.headers["x-foo"]'
   deployment:
     spec:
       replicas: 2
@@ -319,6 +307,44 @@ spec:
         # --- Capture a field in the request body
         #- name: request.body.modelId
         #  expression: json(request.body).modelId
+EOF
+```
+
+## Configure tracing
+
+Apply an `EnterpriseAgentgatewayPolicy` to export traces to the telemetry collector deployed in `002`. Skip this step if you are not setting up the Gloo UI.
+
+```bash
+kubectl apply -f- <<'EOF'
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: tracing
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: agentgateway-proxy
+  frontend:
+    tracing:
+      backendRef:
+        name: solo-enterprise-telemetry-collector
+        namespace: agentgateway-system
+        port: 4317
+      protocol: GRPC
+      randomSampling: "true"
+      attributes:
+        add:
+        # --- Capture the claims from a verified JWT token if JWT policy is enabled
+        - name: jwt
+          expression: jwt
+        # --- Capture entire response body and parse it as JSON
+        - name: response.body
+          expression: json(response.body)
+        # --- Capture a single request header by name (example: x-foo)
+        #- name: x-foo
+        #  expression: 'request.headers["x-foo"]'
 EOF
 ```
 
