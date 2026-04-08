@@ -175,7 +175,7 @@ spec:
       request:
         set:
           - name: x-gateway-model-name
-            value: "json(request.body).model"
+            value: "default(json(request.body).model, '')"
           - name: x-gateway-model-status
             value: "default(json(request.body).model, '') == '' ? 'unspecified' : 'specified'"
 EOF

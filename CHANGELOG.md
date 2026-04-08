@@ -1,5 +1,9 @@
 # Changelog
 
+0.8.0 - (4-8-26)
+---
+- `configure-body-based-routing.md`: change `x-gateway-model-name` extraction to `default(json(request.body).model, '')` to ensure client-supplied headers are always overwritten and the default model is used when no model is specified in the request body
+
 0.7.9 - (4-8-26)
 ---
 - Standardize `kubectl logs` command across all 31 labs to use label selector and `--prefix --tail 20`; drop `| jq` pipes
