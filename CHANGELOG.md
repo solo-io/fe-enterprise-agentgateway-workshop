@@ -1,5 +1,11 @@
 # Changelog
 
+0.7.9 - (4-8-26)
+---
+- `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0-rc.3`
+- `001-install-enterprise-agentgateway.md`: replace `rawConfig.config.logging` with a standalone `EnterpriseAgentgatewayPolicy` (`access-logs`) using `frontend.accessLog.attributes.add`; mark section optional with note that enrichment fields are not required by later labs; add "Next Steps" section pointing to `002`
+- `install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0-rc.3`; replace `rawConfig.config.logging` with a standalone `EnterpriseAgentgatewayPolicy` (`access-logs`) using `frontend.accessLog.attributes.add`; mark section optional; add "Next Steps" section pointing to `002`
+
 0.7.8 - (4-6-26)
 ---
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0-rc.1`
