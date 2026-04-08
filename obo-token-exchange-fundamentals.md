@@ -183,7 +183,7 @@ enterprise-agentgateway   ClusterIP   10.96.120.45    <none>        9977/TCP,777
 Confirm the STS started successfully in the controller logs:
 
 ```bash
-kubectl logs -n agentgateway-system deploy/enterprise-agentgateway | grep token
+kubectl logs -n agentgateway-system deploy/enterprise-agentgateway
 ```
 
 Expected Output (look for these lines):

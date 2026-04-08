@@ -89,8 +89,8 @@ EOF
 
 Verify the deployment:
 ```bash
-kubectl get pods -n agentgateway-system | grep mock-gpt-4o
-kubectl get svc -n agentgateway-system | grep mock-gpt-4o-svc
+kubectl get pods -n agentgateway-system
+kubectl get svc -n agentgateway-system
 ```
 
 You should see the mock-gpt-4o pod running and its service available on port 8000.
@@ -199,7 +199,7 @@ kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
 Verify only one pod is running:
 
 ```bash
-kubectl get pods -n agentgateway-system | grep "^agentgateway-"
+kubectl get pods -n agentgateway-system
 ```
 
 You should see only one agentgateway pod in Running state.
@@ -274,7 +274,7 @@ The Grafana dashboard provides aggregated metrics including:
 Check AgentGateway logs to see the failover behavior:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 50 | jq .
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 In the access logs (entries with `"scope": "request"`), you can observe:
@@ -495,8 +495,7 @@ HTTP Status: 200
 Check the AgentGateway logs to confirm which backends handled each request:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 10 | \
-  jq 'select(.scope == "request") | {status: ."http.status", endpoint: .endpoint, duration: .duration}'
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 **Expected log output:**

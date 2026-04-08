@@ -234,7 +234,7 @@ enterprise-agentgateway   ClusterIP   10.96.120.45    <none>        9977/TCP,777
 Confirm the STS started successfully in the controller logs:
 
 ```bash
-kubectl logs -n agentgateway-system deploy/enterprise-agentgateway | grep token
+kubectl logs -n agentgateway-system deploy/enterprise-agentgateway
 ```
 
 Expected Output (look for these lines):
@@ -543,7 +543,7 @@ Expected Output:
 Inspect the proxy access log to confirm the STS JWT policy is validating tokens on every request:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Look for `error=authentication failure` on rejected requests and `http.status=200` on accepted ones. Example:

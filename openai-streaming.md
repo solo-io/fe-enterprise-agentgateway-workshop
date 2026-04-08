@@ -155,7 +155,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 Check AgentGateway logs to see streaming request details:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20 | jq 'select(.scope == "request")'
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 For streaming requests, you'll see:

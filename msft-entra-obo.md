@@ -167,7 +167,7 @@ enterprise-agentgateway   ClusterIP   10.96.120.45    <none>        9977/TCP,777
 Confirm the token exchange server started in the controller logs:
 
 ```bash
-kubectl logs -n agentgateway-system deploy/enterprise-agentgateway | grep token
+kubectl logs -n agentgateway-system deploy/enterprise-agentgateway
 ```
 
 Expected Output (look for these lines):
@@ -206,7 +206,7 @@ Verify the env vars were applied:
 
 ```bash
 kubectl get enterpriseagentgatewayparameters agentgateway-config \
-  -n agentgateway-system -o jsonpath='{.spec.env}' | jq .
+  -n agentgateway-system -o jsonpath='{.spec.env}'
 ```
 
 Expected Output:

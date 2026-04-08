@@ -463,7 +463,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 AgentGateway automatically logs detailed information about LLM requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.

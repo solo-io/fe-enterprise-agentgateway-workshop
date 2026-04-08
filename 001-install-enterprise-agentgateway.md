@@ -49,7 +49,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2.3.0-rc.1
+export ENTERPRISE_AGW_VERSION=v2.3.0-rc.3
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -203,42 +203,6 @@ spec:
           add:
             user_id: 'request.headers["x-user-id"]'
             #modelId: json(request.body).modelId
-      logging:
-        fields:
-          add:
-            # --- Capture all JWT claims (use to discover available fields, then narrow down)
-            jwt.all: 'jwt'
-            # Streaming vs buffered — useful for debugging latency differences
-            llm.streaming: 'llm.streaming'
-            # Cache efficiency — shows cost savings from prompt caching
-            llm.cached_tokens: 'llm.cachedInputTokens'
-            # Reasoning tokens — relevant for o1/o3 models
-            llm.reasoning_tokens: 'llm.reasoningTokens'
-            # Full prompt conversation (has perf impact for large prompts)
-            llm.prompt: 'llm.prompt'
-            # LLM response content
-            llm.completion: 'llm.completion[0]'
-            # --- Capture a single request header by name (example: x-foo)
-            #x-foo: 'request.headers["x-foo"]'
-            # --- Capture entire request body and parse it as JSON
-            #request.body: json(request.body)
-            # --- Capture entire response body and parse it as JSON
-            #response.body: json(response.body)
-            # --- Capture a field in the request body
-            #request.body.modelId: json(request.body).modelId
-        format: json
-      tracing:
-        otlpProtocol: grpc
-        otlpEndpoint: http://solo-enterprise-telemetry-collector.agentgateway-system.svc.cluster.local:4317
-        randomSampling: 'true'
-        fields:
-          add:
-            # --- Capture the claims from a verified JWT token if JWT policy is enabled
-            jwt: 'jwt'
-            # --- Capture entire response body and parse it as JSON
-            response.body: 'json(response.body)'
-            # --- Capture a single request header by name (example: x-foo)
-            x-foo: 'request.headers["x-foo"]'
   deployment:
     spec:
       replicas: 2
@@ -292,3 +256,97 @@ ext-auth-service-enterprise-agentgateway-6fcc5bc989-22wgd   1/1     Running   0 
 ext-cache-enterprise-agentgateway-6bfcb8c87d-vjzxn          1/1     Running   0          11m
 rate-limiter-enterprise-agentgateway-589f66bb88-xz7nm       1/1     Running   0          11m
 ```
+
+## Configure access logs (optional)
+
+Agentgateway emits access logs by default. This step is optional — the enrichment fields below are not required by any later lab, but are useful for debugging and observability. Apply an `EnterpriseAgentgatewayPolicy` to enrich the default access logs with additional metadata extracted from the request and response:
+
+```bash
+kubectl apply -f- <<'EOF'
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: access-logs
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: agentgateway-proxy
+  frontend:
+    accessLog:
+      attributes:
+        add:
+        # --- Capture all JWT claims (use to discover available fields, then narrow down)
+        - name: jwt.all
+          expression: jwt
+        # Streaming vs buffered — useful for debugging latency differences
+        - name: llm.streaming
+          expression: llm.streaming
+        # Cache efficiency — shows cost savings from prompt caching
+        - name: llm.cached_tokens
+          expression: llm.cachedInputTokens
+        # Reasoning tokens — relevant for o1/o3 models
+        - name: llm.reasoning_tokens
+          expression: llm.reasoningTokens
+        # Full prompt conversation (has perf impact for large prompts)
+        - name: llm.prompt
+          expression: llm.prompt
+        # LLM response content
+        - name: llm.completion
+          expression: 'llm.completion[0]'
+        # --- Capture a single request header by name (example: x-foo)
+        #- name: x-foo
+        #  expression: 'request.headers["x-foo"]'
+        # --- Capture entire request body and parse it as JSON
+        #- name: request.body
+        #  expression: json(request.body)
+        # --- Capture entire response body and parse it as JSON
+        #- name: response.body
+        #  expression: json(response.body)
+        # --- Capture a field in the request body
+        #- name: request.body.modelId
+        #  expression: json(request.body).modelId
+EOF
+```
+
+## Configure tracing
+
+Apply an `EnterpriseAgentgatewayPolicy` to export traces to the telemetry collector deployed in `002`. Skip this step if you are not setting up the Gloo UI.
+
+```bash
+kubectl apply -f- <<'EOF'
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: tracing
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: agentgateway-proxy
+  frontend:
+    tracing:
+      backendRef:
+        name: solo-enterprise-telemetry-collector
+        namespace: agentgateway-system
+        port: 4317
+      protocol: GRPC
+      randomSampling: "true"
+      attributes:
+        add:
+        # --- Capture the claims from a verified JWT token if JWT policy is enabled
+        - name: jwt
+          expression: jwt
+        # --- Capture entire response body and parse it as JSON
+        - name: response.body
+          expression: json(response.body)
+        # --- Capture a single request header by name (example: x-foo)
+        #- name: x-foo
+        #  expression: 'request.headers["x-foo"]'
+EOF
+```
+
+## Next Steps
+Enterprise Agentgateway is now installed and configured with observability. Continue with `002` to set up the Gloo UI and monitoring tools (Prometheus, Grafana) to visualize metrics, logs, and traces.

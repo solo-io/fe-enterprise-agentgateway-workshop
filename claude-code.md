@@ -187,7 +187,7 @@ Traces include LLM-specific spans with information like `gen_ai.completion`, `ge
 AgentGateway automatically logs detailed information about LLM requests to stdout. You can tail the logs to see Claude Code traffic flowing through:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system -f | jq .
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Example output shows comprehensive request details including:

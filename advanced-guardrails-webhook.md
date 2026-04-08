@@ -729,7 +729,7 @@ In Grafana navigate to **Home > Explore**, select **Tempo**, and click **Search*
 ### View AgentGateway access logs
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 ### View raw metrics
