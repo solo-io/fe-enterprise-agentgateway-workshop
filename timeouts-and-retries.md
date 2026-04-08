@@ -210,7 +210,7 @@ You should receive a successful `200 OK` response.
 Start tailing the AgentGateway logs in one terminal:
 
 ```bash
-kubectl logs -f deploy/agentgateway-proxy -n agentgateway-system | jq 'select(.["retry.attempt"]) | {retry: .["retry.attempt"], status: ."http.status", duration, error}'
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Back in the original terminal, scale the mock server deployment to 0 to trigger 503 errors:
@@ -317,7 +317,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 Check the logs to see the retry attempts with backoff delays:
 
 ```bash
-kubectl logs -f deploy/agentgateway-proxy -n agentgateway-system | jq 'select(.["retry.attempt"]) | {retry: .["retry.attempt"], status: ."http.status", duration, error}'
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 You should see output similar to:

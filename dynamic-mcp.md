@@ -283,7 +283,7 @@ No Backend or HTTPRoute change was required at any point.
 
 ### View access logs
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 5
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Look for MCP-specific fields in the structured log output: `mcp.method`, `mcp.resource`, `mcp.target`, and `http.status`.
@@ -291,7 +291,7 @@ Look for MCP-specific fields in the structured log output: `mcp.method`, `mcp.re
 ### View MCP metrics
 ```bash
 kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics | grep mcp && kill $!
+sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ```
 
 You should see:

@@ -148,7 +148,7 @@ Expected response (the `embedding` array is truncated for readability):
 
 AgentGateway automatically logs request details to stdout:
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 ## Observability

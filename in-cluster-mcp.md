@@ -171,7 +171,7 @@ Traces include MCP-specific spans with information like `mcp.method`, `mcp.resou
 AgentGateway automatically logs detailed information about MCP requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Example output shows comprehensive request details including MCP-specific information like `mcp.method`, `mcp.resource`, `mcp.resource.name`, `mcp.target`, and trace IDs for correlation with distributed traces in Grafana.
@@ -230,7 +230,7 @@ MCP error -32001: Error POSTing to endpoint (HTTP 403): authentication failure: 
 
 We should also be able to see this error in the access logs `authentication failure: no bearer token found` with an `http.status: 403`
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 1
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 ### Provide a valid JWT

@@ -19,7 +19,7 @@ The following resources from the `virtual-keys` lab should still be running:
 Agentgateway logs token usage for every request to stdout in JSON format. Check the last few entries after running the budget tests:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 10
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Each log entry is a JSON object. Look for `gen_ai.usage.input_tokens` and `gen_ai.usage.output_tokens`:

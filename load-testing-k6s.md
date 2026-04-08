@@ -605,7 +605,7 @@ Useful metrics to query:
 ### View AgentGateway Logs
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system -f
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 ## Understanding the Load Patterns

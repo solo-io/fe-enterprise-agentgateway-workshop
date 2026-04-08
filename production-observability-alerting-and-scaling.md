@@ -723,7 +723,7 @@ kubectl get pods -n agentgateway-system
 # 5. Check no reconciliation errors
 kubectl port-forward -n agentgateway-system deploy/enterprise-agentgateway 9092:9092 &
 sleep 2
-curl -s http://localhost:9092/metrics | grep 'result="error"'
+curl -s http://localhost:9092/metrics
 kill %1 2>/dev/null
 ```
 
@@ -743,7 +743,7 @@ kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system --ti
 # 3. Verify all pods are on the new version
 kubectl port-forward -n agentgateway-system deploy/agentgateway-proxy 15020:15020 &
 sleep 2
-curl -s http://localhost:15020/metrics | grep agentgateway_build_info
+curl -s http://localhost:15020/metrics
 kill %1 2>/dev/null
 ```
 

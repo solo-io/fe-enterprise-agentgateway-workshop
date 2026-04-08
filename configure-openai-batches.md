@@ -296,7 +296,7 @@ curl -i "$GATEWAY_IP:8080/v1/files/$FILE_ID" \
 AgentGateway automatically logs information about the batch API requests to stdout:
 
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 5
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Example output for batch creation:
@@ -359,7 +359,7 @@ AgentGateway automatically logs detailed information about batch API requests in
 
 Check the logs:
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 ## Cleanup

@@ -137,7 +137,7 @@ lib/langchain/multi-agent-researcher-writer/.venv/bin/python3 lib/langchain/mult
 
 Tail agentgateway logs to see the proxied OpenAI calls:
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 20 | jq .
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Each pipeline run generates two requests — one for the Researcher and one for the Writer — showing model name, token counts, and latency.
@@ -176,7 +176,7 @@ Each chain invocation produces a trace with LLM-specific spans containing `gen_a
 
 ```bash
 kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics | grep agentgateway_gen_ai && kill $!
+sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ```
 
 Useful metrics:

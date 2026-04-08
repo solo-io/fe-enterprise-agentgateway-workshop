@@ -243,7 +243,7 @@ Open http://localhost:3000 in your browser and navigate to **Dashboards > AgentG
 
 AgentGateway logs detailed information about LLM requests:
 ```bash
-kubectl logs deploy/agentgateway-proxy -n agentgateway-system --tail 5
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 ## Cleanup
