@@ -1,5 +1,10 @@
 # Changelog
 
+0.8.0 - (4-13-26)
+---
+- `configure-body-based-routing.md`: change `x-gateway-model-name` extraction to `default(json(request.body).model, '')` to ensure client-supplied headers are always overwritten and the default model is used when no model is specified in the request body
+- `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0`
+
 0.7.9 - (4-8-26)
 ---
 - Standardize `kubectl logs` command across all 31 labs to use label selector and `--prefix --tail 20`; drop `| jq` pipes
