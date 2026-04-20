@@ -74,6 +74,7 @@ Before starting this workshop, you will need:
 - [TLS Termination](tls-termination.md)
 - [Frontend mTLS](frontend-mtls.md)
 - [SNI Matching](sni-matching.md)
+- [LLM BYO gRPC External Authorization (ext-authz)](llm-byo-grpc-ext-authz.md)
 
 ---
 
@@ -109,6 +110,7 @@ Before starting this workshop, you will need:
 - [Remote MCP](remote-mcp.md)
 - [Dynamic MCP](dynamic-mcp.md)
 - [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
+- [MCP BYO gRPC External Authorization (ext-authz)](mcp-byo-grpc-ext-authz.md) _(see also: Security)_
 - [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
 
 ---

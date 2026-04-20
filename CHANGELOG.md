@@ -1,5 +1,12 @@
 # Changelog
 
+0.8.1 - (4-20-26)
+---
+- Add new lab: `llm-byo-grpc-ext-authz.md` — BYO gRPC ext-authz for LLM routes, targeting HTTPRoute-level policy with OpenAI backend
+- Add new lab: `mcp-byo-grpc-ext-authz.md` — BYO gRPC ext-authz for MCP routes, targeting HTTPRoute instead of Gateway, with SSE Accept headers and note on combining with `mcpAuthorization` CEL rules
+- Add new lab: `llm-byo-http-ext-authz.md` — BYO HTTP ext-authz for LLM routes, targeting HTTPRoute-level policy with OpenAI backend; includes `allowedRequestHeaders`/`allowedResponseHeaders` configuration required by HTTP ext-authz
+- Add new lab: `mcp-byo-http-ext-authz.md` — BYO HTTP ext-authz for MCP routes, targeting HTTPRoute instead of Gateway; note on HTTP ext-authz header forwarding differences from gRPC and combining with `mcpAuthorization` CEL rules
+
 0.8.0 - (4-13-26)
 ---
 - `configure-body-based-routing.md`: change `x-gateway-model-name` extraction to `default(json(request.body).model, '')` to ensure client-supplied headers are always overwritten and the default model is used when no model is specified in the request body
