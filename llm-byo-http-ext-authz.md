@@ -25,7 +25,7 @@ The HTTP ext-authz service is a plain HTTP server. The proxy forwards the origin
 
 ## Deploy the ext-authz server
 
-Deploy the custom HTTP ext-authz server. This image is built from [http-ext-authz](https://github.com/ably77/http-ext-authz) and by default allows requests that include the `x-ext-authz: allow` header.
+Deploy the custom HTTP ext-authz server. This image is built from [ably77/http-ext-authz](https://github.com/ably77/http-ext-authz) and by default allows requests that include the `x-ext-authz: allow` header. Fork the repo and modify the `checkAuth()` function or add new [auth modes](https://github.com/ably77/http-ext-authz#auth-modes) to implement your own authorization logic.
 
 ```bash
 kubectl apply -f - <<EOF

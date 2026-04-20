@@ -25,7 +25,7 @@ The ext-authz service must conform to the [Envoy External Authorization gRPC pro
 
 ## Deploy the ext-authz server
 
-Deploy the custom gRPC ext-authz server. This image is built from [grpc-ext-authz](https://github.com/ably77/grpc-ext-authz) and by default allows requests that include the `x-ext-authz: allow` header.
+Deploy the custom gRPC ext-authz server. This image is built from [ably77/grpc-ext-authz](https://github.com/ably77/grpc-ext-authz) and by default allows requests that include the `x-ext-authz: allow` header. Fork the repo and modify the `checkAuth()` function or add new [auth modes](https://github.com/ably77/grpc-ext-authz#auth-modes) to implement your own authorization logic.
 
 ```bash
 kubectl apply -f - <<EOF
