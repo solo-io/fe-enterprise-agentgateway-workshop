@@ -3,6 +3,9 @@
 0.8.2 - (4-23-26)
 ---
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.2`
+- Add new lab: `configure-routing-aws-bedrock-irsa.md` — configures AWS Bedrock access via EKS IRSA (IAM Roles for Service Accounts) instead of static credentials; covers OIDC provider association, IAM role with scoped trust policy, `AgentgatewayBackend` without `policies.auth`, and `EnterpriseAgentgatewayParameters` service account annotation for automatic credential injection
+- `README.md`: add `configure-routing-aws-bedrock-irsa.md` to Routing section under AWS Bedrock entries
+- `configure-routing-aws-bedrock-apikey.md`: normalize resource names from `bedrock-*-apikey` to `bedrock-*` and paths from `/bedrock-apikey/*` to `/bedrock/*` to match the other Bedrock labs (secret name `bedrock-apikey-secret` kept distinct)
 
 0.8.1 - (4-21-26)
 ---
