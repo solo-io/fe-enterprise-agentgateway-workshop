@@ -16,7 +16,7 @@ The data plane is a Rust-based proxy built on Tokio. It handles all request rout
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|
-| `agentgateway_build_info` | Info | `tag` | AgentGateway version (e.g. `v2.2.0`). Use to confirm all pods are on the same version after an upgrade. |
+| `agentgateway_build_info` | Info | `tag` | AgentGateway version (e.g. `v2.3.2`). Use to confirm all pods are on the same version after an upgrade. |
 
 #### HTTP Request Metrics
 

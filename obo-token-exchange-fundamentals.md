@@ -113,7 +113,7 @@ Upgrade the controller helm release, adding the `tokenExchange` block pointing t
 
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2.2.0
+export ENTERPRISE_AGW_VERSION=v2.3.2
 ```
 
 ```bash

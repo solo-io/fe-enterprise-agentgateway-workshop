@@ -1,5 +1,10 @@
 # Changelog
 
+0.8.3 - (4-23-26)
+---
+- Update `image-list.md` for `v2.3.2`
+- Update other areas where we need to update to `v2.3.2`
+
 0.8.2 - (4-23-26)
 ---
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.2`
