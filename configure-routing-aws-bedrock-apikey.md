@@ -104,14 +104,14 @@ EOF
 ## Create AWS Bedrock Route and AgentgatewayBackends
 Create AWS Bedrock route and `AgentgatewayBackend` resources. For this setup we will configure multiple `AgentgatewayBackends` using a single provider (AWS Bedrock) in a path-per-model routing configuration.
 
-Note the key difference from the [AWS Bedrock routing lab](configure-routing-aws-bedrock.md): we use `spec.policies.auth.secretRef` instead of `spec.policies.auth.aws` for API key authentication.
+Note the key difference from the [AWS Bedrock routing lab](configure-routing-aws-bedrock.md): we use `spec.policies.auth.secretRef` instead of `spec.policies.auth.aws` for API key authentication. The resource names below (`bedrock-mistral`, `bedrock-haiku3.5`, etc.) match the other Bedrock labs — clean up previous Bedrock lab resources before starting this one.
 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: bedrock-mistral-apikey
+  name: bedrock-mistral
   namespace: agentgateway-system
 spec:
   ai:
@@ -127,7 +127,7 @@ spec:
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: bedrock-haiku3.5-apikey
+  name: bedrock-haiku3.5
   namespace: agentgateway-system
 spec:
   ai:
@@ -143,7 +143,7 @@ spec:
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: bedrock-llama3-8b-apikey
+  name: bedrock-llama3-8b
   namespace: agentgateway-system
 spec:
   ai:
@@ -159,10 +159,10 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: bedrock-apikey
+  name: bedrock
   namespace: agentgateway-system
   labels:
-    example: bedrock-apikey-route
+    example: bedrock-route
 spec:
   parentRefs:
     - name: agentgateway-proxy
@@ -171,9 +171,9 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /bedrock-apikey/haiku
+            value: /bedrock/haiku
       backendRefs:
-        - name: bedrock-haiku3.5-apikey
+        - name: bedrock-haiku3.5
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -181,9 +181,9 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /bedrock-apikey/mistral
+            value: /bedrock/mistral
       backendRefs:
-        - name: bedrock-mistral-apikey
+        - name: bedrock-mistral
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -191,9 +191,9 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /bedrock-apikey/llama3-8b
+            value: /bedrock/llama3-8b
       backendRefs:
-        - name: bedrock-llama3-8b-apikey
+        - name: bedrock-llama3-8b
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -202,9 +202,9 @@ spec:
     - matches:
         - path:
             type: Exact
-            value: /bedrock-apikey
+            value: /bedrock
       backendRefs:
-        - name: bedrock-mistral-apikey
+        - name: bedrock-mistral
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -218,7 +218,7 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/bedrock-apikey/mistral" \
+curl -i "$GATEWAY_IP:8080/bedrock/mistral" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -233,7 +233,7 @@ curl -i "$GATEWAY_IP:8080/bedrock-apikey/mistral" \
 
 ### curl AWS Bedrock Haiku endpoint
 ```bash
-curl -i "$GATEWAY_IP:8080/bedrock-apikey/haiku" \
+curl -i "$GATEWAY_IP:8080/bedrock/haiku" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -248,7 +248,7 @@ curl -i "$GATEWAY_IP:8080/bedrock-apikey/haiku" \
 
 ### curl AWS Bedrock llama3-8b endpoint
 ```bash
-curl -i "$GATEWAY_IP:8080/bedrock-apikey/llama3-8b" \
+curl -i "$GATEWAY_IP:8080/bedrock/llama3-8b" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -328,9 +328,9 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n agentgateway-system bedrock-apikey
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock-mistral-apikey
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock-haiku3.5-apikey
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock-llama3-8b-apikey
+kubectl delete httproute -n agentgateway-system bedrock
+kubectl delete agentgatewaybackend -n agentgateway-system bedrock-mistral
+kubectl delete agentgatewaybackend -n agentgateway-system bedrock-haiku3.5
+kubectl delete agentgatewaybackend -n agentgateway-system bedrock-llama3-8b
 kubectl delete secret -n agentgateway-system bedrock-apikey-secret
 ```
