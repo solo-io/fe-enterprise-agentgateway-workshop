@@ -1,5 +1,9 @@
 # Changelog
 
+0.8.2 - (4-23-26)
+---
+- `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.2`
+
 0.8.1 - (4-21-26)
 ---
 - Add new lab: `llm-byo-grpc-ext-authz.md` — BYO gRPC ext-authz for LLM routes, targeting HTTPRoute-level policy with OpenAI backend
