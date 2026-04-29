@@ -1,5 +1,9 @@
 # Changelog
 
+0.8.4 - (4-29-26)
+---
+- Update `llm-failover.md` lab. Now supports additional error codes other than 429
+
 0.8.3 - (4-23-26)
 ---
 - Update `image-list.md` for `v2.3.2`
