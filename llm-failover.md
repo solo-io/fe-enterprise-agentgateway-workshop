@@ -335,7 +335,6 @@ The priority group failover configuration demonstrates several key concepts:
    - The **first request** that encounters an error will fail with that error code
    - The provider is evicted after processing the error response
    - **Subsequent requests** will skip evicted providers and use the next priority group
-   - This is an across-request mechanism, not a within-request retry
    - **Important**: Health state is local to each AgentGateway pod. With multiple replicas, you may see 1-2 failed requests before failover as different pods learn about the unhealthy state
 4. **Eviction Duration**: The `eviction.duration` in the `AgentgatewayPolicy` controls how long a backend is removed from the pool. After the period expires, the gateway will retry the primary backend to check if it has recovered. Duration increases with multiplicative backoff on repeated evictions, preventing rapid cycling on persistently failing backends
 5. **Across-Request Failover**: Unlike retry policies that work within a single request, priority group failover works across multiple requests based on provider health state
