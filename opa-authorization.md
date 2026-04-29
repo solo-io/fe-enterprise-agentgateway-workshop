@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 You will also need:
 - An OpenAI API key stored as an environment variable (`$OPENAI_API_KEY`)
-- An MCP server deployed (e.g. `mcp-website-fetcher`) for Part 2
+- Access to the Solo.io docs MCP server (`https://search.solo.io/mcp`) for Part 2
 
 ## Lab Objectives
 - Understand when to use OPA vs CEL-based RBAC for authorization
@@ -304,30 +304,34 @@ The `api-key` header is stripped before it reaches OpenAI, and `x-validated-by: 
 
 ## Part 2: MCP Route with OPA
 
-The same OPA policy can protect MCP tool servers. This demonstrates that one `AuthConfig` can be shared across multiple routes.
+The same OPA policy can protect MCP tool servers. This demonstrates that one `AuthConfig` can be shared across multiple routes. We'll route to the external Solo.io docs MCP server (`https://search.solo.io/mcp`) -- no in-cluster MCP deployment required.
 
 ### Step 1: Create the MCP backend and route
+
+Since the Solo.io docs MCP server is external, we configure a static backend with TLS and use the StreamableHTTP protocol:
 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: mcp
+  name: soloio-docs-mcp
   namespace: agentgateway-system
 spec:
   mcp:
     targets:
-    - name: mcp-website-fetcher
+    - name: soloio-docs-mcp-target
       static:
-        host: mcp-website-fetcher.agentgateway-system.svc.cluster.local
-        port: 80
-        protocol: SSE
+        host: search.solo.io
+        port: 443
+        protocol: StreamableHTTP
+        policies:
+          tls: {}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: mcp
+  name: soloio-docs-mcp
   namespace: agentgateway-system
 spec:
   parentRefs:
@@ -339,7 +343,7 @@ spec:
         type: PathPrefix
         value: /mcp
     backendRefs:
-    - name: mcp
+    - name: soloio-docs-mcp
       namespace: agentgateway-system
       group: agentgateway.dev
       kind: AgentgatewayBackend
@@ -361,7 +365,7 @@ spec:
   targetRefs:
   - group: gateway.networking.k8s.io
     kind: HTTPRoute
-    name: mcp
+    name: soloio-docs-mcp
   traffic:
     entExtAuth:
       authConfigRef:
@@ -440,11 +444,11 @@ curl -s "$GATEWAY_IP:8080/mcp" \
 ```
 
 Expected:
-```
-data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"fetch","description":"Fetches a website and returns its content",...}]}}
+```json
+{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"search","description":"Search Solo.io product documentation",...},{"name":"get_chunks",...}]}}
 ```
 
-**Call a tool:**
+**Call the search tool:**
 
 ```bash
 curl -s "$GATEWAY_IP:8080/mcp" \
@@ -456,8 +460,8 @@ curl -s "$GATEWAY_IP:8080/mcp" \
     "jsonrpc": "2.0",
     "method": "tools/call",
     "params": {
-      "name": "fetch",
-      "arguments": {"url": "https://httpbin.org/get"}
+      "name": "search",
+      "arguments": {"query": "OPA authorization", "product": "solo-enterprise-for-agentgateway", "limit": 2}
     },
     "id": 3
   }'
@@ -509,7 +513,7 @@ Client                AgentGateway Proxy              Ext-Auth (OPA)            
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system llm-opa-policy mcp-opa-policy
 kubectl delete authconfig -n agentgateway-system llm-opa
 kubectl delete configmap -n agentgateway-system llm-opa-policy
-kubectl delete httproute -n agentgateway-system openai mcp
-kubectl delete agentgatewaybackend -n agentgateway-system openai mcp
+kubectl delete httproute -n agentgateway-system openai soloio-docs-mcp
+kubectl delete agentgatewaybackend -n agentgateway-system openai soloio-docs-mcp
 kubectl delete secret -n agentgateway-system openai-secret
 ```
