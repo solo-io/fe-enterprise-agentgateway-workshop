@@ -76,6 +76,7 @@ Before starting this workshop, you will need:
 - [Frontend mTLS](frontend-mtls.md)
 - [SNI Matching](sni-matching.md)
 - [LLM BYO gRPC External Authorization (ext-authz)](llm-byo-grpc-ext-authz.md)
+- [OPA Authorization](opa-authorization.md)
 
 ---
 
@@ -183,6 +184,7 @@ Before starting this workshop, you will need:
     - Frontend TLS termination
     - Frontend mTLS with client certificate validation
     - SNI (Server Name Indication) matching for multi-domain HTTPS
+    - OPA authorization with custom Rego policies (ext-auth)
 - Prompt Guard & Content Moderation
     - Comprehensive built-in Prompt Guard (prompt injection, jailbreak, PII, secrets, harmful content, encoding evasion, and more)
     - External moderation guardrails (OpenAI moderation API)

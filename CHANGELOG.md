@@ -1,5 +1,10 @@
 # Changelog
 
+0.8.5 - (4-29-26)
+---
+- Add new lab: `opa-authorization.md` — OPA authorization for LLM and MCP routes using ext-auth with Rego policies stored in ConfigMaps; covers AuthConfig, EnterpriseAgentgatewayPolicy with `entExtAuth`, custom deny bodies/headers, upstream header injection, and shared AuthConfig across multiple HTTPRoutes
+- `README.md`: add `opa-authorization.md` to Security section and Use Cases list
+
 0.8.4 - (4-29-26)
 ---
 - Update `llm-failover.md` lab. Now supports additional error codes other than 429
