@@ -1,8 +1,10 @@
 # Changelog
 
-0.8.6 - (4-29-26)
+0.8.6 - (5-2-26)
 ---
 - Update `AGW_UI_VERSION` to `0.3.18`
+- Add new lab: `openai-audio.md` — proxies OpenAI Audio API (Text-to-Speech and Speech-to-Text) through AgentGateway using `Passthrough` route type; covers TTS with voice/format selection, STT with Whisper transcription, and a round-trip demo (text → audio → text)
+- `README.md`: add `openai-audio.md` to Routing section and Use Cases list
 
 0.8.5 - (4-29-26)
 ---
