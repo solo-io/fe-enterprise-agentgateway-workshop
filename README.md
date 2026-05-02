@@ -62,6 +62,7 @@ Before starting this workshop, you will need:
 - [OpenAI Batch API](configure-openai-batches.md) _(OpenAI)_
 - [OpenAI Streaming](openai-streaming.md) _(OpenAI)_
 - [OpenAI Audio (TTS & STT)](openai-audio.md) _(OpenAI)_
+- [OpenAI Video Generation (Sora)](openai-video.md) _(OpenAI)_
 - [Direct Response](direct-response.md)
 - [Timeouts and Retries](timeouts-and-retries.md)
 - [LLM Failover](llm-failover.md)
@@ -166,6 +167,7 @@ Before starting this workshop, you will need:
     - OpenAI Batches API support (asynchronous batch processing)
     - Streaming responses support for real-time token generation
     - OpenAI Audio API support (Text-to-Speech and Speech-to-Text)
+    - OpenAI Video Generation support (Sora)
     - Claude Code CLI integration with full observability
     - CrewAI multi-agent workflow integration
     - LangChain multi-agent pipeline integration

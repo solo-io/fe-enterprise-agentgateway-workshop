@@ -5,6 +5,8 @@
 - Update `AGW_UI_VERSION` to `0.3.18`
 - Add new lab: `openai-audio.md` — proxies OpenAI Audio API (Text-to-Speech and Speech-to-Text) through AgentGateway using `Passthrough` route type; covers TTS with voice/format selection, STT with Whisper transcription, and a round-trip demo (text → audio → text)
 - `README.md`: add `openai-audio.md` to Routing section and Use Cases list
+- Add new lab: `openai-video.md` — proxies OpenAI Video API (Sora) through AgentGateway using `Passthrough` route type; covers async video generation, polling for completion, and downloading the result
+- `README.md`: add `openai-video.md` to Routing section and Use Cases list
 
 0.8.5 - (4-29-26)
 ---
