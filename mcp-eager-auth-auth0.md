@@ -15,7 +15,7 @@ You need a registered application in Auth0 (Regular Web Application) with the **
 | `AUTH0_CLIENT_ID` | Client ID of the Auth0 application |
 | `AUTH0_CLIENT_SECRET` | Client secret of the Auth0 application |
 | `AUTH0_AUDIENCE` | Auth0 API audience the JWT must carry |
-| `GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-auth0.glootest.com` |
+| `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-auth0.glootest.com` |
 
 ### Auth0 app callback URLs
 
@@ -96,7 +96,7 @@ Three things make this work:
 
 ## Step 1 — Set Environment Variables and DNS
 
-The Auth0 values and `GATEWAY_HOST` are expected to live in your shell rc (e.g. `~/.zshrc`). Re-export them so child processes (`kubectl`, `helm`) inherit the values — some shells write the rc entries without `export`, in which case they won't be inherited:
+The Auth0 values and `AUTH0_GATEWAY_HOST` are expected to live in your shell rc (e.g. `~/.zshrc`). Re-export them so child processes (`kubectl`, `helm`) inherit the values — some shells write the rc entries without `export`, in which case they won't be inherited:
 
 ```bash
 export AUTH0_ISSUER=$AUTH0_ISSUER
@@ -104,14 +104,14 @@ export AUTH0_DOMAIN=$AUTH0_DOMAIN
 export AUTH0_CLIENT_ID=$AUTH0_CLIENT_ID
 export AUTH0_CLIENT_SECRET=$AUTH0_CLIENT_SECRET
 export AUTH0_AUDIENCE=$AUTH0_AUDIENCE
-export GATEWAY_HOST=$GATEWAY_HOST
+export AUTH0_GATEWAY_HOST=$AUTH0_GATEWAY_HOST
 
 # Controller version and license (from Lab 001)
 export ENTERPRISE_AGW_VERSION=v2.3.2
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
 ```
 
-This lab uses `mcp-auth0.glootest.com` as the gateway hostname. If `GATEWAY_HOST` is not already set in your rc, add `GATEWAY_HOST=mcp-auth0.glootest.com` and reload your shell.
+This lab uses `mcp-auth0.glootest.com` as the gateway hostname. If `AUTH0_GATEWAY_HOST` is not already set in your rc, add `AUTH0_GATEWAY_HOST=mcp-auth0.glootest.com` and reload your shell.
 
 Notes on these values:
 
@@ -133,7 +133,7 @@ echo "$GATEWAY_IP"
 Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-auth0.glootest.com` to the gateway:
 
 ```bash
-echo "$GATEWAY_IP $GATEWAY_HOST" | sudo tee -a /etc/hosts
+echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" | sudo tee -a /etc/hosts
 ```
 
 > **macOS DNS cache.** If the hostname doesn't resolve after the edit, flush DNS: `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`.
@@ -405,7 +405,7 @@ controller:
     KGW_OAUTH_ISSUER_CONFIG: |
       {
         "gateway_config": {
-          "base_url": "https://${GATEWAY_HOST}/oauth-issuer"
+          "base_url": "https://${AUTH0_GATEWAY_HOST}/oauth-issuer"
         },
         "client_config": {
           "clients": {
@@ -418,7 +418,7 @@ controller:
           "client_secret": "${AUTH0_CLIENT_SECRET}",
           "authorize_url": "${AUTH0_ISSUER}authorize",
           "token_url": "${AUTH0_ISSUER}oauth/token",
-          "redirect_uri": "https://${GATEWAY_HOST}/oauth-issuer/callback/downstream",
+          "redirect_uri": "https://${AUTH0_GATEWAY_HOST}/oauth-issuer/callback/downstream",
           "scopes": ["openid", "profile", "email"]
         }
       }
@@ -687,8 +687,8 @@ spec:
         resourceMetadata:
           agentgateway.dev/issuer-proxy: http://enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777/oauth-issuer
           authorizationServers:
-            - https://${GATEWAY_HOST}/mcp
-          resource: https://${GATEWAY_HOST}/mcp
+            - https://${AUTH0_GATEWAY_HOST}/mcp
+          resource: https://${AUTH0_GATEWAY_HOST}/mcp
 EOF
 ```
 
@@ -771,22 +771,22 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | `GET /mcp` without a token returns **406** instead of 401, and `/.well-known/oauth-*-resource/mcp` returns 404 | The MCP authentication policy is `PartiallyValid` because the controller can't fetch JWKS. Most often caused by a leading slash on `jwksPath` (`/.well-known/jwks.json`), which produces `https://$AUTH0_DOMAIN//.well-known/jwks.json` (404 from Auth0) | `kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-auth0-eager -o jsonpath='{.status.ancestors[*].conditions[*].message}'` should say `Policy accepted Attached to all targets`. Controller logs: `kubectl logs -n agentgateway-system deployment/enterprise-agentgateway \| grep jwks`. Fix per Step 8 — `jwksPath: .well-known/jwks.json` (no leading slash) |
 | Controller pod CrashLoopBackOff with `error creating actor validator: unsupported validator type:` | Step 5 helm values are missing `tokenExchange.actorValidator` (and/or `apiValidator`) — all three validators are required at boot even though only the eager-OAuth issuer is being used | Re-run Step 5 with the validator block matching this lab |
 | Inspector errors immediately (no Auth0 redirect) and controller logs show `failed to start auth flow ... secret not found: agentgateway-system/elicitation-secret` | The `elicitation-secret` Secret from Step 7 wasn't created or is in the wrong namespace | `kubectl get secret -n agentgateway-system elicitation-secret`; recreate per Step 7 |
-| Auth0 error page after login (`callback url not allowed` / `invalid redirect_uri`) **even though the URI is in the app's allowlist** | The eager-OAuth issuer uses two callback paths (`/callback/upstream` for PKCE/MCP-client flows, `/callback/downstream` otherwise). Registering only one yields a rejection on whichever flow the client triggers | Confirm **both** `https://${GATEWAY_HOST}/oauth-issuer/callback/upstream` and `.../callback/downstream` are present in the Auth0 app's "Allowed Callback URLs" |
+| Auth0 error page after login (`callback url not allowed` / `invalid redirect_uri`) **even though the URI is in the app's allowlist** | The eager-OAuth issuer uses two callback paths (`/callback/upstream` for PKCE/MCP-client flows, `/callback/downstream` otherwise). Registering only one yields a rejection on whichever flow the client triggers | Confirm **both** `https://${AUTH0_GATEWAY_HOST}/oauth-issuer/callback/upstream` and `.../callback/downstream` are present in the Auth0 app's "Allowed Callback URLs" |
 | Auth0 error page after login (`client not found` / `invalid_client`) | `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` don't match the Auth0 app, or the app is disabled / not assigned to the Auth0 connection | Auth0 admin → Applications → *your app* → Settings (Client ID, Client Secret), and Connections tab |
 | 401 after browser flow with a valid-looking JWT | `mcp.authentication.audiences` doesn't include the `aud` claim Auth0 actually issued, or the `issuer` value's trailing slash doesn't match | Decode the JWT at `jwt.io`; compare `iss` to `${AUTH0_ISSUER}` (trailing slash) and `aud` to `${AUTH0_AUDIENCE}`. See the audience-injection callout in Step 5. |
 | Inspector shows "fetch failed" or `unable to verify the first certificate` | Inspector's Node process rejected the self-signed gateway cert | Restart Inspector with `NODE_TLS_REJECT_UNAUTHORIZED=0` (Step 9) |
 | Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-auth0.glootest.com/.well-known/oauth-protected-resource/mcp` and click through the warning |
-| `mcp-auth0.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
+| `mcp-auth0.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
 
 Useful commands:
 
 ```bash
 # Confirm the discovery endpoints respond from the public URL
-curl -sk "https://${GATEWAY_HOST}/.well-known/oauth-protected-resource/mcp" | jq .
-curl -sk "https://${GATEWAY_HOST}/.well-known/oauth-authorization-server/mcp" | jq .
+curl -sk "https://${AUTH0_GATEWAY_HOST}/.well-known/oauth-protected-resource/mcp" | jq .
+curl -sk "https://${AUTH0_GATEWAY_HOST}/.well-known/oauth-authorization-server/mcp" | jq .
 
 # Verify registration_endpoint points at the gateway, not Auth0
-curl -sk "https://${GATEWAY_HOST}/.well-known/oauth-authorization-server/mcp" | jq .registration_endpoint
+curl -sk "https://${AUTH0_GATEWAY_HOST}/.well-known/oauth-authorization-server/mcp" | jq .registration_endpoint
 
 # Sanity-check Auth0's own discovery doc for comparison
 curl -s "${AUTH0_ISSUER}.well-known/openid-configuration" | jq .
@@ -857,7 +857,7 @@ kubectl delete namespace postgres --ignore-not-found
 
 # 6. Remove local cert files and the /etc/hosts entry
 rm -rf example_certs
-sudo sed -i '' "/${GATEWAY_HOST}/d" /etc/hosts   # macOS; on Linux drop the empty '' arg
+sudo sed -i '' "/${AUTH0_GATEWAY_HOST}/d" /etc/hosts   # macOS; on Linux drop the empty '' arg
 ```
 
 If helm reports the upgrade as a no-op (identical revision), force a controller restart manually so any stale DB state is cleared:
