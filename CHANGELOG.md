@@ -1,5 +1,10 @@
 # Changelog
 
+0.8.8 - (5-6-26)
+---
+- `mcp-eager-auth-okta.md`: rename `GATEWAY_HOST` env var to `OKTA_GATEWAY_HOST` so it can coexist with the Auth0 lab in the same shell rc without one lab overriding the other
+- `mcp-eager-auth-auth0.md`: rename `GATEWAY_HOST` env var to `AUTH0_GATEWAY_HOST` for the same reason
+
 0.8.7 - (5-6-26)
 ---
 - Add new lab: `mcp-eager-auth-auth0.md` — MCP eager-OAuth with Auth0; gateway acts as the OAuth Authorization Server (fake DCR with a pre-registered `client_id`/`client_secret`), brokers Auth0's authorization code flow via `/oauth-issuer`, validates Auth0-issued JWTs against Auth0 JWKS at the MCP backend, terminates TLS on a self-signed cert, tests end-to-end against `@modelcontextprotocol/server-everything` in Streamable HTTP mode

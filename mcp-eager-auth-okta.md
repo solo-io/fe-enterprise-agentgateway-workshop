@@ -16,7 +16,7 @@ You need a registered application in Okta with the **Authorization Code** grant 
 | `OKTA_CLIENT_ID` | Client ID of the Okta application |
 | `OKTA_CLIENT_SECRET` | Client secret of the Okta application |
 | `OKTA_AUDIENCE` | Audience configured on the Okta authz server (e.g. `api://default`) — must match the `aud` claim on issued tokens |
-| `GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-okta.glootest.com` |
+| `OKTA_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-okta.glootest.com` |
 
 ### Okta app callback URLs
 
@@ -97,7 +97,7 @@ Three things make this work:
 
 ## Step 1 — Set Environment Variables and DNS
 
-The Okta values and `GATEWAY_HOST` are expected to live in your shell rc (e.g. `~/.zshrc`). Re-export them so child processes (`kubectl`, `helm`) inherit the values — some shells write the rc entries without `export`, in which case they won't be inherited:
+The Okta values and `OKTA_GATEWAY_HOST` are expected to live in your shell rc (e.g. `~/.zshrc`). Re-export them so child processes (`kubectl`, `helm`) inherit the values — some shells write the rc entries without `export`, in which case they won't be inherited:
 
 ```bash
 export OKTA_DOMAIN=$OKTA_DOMAIN
@@ -106,14 +106,14 @@ export OKTA_ISSUER=$OKTA_ISSUER
 export OKTA_CLIENT_ID=$OKTA_CLIENT_ID
 export OKTA_CLIENT_SECRET=$OKTA_CLIENT_SECRET
 export OKTA_AUDIENCE=$OKTA_AUDIENCE
-export GATEWAY_HOST=$GATEWAY_HOST
+export OKTA_GATEWAY_HOST=$OKTA_GATEWAY_HOST
 
 # Controller version and license (from Lab 001)
 export ENTERPRISE_AGW_VERSION=v2.3.2
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
 ```
 
-This lab uses `mcp-okta.glootest.com` as the gateway hostname. If `GATEWAY_HOST` is not already set in your rc, add `GATEWAY_HOST=mcp-okta.glootest.com` and reload your shell.
+This lab uses `mcp-okta.glootest.com` as the gateway hostname. If `OKTA_GATEWAY_HOST` is not already set in your rc, add `OKTA_GATEWAY_HOST=mcp-okta.glootest.com` and reload your shell.
 
 Notes on these values:
 
@@ -135,7 +135,7 @@ echo "$GATEWAY_IP"
 Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-okta.glootest.com` to the gateway:
 
 ```bash
-echo "$GATEWAY_IP $GATEWAY_HOST" | sudo tee -a /etc/hosts
+echo "$GATEWAY_IP $OKTA_GATEWAY_HOST" | sudo tee -a /etc/hosts
 ```
 
 > **macOS DNS cache.** If the hostname doesn't resolve after the edit, flush DNS: `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`.
@@ -407,7 +407,7 @@ controller:
     KGW_OAUTH_ISSUER_CONFIG: |
       {
         "gateway_config": {
-          "base_url": "https://${GATEWAY_HOST}/oauth-issuer"
+          "base_url": "https://${OKTA_GATEWAY_HOST}/oauth-issuer"
         },
         "client_config": {
           "clients": {
@@ -420,7 +420,7 @@ controller:
           "client_secret": "${OKTA_CLIENT_SECRET}",
           "authorize_url": "${OKTA_ISSUER}/v1/authorize",
           "token_url": "${OKTA_ISSUER}/v1/token",
-          "redirect_uri": "https://${GATEWAY_HOST}/oauth-issuer/callback/downstream",
+          "redirect_uri": "https://${OKTA_GATEWAY_HOST}/oauth-issuer/callback/downstream",
           "scopes": ["openid", "profile", "email"]
         }
       }
@@ -689,8 +689,8 @@ spec:
         resourceMetadata:
           agentgateway.dev/issuer-proxy: http://enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777/oauth-issuer
           authorizationServers:
-            - https://${GATEWAY_HOST}/mcp
-          resource: https://${GATEWAY_HOST}/mcp
+            - https://${OKTA_GATEWAY_HOST}/mcp
+          resource: https://${OKTA_GATEWAY_HOST}/mcp
 EOF
 ```
 
@@ -774,22 +774,22 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | `invalid_token` with `KID not found` | `jwksPath` doesn't match your authz server's keys endpoint | Step 8 — `jwksPath` should be `oauth2/<your-authz-server-id>/v1/keys`. The `default` authz server uses `oauth2/default/v1/keys`; the Okta org auth server uses `oauth2/v1/keys` (no `<id>/`) |
 | Controller pod CrashLoopBackOff with `error creating actor validator: unsupported validator type:` | Step 5 helm values are missing `tokenExchange.actorValidator` (and/or `apiValidator`) — all three validators are required at boot even though only the eager-OAuth issuer is being used | Re-run Step 5 with the validator block matching this lab |
 | Inspector errors immediately (no Okta redirect) and controller logs show `failed to start auth flow ... secret not found: agentgateway-system/elicitation-secret` | The `elicitation-secret` Secret from Step 7 wasn't created or is in the wrong namespace | `kubectl get secret -n agentgateway-system elicitation-secret`; recreate per Step 7 |
-| Okta error page after login (`The 'redirect_uri' parameter must be a Login redirect URI`) **even though the URI is in the app's allowlist** | The eager-OAuth issuer uses two callback paths (`/callback/upstream` for PKCE/MCP-client flows, `/callback/downstream` otherwise). Registering only one yields a rejection on whichever flow the client triggers | Confirm **both** `https://${GATEWAY_HOST}/oauth-issuer/callback/upstream` and `.../callback/downstream` are present in the Okta app's "Sign-in redirect URIs" |
+| Okta error page after login (`The 'redirect_uri' parameter must be a Login redirect URI`) **even though the URI is in the app's allowlist** | The eager-OAuth issuer uses two callback paths (`/callback/upstream` for PKCE/MCP-client flows, `/callback/downstream` otherwise). Registering only one yields a rejection on whichever flow the client triggers | Confirm **both** `https://${OKTA_GATEWAY_HOST}/oauth-issuer/callback/upstream` and `.../callback/downstream` are present in the Okta app's "Sign-in redirect URIs" |
 | Okta error page (`Application not assigned` or similar) | The Okta user isn't assigned to the app, or the app doesn't have the Authorization Code grant enabled | Okta admin → Applications → *your-app* → Assignments tab and General → Grant Types |
 | 401 after browser flow with a valid-looking JWT | `mcp.authentication.audiences` doesn't include the `aud` claim Okta issued, or the `issuer` value has a trailing-slash mismatch | Decode the JWT at `jwt.io`; compare `iss` to `${OKTA_ISSUER}` (**no** trailing slash) and `aud` to `${OKTA_AUDIENCE}`. Adjust the authz server's audience in the Okta admin console if needed. |
 | Inspector shows "fetch failed" or `unable to verify the first certificate` | Inspector's Node process rejected the self-signed gateway cert | Restart Inspector with `NODE_TLS_REJECT_UNAUTHORIZED=0` (Step 9) |
 | Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-okta.glootest.com/.well-known/oauth-protected-resource/mcp` and click through the warning |
-| `mcp-okta.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
+| `mcp-okta.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $OKTA_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
 
 Useful commands:
 
 ```bash
 # Confirm the discovery endpoints respond from the public URL
-curl -sk "https://${GATEWAY_HOST}/.well-known/oauth-protected-resource/mcp" | jq .
-curl -sk "https://${GATEWAY_HOST}/.well-known/oauth-authorization-server/mcp" | jq .
+curl -sk "https://${OKTA_GATEWAY_HOST}/.well-known/oauth-protected-resource/mcp" | jq .
+curl -sk "https://${OKTA_GATEWAY_HOST}/.well-known/oauth-authorization-server/mcp" | jq .
 
 # Verify registration_endpoint points at the gateway, not Okta
-curl -sk "https://${GATEWAY_HOST}/.well-known/oauth-authorization-server/mcp" | jq .registration_endpoint
+curl -sk "https://${OKTA_GATEWAY_HOST}/.well-known/oauth-authorization-server/mcp" | jq .registration_endpoint
 
 # Sanity-check Okta's own discovery doc for comparison
 curl -s "${OKTA_ISSUER}/.well-known/openid-configuration" | jq .
@@ -860,7 +860,7 @@ kubectl delete namespace postgres --ignore-not-found
 
 # 6. Remove local cert files and the /etc/hosts entry
 rm -rf example_certs
-sudo sed -i '' "/${GATEWAY_HOST}/d" /etc/hosts   # macOS; on Linux drop the empty '' arg
+sudo sed -i '' "/${OKTA_GATEWAY_HOST}/d" /etc/hosts   # macOS; on Linux drop the empty '' arg
 ```
 
 If helm reports the upgrade as a no-op (identical revision), force a controller restart manually so any stale DB state is cleared:
