@@ -1,5 +1,11 @@
 # Changelog
 
+0.8.7 - (5-6-26)
+---
+- Add new lab: `mcp-eager-auth-auth0.md` — MCP eager-OAuth with Auth0; gateway acts as the OAuth Authorization Server (fake DCR with a pre-registered `client_id`/`client_secret`), brokers Auth0's authorization code flow via `/oauth-issuer`, validates Auth0-issued JWTs against Auth0 JWKS at the MCP backend, terminates TLS on a self-signed cert, tests end-to-end against `@modelcontextprotocol/server-everything` in Streamable HTTP mode
+- Add new lab: `mcp-eager-auth-okta.md` — Okta equivalent of the eager-OAuth lab against an Okta custom authorization server (`/oauth2/<authz-server-id>/v1/keys`, no trailing slash on issuer)
+- `README.md`: add both eager-OAuth labs to MCP (primary), Security, and Identity & Delegation sections with mutual cross-references; add eager-OAuth bullet to MCP use cases
+
 0.8.6 - (5-2-26)
 ---
 - Update `AGW_UI_VERSION` to `0.3.18`

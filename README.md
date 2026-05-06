@@ -79,6 +79,8 @@ Before starting this workshop, you will need:
 - [SNI Matching](sni-matching.md)
 - [LLM BYO gRPC External Authorization (ext-authz)](llm-byo-grpc-ext-authz.md)
 - [OPA Authorization](opa-authorization.md)
+- [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: MCP)_
+- [MCP Eager OAuth with Okta](mcp-eager-auth-okta.md) _(see also: MCP)_
 
 ---
 
@@ -115,6 +117,8 @@ Before starting this workshop, you will need:
 - [Dynamic MCP](dynamic-mcp.md)
 - [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
 - [MCP BYO gRPC External Authorization (ext-authz)](mcp-byo-grpc-ext-authz.md) _(see also: Security)_
+- [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: Security, Identity & Delegation)_
+- [MCP Eager OAuth with Okta](mcp-eager-auth-okta.md) _(see also: Security, Identity & Delegation)_
 - [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
 
 ---
@@ -132,6 +136,8 @@ Before starting this workshop, you will need:
 - [OBO Token Exchange Fundamentals](obo-token-exchange-fundamentals.md)
 - [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: MCP)_
 - [Microsoft Entra ID OBO](msft-entra-obo.md)
+- [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: MCP)_
+- [MCP Eager OAuth with Okta](mcp-eager-auth-okta.md) _(see also: MCP)_
 
 ---
 
@@ -205,6 +211,7 @@ Before starting this workshop, you will need:
     - Route to in-cluster MCP servers
     - Route to external/remote MCP servers through AgentGateway
     - Secure MCP servers with JWT auth
+    - Eager OAuth with a pre-registered upstream IdP (Auth0) — gateway acts as the OAuth Authorization Server visible to MCP clients
     - Tool-level access control
     - Integration with Claude Code CLI
 - Direct Response / Health Checks
