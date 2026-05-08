@@ -1,5 +1,9 @@
 # Changelog
 
+0.8.9 - (5-8-26)
+---
+- Updates to agentgateway observability dashboard at  `/lib/observability/agentgateway-grafana-dashboard-v1.json`
+
 0.8.8 - (5-6-26)
 ---
 - `mcp-eager-auth-okta.md`: rename `GATEWAY_HOST` env var to `OKTA_GATEWAY_HOST` so it can coexist with the Auth0 lab in the same shell rc without one lab overriding the other
