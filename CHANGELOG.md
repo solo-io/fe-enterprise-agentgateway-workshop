@@ -1,5 +1,9 @@
 # Changelog
 
+0.9.0 - (5-13-26)
+---
+- Update naming from Gloo UI > Solo UI
+
 0.8.9 - (5-8-26)
 ---
 - Updates to agentgateway observability dashboard at  `/lib/observability/agentgateway-grafana-dashboard-v1.json`

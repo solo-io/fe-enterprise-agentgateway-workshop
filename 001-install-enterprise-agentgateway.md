@@ -312,7 +312,7 @@ EOF
 
 ## Configure tracing
 
-Apply an `EnterpriseAgentgatewayPolicy` to export traces to the telemetry collector deployed in `002`. Skip this step if you are not setting up the Gloo UI.
+Apply an `EnterpriseAgentgatewayPolicy` to export traces to the telemetry collector deployed in `002`. Skip this step if you are not setting up the Solo UI.
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -349,4 +349,4 @@ EOF
 ```
 
 ## Next Steps
-Enterprise Agentgateway is now installed and configured with observability. Continue with `002` to set up the Gloo UI and monitoring tools (Prometheus, Grafana) to visualize metrics, logs, and traces.
+Enterprise Agentgateway is now installed and configured with observability. Continue with `002` to set up the Solo UI and monitoring tools (Prometheus, Grafana) to visualize metrics, logs, and traces.
