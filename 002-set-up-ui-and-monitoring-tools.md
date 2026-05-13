@@ -1,17 +1,17 @@
 # Set up UI and monitoring tools
-Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the box. In this lab, we’ll deploy the Gloo UI (with its built-in OTEL collector) for tracing, and Grafana + Prometheus for metrics visualization.
+Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the box. In this lab, we’ll deploy the Solo UI (with its built-in OTEL collector) for tracing, and Grafana + Prometheus for metrics visualization.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`
 
 ## Lab Objectives
-- Deploy Gloo UI with OTEL collector (for tracing)
+- Deploy Solo UI with OTEL collector (for tracing)
 - Deploy metrics (Prometheus, Grafana)
 - Configure Prometheus to scrape Agentgateway
 
-## Deploy Gloo UI
+## Deploy Solo UI
 
-The Gloo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
+The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
 
 ```bash
 export AGW_UI_VERSION=0.3.18
@@ -55,7 +55,7 @@ tracing:
 EOF
 ```
 
-Check that the Gloo UI components are running:
+Check that the Solo UI components are running:
 
 ```bash
 kubectl get pods -n agentgateway-system -l app.kubernetes.io/instance=management
@@ -187,11 +187,11 @@ grafana-prometheus-kube-state-metrics-7c6d5ff8f6-77hkl   1/1     Running   0    
 prometheus-grafana-prometheus-kube-pr-prometheus-0       2/2     Running   0          2m50s
 ```
 
-## Access Gloo UI
+## Access Solo UI
 
-To access the Gloo UI and view traces:
+To access the Solo UI and view traces:
 
-1. Port-forward to the Gloo UI service:
+1. Port-forward to the Solo UI service:
 ```bash
 kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
 ```
