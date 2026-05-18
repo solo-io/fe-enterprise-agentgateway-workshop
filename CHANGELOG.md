@@ -1,5 +1,10 @@
 # Changelog
 
+0.9.1 - (5-18-26)
+---
+- Add new lab: `configure-inference-routing-with-vllm.md` — Enterprise Agentgateway routing to an in-cluster vLLM pod serving `Qwen/Qwen2.5-0.5B-Instruct` via the Gateway API Inference Extension (`InferencePool` + `llm-d` Endpoint Picker)
+- `README.md`: add new top-level **Inference** section to TOC and body between Routing and Security; add inference-routing bullet to Use Cases
+
 0.9.0 - (5-13-26)
 ---
 - Update naming from Gloo UI > Solo UI
