@@ -14,6 +14,7 @@ Before starting this workshop, you will need:
 
 - [Installation](#installation)
 - [Routing](#routing)
+- [Inference](#inference)
 - [Security](#security)
 - [Rate Limiting](#rate-limiting)
 - [Guardrails](#guardrails)
@@ -66,6 +67,12 @@ Before starting this workshop, you will need:
 - [Direct Response](direct-response.md)
 - [Timeouts and Retries](timeouts-and-retries.md)
 - [LLM Failover](llm-failover.md)
+
+---
+
+## Inference
+
+- [Inference Routing with vLLM](configure-inference-routing-with-vllm.md) _(in-cluster vLLM + Gateway API Inference Extension)_
 
 ---
 
@@ -186,6 +193,7 @@ Before starting this workshop, you will need:
 - Token-based metrics from LLM
 - LLM request/response metadata in Traces
 - Traffic Routing patterns (path, host, header, queryparameter)
+- Inference routing to in-cluster LLMs via the Gateway API Inference Extension (`InferencePool` + `llm-d` Endpoint Picker)
 - Model Evaluations
 - Security & Access Control
     - Control access with org-specific API-key
