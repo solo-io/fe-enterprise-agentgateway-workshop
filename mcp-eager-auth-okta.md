@@ -838,6 +838,8 @@ EOF
 
 # 4. Re-run Lab 001's helm upgrade to drop tokenExchange + KGW_OAUTH_ISSUER_CONFIG.
 #    This restarts the controller and clears its stale postgres connection.
+#    Re-detect ENTERPRISE_AGW_VERSION in case this cleanup runs in a fresh shell.
+export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
 helm upgrade -i -n agentgateway-system enterprise-agentgateway \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --version $ENTERPRISE_AGW_VERSION \
