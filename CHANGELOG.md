@@ -1,5 +1,10 @@
 # Changelog
 
+0.9.2 - (5-18-26)
+---
+- Update `ENTERPRISE_AGW_VERSION` to `v2026.5.0`. This version introduces a new versioning schema to align with monthly release cadence
+- Update `image-list.md`
+
 0.9.1 - (5-18-26)
 ---
 - Add new lab: `configure-inference-routing-with-vllm.md` — Enterprise Agentgateway routing to an in-cluster vLLM pod serving `Qwen/Qwen2.5-0.5B-Instruct` via the Gateway API Inference Extension (`InferencePool` + `llm-d` Endpoint Picker)
