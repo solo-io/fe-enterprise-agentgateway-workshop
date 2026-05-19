@@ -35,7 +35,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Step 9)
 - `jq` for inspecting JSON responses
-- Sudo access to edit `/etc/hosts`
+- A way to resolve `mcp-okta.glootest.com` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
 
 ---
 
@@ -97,20 +97,20 @@ Three things make this work:
 
 ## Step 1 — Set Environment Variables and DNS
 
-Export the Okta values from your tenant (per the Prerequisites table above) plus `OKTA_GATEWAY_HOST` (this lab uses `mcp-okta.glootest.com`). If you persist these in your shell rc, make sure each line is prefixed with `export` so child processes (`kubectl`, `helm`) inherit the values:
+Set these values in your shell so child processes (`kubectl`, `helm`) inherit them. If you keep the Okta values in your shell rc, source the rc and run the block below as-is; otherwise replace each `$VAR` with the example value shown in the comment.
 
 ```bash
-export OKTA_DOMAIN=your-tenant.okta.com
-export OKTA_AUTH_SERVER_ID=default
-export OKTA_ISSUER=https://your-tenant.okta.com/oauth2/default   # NO trailing slash
-export OKTA_CLIENT_ID=<your-client-id>
-export OKTA_CLIENT_SECRET=<your-client-secret>
-export OKTA_AUDIENCE=api://default
-export OKTA_GATEWAY_HOST=mcp-okta.glootest.com
+export OKTA_DOMAIN=$OKTA_DOMAIN                   # e.g. your-tenant.okta.com
+export OKTA_AUTH_SERVER_ID=$OKTA_AUTH_SERVER_ID   # e.g. default
+export OKTA_ISSUER=$OKTA_ISSUER                   # e.g. https://your-tenant.okta.com/oauth2/default   (NO trailing slash)
+export OKTA_CLIENT_ID=$OKTA_CLIENT_ID             # e.g. 0oa...
+export OKTA_CLIENT_SECRET=$OKTA_CLIENT_SECRET     # long random string from Okta
+export OKTA_AUDIENCE=$OKTA_AUDIENCE               # e.g. api://default
+export OKTA_GATEWAY_HOST=$OKTA_GATEWAY_HOST       # this lab uses mcp-okta.glootest.com
 
 # Controller version (auto-detected from the Lab 001 helm release) + license
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
-export SOLO_TRIAL_LICENSE_KEY=<your-license-key>
+export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY   # from Lab 001
 ```
 
 Notes on these values:
@@ -135,8 +135,6 @@ Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-ok
 ```bash
 echo "$GATEWAY_IP $OKTA_GATEWAY_HOST" | sudo tee -a /etc/hosts
 ```
-
-> **macOS DNS cache.** If the hostname doesn't resolve after the edit, flush DNS: `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`.
 
 ---
 
