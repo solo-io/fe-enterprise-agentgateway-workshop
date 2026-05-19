@@ -97,23 +97,21 @@ Three things make this work:
 
 ## Step 1 — Set Environment Variables and DNS
 
-The Okta values and `OKTA_GATEWAY_HOST` are expected to live in your shell rc (e.g. `~/.zshrc`). Re-export them so child processes (`kubectl`, `helm`) inherit the values — some shells write the rc entries without `export`, in which case they won't be inherited:
+Export the Okta values from your tenant (per the Prerequisites table above) plus `OKTA_GATEWAY_HOST` (this lab uses `mcp-okta.glootest.com`). If you persist these in your shell rc, make sure each line is prefixed with `export` so child processes (`kubectl`, `helm`) inherit the values:
 
 ```bash
-export OKTA_DOMAIN=$OKTA_DOMAIN
-export OKTA_AUTH_SERVER_ID=$OKTA_AUTH_SERVER_ID
-export OKTA_ISSUER=$OKTA_ISSUER
-export OKTA_CLIENT_ID=$OKTA_CLIENT_ID
-export OKTA_CLIENT_SECRET=$OKTA_CLIENT_SECRET
-export OKTA_AUDIENCE=$OKTA_AUDIENCE
-export OKTA_GATEWAY_HOST=$OKTA_GATEWAY_HOST
+export OKTA_DOMAIN=your-tenant.okta.com
+export OKTA_AUTH_SERVER_ID=default
+export OKTA_ISSUER=https://your-tenant.okta.com/oauth2/default   # NO trailing slash
+export OKTA_CLIENT_ID=<your-client-id>
+export OKTA_CLIENT_SECRET=<your-client-secret>
+export OKTA_AUDIENCE=api://default
+export OKTA_GATEWAY_HOST=mcp-okta.glootest.com
 
-# Controller version and license (from Lab 001)
-export ENTERPRISE_AGW_VERSION=v2026.5.0
-export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
+# Controller version (auto-detected from the Lab 001 helm release) + license
+export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
+export SOLO_TRIAL_LICENSE_KEY=<your-license-key>
 ```
-
-This lab uses `mcp-okta.glootest.com` as the gateway hostname. If `OKTA_GATEWAY_HOST` is not already set in your rc, add `OKTA_GATEWAY_HOST=mcp-okta.glootest.com` and reload your shell.
 
 Notes on these values:
 

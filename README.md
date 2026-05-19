@@ -88,6 +88,7 @@ Before starting this workshop, you will need:
 - [OPA Authorization](opa-authorization.md)
 - [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: MCP)_
 - [MCP Eager OAuth with Okta](mcp-eager-auth-okta.md) _(see also: MCP)_
+- [MCP Pre-Issuance Entitlement Gating with Auth0](mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Identity & Delegation)_
 
 ---
 
@@ -126,6 +127,7 @@ Before starting this workshop, you will need:
 - [MCP BYO gRPC External Authorization (ext-authz)](mcp-byo-grpc-ext-authz.md) _(see also: Security)_
 - [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: Security, Identity & Delegation)_
 - [MCP Eager OAuth with Okta](mcp-eager-auth-okta.md) _(see also: Security, Identity & Delegation)_
+- [MCP Pre-Issuance Entitlement Gating with Auth0](mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: Security, Identity & Delegation)_
 - [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
 
 ---
@@ -145,6 +147,7 @@ Before starting this workshop, you will need:
 - [Microsoft Entra ID OBO](msft-entra-obo.md)
 - [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: MCP)_
 - [MCP Eager OAuth with Okta](mcp-eager-auth-okta.md) _(see also: MCP)_
+- [MCP Pre-Issuance Entitlement Gating with Auth0](mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Security)_
 
 ---
 
@@ -220,6 +223,7 @@ Before starting this workshop, you will need:
     - Route to external/remote MCP servers through AgentGateway
     - Secure MCP servers with JWT auth
     - Eager OAuth with a pre-registered upstream IdP (Auth0) — gateway acts as the OAuth Authorization Server visible to MCP clients
+    - Pre-issuance entitlement gating — gRPC ext_authz hook gates OAuth token issuance per user, redirects denied users to a configurable URL
     - Tool-level access control
     - Integration with Claude Code CLI
 - Direct Response / Health Checks
