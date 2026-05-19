@@ -1,5 +1,9 @@
 # Changelog
 
+0.9.4 - (5-19-26)
+---
+- Minor wording fixes and enhancements to existing eager auth labs
+
 0.9.3 - (5-19-26)
 ---
 - Add new lab: `mcp-eager-auth-auth0-pre-issuance-authz.md` — eager-OAuth with Auth0 + new pre-issuance ext_authz hook (`KGW_OAUTH_ISSUER_CONFIG.pre_issuance`, requires `v2026.5.0`); gates token issuance by Auth0 `sub` via gRPC ext-authz, redirects denied users to a configurable URL; multiplexed backend across in-cluster + remote MCP targets

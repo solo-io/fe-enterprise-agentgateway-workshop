@@ -34,7 +34,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Step 9)
 - `jq` for inspecting JSON responses
-- Sudo access to edit `/etc/hosts`
+- A way to resolve `mcp-auth0.glootest.com` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
 
 ---
 
@@ -96,19 +96,19 @@ Three things make this work:
 
 ## Step 1 — Set Environment Variables and DNS
 
-Export the Auth0 values from your tenant (per the Prerequisites table above) plus `AUTH0_GATEWAY_HOST` (this lab uses `mcp-auth0.glootest.com`). If you persist these in your shell rc, make sure each line is prefixed with `export` so child processes (`kubectl`, `helm`) inherit the values:
+Set these values in your shell so child processes (`kubectl`, `helm`) inherit them. If you keep the Auth0 values in your shell rc, source the rc and run the block below as-is; otherwise replace each `$VAR` with the example value shown in the comment.
 
 ```bash
-export AUTH0_ISSUER=https://your-tenant.us.auth0.com/   # trailing slash REQUIRED
-export AUTH0_DOMAIN=your-tenant.us.auth0.com
-export AUTH0_CLIENT_ID=<your-client-id>
-export AUTH0_CLIENT_SECRET=<your-client-secret>
-export AUTH0_AUDIENCE=<your-api-audience>
-export AUTH0_GATEWAY_HOST=mcp-auth0.glootest.com
+export AUTH0_ISSUER=$AUTH0_ISSUER                 # e.g. https://your-tenant.us.auth0.com/   (trailing slash REQUIRED)
+export AUTH0_DOMAIN=$AUTH0_DOMAIN                 # e.g. your-tenant.us.auth0.com
+export AUTH0_CLIENT_ID=$AUTH0_CLIENT_ID           # e.g. abc123XYZ...
+export AUTH0_CLIENT_SECRET=$AUTH0_CLIENT_SECRET   # long random string from Auth0
+export AUTH0_AUDIENCE=$AUTH0_AUDIENCE             # e.g. https://api.example.com  (your Auth0 API identifier)
+export AUTH0_GATEWAY_HOST=$AUTH0_GATEWAY_HOST     # this lab uses mcp-auth0.glootest.com
 
 # Controller version (auto-detected from the Lab 001 helm release) + license
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
-export SOLO_TRIAL_LICENSE_KEY=<your-license-key>
+export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY   # from Lab 001
 ```
 
 Notes on these values:
@@ -133,8 +133,6 @@ Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-au
 ```bash
 echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" | sudo tee -a /etc/hosts
 ```
-
-> **macOS DNS cache.** If the hostname doesn't resolve after the edit, flush DNS: `sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder`.
 
 ---
 
