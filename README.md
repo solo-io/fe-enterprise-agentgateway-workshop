@@ -136,9 +136,14 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 
 ## Agent Frameworks
 
-- [Claude Code](claude-code.md)
 - [CrewAI](crewai-with-agentgateway.md)
 - [LangChain](langchain-with-agentgateway.md)
+
+---
+
+## Agent Harnesses
+
+- [Claude Code](claude-code.md)
 
 ---
 
