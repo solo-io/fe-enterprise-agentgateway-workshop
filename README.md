@@ -10,6 +10,8 @@ Before starting this workshop, you will need:
 - kubectl CLI installed and configured
 - helm CLI installed
 
+See [System Requirements](system-requirements.md) for detailed cluster sizing, version support, and resource recommendations.
+
 # Table of Contents
 
 - [Installation](#installation)

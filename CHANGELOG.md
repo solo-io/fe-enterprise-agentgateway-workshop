@@ -1,5 +1,11 @@
 # Changelog
 
+0.9.5 - (5-19-26)
+---
+- Add new doc: `system-requirements.md` — cloud-agnostic system requirements (Kubernetes/Helm/Gateway API/Istio versions, POC and Prod cluster sizing, control-plane and proxy pod resource recommendations, `EnterpriseAgentgatewayParameters` + `Gateway` examples, shared extension server footprint) aligned to `v2026.5.0`
+- `README.md`: link `system-requirements.md` from the Prerequisites section
+
+
 0.9.4 - (5-19-26)
 ---
 - Minor wording fixes and enhancements to existing eager auth labs
