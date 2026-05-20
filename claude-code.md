@@ -4,7 +4,8 @@
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
-- Create a Kubernetes secret that contains our Anthropic API key credentials
+- Choose between Direct API Key or Claude Max / Team Subscription access
+- Create a Kubernetes secret that contains your Anthropic credentials
 - Create a passthrough route to Anthropic as our backend LLM provider using a `Backend` and `HTTPRoute`
 - Test the route with curl to verify connectivity
 - Use Claude Code CLI through the agentgateway proxy
@@ -19,28 +20,52 @@ This lab configures Enterprise AgentGateway with passthrough routing to Anthropi
 
 This makes the gateway compatible with Claude Code CLI and other Anthropic API clients, enabling observability, rate limiting, and guardrails for all Claude interactions.
 
-## Configure Required Variables
-Replace with a valid Anthropic API key
+## Choose Your Access Method
+
+There are two ways to authenticate Claude Code through the gateway:
+
+| | Claude Max / Team Subscription | Direct API Key |
+|---|---|---|
+| **Credential type** | `sk-ant-oat01...` OAuth token from your Claude subscription | `sk-ant-api...` key from console.anthropic.com |
+| **Gateway setup** | Reuses the existing `agentgateway-proxy` listener | Reuses the existing `agentgateway-proxy` listener |
+| **Path** | `$GATEWAY_IP:8080/claude` | `$GATEWAY_IP:8080/claude` |
+| **Best for** | Individual or team Claude Max subscriptions | Service accounts, CI/CD, API-billed access |
+
+Follow **Option A** or **Option B** below, then continue to the shared testing and observability steps.
+
+---
+
+## Option A: Claude Max / Team Subscription
+
+### Configure Required Variables
+
+Use the Claude Code CLI to generate a long-lived OAuth token from your Claude Max subscription:
 ```bash
-export CLAUDE_API_KEY=<your-anthropic-api-key>
+claude setup-token
 ```
 
-Create anthropic api-key secret
+This will open a browser-based authentication flow. Once complete, the CLI will print your token. Export it:
 ```bash
-kubectl create secret generic anthropic-secret -n agentgateway-system \
---from-literal="Authorization=$CLAUDE_API_KEY" \
---dry-run=client -oyaml | kubectl apply -f -
+export CLAUDE_OAUTH_TOKEN=<token-printed-by-setup-token>
 ```
 
-## Create Anthropic Route and Backend
+### Create the Secret and Resources
 
-Create the HTTPRoute and AgentgatewayBackend with passthrough configuration:
 ```bash
 kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: claude-subscription-token
+  namespace: agentgateway-system
+type: Opaque
+stringData:
+  Authorization: $CLAUDE_OAUTH_TOKEN
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: claude-passthrough
+  name: claude-subscription-route
   namespace: agentgateway-system
 spec:
   parentRefs:
@@ -58,16 +83,14 @@ spec:
             - x-api-key
             - authorization
       backendRefs:
-        - name: anthropic-passthrough
+        - name: claude-subscription-backend
           group: agentgateway.dev
           kind: AgentgatewayBackend
-      timeouts:
-        request: "120s"
 ---
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: anthropic-passthrough
+  name: claude-subscription-backend
   namespace: agentgateway-system
 spec:
   ai:
@@ -76,34 +99,53 @@ spec:
   policies:
     auth:
       secretRef:
-        name: anthropic-secret
+        name: claude-subscription-token
     ai:
       routes:
         "/v1/messages": "Messages"
         "/v1/models": "Passthrough"
         "*": "Passthrough"
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: claude-subscription-policies
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: claude-subscription-route
+  traffic:
+    retry:
+      attempts: 3
+      backoff: 500ms
+      codes: [429, 502, 503, 504, 529]
+    timeouts:
+      request: 540s
+    rateLimit:
+      local:
+      - tokens: 5000000
+        unit: Hours
 EOF
 ```
 
-The `policies.ai.routes` configuration allows you to route different Anthropic API endpoints through the gateway:
-- `/v1/messages`: `"Messages"` - The native Anthropic messages API (used by Claude Code CLI)
-- `/v1/models`: `"Passthrough"` - Proxies model listing requests
-- `*`: `"Passthrough"` - Default passthrough for any other paths
+### Export the Gateway IP
 
-## Test Anthropic Route with curl
-
-Export the gateway IP:
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
+  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
+  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
-Test the Anthropic native `/v1/messages` endpoint:
+### Test the Route with curl
+
 ```bash
 curl -i "$GATEWAY_IP:8080/claude/v1/messages" \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
-    "model": "claude-3-5-haiku-latest",
+    "model": "claude-haiku-4-5-20251001",
     "max_tokens": 1024,
     "messages": [
       {
@@ -114,17 +156,14 @@ curl -i "$GATEWAY_IP:8080/claude/v1/messages" \
   }'
 ```
 
-You should see a successful response from Claude with the completion.
+### Configure and Launch Claude Code
 
-## Use Claude Code CLI Through the Gateway
+Because the gateway injects the team credential, Claude Code only needs a placeholder API key:
 
-Now that the route is configured, you can use Claude Code CLI through the Enterprise AgentGateway.
-
-### Configure Claude Code
-
-Set the base URL to point to the gateway:
 ```bash
 export ANTHROPIC_BASE_URL="http://$GATEWAY_IP:8080/claude"
+export ANTHROPIC_API_KEY=dummy
+claude
 ```
 
 **Note for Vertex AI users**: If you were previously using Claude Code with Vertex AI, unset the following variable first:
@@ -132,21 +171,134 @@ export ANTHROPIC_BASE_URL="http://$GATEWAY_IP:8080/claude"
 unset CLAUDE_CODE_USE_VERTEX
 ```
 
-### Launch Claude Code
+### Cleanup
 
-Launch Claude Code CLI (it will automatically use `ANTHROPIC_BASE_URL`):
 ```bash
+kubectl delete httproute -n agentgateway-system claude-subscription-route
+kubectl delete agentgatewaybackend -n agentgateway-system claude-subscription-backend
+kubectl delete agentgatewaypolicy -n agentgateway-system claude-subscription-policies
+kubectl delete secret -n agentgateway-system claude-subscription-token
+unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY CLAUDE_OAUTH_TOKEN GATEWAY_IP
+```
+
+---
+
+## Option B: Direct API Key
+
+### Configure Required Variables
+
+Replace with a valid Anthropic API key:
+```bash
+export CLAUDE_API_KEY=<your-anthropic-api-key>
+```
+
+Create the Anthropic API key secret:
+```bash
+kubectl create secret generic claude-direct-apikey -n agentgateway-system \
+--from-literal="Authorization=$CLAUDE_API_KEY" \
+--dry-run=client -oyaml | kubectl apply -f -
+```
+
+### Create Anthropic Route and Backend
+
+Create the HTTPRoute and AgentgatewayBackend with passthrough configuration:
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: claude-directapikey-route
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /claude
+      filters:
+        - type: RequestHeaderModifier
+          requestHeaderModifier:
+            remove:
+            - x-api-key
+            - authorization
+      backendRefs:
+        - name: claude-direct-apikey-backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "540s"
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: claude-direct-apikey-backend
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      anthropic: {}
+  policies:
+    auth:
+      secretRef:
+        name: claude-direct-apikey
+    ai:
+      routes:
+        "/v1/messages": "Messages"
+        "/v1/models": "Passthrough"
+        "*": "Passthrough"
+EOF
+```
+
+### Export the Gateway IP
+
+```bash
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
+  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
+  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+```
+
+### Test the Route with curl
+
+```bash
+curl -i "$GATEWAY_IP:8080/claude/v1/messages" \
+  -H "Content-Type: application/json" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{
+    "model": "claude-haiku-4-5-20251001",
+    "max_tokens": 1024,
+    "messages": [
+      {
+        "role": "user",
+        "content": "Explain what an API Gateway does in one sentence."
+      }
+    ]
+  }'
+```
+
+### Configure and Launch Claude Code
+
+```bash
+export ANTHROPIC_BASE_URL="http://$GATEWAY_IP:8080/claude"
 claude
 ```
 
-All your Claude Code sessions will now route through the Enterprise AgentGateway, enabling observability, rate limiting, and guardrails.
+### Cleanup
 
-Try asking Claude Code a question to generate some traffic:
+```bash
+kubectl delete httproute -n agentgateway-system claude-directapikey-route
+kubectl delete agentgatewaybackend -n agentgateway-system claude-direct-apikey-backend
+kubectl delete secret -n agentgateway-system claude-direct-apikey
+unset ANTHROPIC_BASE_URL CLAUDE_API_KEY GATEWAY_IP
 ```
-> what is kubernetes?
-```
+
+---
 
 ## Observability
+
+These steps apply to both Option A and Option B. For Option B, substitute `$GATEWAY_IP:8080/claude` wherever `$CLAUDE_GATEWAY_IP:4040` appears in the examples.
 
 ### View Metrics and Traces in Grafana
 
@@ -220,10 +372,3 @@ kubectl port-forward svc/jaeger -n observability 16686:16686
 ```
 
 Navigate to http://localhost:16686 in your browser to see traces with LLM-specific spans.
-
-## Cleanup
-```bash
-kubectl delete httproute -n agentgateway-system claude-passthrough
-kubectl delete agentgatewaybackend -n agentgateway-system anthropic-passthrough
-kubectl delete secret -n agentgateway-system anthropic-secret
-```
