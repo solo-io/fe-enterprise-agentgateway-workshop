@@ -64,6 +64,7 @@ Images:
 us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-frontend:0.4.2
 us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-backend:0.4.2
 us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-autoauth:v0.2.1
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-tunnel-server:0.4.2
 docker.io/otel/opentelemetry-collector-contrib:0.150.1
 docker.io/clickhouse/clickhouse-server:26.1.11.9-alpine
 ```
