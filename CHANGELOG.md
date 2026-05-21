@@ -1,5 +1,9 @@
 # Changelog
 
+0.9.7 - (5-21-26)
+---
+- `image-list.md`: add management UI section with helm chart (`oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management`) and images for version `0.4.2`
+
 0.9.6 - (5-21-26)
 ---
 - `claude-code.md`: extend lab to cover both Claude Max / Team Subscription (Option A) and Direct API Key (Option B)
