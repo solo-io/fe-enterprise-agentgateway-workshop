@@ -14,7 +14,7 @@ This lab assumes that you have completed the setup in `001`
 The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
 
 ```bash
-export AGW_UI_VERSION=0.3.18
+export AGW_UI_VERSION=0.4.2
 helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
 --namespace agentgateway-system \
 --create-namespace \
