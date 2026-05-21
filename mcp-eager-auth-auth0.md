@@ -756,6 +756,83 @@ Reconnect from Inspector. If Postgres is wired correctly the gateway should acce
 
 ---
 
+## Step 10 — Test with Claude Code
+
+This step uses Claude Code as the MCP client in place of MCP Inspector. Claude Code follows the same MCP auth spec: it discovers the gateway's OAuth AS metadata, performs Dynamic Client Registration, opens a browser for login, and stores the resulting token. The result is a real agent harness authenticated through the eager-OAuth flow.
+
+### Trust the self-signed cert
+
+This lab uses a self-signed certificate. If your gateway is using a certificate from a trusted CA, skip this section — `NODE_TLS_REJECT_UNAUTHORIZED=0` is not needed.
+
+Claude Code is a Node.js process and won't accept the self-signed gateway cert by default. Prefix the launch command with `NODE_TLS_REJECT_UNAUTHORIZED=0` as shown in the next section — do **not** add it to your shell rc file, as it disables TLS verification for all Node processes in that shell.
+
+### Register the MCP server with Claude Code
+
+Add the gateway's MCP endpoint to Claude Code's local config:
+
+```bash
+claude mcp add mcp-auth0-gateway --transport http https://mcp-auth0.glootest.com/mcp
+```
+
+Verify it was added:
+
+```bash
+claude mcp list
+```
+
+Expected output includes:
+
+```
+mcp-auth0-gateway: https://mcp-auth0.glootest.com/mcp (http)
+```
+
+### Launch Claude Code and walk through the OAuth flow
+
+```bash
+NODE_TLS_REJECT_UNAUTHORIZED=0 claude
+```
+
+On the first prompt that triggers MCP tool discovery, Claude Code initiates the OAuth flow automatically:
+
+1. Claude Code fetches `/.well-known/oauth-protected-resource/mcp` to discover the authorization server.
+2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-auth0.glootest.com/oauth-issuer/register`), not Auth0 — this confirms the eager-OAuth issuer is serving its own AS metadata.
+3. Claude Code POSTs to `/oauth-issuer/register` and receives the pre-registered Auth0 `client_id`.
+4. A browser window opens to **Auth0's Universal Login**. **Verify the URL bar shows `${AUTH0_DOMAIN}`**, not the gateway hostname — this confirms the eager-OAuth issuer correctly delegated downstream.
+5. Complete the Auth0 login (with MFA if your tenant requires it).
+6. The browser redirects back; Claude Code captures the authorization code via a local PKCE callback server and exchanges it for a token.
+7. Claude Code resumes. The token is stored in Claude Code's local config and reused on subsequent runs.
+
+### Confirm tools are reachable
+
+At the Claude Code prompt, ask it to use a tool from the MCP server:
+
+```
+Use the echo tool from mcp-auth0-gateway to echo "hello from agentgateway"
+```
+
+Expected: Claude Code calls the `echo` tool and returns the echoed message without a 401 error. You should see the tool invocation appear in the Claude Code output (tool name, input, result).
+
+### What proves what
+
+| Observation in Claude Code | What it proves |
+|---|---|
+| Browser opens to `${AUTH0_DOMAIN}`, not the gateway | Eager-OAuth AS is serving its own AS metadata; `registration_endpoint` was rewritten to point at the gateway |
+| Login completes and Claude Code resumes tool calls | Pre-registered `client_id`/`client_secret` from `client_config.clients` matched the Auth0 app — fake-DCR worked end-to-end |
+| Tool call returns a result without a 401 | Auth0-issued JWT validated against Auth0 JWKS at the MCP backend; `mcp.authentication` is configured correctly |
+| Subsequent `claude` invocations skip the browser | Token stored in Claude Code's local config and reused automatically |
+
+### Cleanup
+
+Remove the MCP server from Claude Code's local config:
+
+```bash
+claude mcp remove mcp-auth0-gateway
+```
+
+The Kubernetes resources for this lab are removed in the [Cleanup](#cleanup) section below.
+
+---
+
 ## Troubleshooting
 
 If MCP Inspector behaves unexpectedly, this table covers the common breakage modes for an eager-OAuth + Auth0 setup.
@@ -773,6 +850,7 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | Inspector shows "fetch failed" or `unable to verify the first certificate` | Inspector's Node process rejected the self-signed gateway cert | Restart Inspector with `NODE_TLS_REJECT_UNAUTHORIZED=0` (Step 9) |
 | Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-auth0.glootest.com/.well-known/oauth-protected-resource/mcp` and click through the warning |
 | `mcp-auth0.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
+| Claude Code (Step 10) fails to connect with an SSL error or `unable to verify the first certificate` | `NODE_TLS_REJECT_UNAUTHORIZED` not set for the Claude Code process | Launch with `NODE_TLS_REJECT_UNAUTHORIZED=0 claude`; do **not** add this to your shell rc |
 
 Useful commands:
 

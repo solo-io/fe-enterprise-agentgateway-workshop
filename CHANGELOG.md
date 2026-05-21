@@ -1,6 +1,6 @@
 # Changelog
 
-0.9.6 - (5-20-26)
+0.9.6 - (5-21-26)
 ---
 - `claude-code.md`: extend lab to cover both Claude Max / Team Subscription (Option A) and Direct API Key (Option B)
 - `README.md`: add new **Agent Harnesses** section; move `claude-code.md` under it; remove from **Agent Frameworks**

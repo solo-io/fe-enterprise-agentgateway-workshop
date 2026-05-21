@@ -144,6 +144,8 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 ## Agent Harnesses
 
 - [Claude Code](claude-code.md)
+- [Claude Code as MCP Client with Eager OAuth (Auth0)](mcp-eager-auth-auth0.md#step-10--test-with-claude-code)
+- [Claude Code as MCP Client with Eager OAuth (Okta)](mcp-eager-auth-okta.md#step-10--test-with-claude-code)
 
 ---
 
