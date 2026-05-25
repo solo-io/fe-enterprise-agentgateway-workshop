@@ -46,7 +46,3 @@ temp/
 
 # Superpowers docs
 docs/
-
-# MkDocs build output and local venv
-_site/
-.venv-docs/
