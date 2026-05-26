@@ -7,13 +7,13 @@
 ### Enterprise Agentgateway CRD Helm chart
 
 ```bash
-oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds
+helm pull oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds --version $ENTERPRISE_AGW_VERSION
 ```
 
 ### Enterprise Agentgateway Helm Chart
 
 ```bash
-oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway
+helm pull oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway --version $ENTERPRISE_AGW_VERSION
 ```
 
 ## Images
