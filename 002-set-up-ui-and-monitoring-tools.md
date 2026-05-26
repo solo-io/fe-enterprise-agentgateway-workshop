@@ -13,13 +13,37 @@ This lab assumes that you have completed the setup in `001`
 
 The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
 
+### Set required variables
+
+Export your Solo license key (same key used in lab 001):
 ```bash
-export AGW_UI_VERSION=0.4.2
+export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
+export AGW_UI_VERSION=0.4.3
+```
+
+### Step 1: Install/upgrade CRDs
+
+```bash
+helm upgrade -i management-crds oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management-crds \
+  --namespace agentgateway-system \
+  --create-namespace \
+  --version "$AGW_UI_VERSION"
+```
+
+### Step 2: Install/upgrade the chart
+
+The `management-crds` subchart is bundled inside `management` and enabled by default. Since we installed it separately in Step 1, disable it here to avoid ownership conflicts:
+
+```bash
 helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
 --namespace agentgateway-system \
 --create-namespace \
 --version "$AGW_UI_VERSION" \
 -f - <<EOF
+management-crds:
+  enabled: false
+licensing:
+  licenseKey: "${SOLO_TRIAL_LICENSE_KEY}"
 global:
   imagePullPolicy: IfNotPresent
   #--- imagePullSecrets for private registry (propagated to all subcharts) ---
@@ -278,3 +302,25 @@ The dashboard is organized into several key metric categories:
 - Tool call frequency and patterns
 - MCP server request rates
 - Tool execution performance
+
+## Uninstall
+
+Remove the Solo UI:
+
+```bash
+helm uninstall management -n agentgateway-system
+helm uninstall management-crds -n agentgateway-system
+```
+
+Remove Grafana and Prometheus:
+
+```bash
+helm uninstall grafana-prometheus -n monitoring
+kubectl delete namespace monitoring
+```
+
+Remove the AgentGateway PodMonitor:
+
+```bash
+kubectl delete podmonitor data-plane-monitoring-agentgateway-metrics -n agentgateway-system
+```
