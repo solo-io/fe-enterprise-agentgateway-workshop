@@ -50,7 +50,7 @@ gcr.io/gloo-mesh/rate-limiter:0.18.6
 
 ### Image list for Solo UI
 
-**0.4.2**
+**0.4.3**
 
 Helm chart:
 
@@ -61,10 +61,10 @@ oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management
 Images:
 
 ```bash
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-frontend:0.4.2
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-backend:0.4.2
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-frontend:0.4.3
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-backend:0.4.3
 us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-autoauth:v0.2.1
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-tunnel-server:0.4.2
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-tunnel-server:0.4.3
 docker.io/otel/opentelemetry-collector-contrib:0.150.1
 docker.io/clickhouse/clickhouse-server:26.1.11.9-alpine
 ```
@@ -80,7 +80,7 @@ global:
   #image:
   #  registry: my-registry.example.com
   #  repository: solo-enterprise
-  #  tag: "0.4.2"
+  #  tag: "0.4.3"
 clickhouse:
   #--- Image override for ClickHouse (embed registry in repository if using private registry) ---
   #image:

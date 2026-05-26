@@ -1,5 +1,10 @@
 # Changelog
 
+0.9.9 - (5-26-26)
+---
+- `002-set-up-ui-and-monitoring-tools.md`: add license key prerequisite (`SOLO_TRIAL_LICENSE_KEY`); split CRD install into separate step using `management-crds` chart with `management-crds.enabled: false` on main chart to avoid ownership conflicts; add Uninstall section
+- `image-list.md`: update Solo UI section from `0.4.2` to `0.4.3`
+
 0.9.8 - (5-21-26)
 ---
 - Update `image-list.md`
