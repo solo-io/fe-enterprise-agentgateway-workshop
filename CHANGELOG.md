@@ -3,7 +3,8 @@
 0.10.0 - (5-27-26)
 ---
 - Update `image-list.md` with helm pull commands for the various Helm charts
-- Rename `load-testing-k6s.md` → `llm-load-testing-k6s.md`; update link text in `README.md` to "LLM Load Testing with k6s"
+- Rename `load-testing-k6s.md` → `llm-load-testing-k6.md`; update link text in `README.md` to "LLM Load Testing with k6"
+- Add new lab: `mcp-load-testing-k6.md` — k6 load testing of MCP traffic through Enterprise AgentGateway; deploys a Python-based multi-arch MCP echo server (`python:3.12-alpine` + ConfigMap); VU test ramps 5→25 concurrent sessions; RPS test ramps 25→50 req/s; both run in 2m; includes smoke test, optional Grafana/Prometheus observation, and cleanup
 
 0.9.9 - (5-26-26)
 ---
