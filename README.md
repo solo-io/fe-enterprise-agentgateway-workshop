@@ -168,7 +168,7 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 
 ## Load Testing
 
-- [Load Testing with k6s](load-testing-k6s.md)
+- [LLM Load Testing with k6](llm-load-testing-k6.md)
 
 ---
 
@@ -245,8 +245,8 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
     - Priority group failover between LLM providers
     - Health-based routing across multiple backends
     - Failover on rate limit errors (429)
-- Load Testing with K6s
-    - Performance testing with k6s load generator
+- Load Testing with k6
+    - Performance testing with k6 load generator
     - Ramping and constant load patterns
     - Integration with Grafana and Prometheus metrics
 
