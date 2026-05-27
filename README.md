@@ -168,7 +168,7 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 
 ## Load Testing
 
-- [Load Testing with k6s](load-testing-k6s.md)
+- [LLM Load Testing with k6s](llm-load-testing-k6s.md)
 
 ---
 

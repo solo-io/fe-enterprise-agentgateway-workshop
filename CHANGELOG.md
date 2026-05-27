@@ -1,9 +1,9 @@
 # Changelog
 
-0.10.0 - (5-26-26)
+0.10.0 - (5-27-26)
 ---
 - Update `image-list.md` with helm pull commands for the various Helm charts
-
+- Rename `load-testing-k6s.md` → `llm-load-testing-k6s.md`; update link text in `README.md` to "LLM Load Testing with k6s"
 
 0.9.9 - (5-26-26)
 ---
