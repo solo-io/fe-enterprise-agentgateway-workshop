@@ -169,6 +169,7 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 ## Load Testing
 
 - [LLM Load Testing with k6](llm-load-testing-k6.md)
+- [MCP Load Testing with k6](mcp-load-testing-k6.md)
 
 ---
 

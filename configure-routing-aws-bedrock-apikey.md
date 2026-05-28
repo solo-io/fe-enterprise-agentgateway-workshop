@@ -133,7 +133,39 @@ spec:
   ai:
     provider:
       bedrock:
-        model: anthropic.claude-3-5-haiku-20241022-v1:0
+        model: us.anthropic.claude-haiku-4-5-20251001-v1:0
+        region: us-west-2
+  policies:
+    auth:
+      secretRef:
+        name: bedrock-apikey-secret
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: bedrock-opus
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      bedrock:
+        model: us.anthropic.claude-opus-4-7
+        region: us-west-2
+  policies:
+    auth:
+      secretRef:
+        name: bedrock-apikey-secret
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: bedrock-sonnet
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      bedrock:
+        model: us.anthropic.claude-sonnet-4-6
         region: us-west-2
   policies:
     auth:
@@ -174,6 +206,26 @@ spec:
             value: /bedrock/haiku
       backendRefs:
         - name: bedrock-haiku3.5
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bedrock/opus
+      backendRefs:
+        - name: bedrock-opus
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bedrock/sonnet
+      backendRefs:
+        - name: bedrock-sonnet
           group: agentgateway.dev
           kind: AgentgatewayBackend
       timeouts:
@@ -234,6 +286,36 @@ curl -i "$GATEWAY_IP:8080/bedrock/mistral" \
 ### curl AWS Bedrock Haiku endpoint
 ```bash
 curl -i "$GATEWAY_IP:8080/bedrock/haiku" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+### curl AWS Bedrock Opus endpoint
+```bash
+curl -i "$GATEWAY_IP:8080/bedrock/opus" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+### curl AWS Bedrock Sonnet endpoint
+```bash
+curl -i "$GATEWAY_IP:8080/bedrock/sonnet" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -331,6 +413,8 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 kubectl delete httproute -n agentgateway-system bedrock
 kubectl delete agentgatewaybackend -n agentgateway-system bedrock-mistral
 kubectl delete agentgatewaybackend -n agentgateway-system bedrock-haiku3.5
+kubectl delete agentgatewaybackend -n agentgateway-system bedrock-opus
+kubectl delete agentgatewaybackend -n agentgateway-system bedrock-sonnet
 kubectl delete agentgatewaybackend -n agentgateway-system bedrock-llama3-8b
 kubectl delete secret -n agentgateway-system bedrock-apikey-secret
 ```
