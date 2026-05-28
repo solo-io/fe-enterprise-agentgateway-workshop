@@ -1580,7 +1580,7 @@
           "showLineNumbers": false,
           "showMiniMap": false
         },
-        "content": "| Model | Input (per 1M tokens) | Output (per 1M tokens) |\n|-------|----------------------|------------------------|\n| claude-haiku-4-5-* | $1.00 | $5.00 |\n| claude-3-5-haiku-* | $0.80 | $4.00 |\n| claude-sonnet-4-5-* | $3.00 | $15.00 |\n\nReference: [Anthropic Pricing](https://www.anthropic.com/pricing#anthropic-api)",
+        "content": "| Model | Input (per 1M tokens) | Output (per 1M tokens) |\n|-------|----------------------|------------------------|\n| claude-haiku-3-5-* | $0.80 | $4.00 |\n| claude-haiku-4-5-* | $1.00 | $5.00 |\n| claude-sonnet-4-5-* | $3.00 | $15.00 |\n| claude-sonnet-4-6-* | $3.00 | $15.00 |\n| claude-opus-4-7-* | $5.00 | $25.00 |\n\nReference: [Anthropic Pricing](https://www.anthropic.com/pricing#anthropic-api)",
         "mode": "markdown"
       },
       "pluginVersion": "12.3.0",
@@ -6146,7 +6146,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(agentgateway_requests_total{namespace=~\"$namespace\",route=~\".*mcp.*\",status=~\"5..\"}[5m])) by (route, status)",
+          "expr": "sum(rate(agentgateway_requests_total{namespace=~\"$namespace\",route=~\".*mcp.*\",status=~\"5..\",reason!=\"MCP\"}[5m])) by (route, status)",
           "legendFormat": "{{route}} - 5xx ({{status}})",
           "refId": "C"
         }

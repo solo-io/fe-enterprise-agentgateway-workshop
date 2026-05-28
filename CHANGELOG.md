@@ -1,5 +1,10 @@
 # Changelog
 
+0.10.1 - (5-27-26)
+---
+- `lib/observability/agentgateway-grafana-dashboard-v1.json`: updates to Claude Pricing Table
+- Add `lib/observability/update-dashboard.sh` helper script
+
 0.10.0 - (5-27-26)
 ---
 - Update `image-list.md` with helm pull commands for the various Helm charts
