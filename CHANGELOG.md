@@ -5,6 +5,7 @@
 - `lib/observability/agentgateway-grafana-dashboard-v1.json`: updates to Claude Pricing Table
 - `lib/observability/agentgateway-grafana-dashboard-v1.json`: updates to Cost Tracking
 - Add `lib/observability/update-dashboard.sh` helper script
+- `configure-routing-aws-bedrock.md` and `configure-routing-aws-bedrock-apikey.md`: add Claude Opus 4.7 (`us.anthropic.claude-opus-4-7`) at `/bedrock/opus` and Claude Sonnet 4.6 (`us.anthropic.claude-sonnet-4-6`) at `/bedrock/sonnet`; fix existing Haiku 4.5 model ID by prefixing with `us.` cross-region inference profile (required for on-demand invocation of newer Claude models on Bedrock)
 
 0.10.0 - (5-27-26)
 ---
