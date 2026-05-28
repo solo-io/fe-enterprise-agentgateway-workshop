@@ -60,7 +60,7 @@ kubectl create configmap "$CONFIGMAP_NAME" \
   kubectl label -f - \
     grafana_dashboard="1" \
     --local --dry-run=client -o yaml | \
-  kubectl apply -f - --context "$CONTEXT"
+  kubectl create -f - --context "$CONTEXT"
 
 log_info "✅ Dashboard ConfigMap updated successfully"
 log_info "   Grafana sidecar will automatically reload the dashboard in a few seconds"
