@@ -4,7 +4,7 @@
 
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
-> ⚠ This lab requires enterprise-agentgateway **`v2026.5.0` or newer**. The `pre_issuance` field in `KGW_OAUTH_ISSUER_CONFIG` does not exist on earlier controllers, and `source.principal` is not populated on pre-issuance Checks before that version.
+> ⚠ This lab requires enterprise-agentgateway **`v2026.5.x` or newer**. The `pre_issuance` field in `KGW_OAUTH_ISSUER_CONFIG` does not exist on earlier controllers, and `source.principal` is not populated on pre-issuance Checks before that version.
 
 This lab uses the same gateway hostname (`mcp-auth0.glootest.com`) as [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md). The two labs cannot run concurrently — clean up the other lab before starting this one. The Okta labs use `mcp-okta.glootest.com` and do not collide.
 
@@ -1001,7 +1001,7 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | `mcp-auth0.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
 | **Every login redirects to `https://example.com/no-access`** (or your custom deny page) | The Auth0 sub of the user you logged in as is not in `ALLOWED_PRINCIPALS`. This is the expected deny-path behavior — but if you meant to be on the allow path, the allowlist needs to be updated. | `kubectl logs -n agentgateway-system deployment/grpc-ext-authz --tail=20` — every Check prints one line including the `source.principal` it saw. Edit `ALLOWED_PRINCIPALS` per Step 7's BYO sub-section. |
 | **Inspector shows "failed to process downstream callback" 400 instead of redirecting** | The ext-authz pod is unreachable or timing out. With `failure_policy: closed`, gRPC dial/timeout errors do NOT trigger the deny redirect — the redirect only fires on an explicit `PERMISSION_DENIED`. | `kubectl get pods -n agentgateway-system -l app=grpc-ext-authz`; `kubectl get svc -n agentgateway-system grpc-ext-authz`; controller logs |
-| **`source.principal=""` in ext-authz logs** | The agentgateway controller is too old to populate `source.principal` on the pre-issuance Check | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].image}'` — verify the image tag is `v2026.5.0` or later |
+| **`source.principal=""` in ext-authz logs** | The agentgateway controller is too old to populate `source.principal` on the pre-issuance Check | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].image}'` — verify the image tag is `v2026.5.x` or later |
 | **Inspector connects despite the user being absent from `ALLOWED_PRINCIPALS`** | `pre_issuance.enabled` is not actually true in `KGW_OAUTH_ISSUER_CONFIG` in the running controller | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].env[?(@.name=="KGW_OAUTH_ISSUER_CONFIG")].value}' \| jq .pre_issuance` |
 
 Useful commands:

@@ -1,6 +1,6 @@
 # Image list for Enterprise Agentgateway
 
-**v2026.5.0**
+**v2026.5.2**
 
 ## Helm Charts
 
@@ -21,13 +21,13 @@ helm pull oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/ent
 ### controller
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2026.5.0
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2026.5.2
 ```
 
 ### agentgateway proxy
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/agentgateway-enterprise:2026.5.0
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/agentgateway-enterprise:2026.5.2
 ```
 
 ### ext-cache (redis)
