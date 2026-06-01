@@ -1,6 +1,6 @@
 # Changelog
 
-0.10.2 - (5-31-26)
+0.10.2 - (6-1-26)
 ---
 - Updates to agentgateway grafana dashboard
 

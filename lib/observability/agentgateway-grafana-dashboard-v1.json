@@ -3925,11 +3925,11 @@
       },
       "id": 30,
       "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
+        "displayMode": "gradient",
+        "minVizHeight": 16,
+        "minVizWidth": 8,
+        "namePlacement": "auto",
+        "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -3937,13 +3937,9 @@
           "fields": "",
           "values": false
         },
-        "showPercentChange": false,
-        "text": {
-          "titleSize": 18,
-          "valueSize": 96
-        },
-        "textMode": "value_and_name",
-        "wideLayout": true
+        "showUnfilled": true,
+        "sizing": "auto",
+        "valueMode": "color"
       },
       "pluginVersion": "12.3.0",
       "targets": [
@@ -3960,7 +3956,7 @@
         }
       ],
       "title": "Total Requests by model (counter)",
-      "type": "stat"
+      "type": "bargauge"
     },
     {
       "datasource": {
