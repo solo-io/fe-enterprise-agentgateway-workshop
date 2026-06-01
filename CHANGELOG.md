@@ -1,5 +1,9 @@
 # Changelog
 
+0.10.2 - (5-31-26)
+---
+- Updates to agentgateway grafana dashboard
+
 0.10.1 - (5-28-26)
 ---
 - `lib/observability/agentgateway-grafana-dashboard-v1.json`: updates to Claude Pricing Table

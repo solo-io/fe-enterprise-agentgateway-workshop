@@ -287,9 +287,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\"}[$__range])) by (le))",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -352,9 +353,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.90, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.90, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\"}[$__range])) by (le))",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -416,9 +418,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\"}[$__rate_interval])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\"}[$__range])) by (le))",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -480,9 +483,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(agentgateway_requests_total{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "sum(increase(agentgateway_requests_total{namespace=~\"$namespace\"}[$__range])) / ($__range_s)",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -545,9 +549,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\"}[$__rate_interval]))",
+          "expr": "sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\"}[$__range])) / ($__range_s)",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -610,9 +615,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\"}[$__rate_interval]))",
+          "expr": "sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\"}[$__range])) / ($__range_s)",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -683,7 +689,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(increase(agentgateway_requests_total{namespace=~\"$namespace\", status=~\"401\"}[$__range])) / sum(increase(agentgateway_requests_total{namespace=~\"$namespace\"}[$__range])) or vector(0)",
+          "expr": "sum(increase(agentgateway_requests_total{namespace=~\"$namespace\", status=~\"4..\", status!=\"429\"}[$__range])) / sum(increase(agentgateway_requests_total{namespace=~\"$namespace\"}[$__range])) or vector(0)",
           "format": "time_series",
           "instant": true,
           "legendFormat": "",
@@ -906,9 +912,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\"}[$__rate_interval])) / sum(rate(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\"}[$__range])) / sum(increase(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\"}[$__range]))",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -980,9 +987,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\"}[$__rate_interval])) / sum(rate(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\"}[$__range])) / sum(increase(agentgateway_gen_ai_server_request_duration_count{namespace=~\"$namespace\"}[$__range]))",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -1045,9 +1053,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(agentgateway_response_bytes_total{namespace=~\"$namespace\"}[$__rate_interval])) / sum(rate(agentgateway_requests_total{namespace=~\"$namespace\"}[$__rate_interval])) or vector(0)",
+          "expr": "sum(increase(agentgateway_response_bytes_total{namespace=~\"$namespace\"}[$__range])) / sum(increase(agentgateway_requests_total{namespace=~\"$namespace\"}[$__range])) or vector(0)",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -1390,9 +1399,10 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(agentgateway_downstream_connections_total{namespace=~\"$namespace\"}[$__rate_interval]))",
+          "expr": "sum(increase(agentgateway_downstream_connections_total{namespace=~\"$namespace\"}[$__range])) / ($__range_s)",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -1605,7 +1615,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[1h])) or vector(0)) * 2.50 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[1h])) or vector(0)) * 10.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"mock-gpt-5.2\"}[1h])) or vector(0)) * 1.75 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"mock-gpt-5.2\"}[1h])) or vector(0)) * 14.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[1h])) or vector(0)) * 0.15 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[1h])) or vector(0)) * 0.60 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-haiku-4-5-.*\"}[1h])) or vector(0)) * 1.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-haiku-4-5-.*\"}[1h])) or vector(0)) * 5.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-3-5-haiku-.*\"}[1h])) or vector(0)) * 0.80 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-3-5-haiku-.*\"}[1h])) or vector(0)) * 4.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-sonnet-4-5-.*\"}[1h])) or vector(0)) * 3.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-sonnet-4-5-.*\"}[1h])) or vector(0)) * 15.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-sonnet-4-6.*\"}[1h])) or vector(0)) * 3.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-sonnet-4-6.*\"}[1h])) or vector(0)) * 15.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-opus-4-7.*\"}[1h])) or vector(0)) * 5.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-opus-4-7.*\"}[1h])) or vector(0)) * 25.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"anthropic\\\\.claude-3-5-haiku-.*\"}[1h])) or vector(0)) * 0.80 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"anthropic\\\\.claude-3-5-haiku-.*\"}[1h])) or vector(0)) * 4.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"anthropic\\\\.claude-3-haiku-.*\"}[1h])) or vector(0)) * 0.25 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"anthropic\\\\.claude-3-haiku-.*\"}[1h])) or vector(0)) * 1.25 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"meta\\\\.llama3-1-8b-.*\"}[1h])) or vector(0)) * 0.22 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"meta\\\\.llama3-1-8b-.*\"}[1h])) or vector(0)) * 0.22 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-3\\\\.5-turbo.*\"}[1h])) or vector(0)) * 0.50 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-3\\\\.5-turbo.*\"}[1h])) or vector(0)) * 1.50 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o(-2024.*)?\"}[1h])) or vector(0)) * 2.50 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o(-2024.*)?\"}[1h])) or vector(0)) * 10.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-5-2025.*\"}[1h])) or vector(0)) * 1.25 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-5-2025.*\"}[1h])) or vector(0)) * 10.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-5-mini-2025.*\"}[1h])) or vector(0)) * 0.25 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-5-mini-2025.*\"}[1h])) or vector(0)) * 2.00 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-5-nano-2025.*\"}[1h])) or vector(0)) * 0.05 / 1000000 +\n  (sum(rate(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-5-nano-2025.*\"}[1h])) or vector(0)) * 0.40 / 1000000\n) * 3600",
+          "expr": "(\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=\"mock-gpt-4o\"}[1h])) or vector(0)) * 2.50 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=\"mock-gpt-4o\"}[1h])) or vector(0)) * 10.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"mock-gpt-5.2\"}[1h])) or vector(0)) * 1.75 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"mock-gpt-5.2\"}[1h])) or vector(0)) * 14.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[1h])) or vector(0)) * 0.15 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o-mini-.*\"}[1h])) or vector(0)) * 0.60 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-haiku-4-5-.*\"}[1h])) or vector(0)) * 1.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-haiku-4-5-.*\"}[1h])) or vector(0)) * 5.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-3-5-haiku-.*\"}[1h])) or vector(0)) * 0.80 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-3-5-haiku-.*\"}[1h])) or vector(0)) * 4.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-sonnet-4-5-.*\"}[1h])) or vector(0)) * 3.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-sonnet-4-5-.*\"}[1h])) or vector(0)) * 15.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-sonnet-4-6.*\"}[1h])) or vector(0)) * 3.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-sonnet-4-6.*\"}[1h])) or vector(0)) * 15.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"claude-opus-4-7.*\"}[1h])) or vector(0)) * 5.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"claude-opus-4-7.*\"}[1h])) or vector(0)) * 25.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"anthropic\\\\.claude-3-5-haiku-.*\"}[1h])) or vector(0)) * 0.80 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"anthropic\\\\.claude-3-5-haiku-.*\"}[1h])) or vector(0)) * 4.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"anthropic\\\\.claude-3-haiku-.*\"}[1h])) or vector(0)) * 0.25 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"anthropic\\\\.claude-3-haiku-.*\"}[1h])) or vector(0)) * 1.25 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"meta\\\\.llama3-1-8b-.*\"}[1h])) or vector(0)) * 0.22 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"meta\\\\.llama3-1-8b-.*\"}[1h])) or vector(0)) * 0.22 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-3\\\\.5-turbo.*\"}[1h])) or vector(0)) * 0.50 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-3\\\\.5-turbo.*\"}[1h])) or vector(0)) * 1.50 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-4o(-2024.*)?\"}[1h])) or vector(0)) * 2.50 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-4o(-2024.*)?\"}[1h])) or vector(0)) * 10.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-5-2025.*\"}[1h])) or vector(0)) * 1.25 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-5-2025.*\"}[1h])) or vector(0)) * 10.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-5-mini-2025.*\"}[1h])) or vector(0)) * 0.25 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-5-mini-2025.*\"}[1h])) or vector(0)) * 2.00 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"input\", gen_ai_response_model=~\"gpt-5-nano-2025.*\"}[1h])) or vector(0)) * 0.05 / 1000000 +\n  (sum(increase(agentgateway_gen_ai_client_token_usage_sum{namespace=~\"$namespace\", gen_ai_token_type=\"output\", gen_ai_response_model=~\"gpt-5-nano-2025.*\"}[1h])) or vector(0)) * 0.40 / 1000000\n)",
           "instant": true,
           "legendFormat": "",
           "refId": "A"
@@ -2839,9 +2849,10 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n    sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\"}[$__rate_interval]))\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\", resource=\"cpu\"})\n  ) * 100",
+          "expr": "(\n    sum(increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\"}[$__range])) / ($__range_s)\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\", resource=\"cpu\"})\n  ) * 100",
+          "format": "time_series",
+          "instant": true,
           "legendFormat": "",
-          "range": true,
           "refId": "A"
         }
       ],
@@ -3017,7 +3028,7 @@
         "percentChangeColorMode": "standard",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean"
           ],
           "fields": "",
           "values": false
@@ -5509,7 +5520,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\",route=~\".*mcp.*\"}[5m])) by (le, route))",
+          "expr": "histogram_quantile(0.50, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\",route=~\".*mcp.*\"}[$__rate_interval])) by (le, route))",
           "legendFormat": "{{route}} - P50",
           "refId": "A"
         },
@@ -5518,7 +5529,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\",route=~\".*mcp.*\"}[5m])) by (le, route))",
+          "expr": "histogram_quantile(0.95, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\",route=~\".*mcp.*\"}[$__rate_interval])) by (le, route))",
           "legendFormat": "{{route}} - P95",
           "refId": "B"
         },
@@ -5527,7 +5538,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\",route=~\".*mcp.*\"}[5m])) by (le, route))",
+          "expr": "histogram_quantile(0.99, sum(rate(agentgateway_request_duration_seconds_bucket{namespace=~\"$namespace\",route=~\".*mcp.*\"}[$__rate_interval])) by (le, route))",
           "legendFormat": "{{route}} - P99",
           "refId": "C"
         }
@@ -5668,7 +5679,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(agentgateway_requests_total{namespace=~\"$namespace\",route=~\".*mcp.*\",status=~\"2..\"}[5m])) by (route)",
+          "expr": "sum(rate(agentgateway_requests_total{namespace=~\"$namespace\",route=~\".*mcp.*\",status=~\"2..\"}[$__rate_interval])) by (route)",
           "legendFormat": "{{route}} - Success (2xx)",
           "refId": "A"
         },
@@ -5677,7 +5688,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(agentgateway_requests_total{namespace=~\"$namespace\",route=~\".*mcp.*\",status=~\"4..\"}[5m])) by (route, status)",
+          "expr": "sum(rate(agentgateway_requests_total{namespace=~\"$namespace\",route=~\".*mcp.*\",status=~\"4..\"}[$__rate_interval])) by (route, status)",
           "legendFormat": "{{route}} - 4xx ({{status}})",
           "refId": "B"
         },
@@ -5686,7 +5697,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(agentgateway_requests_total{namespace=~\"$namespace\",route=~\".*mcp.*\",status=~\"5..\",reason!=\"MCP\"}[5m])) by (route, status)",
+          "expr": "sum(rate(agentgateway_requests_total{namespace=~\"$namespace\",route=~\".*mcp.*\",status=~\"5..\",reason!=\"MCP\"}[$__rate_interval])) by (route, status)",
           "legendFormat": "{{route}} - 5xx ({{status}})",
           "refId": "C"
         }
@@ -5782,7 +5793,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(agentgateway_mcp_requests_total{namespace=~\"$namespace\"}[5m])) by (route)",
+          "expr": "sum(rate(agentgateway_mcp_requests_total{namespace=~\"$namespace\"}[$__rate_interval])) by (route)",
           "legendFormat": "{{route}}",
           "refId": "A"
         }
