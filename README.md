@@ -125,6 +125,8 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 - [In-Cluster MCP](in-cluster-mcp.md)
 - [Remote MCP](remote-mcp.md)
 - [Dynamic MCP](dynamic-mcp.md)
+- [MCP Tool Mode — Search](mcp-tool-mode-search.md)
+- [MCP Tool Mode — Code](mcp-tool-mode-code.md)
 - [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
 - [MCP BYO gRPC External Authorization (ext-authz)](mcp-byo-grpc-ext-authz.md) _(see also: Security)_
 - [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: Security, Identity & Delegation)_

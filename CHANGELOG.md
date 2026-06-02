@@ -1,5 +1,14 @@
 # Changelog
 
+0.10.2 - (6-1-26)
+---
+- Updates to agentgateway grafana dashboard
+- Update `ENTERPRISE_AGW_VERSION` to `v2026.5.2`
+- `image-list.md`: bump Enterprise Agentgateway header and controller/proxy image tags from `2026.5.0` to `2026.5.2`
+- Add new lab: `mcp-tool-mode-search.md` — Enterprise MCP Search tool mode on `EnterpriseAgentgatewayBackend` (`entMcp.toolMode: Search`, `sessionRouting: Stateless`, static target with `host`/`port`/`path: /`); HTTPRoute uses URLRewrite to strip `/mcp/search` to `/`; deploys `mcp-server-everything`, walks the reader through the `get_tool` / `invoke_tool` meta-tools via MCP Inspector + raw JSON-RPC curl; demonstrates backend-scoped per-tool RBAC via `EnterpriseAgentgatewayPolicy.spec.backend.entMcp.authorization` with the gateway-native `mcp.tool.name` CEL attribute
+- Add new lab: `mcp-tool-mode-code.md` — Enterprise MCP Code tool mode (`entMcp.toolMode: Code`, `codeMode.timeout: 60s`); single `run_code` tool exposing a typed JS API for upstream MCP tools, executed in a QuickJS sandbox (4 MiB memory / 20 tool calls / 60s wall-clock / 256 KiB stack); raw JSON-RPC walkthrough composes two upstream tools in one script plus a deliberate timeout demo (120s busy-loop exceeding the 60s ceiling); same backend-scoped `mcp.tool.name` RBAC pattern as the search lab
+- `README.md`: add "MCP Tool Mode — Search" and "MCP Tool Mode — Code" entries to the MCP (Model Context Protocol) section
+
 0.10.1 - (5-28-26)
 ---
 - `lib/observability/agentgateway-grafana-dashboard-v1.json`: updates to Claude Pricing Table
