@@ -13,7 +13,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - Test failover from rate-limited backend to healthy OpenAI backend
 - Observe failover behavior in logs and traces
 
-For more advanced patterns (intra-group load balancing, 5XX eviction, and combined LB + per-provider eviction + inter-group failover), see [Advanced LLM Failover Patterns](advanced-llm-failover.md).
+For more advanced patterns (intra-group load balancing, 5XX eviction, and combined LB + per-provider eviction + inter-group failover), see [Advanced LLM Failover Patterns](llm-failover-advanced.md).
 
 ## Deploy Mock Server with Rate Limiting
 
@@ -355,7 +355,7 @@ The priority group failover configuration demonstrates several key concepts:
 
 ## Next Steps: Advanced Failover Patterns
 
-The basic lab above demonstrates one failover from a single failing backend to a healthy fallback. For more advanced patterns — load balancing across multiple providers within a priority group, eviction on 5XX server errors, and proving the full intra-group LB + per-provider eviction + inter-group failover behavior end-to-end — see [Advanced LLM Failover Patterns](advanced-llm-failover.md).
+The basic lab above demonstrates one failover from a single failing backend to a healthy fallback. For more advanced patterns — load balancing across multiple providers within a priority group, eviction on 5XX server errors, and proving the full intra-group LB + per-provider eviction + inter-group failover behavior end-to-end — see [Advanced LLM Failover Patterns](llm-failover-advanced.md).
 
 ## Cleanup
 
@@ -369,7 +369,7 @@ kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```
 
-If you ran any of the patterns in the [Advanced LLM Failover Patterns](advanced-llm-failover.md) lab, follow the Cleanup section there as well.
+If you ran any of the patterns in the [Advanced LLM Failover Patterns](llm-failover-advanced.md) lab, follow the Cleanup section there as well.
 
 Restore the AgentGateway to the 2 replicas we originally set up:
 ```bash
