@@ -69,6 +69,7 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 - [Direct Response](direct-response.md)
 - [Timeouts and Retries](timeouts-and-retries.md)
 - [LLM Failover](llm-failover.md)
+- [Advanced LLM Failover Patterns](llm-failover-advanced.md)
 
 ---
 
