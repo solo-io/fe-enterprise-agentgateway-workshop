@@ -1,5 +1,12 @@
 # Changelog
 
+0.10.4 - (6-4-26)
+---
+- Split `llm-failover.md` into two labs: basic flow stays in `llm-failover.md`; advanced patterns moved to new `advanced-llm-failover.md`
+- Add new lab: `advanced-llm-failover.md` — three failover patterns: (1) Intra-Priority-Group Failover demonstrating per-provider eviction with P2C load balancing within a single group; (2) 5XX Server Error Failover via separate mock + `unhealthyCondition: "response.code >= 500"`; (3) Combined LB + Per-Provider Eviction + Inter-Group Failover with two failing mocks (429 + 503) in group 1 and healthy OpenAI fallback in group 2, proving intra-group P2C LB + per-provider eviction + inter-group failover only triggers once the whole group is evicted
+- `llm-failover.md`: trim Lab Objectives to basic-only scope; add "Next Steps" pointer to `advanced-llm-failover.md`
+- `README.md`: add "Advanced LLM Failover Patterns" entry under the LLM section
+
 0.10.3 - (6-3-26)
 ---
 - Updates to `claude-code.md` lab
