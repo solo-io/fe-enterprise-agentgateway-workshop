@@ -1,4 +1,4 @@
-# Configure Enterprise AgentGateway for Claude Code
+# Configure Enterprise AgentGateway for Claude Desktop
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -8,30 +8,33 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - Create a Kubernetes secret that contains your Anthropic credentials
 - Create a passthrough route to Anthropic as our backend LLM provider using a `Backend` and `HTTPRoute`
 - Test the route with curl to verify connectivity
-- Use Claude Code CLI through the agentgateway proxy
-- Validate Claude Code requests in Grafana UI and access logs
+- Configure Claude Desktop's third-party inference settings to route through the gateway
+- Validate Claude Desktop requests in Grafana UI and access logs
 
 ## Overview
 
-This lab configures Enterprise AgentGateway with passthrough routing to Anthropic's Claude API. The configuration supports multiple endpoints including:
+This lab configures Claude Desktop to send inference requests through Enterprise AgentGateway using its built-in **Gateway** third-party inference connector. The gateway provides passthrough routing to Anthropic's Claude API while adding observability, rate limiting, retries, and guardrails for all Claude Desktop interactions.
 
-- **Native Anthropic API** (`/v1/messages`) - Claude's native message format used by Claude Code CLI
-- **Additional endpoints** (`/v1/models`, `*`) - All other API endpoints pass through
-
-This makes the gateway compatible with Claude Code CLI and other Anthropic API clients, enabling observability, rate limiting, and guardrails for all Claude interactions.
+> **Note on localhost requirement**: When using `http://<non-localhost>` (for example `http://$GATEWAY_IP:8080/claude`) as the gateway base URL, Claude Desktop's **Test connection** check fails immediately with:
+>
+> ```
+> Connection — Invalid custom3p enterprise config: baseUrl: must use https (or http on loopback)
+> ```
+>
+> The third-party inference connector enforces TLS for any non-loopback endpoint — the base URL must be either `https://...` or `http://localhost...` / `http://127.0.0.1...`. To keep this workshop simple, without provisioning a TLS cert for the gateway, we port-forward the `agentgateway-proxy` Service to `localhost:8080` and point Claude Desktop at `http://localhost:8080/claude`, which satisfies the loopback exception. In a real deployment you would terminate TLS on the gateway and use the `https://` URL directly.
 
 ## Choose Your Access Method
 
-There are two ways to authenticate Claude Code through the gateway:
+There are two ways to authenticate Claude Desktop through the gateway:
 
 | | Claude Max / Team Subscription | Direct API Key |
 |---|---|---|
 | **Credential type** | `sk-ant-oat01...` OAuth token from your Claude subscription | `sk-ant-api...` key from console.anthropic.com |
 | **Gateway setup** | Reuses the existing `agentgateway-proxy` listener | Reuses the existing `agentgateway-proxy` listener |
-| **Path** | `$GATEWAY_IP:8080/claude` | `$GATEWAY_IP:8080/claude` |
+| **Path** | `http://localhost:8080/claude` (via port-forward) | `http://localhost:8080/claude` (via port-forward) |
 | **Best for** | Individual or team Claude Max subscriptions | Service accounts, CI/CD, API-billed access |
 
-Follow **Option A** or **Option B** below, then continue to the shared testing and observability steps.
+Follow **Option A** or **Option B** below, then continue to the shared Claude Desktop configuration and observability steps.
 
 ---
 
@@ -46,7 +49,7 @@ claude setup-token
 
 This will open a browser-based authentication flow. Once complete, the CLI will print your token. Export it:
 ```bash
-export CLAUDE_OAUTH_TOKEN=<token-printed-by-setup-token>
+export CLAUDE_CODE_OAUTH_TOKEN=<token-printed-by-setup-token>
 ```
 
 ### Create the Secret and Resources
@@ -60,7 +63,7 @@ metadata:
   namespace: agentgateway-system
 type: Opaque
 stringData:
-  Authorization: $CLAUDE_OAUTH_TOKEN
+  Authorization: $CLAUDE_CODE_OAUTH_TOKEN
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -77,6 +80,13 @@ spec:
             type: PathPrefix
             value: /claude
       filters:
+        # required so that /claude/v1/models reaches the upstream as /v1/models
+        # (Claude Desktop's "Model discovery" toggle calls this endpoint)
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
         - type: RequestHeaderModifier
           requestHeaderModifier:
             remove:
@@ -106,10 +116,10 @@ spec:
         "/v1/models": "Passthrough"
         "*": "Passthrough"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayPolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
-  name: claude-subscription-policies
+  name: claude-policy
   namespace: agentgateway-system
 spec:
   targetRefs:
@@ -130,18 +140,16 @@ spec:
 EOF
 ```
 
-### Export the Gateway IP
-
-```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
-  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
-  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
-```
-
 ### Test the Route with curl
 
+Port-forward the `agentgateway-proxy` Service to your local machine (the same port-forward we'll use for Claude Desktop):
 ```bash
-curl -i "$GATEWAY_IP:8080/claude/v1/messages" \
+kubectl port-forward -n agentgateway-system svc/agentgateway-proxy 8080:8080
+```
+
+In another terminal, send a test request:
+```bash
+curl -i "http://localhost:8080/claude/v1/messages" \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
@@ -156,30 +164,7 @@ curl -i "$GATEWAY_IP:8080/claude/v1/messages" \
   }'
 ```
 
-### Configure and Launch Claude Code
-
-Because the gateway injects the team credential, Claude Code only needs a placeholder API key:
-
-```bash
-export ANTHROPIC_BASE_URL="http://$GATEWAY_IP:8080/claude"
-export ANTHROPIC_API_KEY=dummy
-claude
-```
-
-**Note for Vertex AI users**: If you were previously using Claude Code with Vertex AI, unset the following variable first:
-```bash
-unset CLAUDE_CODE_USE_VERTEX
-```
-
-### Cleanup
-
-```bash
-kubectl delete httproute -n agentgateway-system claude-subscription-route
-kubectl delete agentgatewaybackend -n agentgateway-system claude-subscription-backend
-kubectl delete agentgatewaypolicy -n agentgateway-system claude-subscription-policies
-kubectl delete secret -n agentgateway-system claude-subscription-token
-unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY CLAUDE_OAUTH_TOKEN GATEWAY_IP
-```
+You should receive a `200 OK` with a Claude response body. Leave the port-forward running for the Claude Desktop steps below.
 
 ---
 
@@ -201,7 +186,6 @@ kubectl create secret generic claude-direct-apikey -n agentgateway-system \
 
 ### Create Anthropic Route and Backend
 
-Create the HTTPRoute and AgentgatewayBackend with passthrough configuration:
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -219,6 +203,11 @@ spec:
             type: PathPrefix
             value: /claude
       filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
         - type: RequestHeaderModifier
           requestHeaderModifier:
             remove:
@@ -252,18 +241,16 @@ spec:
 EOF
 ```
 
-### Export the Gateway IP
-
-```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
-  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
-  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
-```
-
 ### Test the Route with curl
 
+Port-forward the `agentgateway-proxy` Service to your local machine:
 ```bash
-curl -i "$GATEWAY_IP:8080/claude/v1/messages" \
+kubectl port-forward -n agentgateway-system svc/agentgateway-proxy 8080:8080
+```
+
+In another terminal, send a test request:
+```bash
+curl -i "http://localhost:8080/claude/v1/messages" \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
@@ -278,27 +265,60 @@ curl -i "$GATEWAY_IP:8080/claude/v1/messages" \
   }'
 ```
 
-### Configure and Launch Claude Code
+Leave the port-forward running for the Claude Desktop steps below.
 
-```bash
-export ANTHROPIC_BASE_URL="http://$GATEWAY_IP:8080/claude"
-claude
-```
+---
 
-### Cleanup
+## Configure Claude Desktop
 
-```bash
-kubectl delete httproute -n agentgateway-system claude-directapikey-route
-kubectl delete agentgatewaybackend -n agentgateway-system claude-direct-apikey-backend
-kubectl delete secret -n agentgateway-system claude-direct-apikey
-unset ANTHROPIC_BASE_URL CLAUDE_API_KEY GATEWAY_IP
-```
+These steps apply to both Option A and Option B. They assume the port-forward from the previous step is still running, exposing the gateway at `http://localhost:8080`.
+
+### Enable Developer Mode
+
+The **Configure third-party inference** panel is gated behind Claude Desktop's developer mode. Turn it on first:
+
+1. Launch Claude Desktop
+2. From the macOS menu bar, open **Help > Troubleshooting > Enable Developer Mode**
+
+![enable-developer-mode-1.png](images/claude-desktop/enable-developer-mode-1.png)
+
+Once developer mode is on, the third-party inference settings become available under **Settings**.
+
+### Open Third-Party Inference Settings
+
+1. Open **Settings** and navigate to **Configure third-party inference**
+2. Under **Connection**, open the provider dropdown and select **Gateway** (the "Connect to your own gateway" option)
+
+![3P-1.png](images/claude-desktop/3P-1.png)
+
+### Fill in the Gateway Credentials
+
+Configure the **Gateway Credentials** section as shown:
+
+| Field | Value |
+|---|---|
+| **Credential kind** | `Static API key` |
+| **Gateway base URL** | `http://localhost:8080/claude` |
+| **Gateway API key** | `dummy` *(any non-empty value — the gateway injects the real credential server-side)* |
+| **Gateway auth scheme** | `bearer` |
+
+Under **Models**, leave **Model discovery** enabled so Claude Desktop auto-populates the model picker from `GET /claude/v1/models` at launch.
+
+Click **Test connection** to confirm the gateway is reachable. You should see green confirmation messages for both **Model discovery** (e.g., *"found 10 models"*) and **Inference** (e.g., *"1-token completion in 810 ms (claude-haiku-4-5-20251001) — via static key"*).
+
+![3P-2.png](images/claude-desktop/3P-2.png)
+
+Click **Apply Changes**. Claude Desktop will now send all inference traffic through Enterprise AgentGateway.
+
+### Try It Out
+
+Start a new conversation in Claude Desktop. Every prompt now flows through the gateway, where it picks up the team OAuth token (Option A) or API key (Option B), retries, rate limits, and observability you configured.
 
 ---
 
 ## Observability
 
-These steps apply to both Option A and Option B. For Option B, substitute `$GATEWAY_IP:8080/claude` wherever `$CLAUDE_GATEWAY_IP:4040` appears in the examples.
+These steps apply to both Option A and Option B.
 
 ### View Metrics in Grafana
 
@@ -317,15 +337,18 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 
 4. Navigate to **Dashboards > AgentGateway Dashboard** to view metrics
 
+![grafana-1.png](images/claude-desktop/grafana-1.png)
+
 The dashboard provides real-time visualization of:
-- Core GenAI metrics (request rates, token usage by model)
-- Claude Code specific metrics showing `claude-3-5-sonnet` or `claude-3-5-haiku` model usage
+- Core GenAI metrics (request rates, token usage by model — you should see `claude-haiku-4-5-*` and `claude-opus-4-*` / `claude-sonnet-4-*` rows populate as you chat with Claude Desktop)
+- Latency percentiles (P50 / P95 / P99) and request/token rates
+- Cost tracking (1h / 24h / 7d totals and projected monthly cost by model)
 - Streaming metrics (TTFT, TPOT)
 - Connection and runtime metrics
 
 ### View Traces in the Solo UI
 
-Distributed traces for Claude Code requests are surfaced in the Solo UI deployed in the [monitoring tools lab](002-set-up-ui-and-monitoring-tools.md). The UI ingests OTLP spans from AgentGateway via its built-in OpenTelemetry collector and stores them in ClickHouse.
+Distributed traces for Claude Desktop requests are surfaced in the Solo UI deployed in the [monitoring tools lab](002-set-up-ui-and-monitoring-tools.md). The UI ingests OTLP spans from AgentGateway via its built-in OpenTelemetry collector and stores them in ClickHouse.
 
 1. Port-forward to the Solo UI service:
 ```bash
@@ -350,7 +373,7 @@ You will see a table of recent spans with the following columns:
 | **Route** | `agentgateway-system/claude-subscription-route` (Option A) or `agentgateway-system/claude-directapikey-route` (Option B) |
 | **Input Tokens** / **Output Tokens** | per-request token counts |
 
-Use the **search spans** box at the top to filter, the time-range selector to scope the window, and the route column to confirm Claude Code traffic is hitting the route you created in this lab.
+Use the **search spans** box at the top to filter, the time-range selector to scope the window, and the route column to confirm Claude Desktop traffic is hitting the route you created in this lab.
 
 4. Click any row to open the trace detail view
 
@@ -366,14 +389,14 @@ Cross-reference the **Trace ID** with the access logs (next section) to jump fro
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about LLM requests to stdout. You can tail the logs to see Claude Code traffic flowing through:
+AgentGateway automatically logs detailed information about LLM requests to stdout. You can tail the logs to see Claude Desktop traffic flowing through:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 Example output shows comprehensive request details including:
-- Model information (e.g., `claude-3-5-sonnet-20241022`)
+- Model information (e.g., `claude-haiku-4-5-20251001`)
 - Token usage (input and output tokens)
 - Request duration
 - Trace IDs for correlation with Solo UI traces
@@ -392,3 +415,28 @@ Look for metrics like:
 - `agentgateway_gen_ai_client_token_usage` - Token usage by model and type
 - `agentgateway_gen_ai_server_request_duration` - Request latency for Claude API calls
 - `agentgateway_requests_total` - HTTP request counts
+
+---
+
+## Cleanup
+
+Stop the `kubectl port-forward` process (Ctrl-C) and run the cleanup for whichever option you followed.
+
+### Option A: Claude Max / Team Subscription
+
+```bash
+kubectl delete httproute -n agentgateway-system claude-subscription-route
+kubectl delete agentgatewaybackend -n agentgateway-system claude-subscription-backend
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system claude-policy
+kubectl delete secret -n agentgateway-system claude-subscription-token
+unset CLAUDE_CODE_OAUTH_TOKEN
+```
+
+### Option B: Direct API Key
+
+```bash
+kubectl delete httproute -n agentgateway-system claude-directapikey-route
+kubectl delete agentgatewaybackend -n agentgateway-system claude-direct-apikey-backend
+kubectl delete secret -n agentgateway-system claude-direct-apikey
+unset CLAUDE_API_KEY
+```

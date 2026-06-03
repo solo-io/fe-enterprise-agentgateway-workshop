@@ -1,5 +1,10 @@
 # Changelog
 
+0.10.3 - (6-3-26)
+---
+- Updates to `claude-code.md` lab
+- Add new lab: `claude-desktop.md`
+
 0.10.2 - (6-1-26)
 ---
 - Updates to agentgateway grafana dashboard
