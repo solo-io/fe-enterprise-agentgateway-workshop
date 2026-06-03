@@ -1,6 +1,6 @@
 # Changelog
 
-0.10.4 - (6-4-26)
+0.10.4 - (6-3-26)
 ---
 - Add new lab: `llm-failover-advanced.md` — standalone lab with three failover patterns: intra-priority-group failover (per-provider eviction with P2C load balancing inside a group), 5XX server error failover via a CEL `unhealthyCondition`, and a combined end-to-end demo proving intra-group LB + per-provider eviction + inter-group failover work together
 - `README.md`: add "Advanced LLM Failover Patterns" entry under the LLM section
