@@ -1,20 +1,12 @@
 # Advanced LLM Failover Patterns
 
-This lab extends the [LLM Failover](llm-failover.md) lab with three advanced failover patterns. Each section is a self-contained pattern you can apply to real-world configurations.
+This lab walks through three advanced failover patterns on Enterprise AgentGateway: intra-priority-group failover, eviction on 5XX server errors, and the combined behavior that proves intra-group P2C load balancing, per-provider eviction, and inter-group failover work together.
+
+If you have already completed the [LLM Failover](llm-failover.md) lab, you can skip the **Base Setup** section below — your resources are already in place.
 
 ## Pre-requisites
 
-Complete the [LLM Failover](llm-failover.md) lab first. The examples in this lab reuse the resources it created:
-
-- `mock-gpt-4o` deployment and `mock-gpt-4o-svc` service (always returns 429)
-- `openai-secret` secret in `agentgateway-system`
-- AgentGateway scaled to 1 replica (per-replica eviction state, see the basic lab for why)
-
-Re-export the gateway IP if you opened a new shell:
-
-```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
-```
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 
@@ -22,11 +14,191 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 - Trigger eviction on 5XX server errors via a separate mock and CEL expression
 - Combine all behaviors in a single backend: intra-group P2C load balancing, per-provider eviction, and inter-group failover only when the entire current group is evicted
 
+## Base Setup
+
+The patterns below reuse a single 429-returning mock server, an OpenAI secret, and a single-replica AgentGateway deployment. If you already have these from the [LLM Failover](llm-failover.md) lab, skip this section.
+
+### Deploy Mock Server with Rate Limiting
+
+Deploy the vllm-sim mock server configured to always return 429 rate limit errors:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-gpt-4o
+  namespace: agentgateway-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-gpt-4o
+  template:
+    metadata:
+      labels:
+        app: mock-gpt-4o
+    spec:
+      containers:
+      - args:
+        - --model
+        - mock-gpt-4o
+        - --port
+        - "8000"
+        - --max-loras
+        - "2"
+        - --lora-modules
+        - '{"name": "food-review-1"}'
+        # Failure Injection - 100% rate limit errors
+        - --failure-injection-rate
+        - "100"
+        - --failure-types
+        - "rate_limit"
+        image: ghcr.io/llm-d/llm-d-inference-sim:latest
+        imagePullPolicy: IfNotPresent
+        name: vllm-sim
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-gpt-4o-svc
+  namespace: agentgateway-system
+  labels:
+    app: mock-gpt-4o
+spec:
+  selector:
+    app: mock-gpt-4o
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      name: http
+  type: ClusterIP
+EOF
+```
+
+### Configure OpenAI Secret
+
+Create a Kubernetes secret with your OpenAI API key for the failover backend:
+
+```bash
+export OPENAI_API_KEY=$OPENAI_API_KEY
+
+kubectl create secret generic openai-secret -n agentgateway-system \
+  --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
+  --dry-run=client -oyaml | kubectl apply -f -
+```
+
+### Configure Single Replica for Consistent Testing
+
+Provider health state is local to each pod. With multiple replicas, different pods maintain separate health states, which can lead to inconsistent failover behavior. Scale to one replica for predictable test results:
+
+```bash
+kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":1}}}}'
+
+kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
+kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
+```
+
+### Export the Gateway IP
+
+```bash
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+```
+
+### Apply the Base Backend, Route, and Health Policy
+
+Pattern 1 modifies the backend created here; subsequent patterns create their own. This block bootstraps the shared `mock-ratelimit-backend` + `mock-ratelimit-health` policy that Pattern 1 will mutate.
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mock-ratelimit-failover
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+      backendRefs:
+        - name: mock-ratelimit-backend
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      timeouts:
+        request: "120s"
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: mock-ratelimit-backend
+  namespace: agentgateway-system
+spec:
+  ai:
+    groups:
+      - providers:
+          - name: mock-ratelimit-provider
+            openai:
+              model: "mock-gpt-4o"
+            host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
+            port: 8000
+            path: "/v1/chat/completions"
+            policies:
+              auth:
+                passthrough: {}
+      - providers:
+          - name: openai-provider
+            openai:
+              model: "gpt-4o-mini"
+            policies:
+              auth:
+                secretRef:
+                  name: openai-secret
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: mock-ratelimit-health
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: agentgateway.dev
+    kind: AgentgatewayBackend
+    name: mock-ratelimit-backend
+  backend:
+    health:
+      unhealthyCondition: "response.code >= 500 || response.code == 429"
+      eviction:
+        duration: 60s
+        consecutiveFailures: 1
+EOF
+```
+
 ---
 
 ## Pattern 1: Intra-Priority-Group Failover
 
-The basic lab showed failover between priority groups (group 1 to group 2). This pattern tests **failover between multiple backends within the same priority group**.
+The simplest failover case is between priority groups (group 1 to group 2 when group 1 fails). This pattern tests a more nuanced scenario: **failover between multiple backends within the same priority group**.
 
 ### Why This Matters
 
@@ -44,7 +216,7 @@ This enables:
 
 ### Health Policy
 
-The `AgentgatewayPolicy` (`mock-ratelimit-health`) created in the basic lab already targets `mock-ratelimit-backend` by name, so it continues to apply here. No additional policy configuration is needed — the same `unhealthyCondition` and `eviction` settings govern this scenario.
+The `AgentgatewayPolicy` (`mock-ratelimit-health`) created in the Base Setup already targets `mock-ratelimit-backend` by name, so it continues to apply here. No additional policy configuration is needed — the same `unhealthyCondition` and `eviction` settings govern this scenario.
 
 ### Test Scenario
 
@@ -133,7 +305,7 @@ spec:
 EOF
 ```
 
-**Key differences from the basic lab:**
+**Key differences from the Base Setup backend:**
 - Priority Group 1 now has TWO providers: mock-ratelimit-provider and openai-provider-primary (gpt-4o)
 - Priority Group 2 uses a less capable model (gpt-4o-mini) as a "degraded mode" fallback
 - This demonstrates graceful degradation: prefer the more capable model, but ensure users get *some* response (even if lower quality) if all preferred backends fail
@@ -220,7 +392,7 @@ This pattern is crucial for building resilient AI gateway architectures that bal
 
 ## Pattern 2: 5XX Server Error Failover
 
-The basic lab demonstrated failover triggered by 429 rate limit errors. This pattern tests failover triggered by **5XX server errors**, showing that the `AgentgatewayPolicy` health policy can handle any error condition defined by the CEL expression.
+Pattern 1 demonstrated failover triggered by 429 rate limit errors. This pattern tests failover triggered by **5XX server errors**, showing that the `AgentgatewayPolicy` health policy can handle any error condition defined by the CEL expression.
 
 ### Why This Matters
 
@@ -463,11 +635,11 @@ This pattern proves the behavior end-to-end on the cluster by combining the 429 
 
 ### Prerequisites
 
-This pattern assumes you have already completed:
-- The base setup in the [LLM Failover](llm-failover.md) lab (mock-gpt-4o deployment, openai-secret)
-- Pattern 2 above (mock-gpt-4o-500 deployment)
+This pattern reuses resources from earlier in this lab:
+- `mock-gpt-4o` deployment and `openai-secret` from the **Base Setup** section
+- `mock-gpt-4o-500` deployment from **Pattern 2** above
 
-If you have not, deploy both mocks before continuing.
+If you have not, complete those sections before continuing.
 
 ### Apply the Combined Configuration
 
@@ -624,7 +796,7 @@ endpoint=api.openai.com:443                                              http.st
 
 ## Cleanup
 
-Delete the resources created in this lab. Skip any sections you didn't run.
+Delete the resources created in this lab. Skip any sections you did not run.
 
 Pattern 2 resources:
 ```bash
@@ -642,4 +814,19 @@ kubectl delete agentgatewaybackend -n agentgateway-system combined-backend
 kubectl delete agentgatewaypolicy -n agentgateway-system combined-health
 ```
 
-For the base resources (`mock-ratelimit-failover`, `mock-ratelimit-backend`, `mock-ratelimit-health`, `mock-gpt-4o`, `openai-secret`) and to restore the AgentGateway to 2 replicas, see the Cleanup section of the [LLM Failover](llm-failover.md) lab.
+Base Setup resources (skip if you want to keep them for the [LLM Failover](llm-failover.md) lab):
+```bash
+kubectl delete httproute -n agentgateway-system mock-ratelimit-failover
+kubectl delete agentgatewaybackend -n agentgateway-system mock-ratelimit-backend
+kubectl delete agentgatewaypolicy -n agentgateway-system mock-ratelimit-health
+kubectl delete secret -n agentgateway-system openai-secret
+kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
+kubectl delete -n agentgateway-system deploy/mock-gpt-4o
+```
+
+Restore the AgentGateway to the 2 replicas we originally set up:
+```bash
+kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":2}}}}'
+
+kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
+```
