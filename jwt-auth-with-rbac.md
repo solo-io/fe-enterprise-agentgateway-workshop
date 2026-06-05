@@ -351,8 +351,8 @@ This example requires a valid token from `https://integrator-5513662.okta.com/oa
 Create an EnterpriseAgentgatewayBackend for the Okta JWKS endpoint
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
 metadata:
   name: okta-jwks
   namespace: agentgateway-system
@@ -388,8 +388,8 @@ spec:
               backendRef:
                 name: okta-jwks
                 namespace: agentgateway-system
-                kind: EnterpriseAgentgatewayBackend
-                group: enterpriseagentgateway.solo.io
+                kind: AgentgatewayBackend
+                group: agentgateway.dev
               jwksPath: /oauth2/ausxkvmeftgcdj6HA697/v1/keys
     authorization:
       policy:
@@ -472,7 +472,7 @@ Example output shows comprehensive request details including model information, 
 ```bash
 kubectl delete httproute -n agentgateway-system openai
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system okta-jwks
+kubectl delete agentgatewaybackend -n agentgateway-system okta-jwks
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system agentgateway-jwt-auth
 ```

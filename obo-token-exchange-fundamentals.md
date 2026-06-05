@@ -334,8 +334,8 @@ Create a backend pointing to the STS JWKS endpoint so the policy can fetch keys 
 
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
 metadata:
   name: sts-jwks
   namespace: agentgateway-system
@@ -370,8 +370,8 @@ spec:
               backendRef:
                 name: sts-jwks
                 namespace: agentgateway-system
-                kind: EnterpriseAgentgatewayBackend
-                group: enterpriseagentgateway.solo.io
+                kind: AgentgatewayBackend
+                group: agentgateway.dev
               jwksPath: .well-known/jwks.json
 EOF
 ```
@@ -764,7 +764,8 @@ pkill -f "port-forward.*7777" 2>/dev/null || true
 
 # Remove gateway resources
 kubectl delete httproute -n agentgateway-system mock-llm
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-llm-backend sts-jwks
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-llm-backend
+kubectl delete agentgatewaybackend -n agentgateway-system sts-jwks
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system obo-jwt-policy
 kubectl delete serviceaccount -n agentgateway-system obo-agent
 kubectl delete pod obo-agent-test -n agentgateway-system

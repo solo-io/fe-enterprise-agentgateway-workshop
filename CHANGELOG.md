@@ -1,6 +1,6 @@
 # Changelog
 
-0.10.5 - (6-4-26)
+0.10.5 - (6-5-26)
 ---
 - Migrate backend and backend-targeting policy resources across all labs from OSS `agentgateway.dev/v1alpha1` (`AgentgatewayBackend`, and the four `AgentgatewayPolicy` objects in `llm-failover.md` / `llm-failover-advanced.md` that target backends) to `enterpriseagentgateway.solo.io/v1alpha1` (`EnterpriseAgentgatewayBackend`, `EnterpriseAgentgatewayPolicy`)
 

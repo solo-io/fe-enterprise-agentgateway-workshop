@@ -617,8 +617,8 @@ spec:
           group: enterpriseagentgateway.solo.io
           kind: EnterpriseAgentgatewayBackend
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
 metadata:
   name: okta-jwks
   namespace: agentgateway-system
@@ -679,8 +679,8 @@ spec:
         jwks:
           backendRef:
             name: okta-jwks
-            kind: EnterpriseAgentgatewayBackend
-            group: enterpriseagentgateway.solo.io
+            kind: AgentgatewayBackend
+            group: agentgateway.dev
           jwksPath: oauth2/${OKTA_AUTH_SERVER_ID}/v1/keys
         resourceMetadata:
           agentgateway.dev/issuer-proxy: http://enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777/oauth-issuer
@@ -882,7 +882,8 @@ Fully revert to the Lab 001 baseline. Run these in order — the helm revert is 
 # 1. Delete lab-specific resources
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mcp-okta-eager --ignore-not-found
 kubectl delete httproute -n agentgateway-system mcp-route oauth-issuer --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend okta-jwks --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend --ignore-not-found
+kubectl delete agentgatewaybackend -n agentgateway-system okta-jwks --ignore-not-found
 kubectl delete deployment -n agentgateway-system mcp-server --ignore-not-found
 kubectl delete service -n agentgateway-system mcp-server --ignore-not-found
 kubectl delete secret -n agentgateway-system elicitation-secret mcp-okta-tls --ignore-not-found
