@@ -1,5 +1,5 @@
 # Configure OpenAI Batches API
-Configure access to OpenAI Batches API for asynchronous batch processing of requests through the AgentgatewayBackend.
+Configure access to OpenAI Batches API for asynchronous batch processing of requests through the EnterpriseAgentgatewayBackend.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -39,13 +39,13 @@ spec:
   rules:
     - backendRefs:
         - name: openai-batches-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-batches-backend
   namespace: agentgateway-system
@@ -383,6 +383,6 @@ rm -f batch_requests.jsonl batch_results.jsonl
 
 # Delete Kubernetes resources
 kubectl delete httproute -n agentgateway-system openai-batches
-kubectl delete agentgatewaybackend -n agentgateway-system openai-batches-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-batches-backend
 kubectl delete secret -n agentgateway-system openai-secret
 ```

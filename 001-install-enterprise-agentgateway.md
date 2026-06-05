@@ -73,7 +73,7 @@ Expected output
 
 ```bash
 NAME                                SHORTNAMES        APIVERSION                                NAMESPACED   KIND
-agentgatewaybackends                agbe              agentgateway.dev/v1alpha1                 true         AgentgatewayBackend
+enterpriseagentgatewaybackends                agbe              agentgateway.dev/v1alpha1                 true         EnterpriseAgentgatewayBackend
 agentgatewayparameters              agpar             agentgateway.dev/v1alpha1                 true         AgentgatewayParameters
 agentgatewaypolicies                agpol             agentgateway.dev/v1alpha1                 true         AgentgatewayPolicy
 enterpriseagentgatewayparameters    eagpar            enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters

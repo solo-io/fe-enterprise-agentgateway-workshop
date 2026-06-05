@@ -94,11 +94,11 @@ spec:
             - authorization
       backendRefs:
         - name: claude-subscription-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: claude-subscription-backend
   namespace: agentgateway-system
@@ -215,13 +215,13 @@ spec:
             - authorization
       backendRefs:
         - name: claude-direct-apikey-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "540s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: claude-direct-apikey-backend
   namespace: agentgateway-system
@@ -426,7 +426,7 @@ Stop the `kubectl port-forward` process (Ctrl-C) and run the cleanup for whichev
 
 ```bash
 kubectl delete httproute -n agentgateway-system claude-subscription-route
-kubectl delete agentgatewaybackend -n agentgateway-system claude-subscription-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-subscription-backend
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system claude-policy
 kubectl delete secret -n agentgateway-system claude-subscription-token
 unset CLAUDE_CODE_OAUTH_TOKEN
@@ -436,7 +436,7 @@ unset CLAUDE_CODE_OAUTH_TOKEN
 
 ```bash
 kubectl delete httproute -n agentgateway-system claude-directapikey-route
-kubectl delete agentgatewaybackend -n agentgateway-system claude-direct-apikey-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-direct-apikey-backend
 kubectl delete secret -n agentgateway-system claude-direct-apikey
 unset CLAUDE_API_KEY
 ```

@@ -261,8 +261,8 @@ Apply the OpenAI backend and HTTPRoute:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
@@ -293,8 +293,8 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -304,8 +304,8 @@ Apply the MCP backend and HTTPRoute (multiplexes DeepWiki and Solo.io Docs):
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: copilot-mcp-backend
   namespace: agentgateway-system
@@ -344,8 +344,8 @@ spec:
         request: 0s
       backendRefs:
       - name: copilot-mcp-backend
-        group: agentgateway.dev
-        kind: AgentgatewayBackend
+        group: enterpriseagentgateway.solo.io
+        kind: EnterpriseAgentgatewayBackend
 EOF
 ```
 
@@ -353,8 +353,8 @@ Apply the STS JWKS backend and the JWT policies that protect both routes:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: sts-jwks
   namespace: agentgateway-system
@@ -383,8 +383,8 @@ spec:
               backendRef:
                 name: sts-jwks
                 namespace: agentgateway-system
-                kind: AgentgatewayBackend
-                group: agentgateway.dev
+                kind: EnterpriseAgentgatewayBackend
+                group: enterpriseagentgateway.solo.io
               jwksPath: .well-known/jwks.json
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
@@ -407,8 +407,8 @@ spec:
               backendRef:
                 name: sts-jwks
                 namespace: agentgateway-system
-                kind: AgentgatewayBackend
-                group: agentgateway.dev
+                kind: EnterpriseAgentgatewayBackend
+                group: enterpriseagentgateway.solo.io
               jwksPath: .well-known/jwks.json
 EOF
 ```
@@ -565,7 +565,7 @@ pkill -f "port-forward.*7777" 2>/dev/null || true
 
 # Remove gateway resources
 kubectl delete httproute -n agentgateway-system openai copilot-mcp
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models copilot-mcp-backend sts-jwks
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models copilot-mcp-backend sts-jwks
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system openai-obo-jwt-policy copilot-mcp-obo-jwt-policy
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete serviceaccount -n agentgateway-system obo-agent

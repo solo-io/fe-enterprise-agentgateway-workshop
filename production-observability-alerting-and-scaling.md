@@ -32,7 +32,7 @@ These are the primary metrics for monitoring gateway health and performance. Eve
 
 | Label | Values | Description |
 |---|---|---|
-| `backend` | Backend name or `"unknown"` | The upstream AgentgatewayBackend that handled the request. `"unknown"` means no route matched. |
+| `backend` | Backend name or `"unknown"` | The upstream EnterpriseAgentgatewayBackend that handled the request. `"unknown"` means no route matched. |
 | `protocol` | `http`, `https`, `tls`, `tcp`, `hbone` | Transport protocol to the upstream. |
 | `method` | `GET`, `POST`, `CONNECT`, etc. | HTTP method. LLM chat completions are always `POST`. |
 | `status` | HTTP status code (200, 404, 429, 500, etc.) | Response status code. |
@@ -67,7 +67,7 @@ The `reason` label tells you _why_ a response was generated — critical for dis
 
 #### GenAI (LLM) Metrics
 
-These follow the [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). They are only populated for requests routed to LLM backends (AgentgatewayBackend with `ai` spec).
+These follow the [OpenTelemetry GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/). They are only populated for requests routed to LLM backends (EnterpriseAgentgatewayBackend with `ai` spec).
 
 | Metric | Type | Labels | Description |
 |---|---|---|---|

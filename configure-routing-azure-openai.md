@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our Azure OpenAI api-key credentials
-- Create a route to Azure OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Create a route to Azure OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
 - Curl Azure OpenAI through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
@@ -56,13 +56,13 @@ spec:
             value: /azure
       backendRefs:
         - name: azure-openai
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: azure-openai
   namespace: agentgateway-system
@@ -164,6 +164,6 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system azure-openai
-kubectl delete agentgatewaybackend -n agentgateway-system azure-openai
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system azure-openai
 kubectl delete secret -n agentgateway-system azureopenai-secret
 ```

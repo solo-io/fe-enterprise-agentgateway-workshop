@@ -224,8 +224,8 @@ Expected Output:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: entra-jwks
   namespace: agentgateway-system
@@ -238,7 +238,7 @@ spec:
 EOF
 ```
 
-This creates an `AgentgatewayBackend` named `entra-jwks` that points to `login.microsoftonline.com:443` with TLS enabled. The JWT authentication policy (Step 8) uses this backend to fetch Entra's JWKS for token validation.
+This creates an `EnterpriseAgentgatewayBackend` named `entra-jwks` that points to `login.microsoftonline.com:443` with TLS enabled. The JWT authentication policy (Step 8) uses this backend to fetch Entra's JWKS for token validation.
 
 ---
 
@@ -246,8 +246,8 @@ This creates an `AgentgatewayBackend` named `entra-jwks` that points to `login.m
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: obo-demo-backend
   namespace: agentgateway-system
@@ -271,8 +271,8 @@ spec:
             value: /
       backendRefs:
         - name: obo-demo-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -328,7 +328,7 @@ This creates:
 
 | Resource | Kind | Description |
 |---|---|---|
-| `obo-demo-backend` | AgentgatewayBackend | Points to the in-cluster httpbin service |
+| `obo-demo-backend` | EnterpriseAgentgatewayBackend | Points to the in-cluster httpbin service |
 | `jwt-secure-obo` | HTTPRoute | Routes all traffic to `obo-demo-backend` via `agentgateway-proxy` |
 | `httpbin` | Deployment + Service + SA | Echo server for verifying headers and exchanged token |
 
@@ -375,8 +375,8 @@ spec:
               jwksPath: /${ENTRA_TENANT_ID}/discovery/v2.0/keys
               backendRef:
                 name: entra-jwks
-                kind: AgentgatewayBackend
-                group: agentgateway.dev
+                kind: EnterpriseAgentgatewayBackend
+                group: enterpriseagentgateway.solo.io
                 port: 443
 EOF
 ```
@@ -396,8 +396,8 @@ metadata:
   namespace: agentgateway-system
 spec:
   targetRefs:
-    - group: agentgateway.dev
-      kind: AgentgatewayBackend
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
       name: obo-demo-backend
   backend:
     tokenExchange:
@@ -554,7 +554,7 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt-secure-ob
 
 # Delete route and backends
 kubectl delete httproute -n agentgateway-system jwt-secure-obo
-kubectl delete agentgatewaybackend -n agentgateway-system obo-demo-backend entra-jwks
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system obo-demo-backend entra-jwks
 
 # Delete httpbin
 kubectl delete deployment -n agentgateway-system httpbin

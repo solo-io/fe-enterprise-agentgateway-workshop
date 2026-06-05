@@ -57,8 +57,8 @@ EOF
 ### Create backend and HTTPRoute
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mcp-backend
   namespace: agentgateway-system
@@ -82,8 +82,8 @@ spec:
   rules:
     - backendRefs:
       - name: mcp-backend
-        group: agentgateway.dev
-        kind: AgentgatewayBackend
+        group: enterpriseagentgateway.solo.io
+        kind: EnterpriseAgentgatewayBackend
 EOF
 ```
 
@@ -321,7 +321,7 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt-rbac
 kubectl delete deployment -n mcp mcp-website-fetcher
 kubectl delete service -n mcp mcp-website-fetcher
-kubectl delete agentgatewaybackend -n agentgateway-system mcp-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend
 kubectl delete httproute -n agentgateway-system mcp
 kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":2}}}}'
 ```

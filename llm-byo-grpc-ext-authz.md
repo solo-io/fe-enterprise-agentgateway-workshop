@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 ## Lab Objectives
 - Deploy a custom gRPC ext-authz server to the cluster
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
 - Create an `EnterpriseAgentgatewayPolicy` to enforce external authorization on the Gateway
 - Validate that requests without the required header are denied with 403
 - Validate that requests with the required header are allowed through
@@ -115,13 +115,13 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
@@ -251,6 +251,6 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system openai-ext-au
 kubectl delete deployment -n agentgateway-system grpc-ext-authz
 kubectl delete service -n agentgateway-system grpc-ext-authz
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 ```

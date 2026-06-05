@@ -72,7 +72,7 @@ kubectl get crds | grep -E "solo.io|agentgateway" | awk '{ print $1 }'
 Expected output
 
 ```bash
-agentgatewaybackends.agentgateway.dev
+enterpriseagentgatewaybackends.agentgateway.dev
 agentgatewayparameters.agentgateway.dev
 agentgatewaypolicies.agentgateway.dev
 authconfigs.extauth.solo.io

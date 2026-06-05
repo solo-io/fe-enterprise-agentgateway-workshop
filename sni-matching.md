@@ -83,11 +83,11 @@ spec:
 EOF
 ```
 
-Create the AgentgatewayBackend for the mock OpenAI server
+Create the EnterpriseAgentgatewayBackend for the mock OpenAI server
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-openai
   namespace: agentgateway-system
@@ -206,8 +206,8 @@ spec:
             value: /
       backendRefs:
         - name: mock-openai
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
@@ -229,8 +229,8 @@ spec:
             value: /
       backendRefs:
         - name: mock-openai
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
@@ -252,8 +252,8 @@ spec:
             value: /
       backendRefs:
         - name: mock-openai
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -372,7 +372,7 @@ kubectl delete gateway -n agentgateway-system agentgateway
 kubectl delete httproute -n agentgateway-system mock-openai-bar-route
 kubectl delete httproute -n agentgateway-system mock-openai-baz-route
 kubectl delete httproute -n agentgateway-system mock-openai-foo-route
-kubectl delete agentgatewaybackend -n agentgateway-system mock-openai
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-openai
 kubectl delete secret -n agentgateway-system foo
 kubectl delete secret -n agentgateway-system bar
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc

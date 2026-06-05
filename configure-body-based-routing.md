@@ -7,7 +7,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Deploy a mock LLM server to act as a second backend
-- Create an OpenAI secret and per-model `AgentgatewayBackend` resources
+- Create an OpenAI secret and per-model `EnterpriseAgentgatewayBackend` resources
 - Configure an `EnterpriseAgentgatewayPolicy` to extract the `model` field from the request body and promote it to a request header
 - Create an `HTTPRoute` that uses header matching to route requests to either OpenAI or the mock LLM based on the extracted model name
 - Curl the gateway with different model values to observe routing behavior
@@ -107,15 +107,15 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-## Create AgentgatewayBackend Resources
+## Create EnterpriseAgentgatewayBackend Resources
 
 Create one backend for each routing target: OpenAI (`gpt-4o-mini`) and the mock LLM server.
 
 ```bash
 kubectl apply -f - <<EOF
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-gpt-4o-mini
   namespace: agentgateway-system
@@ -129,8 +129,8 @@ spec:
       secretRef:
         name: openai-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-gpt-4o
   namespace: agentgateway-system
@@ -210,8 +210,8 @@ spec:
               value: gpt-4o-mini
       backendRefs:
         - name: openai-gpt-4o-mini
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -224,8 +224,8 @@ spec:
               value: mock-gpt-4o
       backendRefs:
         - name: mock-gpt-4o
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -238,8 +238,8 @@ spec:
               value: unspecified
       backendRefs:
         - name: mock-gpt-4o
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -381,8 +381,8 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 ```bash
 kubectl delete agentgatewaypolicy -n agentgateway-system extract-model-from-body
 kubectl delete httproute -n agentgateway-system body-based-routing
-kubectl delete agentgatewaybackend -n agentgateway-system openai-gpt-4o-mini
-kubectl delete agentgatewaybackend -n agentgateway-system mock-gpt-4o
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o-mini
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-gpt-4o
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete svc -n agentgateway-system mock-gpt-4o-svc
 kubectl delete deploy -n agentgateway-system mock-gpt-4o

@@ -39,13 +39,13 @@ spec:
   rules:
     - backendRefs:
         - name: openai-video
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-video
   namespace: agentgateway-system
@@ -169,7 +169,7 @@ Delete the generated video from OpenAI and remove the lab resources:
 curl -s -X DELETE "$GATEWAY_IP:8080/v1/videos/$VIDEO_ID"
 
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-video
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-video
 kubectl delete secret -n agentgateway-system openai-secret
 rm -f video.mp4
 ```

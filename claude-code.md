@@ -84,11 +84,11 @@ spec:
             - authorization
       backendRefs:
         - name: claude-subscription-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: claude-subscription-backend
   namespace: agentgateway-system
@@ -175,7 +175,7 @@ unset CLAUDE_CODE_USE_VERTEX
 
 ```bash
 kubectl delete httproute -n agentgateway-system claude-subscription-route
-kubectl delete agentgatewaybackend -n agentgateway-system claude-subscription-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-subscription-backend
 kubectl delete agentgatewaypolicy -n agentgateway-system claude-subscription-policies
 kubectl delete secret -n agentgateway-system claude-subscription-token
 unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY CLAUDE_OAUTH_TOKEN GATEWAY_IP
@@ -201,7 +201,7 @@ kubectl create secret generic claude-direct-apikey -n agentgateway-system \
 
 ### Create Anthropic Route and Backend
 
-Create the HTTPRoute and AgentgatewayBackend with passthrough configuration:
+Create the HTTPRoute and EnterpriseAgentgatewayBackend with passthrough configuration:
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -226,13 +226,13 @@ spec:
             - authorization
       backendRefs:
         - name: claude-direct-apikey-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "540s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: claude-direct-apikey-backend
   namespace: agentgateway-system
@@ -289,7 +289,7 @@ claude
 
 ```bash
 kubectl delete httproute -n agentgateway-system claude-directapikey-route
-kubectl delete agentgatewaybackend -n agentgateway-system claude-direct-apikey-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-direct-apikey-backend
 kubectl delete secret -n agentgateway-system claude-direct-apikey
 unset ANTHROPIC_BASE_URL CLAUDE_API_KEY GATEWAY_IP
 ```

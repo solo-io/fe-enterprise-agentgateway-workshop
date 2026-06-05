@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 ## Lab Objectives
 - Understand the difference between static and dynamic MCP backends
 - Deploy the `mcp-server-everything` reference MCP server
-- Configure a dynamic `AgentgatewayBackend` using label selectors
+- Configure a dynamic `EnterpriseAgentgatewayBackend` using label selectors
 - Validate connectivity and tool execution with MCP Inspector
 - Demonstrate zero-downtime backend updates without touching the Backend resource
 
@@ -14,7 +14,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ### Static vs. Dynamic Backends
 
-The previous MCP labs used **static** backends, where you hard-code the target host and port directly in the `AgentgatewayBackend` resource:
+The previous MCP labs used **static** backends, where you hard-code the target host and port directly in the `EnterpriseAgentgatewayBackend` resource:
 
 ```yaml
 spec:
@@ -160,8 +160,8 @@ Instead of providing a `static` host and port, we provide a `selector` that matc
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mcp-everything-backend
   namespace: agentgateway-system
@@ -193,8 +193,8 @@ spec:
             value: /mcp
       backendRefs:
         - name: mcp-everything-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "0s"
 EOF
@@ -203,7 +203,7 @@ EOF
 **Key configuration details:**
 
 - `selector.services.matchLabels` — AgentGateway uses this to find matching Services in the cluster
-- The `AgentgatewayBackend` itself does not reference any hostname or port — those are resolved dynamically from the discovered Service
+- The `EnterpriseAgentgatewayBackend` itself does not reference any hostname or port — those are resolved dynamically from the discovered Service
 - Path prefix `/mcp` isolates this backend from other MCP routes on the same gateway
 
 ---
@@ -315,7 +315,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 
 ```bash
 kubectl delete httproute -n agentgateway-system mcp-everything
-kubectl delete agentgatewaybackend -n agentgateway-system mcp-everything-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-everything-backend
 kubectl delete deployment -n mcp mcp-server-everything
 kubectl delete service -n mcp mcp-server-everything
 ```

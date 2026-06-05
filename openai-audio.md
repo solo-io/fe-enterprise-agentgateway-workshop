@@ -38,13 +38,13 @@ spec:
   rules:
     - backendRefs:
         - name: openai-audio
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-audio
   namespace: agentgateway-system
@@ -233,7 +233,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 Delete the lab resources:
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-audio
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-audio
 kubectl delete secret -n agentgateway-system openai-secret
 rm -f speech.mp3 speech-nova.mp3 speech.wav
 ```

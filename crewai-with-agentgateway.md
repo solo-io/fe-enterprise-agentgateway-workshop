@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains your OpenAI API key credentials
-- Create a route to OpenAI as the backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as the backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
 - Run a CrewAI two-agent crew (Researcher + Writer) whose LLM calls route through agentgateway
 - Validate proxied requests in Grafana and access logs
 
@@ -33,11 +33,11 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 
 ## Create OpenAI Route and Backend
 
-Apply the `AgentgatewayBackend` and `HTTPRoute`:
+Apply the `EnterpriseAgentgatewayBackend` and `HTTPRoute`:
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
@@ -66,14 +66,14 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
 ```
 
-The `AgentgatewayBackend` matches requests on the `/openai` path prefix, rewrites the path to `/v1/chat/completions`, and forwards the request to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret.
+The `EnterpriseAgentgatewayBackend` matches requests on the `/openai` path prefix, rewrites the path to `/v1/chat/completions`, and forwards the request to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret.
 
 ## Get the Gateway IP
 
@@ -197,7 +197,7 @@ Useful metrics:
 
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 rm -rf lib/crewai/multi-agent-researcher-writer/.venv
 ```

@@ -1,5 +1,9 @@
 # Changelog
 
+0.10.5 - (6-4-26)
+---
+- Migrate backend and backend-targeting policy resources across all labs from OSS `agentgateway.dev/v1alpha1` (`AgentgatewayBackend`, and the four `AgentgatewayPolicy` objects in `llm-failover.md` / `llm-failover-advanced.md` that target backends) to `enterpriseagentgateway.solo.io/v1alpha1` (`EnterpriseAgentgatewayBackend`, `EnterpriseAgentgatewayPolicy`)
+
 0.10.4 - (6-3-26)
 ---
 - Add new lab: `llm-failover-advanced.md` — standalone lab with three failover patterns: intra-priority-group failover (per-provider eviction with P2C load balancing inside a group), 5XX server error failover via a CEL `unhealthyCondition`, and a combined end-to-end demo proving intra-group LB + per-provider eviction + inter-group failover work together
@@ -120,7 +124,7 @@
 0.8.2 - (4-23-26)
 ---
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.2`
-- Add new lab: `configure-routing-aws-bedrock-irsa.md` — configures AWS Bedrock access via EKS IRSA (IAM Roles for Service Accounts) instead of static credentials; covers OIDC provider association, IAM role with scoped trust policy, `AgentgatewayBackend` without `policies.auth`, and `EnterpriseAgentgatewayParameters` service account annotation for automatic credential injection
+- Add new lab: `configure-routing-aws-bedrock-irsa.md` — configures AWS Bedrock access via EKS IRSA (IAM Roles for Service Accounts) instead of static credentials; covers OIDC provider association, IAM role with scoped trust policy, `EnterpriseAgentgatewayBackend` without `policies.auth`, and `EnterpriseAgentgatewayParameters` service account annotation for automatic credential injection
 - `README.md`: add `configure-routing-aws-bedrock-irsa.md` to Routing section under AWS Bedrock entries
 - `configure-routing-aws-bedrock-apikey.md`: normalize resource names from `bedrock-*-apikey` to `bedrock-*` and paths from `/bedrock-apikey/*` to `/bedrock/*` to match the other Bedrock labs (secret name `bedrock-apikey-secret` kept distinct)
 
@@ -190,7 +194,7 @@
 
 0.7.2 - (3-31-26)
 ---
-- Add new lab: `dynamic-mcp.md` which covers dynamic MCP backends using label selectors, deploying `mcp-server-everything` to a dedicated `mcp` namespace, scaling example without modifying the `AgentgatewayBackend`
+- Add new lab: `dynamic-mcp.md` which covers dynamic MCP backends using label selectors, deploying `mcp-server-everything` to a dedicated `mcp` namespace, scaling example without modifying the `EnterpriseAgentgatewayBackend`
 - `in-cluster-mcp.md`: add SSE session affinity limitation callout — explains why AGW proxy must run at 1 replica with SSE transport and links to `dynamic-mcp.md` (Streamable HTTP) as the solution
 
 0.7.1 - (3-30-26)
@@ -459,9 +463,9 @@
   - Helm registry path change: charts now at `oci://us-docker.pkg.dev/solo-public/gloo-gateway/charts/enterprise-agentgateway*`
   - Changed namespace: `gloo-system` → `enterprise-agentgateway`
   - License key flag: `licensing.glooGatewayLicenseKey` / `licensing.agentgatewayLicenseKey` → `licensing.licenseKey`
-  - API group migration: `gateway.kgateway.dev` → `agentgateway.dev` for AgentgatewayBackend
+  - API group migration: `gateway.kgateway.dev` → `agentgateway.dev` for EnterpriseAgentgatewayBackend
   - API group migration: `gloo.solo.io` → `enterpriseagentgateway.solo.io` for policies
-  - CRD renames: `Backend` → `AgentgatewayBackend`, `GlooGatewayParameters` → `EnterpriseAgentgatewayParameters`, `GlooTrafficPolicy`/`AgentgatewayEnterprisePolicy` → `EnterpriseAgentgatewayPolicy`
+  - CRD renames: `Backend` → `EnterpriseAgentgatewayBackend`, `GlooGatewayParameters` → `EnterpriseAgentgatewayParameters`, `GlooTrafficPolicy`/`AgentgatewayEnterprisePolicy` → `EnterpriseAgentgatewayPolicy`
   - GatewayClass name: `agentgateway-enterprise` → `enterprise-agentgateway`
   - Policy structure: traffic fields moved to `spec.traffic`, AI backend fields moved to `spec.backend`
   - Backend structure: `spec.ai.llm` → `spec.ai.provider`, `authToken` → `policies.auth`
