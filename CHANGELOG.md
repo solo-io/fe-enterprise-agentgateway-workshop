@@ -5,6 +5,7 @@
 - Migrate backend and backend-targeting policy resources across all labs from OSS `agentgateway.dev/v1alpha1` (`AgentgatewayBackend`, and the four `AgentgatewayPolicy` objects in `llm-failover.md` / `llm-failover-advanced.md` that target backends) to `enterpriseagentgateway.solo.io/v1alpha1` (`EnterpriseAgentgatewayBackend`, `EnterpriseAgentgatewayPolicy`)
 - Updates to cost tracking section in `lib/observability/agentgateway/agentgateway-grafana-dashboard-v1.json`
 - Update `EnterpriseAgentgatewayParameters` in lab `001` to add some metrics tagging examples
+- Update lab `002` to server-side apply the grafana dashboard to avoid annotation size conflicts
 
 0.10.4 - (6-3-26)
 ---

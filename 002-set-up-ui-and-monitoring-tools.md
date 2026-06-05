@@ -190,7 +190,7 @@ kubectl create configmap agentgateway-dashboard \
 kubectl label --local -f - \
   grafana_dashboard="1" \
   --dry-run=client -o yaml | \
-kubectl apply -f -
+kubectl apply --server-side --force-conflicts -f -
 ```
 
 The dashboard will be automatically loaded by the Grafana sidecar. You can access it in Grafana under "Dashboards" > "AgentGateway Overview".
