@@ -201,7 +201,13 @@ spec:
       metrics:
         fields:
           add:
-            user_id: 'request.headers["x-user-id"]'
+            # --- Label all metrics with a value extracted from a verified JWT token if present,
+            #     falling back to the `x-org` request header (e.g. ANTHROPIC_CUSTOM_HEADERS from Claude Code)
+            user_org: default(jwt.org, default(request.headers["x-org"], "public-tier"))
+            user_team: default(jwt.team, "public-tier")
+            user_tier: default(jwt.tier, "public-tier")
+            user_name: default(jwt.preferred_username, default(request.headers["x-user"], "public-tier"))
+            # --- Label all metrics using a value extracted from the request body
             #modelId: json(request.body).modelId
   deployment:
     spec:
