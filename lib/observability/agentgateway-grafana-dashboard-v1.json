@@ -3005,7 +3005,7 @@
       "id": 87,
       "options": {
         "mode": "markdown",
-        "content": "### OpenAI Pricing (per 1M tokens)\n\n| Model | Input | Output | Cache Read | Cache Write |\n|---|---|---|---|---|\n| gpt-3.5-turbo | $0.50 | $1.50 | $0.25 | \u2014 |\n| gpt-4o-mini | $0.15 | $0.60 | $0.07 | \u2014 |\n| gpt-4o | $2.50 | $10.00 | $1.25 | \u2014 |\n| gpt-5 | $1.25 | $10.00 | $0.62 | \u2014 |\n| gpt-5-mini | $0.25 | $2.00 | $0.12 | \u2014 |\n| gpt-5-nano | $0.05 | $0.40 | $0.03 | \u2014 |\n\n_Last updated: 2026-06-05_"
+        "content": "### OpenAI Pricing (per 1M tokens)\n\n| Model | Input | Output | Cache Read | Cache Write |\n|---|---|---|---|---|\n| mock-gpt-4o | $2.50 | $10.00 | $0.25 | $3.12 |\n| mock-gpt-5-2 | $1.75 | $14.00 | $0.17 | $2.19 |\n| gpt-3.5-turbo | $0.50 | $1.50 | $0.25 | \u2014 |\n| gpt-4o-mini | $0.15 | $0.60 | $0.07 | \u2014 |\n| gpt-4o | $2.50 | $10.00 | $1.25 | \u2014 |\n| gpt-5 | $1.25 | $10.00 | $0.62 | \u2014 |\n| gpt-5-mini | $0.25 | $2.00 | $0.12 | \u2014 |\n| gpt-5-nano | $0.05 | $0.40 | $0.03 | \u2014 |\n\n_Last updated: 2026-06-05_"
       },
       "pluginVersion": "12.3.0",
       "title": "OpenAI Pricing (per 1M tokens)",
