@@ -149,12 +149,12 @@ kubectl rollout status deployment/fast-mcp -n agentgateway-system
 
 ## Configure AgentGateway MCP Routing
 
-Create an `AgentgatewayBackend` resource that points AgentGateway to the mock MCP server, then create an `HTTPRoute` that forwards `/mcp` traffic to it:
+Create an `EnterpriseAgentgatewayBackend` resource that points AgentGateway to the mock MCP server, then create an `HTTPRoute` that forwards `/mcp` traffic to it:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: fast-mcp-backend
   namespace: agentgateway-system
@@ -186,8 +186,8 @@ spec:
         value: /mcp
     backendRefs:
     - name: fast-mcp-backend
-      group: agentgateway.dev
-      kind: AgentgatewayBackend
+      group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
     timeouts:
       request: "0s"
 EOF
@@ -669,7 +669,7 @@ Delete the AgentGateway routing configuration:
 
 ```bash
 kubectl delete httproute fast-mcp -n agentgateway-system
-kubectl delete agentgatewaybackend fast-mcp-backend -n agentgateway-system
+kubectl delete enterpriseagentgatewaybackend fast-mcp-backend -n agentgateway-system
 ```
 
 Delete the mock MCP server:

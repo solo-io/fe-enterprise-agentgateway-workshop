@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
 - Configure a basic response transformation using `EnterpriseAgentgatewayPolicy`
 - Validate that the transformation occurs
 - Extend our example by enriching response headers with additional context for observability and debugging
@@ -36,13 +36,13 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
@@ -217,6 +217,6 @@ These fields make debugging and observability far easier — especially in multi
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system openai-transformation
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 ```

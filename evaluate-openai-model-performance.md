@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
 - Curl OpenAI through the agentgateway proxy
 - Install promptfoo on your local machine
 - Run evaluations
@@ -17,7 +17,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create openai route and `AgentgatewayBackend`
+Create openai route and `EnterpriseAgentgatewayBackend`
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -36,13 +36,13 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
@@ -113,7 +113,7 @@ Feel free to review or test out the other evaluation examples in `/evaluations`
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 rm -f promptfoo-errors.log
 ```

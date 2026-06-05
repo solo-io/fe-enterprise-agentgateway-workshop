@@ -135,8 +135,8 @@ EOF
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mcp-backend
   namespace: agentgateway-system
@@ -160,8 +160,8 @@ spec:
   rules:
     - backendRefs:
       - name: mcp-backend
-        group: agentgateway.dev
-        kind: AgentgatewayBackend
+        group: enterpriseagentgateway.solo.io
+        kind: EnterpriseAgentgatewayBackend
 EOF
 ```
 
@@ -308,7 +308,7 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mcp-ext-auth-
 kubectl delete deployment -n agentgateway-system grpc-ext-authz
 kubectl delete service -n agentgateway-system grpc-ext-authz
 kubectl delete httproute -n agentgateway-system mcp
-kubectl delete agentgatewaybackend -n agentgateway-system mcp-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend
 kubectl delete deployment -n mcp mcp-website-fetcher
 kubectl delete service -n mcp mcp-website-fetcher
 ```

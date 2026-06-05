@@ -112,8 +112,8 @@ kubectl rollout status deployment/mcp-server-everything -n mcp
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mcp-backend
   namespace: agentgateway-system
@@ -145,8 +145,8 @@ spec:
           value: /mcp
       backendRefs:
       - name: mcp-backend
-        group: agentgateway.dev
-        kind: AgentgatewayBackend
+        group: enterpriseagentgateway.solo.io
+        kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "0s"
 EOF
@@ -273,6 +273,6 @@ kubectl delete rlc -n agentgateway-system mcp-tool-rate-limit
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mcp-tool-rate-limit
 kubectl delete deployment -n mcp mcp-server-everything
 kubectl delete service -n mcp mcp-server-everything
-kubectl delete agentgatewaybackend -n agentgateway-system mcp-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend
 kubectl delete httproute -n agentgateway-system mcp
 ```

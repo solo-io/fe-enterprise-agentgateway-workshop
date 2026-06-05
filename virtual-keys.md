@@ -5,7 +5,7 @@ This lab assumes that you have completed `001` and `api-key-masking`. `002` is o
 
 The following resources from the `api-key-masking` lab should still be running:
 - `openai-secret` — upstream OpenAI credentials
-- `openai-all-models` AgentgatewayBackend and `openai` HTTPRoute
+- `openai-all-models` EnterpriseAgentgatewayBackend and `openai` HTTPRoute
 - `apikey-auth` AuthConfig and `api-key-auth` EnterpriseAgentgatewayPolicy
 
 ## Lab Objectives
@@ -402,6 +402,6 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system api-key-auth
 kubectl delete authconfig -n agentgateway-system apikey-auth
 kubectl delete secret -n agentgateway-system team1-apikey
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 ```

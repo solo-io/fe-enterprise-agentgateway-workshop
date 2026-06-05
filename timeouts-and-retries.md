@@ -83,7 +83,7 @@ EOF
 
 ## Configure Route and Backend
 
-Create the HTTPRoute and AgentgatewayBackend:
+Create the HTTPRoute and EnterpriseAgentgatewayBackend:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -103,11 +103,11 @@ spec:
             value: /openai
       backendRefs:
         - name: mock-openai
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-openai
   namespace: agentgateway-system
@@ -356,7 +356,7 @@ Delete the lab resources:
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system timeout-retry-policy
 kubectl delete httproute -n agentgateway-system mock-openai
-kubectl delete agentgatewaybackend -n agentgateway-system mock-openai
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-openai
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```

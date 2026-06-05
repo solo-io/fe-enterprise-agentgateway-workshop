@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our AWS Access Key credentials
-- Create a route to AWS Bedrock as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Create a route to AWS Bedrock as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
 - Curl AWS Bedrock through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
@@ -40,11 +40,11 @@ stringData:
 EOF
 ```
 
-Create AWS Bedrock route and `AgentgatewayBackend`. For this setup we will configure multiple `AgentgatewayBackends` using a single provider (AWS Bedrock) in a path-per-model routing configuration
+Create AWS Bedrock route and `EnterpriseAgentgatewayBackend`. For this setup we will configure multiple `AgentgatewayBackends` using a single provider (AWS Bedrock) in a path-per-model routing configuration
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: bedrock-mistral
   namespace: agentgateway-system
@@ -60,8 +60,8 @@ spec:
         secretRef:
           name: bedrock-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: bedrock-haiku4.5
   namespace: agentgateway-system
@@ -77,8 +77,8 @@ spec:
         secretRef:
           name: bedrock-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: bedrock-opus
   namespace: agentgateway-system
@@ -94,8 +94,8 @@ spec:
         secretRef:
           name: bedrock-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: bedrock-sonnet
   namespace: agentgateway-system
@@ -111,8 +111,8 @@ spec:
         secretRef:
           name: bedrock-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: bedrock-llama3-8b
   namespace: agentgateway-system
@@ -146,8 +146,8 @@ spec:
             value: /bedrock/haiku
       backendRefs:
         - name: bedrock-haiku4.5
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -156,8 +156,8 @@ spec:
             value: /bedrock/opus
       backendRefs:
         - name: bedrock-opus
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -166,8 +166,8 @@ spec:
             value: /bedrock/sonnet
       backendRefs:
         - name: bedrock-sonnet
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -176,8 +176,8 @@ spec:
             value: /bedrock/mistral
       backendRefs:
         - name: bedrock-mistral
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -186,8 +186,8 @@ spec:
             value: /bedrock/llama3-8b
       backendRefs:
         - name: bedrock-llama3-8b
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     # catch-all will route to the bedrock mistral upstream
@@ -197,8 +197,8 @@ spec:
             value: /bedrock
       backendRefs:
         - name: bedrock-mistral
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -349,10 +349,10 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system bedrock
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock-mistral
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock-haiku3.5
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock-opus
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock-sonnet
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock-llama3-8b
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-mistral
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-haiku3.5
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-opus
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-sonnet
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-llama3-8b
 kubectl delete secret -n agentgateway-system bedrock-secret
 ```

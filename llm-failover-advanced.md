@@ -143,13 +143,13 @@ spec:
             value: /openai
       backendRefs:
         - name: mock-ratelimit-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-ratelimit-backend
   namespace: agentgateway-system
@@ -163,27 +163,51 @@ spec:
             host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
             port: 8000
             path: "/v1/chat/completions"
-            policies:
-              auth:
-                passthrough: {}
       - providers:
           - name: openai-provider
             openai:
               model: "gpt-4o-mini"
-            policies:
-              auth:
-                secretRef:
-                  name: openai-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayPolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mock-ratelimit-auth-mock
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: mock-ratelimit-backend
+    sectionName: mock-ratelimit-provider
+  backend:
+    auth:
+      passthrough: {}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mock-ratelimit-auth-openai
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: mock-ratelimit-backend
+    sectionName: openai-provider
+  backend:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: mock-ratelimit-health
   namespace: agentgateway-system
 spec:
   targetRefs:
-  - group: agentgateway.dev
-    kind: AgentgatewayBackend
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
     name: mock-ratelimit-backend
   backend:
     health:
@@ -216,7 +240,7 @@ This enables:
 
 ### Health Policy
 
-The `AgentgatewayPolicy` (`mock-ratelimit-health`) created in the Base Setup already targets `mock-ratelimit-backend` by name, so it continues to apply here. No additional policy configuration is needed — the same `unhealthyCondition` and `eviction` settings govern this scenario.
+The `EnterpriseAgentgatewayPolicy` (`mock-ratelimit-health`) created in the Base Setup already targets `mock-ratelimit-backend` by name, so it continues to apply here. No additional policy configuration is needed — the same `unhealthyCondition` and `eviction` settings govern this scenario.
 
 ### Test Scenario
 
@@ -260,13 +284,13 @@ spec:
             value: /openai
       backendRefs:
         - name: mock-ratelimit-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-ratelimit-backend
   namespace: agentgateway-system
@@ -282,26 +306,53 @@ spec:
             host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
             port: 8000
             path: "/v1/chat/completions"
-            policies:
-              auth:
-                passthrough: {}
           # OpenAI (should failover to this within the same priority group)
           - name: openai-provider-primary
             openai:
               model: "gpt-4o"
-            policies:
-              auth:
-                secretRef:
-                  name: openai-secret
       # Priority Group 2: OpenAI fallback (should NOT be reached)
       - providers:
           - name: openai-provider-fallback
             openai:
               model: "gpt-4o-mini"
-            policies:
-              auth:
-                secretRef:
-                  name: openai-secret
+---
+# Re-apply the per-provider auth policies for the new provider names. The
+# passthrough EAGP from Base Setup still matches; the OpenAI EAGP now needs
+# to target both openai-provider-primary and openai-provider-fallback.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mock-ratelimit-auth-mock
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: mock-ratelimit-backend
+    sectionName: mock-ratelimit-provider
+  backend:
+    auth:
+      passthrough: {}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mock-ratelimit-auth-openai
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: mock-ratelimit-backend
+    sectionName: openai-provider-primary
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: mock-ratelimit-backend
+    sectionName: openai-provider-fallback
+  backend:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
@@ -392,11 +443,11 @@ This pattern is crucial for building resilient AI gateway architectures that bal
 
 ## Pattern 2: 5XX Server Error Failover
 
-Pattern 1 demonstrated failover triggered by 429 rate limit errors. This pattern tests failover triggered by **5XX server errors**, showing that the `AgentgatewayPolicy` health policy can handle any error condition defined by the CEL expression.
+Pattern 1 demonstrated failover triggered by 429 rate limit errors. This pattern tests failover triggered by **5XX server errors**, showing that the `EnterpriseAgentgatewayPolicy` health policy can handle any error condition defined by the CEL expression.
 
 ### Why This Matters
 
-LLM providers can fail with more than just rate limits. Server errors (500, 502, 503) indicate the backend is experiencing issues and should be temporarily removed from the pool. With the `AgentgatewayPolicy`, you can define exactly which error codes trigger eviction using CEL expressions, giving you fine-grained control over failover behavior.
+LLM providers can fail with more than just rate limits. Server errors (500, 502, 503) indicate the backend is experiencing issues and should be temporarily removed from the pool. With the `EnterpriseAgentgatewayPolicy`, you can define exactly which error codes trigger eviction using CEL expressions, giving you fine-grained control over failover behavior.
 
 ### Deploy Mock Server with Server Errors
 
@@ -479,7 +530,7 @@ kubectl get pods -n agentgateway-system -l app=mock-gpt-4o-500
 
 ### Create 5XX Failover Configuration
 
-Configure a separate HTTPRoute, AgentgatewayBackend, and AgentgatewayPolicy for the 5XX failover scenario. Note that this policy uses `unhealthyCondition: "response.code >= 500"` to evict only on server errors:
+Configure a separate HTTPRoute, EnterpriseAgentgatewayBackend, and EnterpriseAgentgatewayPolicy for the 5XX failover scenario. Note that this policy uses `unhealthyCondition: "response.code >= 500"` to evict only on server errors:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -499,13 +550,13 @@ spec:
             value: /openai-5xx
       backendRefs:
         - name: mock-5xx-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-5xx-backend
   namespace: agentgateway-system
@@ -520,28 +571,52 @@ spec:
             host: mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local
             port: 8000
             path: "/v1/chat/completions"
-            policies:
-              auth:
-                passthrough: {}
       # Priority Group 2: OpenAI (failover when group 1 is evicted)
       - providers:
           - name: openai-provider
             openai:
               model: "gpt-4o-mini"
-            policies:
-              auth:
-                secretRef:
-                  name: openai-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayPolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mock-5xx-auth-mock
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: mock-5xx-backend
+    sectionName: mock-5xx-provider
+  backend:
+    auth:
+      passthrough: {}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mock-5xx-auth-openai
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: mock-5xx-backend
+    sectionName: openai-provider
+  backend:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: mock-5xx-health
   namespace: agentgateway-system
 spec:
   targetRefs:
-  - group: agentgateway.dev
-    kind: AgentgatewayBackend
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
     name: mock-5xx-backend
   backend:
     health:
@@ -582,7 +657,7 @@ curl -s -w "\nHTTP Status: %{http_code}\n" \
 
 **What's happening:**
 1. The first request hits the mock server and receives a 503 error
-2. The `AgentgatewayPolicy` evaluates `response.code >= 500` → `true` (503 >= 500), and since `consecutiveFailures: 1`, the backend is evicted immediately for 30 seconds
+2. The `EnterpriseAgentgatewayPolicy` evaluates `response.code >= 500` → `true` (503 >= 500), and since `consecutiveFailures: 1`, the backend is evicted immediately for 30 seconds
 3. Subsequent requests are routed to priority group 2 (OpenAI) and receive successful 200 responses
 4. After 30 seconds, the gateway will retry the mock server to check if it has recovered
 5. Since the mock server always returns 503, the cycle repeats with the eviction duration increasing via multiplicative backoff
@@ -618,7 +693,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ### What This Proves
 
 This pattern demonstrates that:
-1. **Non-429 failover**: The `AgentgatewayPolicy` health policy enables failover for any error condition, not just rate limits
+1. **Non-429 failover**: The `EnterpriseAgentgatewayPolicy` health policy enables failover for any error condition, not just rate limits
 2. **CEL flexibility**: The `unhealthyCondition` expression can target specific error ranges (`>= 500`), individual codes (`== 429`), or combinations (`>= 500 || == 429`)
 3. **Policy-controlled duration**: The policy's `eviction.duration` controls how long the backend is removed from the pool
 4. **Multiplicative backoff**: Repeated evictions increase the eviction duration automatically, preventing rapid cycling on persistently failing backends
@@ -643,7 +718,7 @@ If you have not, complete those sections before continuing.
 
 ### Apply the Combined Configuration
 
-Create a new HTTPRoute, AgentgatewayBackend, and AgentgatewayPolicy that puts both mocks in Priority Group 1 and OpenAI in Priority Group 2. The route uses `/openai-combo` so it coexists with the earlier examples.
+Create a new HTTPRoute, EnterpriseAgentgatewayBackend, and EnterpriseAgentgatewayPolicy that puts both mocks in Priority Group 1 and OpenAI in Priority Group 2. The route uses `/openai-combo` so it coexists with the earlier examples.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -663,13 +738,13 @@ spec:
             value: /openai-combo
       backendRefs:
         - name: combined-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: combined-backend
   namespace: agentgateway-system
@@ -685,38 +760,63 @@ spec:
             host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
             port: 8000
             path: "/v1/chat/completions"
-            policies:
-              auth:
-                passthrough: {}
           - name: mock-503
             openai:
               model: "mock-gpt-4o-500"
             host: mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local
             port: 8000
             path: "/v1/chat/completions"
-            policies:
-              auth:
-                passthrough: {}
       # Priority Group 2: healthy OpenAI fallback
       # Reached only after BOTH providers in group 1 are evicted
       - providers:
           - name: openai-fallback
             openai:
               model: "gpt-4o-mini"
-            policies:
-              auth:
-                secretRef:
-                  name: openai-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayPolicy
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: combined-auth-mocks
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: combined-backend
+    sectionName: mock-429
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: combined-backend
+    sectionName: mock-503
+  backend:
+    auth:
+      passthrough: {}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: combined-auth-openai
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: combined-backend
+    sectionName: openai-fallback
+  backend:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: combined-health
   namespace: agentgateway-system
 spec:
   targetRefs:
-  - group: agentgateway.dev
-    kind: AgentgatewayBackend
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
     name: combined-backend
   backend:
     health:
@@ -801,8 +901,8 @@ Delete the resources created in this lab. Skip any sections you did not run.
 Pattern 2 resources:
 ```bash
 kubectl delete httproute -n agentgateway-system mock-5xx-failover
-kubectl delete agentgatewaybackend -n agentgateway-system mock-5xx-backend
-kubectl delete agentgatewaypolicy -n agentgateway-system mock-5xx-health
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-5xx-backend
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mock-5xx-health mock-5xx-auth-mock mock-5xx-auth-openai
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-500-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o-500
 ```
@@ -810,15 +910,15 @@ kubectl delete -n agentgateway-system deploy/mock-gpt-4o-500
 Pattern 3 resources:
 ```bash
 kubectl delete httproute -n agentgateway-system combined-failover
-kubectl delete agentgatewaybackend -n agentgateway-system combined-backend
-kubectl delete agentgatewaypolicy -n agentgateway-system combined-health
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system combined-backend
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system combined-health combined-auth-mocks combined-auth-openai
 ```
 
 Base Setup resources (skip if you want to keep them for the [LLM Failover](llm-failover.md) lab):
 ```bash
 kubectl delete httproute -n agentgateway-system mock-ratelimit-failover
-kubectl delete agentgatewaybackend -n agentgateway-system mock-ratelimit-backend
-kubectl delete agentgatewaypolicy -n agentgateway-system mock-ratelimit-health
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-ratelimit-backend
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mock-ratelimit-health mock-ratelimit-auth-mock mock-ratelimit-auth-openai
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o

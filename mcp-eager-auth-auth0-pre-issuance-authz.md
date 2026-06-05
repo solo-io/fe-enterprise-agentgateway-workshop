@@ -51,7 +51,7 @@ This lab demonstrates both the allow and deny paths of the pre-issuance hook, so
 - Stand up the eager-OAuth feature so the gateway acts as the OAuth Authorization Server visible to MCP clients
 - Broker the Auth0 authorization code flow through the gateway (`/oauth-issuer/...`)
 - Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-auth0.glootest.com`
-- **Multiplex two MCP upstreams (in-cluster `server-everything` + remote `search.solo.io`) behind one `AgentgatewayBackend`**
+- **Multiplex two MCP upstreams (in-cluster `server-everything` + remote `search.solo.io`) behind one `EnterpriseAgentgatewayBackend`**
 - **Gate OAuth token issuance with a pre-issuance ext_authz hook so only allowlisted Auth0 users receive a token — others are redirected to a configurable deny page**
 - **Test both allow and deny paths end-to-end with MCP Inspector**
 
@@ -118,7 +118,7 @@ The hook integrates with the existing `ably7/grpc-ext-authz` image in `AUTH_MODE
 ## Custom Gateway Features Covered
 
 - **OAuth 2.0 Authorization Server**: agentgateway acts as the AS at `/oauth-issuer/...` (recap)
-- **Multiplexed MCP backend**: one `AgentgatewayBackend` fronts two upstreams — an in-cluster `server-everything` and the remote `search.solo.io` — letting one OAuth-protected MCP endpoint expose tools from both
+- **Multiplexed MCP backend**: one `EnterpriseAgentgatewayBackend` fronts two upstreams — an in-cluster `server-everything` and the remote `search.solo.io` — letting one OAuth-protected MCP endpoint expose tools from both
 - **Pre-issuance ext_authz hook**: `KGW_OAUTH_ISSUER_CONFIG.pre_issuance` calls a gRPC service between Auth0 callback and gateway-issued token; allowlists by Auth0 `sub` via `source.principal`; on deny the browser is redirected to `denied_redirect`
 - **Frontend TLS termination**: HTTPS listener on `agentgateway-proxy` for `mcp-auth0.glootest.com` (recap)
 
@@ -644,9 +644,9 @@ This step deploys five resources in `agentgateway-system`:
 | Resource | Kind | Description |
 |---|---|---|
 | `mcp-server` | Deployment + Service | `@modelcontextprotocol/server-everything` reference server in Streamable HTTP mode (run via `npx` on `node:20-alpine`). Streamable HTTP is per-request stateless, which lets Lab 001's `replicas: 2` proxy stay unchanged. |
-| `mcp-backend` | AgentgatewayBackend | **Multiplexed** — wraps two MCP targets behind one backend: the in-cluster `mcp-server` (named `everything`) and the remote `search.solo.io` MCP server (named `soloio-docs`, reached via HTTPS using `policies.tls: {}`). The gateway fans every MCP request out to both targets and merges their tool lists into one view. |
+| `mcp-backend` | EnterpriseAgentgatewayBackend | **Multiplexed** — wraps two MCP targets behind one backend: the in-cluster `mcp-server` (named `everything`) and the remote `search.solo.io` MCP server (named `soloio-docs`, reached via HTTPS using `policies.tls: {}`). The gateway fans every MCP request out to both targets and merges their tool lists into one view. |
 | `mcp-route` | HTTPRoute | Exposes `/mcp` plus the two `.well-known/oauth-*-resource/mcp` discovery paths on the `https` listener |
-| `auth0-jwks` | AgentgatewayBackend | Static backend pointing at Auth0 for JWKS lookups during request validation |
+| `auth0-jwks` | EnterpriseAgentgatewayBackend | Static backend pointing at Auth0 for JWKS lookups during request validation |
 | `elicitation-secret` | Secret | **Required** by the eager-OAuth issuer at the start of an auth flow. The controller looks for this exact name in its own namespace and 500s with `secret not found: agentgateway-system/elicitation-secret` on `/oauth-issuer/authorize` if it's missing. |
 
 ```bash
@@ -710,8 +710,8 @@ spec:
       targetPort: 3001
       appProtocol: agentgateway.dev/mcp
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mcp-backend
   namespace: agentgateway-system
@@ -750,24 +750,24 @@ spec:
             value: /mcp
       backendRefs:
         - name: mcp-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
     - matches:
         - path:
             type: PathPrefix
             value: /.well-known/oauth-protected-resource/mcp
       backendRefs:
         - name: mcp-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
     - matches:
         - path:
             type: PathPrefix
             value: /.well-known/oauth-authorization-server/mcp
       backendRefs:
         - name: mcp-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
 ---
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
@@ -820,8 +820,8 @@ metadata:
   namespace: agentgateway-system
 spec:
   targetRefs:
-    - group: agentgateway.dev
-      kind: AgentgatewayBackend
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
       name: mcp-backend
   backend:
     mcp:
@@ -1031,7 +1031,8 @@ Fully revert to the Lab 001 baseline. Run these in order — the helm revert is 
 # 1. Delete lab-specific resources
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mcp-auth0-eager --ignore-not-found
 kubectl delete httproute -n agentgateway-system mcp-route oauth-issuer --ignore-not-found
-kubectl delete agentgatewaybackend -n agentgateway-system mcp-backend auth0-jwks --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend --ignore-not-found
+kubectl delete agentgatewaybackend -n agentgateway-system auth0-jwks --ignore-not-found
 kubectl delete deployment -n agentgateway-system mcp-server --ignore-not-found
 kubectl delete service -n agentgateway-system mcp-server --ignore-not-found
 kubectl delete secret -n agentgateway-system elicitation-secret mcp-auth0-tls --ignore-not-found

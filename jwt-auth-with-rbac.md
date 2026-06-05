@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
 - Configure JWT Auth
 - Validate JWT Auth
 
@@ -16,7 +16,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create openai route and `AgentgatewayBackend`
+Create openai route and `EnterpriseAgentgatewayBackend`
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -35,13 +35,13 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
@@ -255,8 +255,8 @@ spec:
               value: team-id
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -337,8 +337,8 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -348,7 +348,7 @@ EOF
 
 This example requires a valid token from `https://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697/v1/token`. If you do not have access to generating a token from this auth server, then simply use this as a reference example or replace the config above with a valid OIDC endpoint
 
-Create an AgentgatewayBackend for the Okta JWKS endpoint
+Create an EnterpriseAgentgatewayBackend for the Okta JWKS endpoint
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: agentgateway.dev/v1alpha1
@@ -471,7 +471,7 @@ Example output shows comprehensive request details including model information, 
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete agentgatewaybackend -n agentgateway-system okta-jwks
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system agentgateway-jwt-auth

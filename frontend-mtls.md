@@ -116,13 +116,13 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
@@ -250,7 +250,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ```bash
 rm -rf example_certs
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret https
 kubectl delete configmap -n agentgateway-system ca-cert
 ```

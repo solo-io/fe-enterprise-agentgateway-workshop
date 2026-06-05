@@ -4,7 +4,7 @@
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
-- Configure `AgentgatewayBackend` per model using model override parameter
+- Configure `EnterpriseAgentgatewayBackend` per model using model override parameter
 - Configure LLM routing example with path-per-model to access endpoint
 - Curl OpenAI endpoints through the agentgateway proxy
 - Validate path to model mapping
@@ -18,7 +18,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 ```
 
 ### Configure LLM routing example with path-per-model to access endpoints
-Our previous `AgentgatewayBackend` allows the user to specify any `model` parameter in the request body. In order to restrict access to specific models, we can configure a model override in the `AgentgatewayBackend`
+Our previous `EnterpriseAgentgatewayBackend` allows the user to specify any `model` parameter in the request body. In order to restrict access to specific models, we can configure a model override in the `EnterpriseAgentgatewayBackend`
 ```
 provider:
   openai:
@@ -26,16 +26,16 @@ provider:
 ```
 When a model override is configured, the gateway will override any user-input `model` parameter in the request body (e.g. if user supplies `model: gpt-5-2025-08-07` it will be overridden to `gpt-4o-mini`)
 
-With this option, we can create an `AgentgatewayBackend` per model if we want more granular control of access to models. 
+With this option, we can create an `EnterpriseAgentgatewayBackend` per model if we want more granular control of access to models. 
 
 **Additionally, when model overrides are specified, the client does not have to supply a `model` parameter in the request body, since the gateway will inject it. The client can input a model in the request body, but effectively it will just be overwritten.**
 
-Lets create an OpenAI `AgentgatewayBackend` per specific-model
+Lets create an OpenAI `EnterpriseAgentgatewayBackend` per specific-model
 ```bash
 kubectl apply -f - <<EOF
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-gpt-3.5-turbo
   namespace: agentgateway-system
@@ -50,8 +50,8 @@ spec:
       secretRef:
         name: openai-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-gpt-4o-mini
   namespace: agentgateway-system
@@ -66,8 +66,8 @@ spec:
       secretRef:
         name: openai-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-gpt-4o
   namespace: agentgateway-system
@@ -103,8 +103,8 @@ spec:
             value: /openai/gpt-3.5-turbo
       backendRefs:
         - name: openai-gpt-3.5-turbo
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -113,8 +113,8 @@ spec:
             value: /openai/gpt-4o-mini
       backendRefs:
         - name: openai-gpt-4o-mini
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -123,8 +123,8 @@ spec:
             value: /openai/gpt-4o
       backendRefs:
         - name: openai-gpt-4o
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -246,7 +246,7 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 ```bash
 kubectl delete httproute -n agentgateway-system openai
 kubectl delete secret -n agentgateway-system openai-secret
-kubectl delete agentgatewaybackend -n agentgateway-system openai-gpt-4o
-kubectl delete agentgatewaybackend -n agentgateway-system openai-gpt-4o-mini
-kubectl delete agentgatewaybackend -n agentgateway-system openai-gpt-3.5-turbo
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o-mini
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-3.5-turbo
 ```

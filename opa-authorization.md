@@ -86,8 +86,8 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 Create the OpenAI backend and HTTPRoute
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai
   namespace: agentgateway-system
@@ -118,8 +118,8 @@ spec:
     backendRefs:
     - name: openai
       namespace: agentgateway-system
-      group: agentgateway.dev
-      kind: AgentgatewayBackend
+      group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
 EOF
 ```
 
@@ -312,8 +312,8 @@ Since the Solo.io docs MCP server is external, we configure a static backend wit
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: soloio-docs-mcp
   namespace: agentgateway-system
@@ -345,8 +345,8 @@ spec:
     backendRefs:
     - name: soloio-docs-mcp
       namespace: agentgateway-system
-      group: agentgateway.dev
-      kind: AgentgatewayBackend
+      group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
 EOF
 ```
 
@@ -514,6 +514,6 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system llm-opa-polic
 kubectl delete authconfig -n agentgateway-system llm-opa
 kubectl delete configmap -n agentgateway-system llm-opa-policy
 kubectl delete httproute -n agentgateway-system openai soloio-docs-mcp
-kubectl delete agentgatewaybackend -n agentgateway-system openai soloio-docs-mcp
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai soloio-docs-mcp
 kubectl delete secret -n agentgateway-system openai-secret
 ```

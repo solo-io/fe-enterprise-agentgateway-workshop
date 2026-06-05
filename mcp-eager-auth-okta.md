@@ -499,9 +499,9 @@ This step deploys five resources in `agentgateway-system`:
 | Resource | Kind | Description |
 |---|---|---|
 | `mcp-server` | Deployment + Service | `@modelcontextprotocol/server-everything` reference server in Streamable HTTP mode (run via `npx` on `node:20-alpine`). Streamable HTTP is per-request stateless, which lets Lab 001's `replicas: 2` proxy stay unchanged. |
-| `mcp-backend` | AgentgatewayBackend | Wraps the MCP server as an MCP target |
+| `mcp-backend` | EnterpriseAgentgatewayBackend | Wraps the MCP server as an MCP target |
 | `mcp-route` | HTTPRoute | Exposes `/mcp` plus the two `.well-known/oauth-*-resource/mcp` discovery paths on the `https` listener |
-| `okta-jwks` | AgentgatewayBackend | Static backend pointing at Okta for JWKS lookups during request validation |
+| `okta-jwks` | EnterpriseAgentgatewayBackend | Static backend pointing at Okta for JWKS lookups during request validation |
 | `elicitation-secret` | Secret | **Required** by the eager-OAuth issuer at the start of an auth flow. The controller looks for this exact name in its own namespace and 500s with `secret not found: agentgateway-system/elicitation-secret` on `/oauth-issuer/authorize` if it's missing. |
 
 ```bash
@@ -565,8 +565,8 @@ spec:
       targetPort: 3001
       appProtocol: agentgateway.dev/mcp
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mcp-backend
   namespace: agentgateway-system
@@ -598,24 +598,24 @@ spec:
             value: /mcp
       backendRefs:
         - name: mcp-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
     - matches:
         - path:
             type: PathPrefix
             value: /.well-known/oauth-protected-resource/mcp
       backendRefs:
         - name: mcp-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
     - matches:
         - path:
             type: PathPrefix
             value: /.well-known/oauth-authorization-server/mcp
       backendRefs:
         - name: mcp-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
 ---
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
@@ -666,8 +666,8 @@ metadata:
   namespace: agentgateway-system
 spec:
   targetRefs:
-    - group: agentgateway.dev
-      kind: AgentgatewayBackend
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
       name: mcp-backend
   backend:
     mcp:
@@ -882,7 +882,8 @@ Fully revert to the Lab 001 baseline. Run these in order — the helm revert is 
 # 1. Delete lab-specific resources
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mcp-okta-eager --ignore-not-found
 kubectl delete httproute -n agentgateway-system mcp-route oauth-issuer --ignore-not-found
-kubectl delete agentgatewaybackend -n agentgateway-system mcp-backend okta-jwks --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend --ignore-not-found
+kubectl delete agentgatewaybackend -n agentgateway-system okta-jwks --ignore-not-found
 kubectl delete deployment -n agentgateway-system mcp-server --ignore-not-found
 kubectl delete service -n agentgateway-system mcp-server --ignore-not-found
 kubectl delete secret -n agentgateway-system elicitation-secret mcp-okta-tls --ignore-not-found

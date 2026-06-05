@@ -1,5 +1,5 @@
 # Configure OpenAI Embeddings
-Configure access to multiple OpenAI API endpoints such as for chat completions, embeddings, and models through the AgentgatewayBackend.
+Configure access to multiple OpenAI API endpoints such as for chat completions, embeddings, and models through the EnterpriseAgentgatewayBackend.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -39,13 +39,13 @@ spec:
   rules:
     - backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
@@ -325,8 +325,8 @@ spec:
               replacePrefixMatch: /v1/chat/completions
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     # Custom path for embeddings: /openai/embeddings -> /v1/embeddings
@@ -342,8 +342,8 @@ spec:
               replacePrefixMatch: /v1/embeddings
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     # Custom path for models: /openai/models -> /v1/models
@@ -359,15 +359,15 @@ spec:
               replacePrefixMatch: /v1/models
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     # Default route for standard OpenAI paths (no rewrite needed)
     - backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -423,6 +423,6 @@ curl -i "$GATEWAY_IP:8080/v1/chat/completions" \
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 ```

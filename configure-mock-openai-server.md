@@ -100,13 +100,13 @@ spec:
             value: /openai
       backendRefs:
         - name: mock-openai
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-openai
   namespace: agentgateway-system
@@ -209,7 +209,7 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system mock-openai
-kubectl delete agentgatewaybackend -n agentgateway-system mock-openai
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-openai
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```

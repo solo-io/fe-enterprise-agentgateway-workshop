@@ -33,8 +33,8 @@ Since the Solo.io docs MCP server is external (already running at `https://searc
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: soloio-docs-mcp-backend
   namespace: agentgateway-system
@@ -64,8 +64,8 @@ spec:
           value: /mcp
       backendRefs:
       - name: soloio-docs-mcp-backend
-        group: agentgateway.dev
-        kind: AgentgatewayBackend
+        group: enterpriseagentgateway.solo.io
+        kind: EnterpriseAgentgatewayBackend
 EOF
 ```
 
@@ -385,7 +385,7 @@ Remove Kubernetes resources:
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt-rbac
-kubectl delete agentgatewaybackend -n agentgateway-system soloio-docs-mcp-backend
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system soloio-docs-mcp-backend
 kubectl delete httproute -n agentgateway-system soloio-docs-mcp
 ```
 

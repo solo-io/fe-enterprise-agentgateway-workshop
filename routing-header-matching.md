@@ -16,12 +16,12 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Lets create an OpenAI `AgentgatewayBackend` per specific-model if you haven't already
+Lets create an OpenAI `EnterpriseAgentgatewayBackend` per specific-model if you haven't already
 ```bash
 kubectl apply -f - <<EOF
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-gpt-3.5-turbo
   namespace: agentgateway-system
@@ -36,8 +36,8 @@ spec:
       secretRef:
         name: openai-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-gpt-4o-mini
   namespace: agentgateway-system
@@ -52,8 +52,8 @@ spec:
       secretRef:
         name: openai-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-gpt-4o
   namespace: agentgateway-system
@@ -95,8 +95,8 @@ spec:
             value: gpt-3.5-turbo
       backendRefs:
         - name: openai-gpt-3.5-turbo
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -109,8 +109,8 @@ spec:
             value: gpt-4o-mini
       backendRefs:
         - name: openai-gpt-4o-mini
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
     - matches:
@@ -123,8 +123,8 @@ spec:
             value: gpt-4o
       backendRefs:
         - name: openai-gpt-4o
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -249,7 +249,7 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 ```bash
 kubectl delete httproute -n agentgateway-system openai
 kubectl delete secret -n agentgateway-system openai-secret
-kubectl delete agentgatewaybackend -n agentgateway-system openai-gpt-4o
-kubectl delete agentgatewaybackend -n agentgateway-system openai-gpt-4o-mini
-kubectl delete agentgatewaybackend -n agentgateway-system openai-gpt-3.5-turbo
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o-mini
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-3.5-turbo
 ```

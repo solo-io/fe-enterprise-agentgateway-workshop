@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
 - Create an initial RateLimitConfig to implement request-based rate limiting using a simple counter (e.g. all users get 5 requests per hour)
 - Validate request-based rate limiting
 
@@ -35,13 +35,13 @@ spec:
             value: /openai
       backendRefs:
         - name: openai-all-models
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
@@ -140,7 +140,7 @@ You should be rate limited on the 6th request to the LLM
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete agentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system global-request-rate-limit
 kubectl delete rlc -n agentgateway-system global-request-rate-limit

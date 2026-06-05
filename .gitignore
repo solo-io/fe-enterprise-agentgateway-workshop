@@ -46,3 +46,6 @@ temp/
 
 # Superpowers docs
 docs/
+
+# Migration scripts (one-shot, kept locally)
+scripts/

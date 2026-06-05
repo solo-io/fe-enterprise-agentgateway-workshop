@@ -1,14 +1,14 @@
 # Configure LLM Failover
 
-In this lab, you'll configure priority group failover using an `AgentgatewayPolicy` health policy. You'll deploy a mock openai server configured to return rate limit errors (priority group 1) and use OpenAI as the failover (priority group 2). When the health policy detects unhealthy responses, the backend is evicted from its priority group, causing subsequent requests to route to the next available group
+In this lab, you'll configure priority group failover using an `EnterpriseAgentgatewayPolicy` health policy. You'll deploy a mock openai server configured to return rate limit errors (priority group 1) and use OpenAI as the failover (priority group 2). When the health policy detects unhealthy responses, the backend is evicted from its priority group, causing subsequent requests to route to the next available group
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Deploy a mock openai server configured to always return 429 rate limit errors
-- Configure an `AgentgatewayPolicy` with `unhealthyCondition` CEL expression and `eviction` settings to define what triggers failover
-- Configure an `AgentgatewayBackend` with priority groups
+- Configure an `EnterpriseAgentgatewayPolicy` with `unhealthyCondition` CEL expression and `eviction` settings to define what triggers failover
+- Configure an `EnterpriseAgentgatewayBackend` with priority groups
 - Create priority group failover configuration with mock-gpt-4o as priority 1 and OpenAI as priority 2
 - Test failover from rate-limited backend to healthy OpenAI backend
 - Observe failover behavior in logs and traces
@@ -113,7 +113,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 
 ## Create Priority Group Failover Configuration
 
-Configure the AgentgatewayBackend with priority groups, HTTPRoute, and an AgentgatewayPolicy health policy. The `AgentgatewayPolicy` defines what constitutes an unhealthy response using a CEL expression and how long to evict the backend. Without a health policy, backends are never evicted and failover will not trigger:
+Configure the EnterpriseAgentgatewayBackend with priority groups, HTTPRoute, and an EnterpriseAgentgatewayPolicy health policy. The `EnterpriseAgentgatewayPolicy` defines what constitutes an unhealthy response using a CEL expression and how long to evict the backend. Without a health policy, backends are never evicted and failover will not trigger:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -133,13 +133,13 @@ spec:
             value: /openai
       backendRefs:
         - name: mock-ratelimit-backend
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-ratelimit-backend
   namespace: agentgateway-system
@@ -154,28 +154,55 @@ spec:
             host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
             port: 8000
             path: "/v1/chat/completions"
-            policies:
-              auth:
-                passthrough: {}
       # Priority Group 2: OpenAI (failover when group 1 is evicted)
       - providers:
           - name: openai-provider
             openai:
               model: "gpt-4o-mini"
-            policies:
-              auth:
-                secretRef:
-                  name: openai-secret
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayPolicy
+# Per-provider auth: passthrough for the mock (no upstream API key needed),
+# OpenAI secretRef for the failover provider. Each policy uses
+# targetRefs[].sectionName to attach to a single provider by name.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mock-ratelimit-auth-mock
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: mock-ratelimit-backend
+    sectionName: mock-ratelimit-provider
+  backend:
+    auth:
+      passthrough: {}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mock-ratelimit-auth-openai
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
+    name: mock-ratelimit-backend
+    sectionName: openai-provider
+  backend:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
   name: mock-ratelimit-health
   namespace: agentgateway-system
 spec:
   targetRefs:
-  - group: agentgateway.dev
-    kind: AgentgatewayBackend
+  - group: enterpriseagentgateway.solo.io
+    kind: EnterpriseAgentgatewayBackend
     name: mock-ratelimit-backend
   backend:
     health:
@@ -187,7 +214,7 @@ EOF
 ```
 
 **Key Configuration Points:**
-- The `AgentgatewayPolicy` is what enables failover. Without it, backends are never evicted regardless of error codes
+- The `EnterpriseAgentgatewayPolicy` is what enables failover. Without it, backends are never evicted regardless of error codes
 - `unhealthyCondition: "response.code >= 500 || response.code == 429"` is a CEL expression that classifies both 5XX server errors and 429 rate limit errors as unhealthy
 - `eviction.duration: 60s` sets how long an evicted backend is removed from the pool. `consecutiveFailures: 1` means a single unhealthy response triggers eviction immediately
 - Priority group 1 uses the mock server that always returns 429 errors
@@ -253,7 +280,7 @@ Note that the default response from the mock openai server will always be
 
 **What's happening:**
 1. The first request hits the mock server and receives a 429 error
-2. The `AgentgatewayPolicy` evaluates `response.code == 429` → `true`, and since `consecutiveFailures: 1`, the backend is evicted for 60 seconds (`eviction.duration`)
+2. The `EnterpriseAgentgatewayPolicy` evaluates `response.code == 429` → `true`, and since `consecutiveFailures: 1`, the backend is evicted for 60 seconds (`eviction.duration`)
 3. All subsequent requests are routed to priority group 2 (OpenAI) and receive successful 200 responses
 4. After 60 seconds, the gateway will retry the mock server to check if it has recovered
 5. Since the mock server always returns 429, the cycle repeats with the eviction duration increasing via multiplicative backoff
@@ -328,7 +355,7 @@ The priority group failover configuration demonstrates several key concepts:
 ### How Priority Groups Work
 
 1. **Priority Ordering**: The gateway prefers providers in higher priority groups (group 1 over group 2, etc.)
-2. **Health Policy (AgentgatewayPolicy)**: An `AgentgatewayPolicy` with `backend.health` defines what constitutes an unhealthy response and how eviction works. **Without a health policy, backends are never evicted and failover will not trigger.**
+2. **Health Policy (EnterpriseAgentgatewayPolicy)**: An `EnterpriseAgentgatewayPolicy` with `backend.health` defines what constitutes an unhealthy response and how eviction works. **Without a health policy, backends are never evicted and failover will not trigger.**
    - `unhealthyCondition` is a CEL expression evaluated against each response. If it returns `true`, the response counts toward eviction
    - `eviction.consecutiveFailures` sets how many consecutive unhealthy responses are required before eviction (use `1` for immediate eviction, `3` to tolerate transient errors)
    - `eviction.duration` sets the base removal time from the priority group. Duration increases with multiplicative backoff on repeated evictions
@@ -337,7 +364,7 @@ The priority group failover configuration demonstrates several key concepts:
    - The provider is evicted after processing the error response
    - **Subsequent requests** will skip evicted providers and use the next priority group
    - **Important**: Health state is local to each AgentGateway pod. With multiple replicas, you may see 1-2 failed requests before failover as different pods learn about the unhealthy state
-4. **Eviction Duration**: The `eviction.duration` in the `AgentgatewayPolicy` controls how long a backend is removed from the pool. After the period expires, the gateway will retry the primary backend to check if it has recovered. Duration increases with multiplicative backoff on repeated evictions, preventing rapid cycling on persistently failing backends
+4. **Eviction Duration**: The `eviction.duration` in the `EnterpriseAgentgatewayPolicy` controls how long a backend is removed from the pool. After the period expires, the gateway will retry the primary backend to check if it has recovered. Duration increases with multiplicative backoff on repeated evictions, preventing rapid cycling on persistently failing backends
 5. **Across-Request Failover**: Unlike retry policies that work within a single request, priority group failover works across multiple requests based on provider health state
    - With a single replica: expect 1 failed request, then failover to the next priority group
    - With multiple replicas: expect 1-2 failed requests before all pods mark the provider as unhealthy
@@ -362,8 +389,8 @@ The basic lab above demonstrates one failover from a single failing backend to a
 Delete the lab resources:
 ```bash
 kubectl delete httproute -n agentgateway-system mock-ratelimit-failover
-kubectl delete agentgatewaybackend -n agentgateway-system mock-ratelimit-backend
-kubectl delete agentgatewayPolicy -n agentgateway-system mock-ratelimit-health
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-ratelimit-backend
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mock-ratelimit-health mock-ratelimit-auth-mock mock-ratelimit-auth-openai
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o

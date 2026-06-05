@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains your Anthropic API key credentials
-- Create a route to Anthropic as your backend LLM provider using an `AgentgatewayBackend` and `HTTPRoute`
+- Create a route to Anthropic as your backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
 - Test the integration with a sample request to Claude
 
 ## Set Environment Variables
@@ -26,12 +26,12 @@ kubectl create secret generic anthropic-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-The `AgentgatewayBackend` object/kind is used to reference the Anthropic API key and specify the Model to be used.
+The `EnterpriseAgentgatewayBackend` object/kind is used to reference the Anthropic API key and specify the Model to be used.
 
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: anthropic
   namespace: agentgateway-system
@@ -48,7 +48,7 @@ EOF
 ```
 
 ```bash
-kubectl get agentgatewaybackend -n agentgateway-system
+kubectl get enterpriseagentgatewaybackend -n agentgateway-system
 ```
 
 Create the route used to interact with the LLM via the Gateway that you created previously.
@@ -73,8 +73,8 @@ spec:
             value: /anthropic
       backendRefs:
         - name: anthropic
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
 EOF
@@ -107,6 +107,6 @@ Expected output should be a successful response from Claude with a paragraph abo
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system claude
-kubectl delete agentgatewaybackend -n agentgateway-system anthropic
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system anthropic
 kubectl delete secret -n agentgateway-system anthropic-secret
 ```

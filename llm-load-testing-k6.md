@@ -125,12 +125,12 @@ kubectl rollout status deployment/mock-gpt-5-2 -n agentgateway-system
 
 ## Configure Routing to Mock Backends
 
-Create AgentgatewayBackend resources for both mock services:
+Create EnterpriseAgentgatewayBackend resources for both mock services:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-gpt-4o
   namespace: agentgateway-system
@@ -146,8 +146,8 @@ spec:
     auth:
       passthrough: {}
 ---
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: mock-gpt-5-2
   namespace: agentgateway-system
@@ -185,16 +185,16 @@ spec:
             value: /openai/gpt-4o
       backendRefs:
         - name: mock-gpt-4o
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
     - matches:
         - path:
             type: PathPrefix
             value: /openai/gpt-5.2
       backendRefs:
         - name: mock-gpt-5-2
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
 EOF
 ```
 
@@ -663,8 +663,8 @@ Delete the routing configuration:
 
 ```bash
 kubectl delete httproute -n agentgateway-system mock-openai
-kubectl delete agentgatewaybackend -n agentgateway-system mock-gpt-4o
-kubectl delete agentgatewaybackend -n agentgateway-system mock-gpt-5-2
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-gpt-4o
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-gpt-5-2
 ```
 
 Delete the mock services:

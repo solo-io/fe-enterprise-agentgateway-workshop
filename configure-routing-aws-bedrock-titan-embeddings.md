@@ -11,7 +11,7 @@ You will also need:
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our AWS Access Key credentials
-- Create an `AgentgatewayBackend` with a `Passthrough` route for the Titan Embed InvokeModel endpoint
+- Create an `EnterpriseAgentgatewayBackend` with a `Passthrough` route for the Titan Embed InvokeModel endpoint
 - Create an `HTTPRoute` with a URL rewrite that maps a friendly path to the Bedrock InvokeModel API
 - Test the embedding endpoint through the AgentGateway proxy
 
@@ -46,14 +46,14 @@ stringData:
 EOF
 ```
 
-## Create the AgentgatewayBackend
+## Create the EnterpriseAgentgatewayBackend
 
-Create an `AgentgatewayBackend` for the Titan Embed v2 model. The `policies.ai.routes` block marks the InvokeModel endpoint as `Passthrough` — this is required for embedding models because they do not use the OpenAI-compatible Chat Completions format.
+Create an `EnterpriseAgentgatewayBackend` for the Titan Embed v2 model. The `policies.ai.routes` block marks the InvokeModel endpoint as `Passthrough` — this is required for embedding models because they do not use the OpenAI-compatible Chat Completions format.
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: bedrock-titan-embed-v2
   namespace: agentgateway-system
@@ -103,8 +103,8 @@ spec:
               replaceFullPath: /model/amazon.titan-embed-text-v2:0/invoke
       backendRefs:
         - name: bedrock-titan-embed-v2
-          group: agentgateway.dev
-          kind: AgentgatewayBackend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "30s"
 EOF
@@ -182,6 +182,6 @@ To view distributed traces:
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system bedrock-titan-embed
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock-titan-embed-v2
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-titan-embed-v2
 kubectl delete secret -n agentgateway-system bedrock-secret
 ```

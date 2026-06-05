@@ -13,7 +13,7 @@ Additionally, this lab requires:
 - Configure IRSA so the agentgateway pod can assume an IAM role for Bedrock access without storing AWS credentials as Kubernetes secrets
 - Associate the EKS cluster OIDC provider with AWS IAM
 - Create an IAM role with a trust policy scoped to the agentgateway service account
-- Deploy an `AgentgatewayBackend` for Bedrock that relies on IRSA instead of secret-based auth
+- Deploy an `EnterpriseAgentgatewayBackend` for Bedrock that relies on IRSA instead of secret-based auth
 - Annotate the data plane service account via `EnterpriseAgentgatewayParameters`
 - Verify end-to-end connectivity with Bedrock using temporary IRSA credentials
 
@@ -169,8 +169,8 @@ Note: there is **no** `policies.auth` section. This signals to agentgateway to u
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: bedrock
   namespace: agentgateway-system
@@ -234,8 +234,8 @@ spec:
           value: /bedrock
     backendRefs:
       - name: bedrock
-        group: agentgateway.dev
-        kind: AgentgatewayBackend
+        group: enterpriseagentgateway.solo.io
+        kind: EnterpriseAgentgatewayBackend
     timeouts:
       request: "120s"
 EOF
@@ -387,7 +387,7 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 ```bash
 # Remove Kubernetes resources
 kubectl delete httproute -n agentgateway-system bedrock
-kubectl delete agentgatewaybackend -n agentgateway-system bedrock
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock
 
 # Remove IRSA annotation from EnterpriseAgentgatewayParameters
 kubectl patch enterpriseagentgatewayparameters agentgateway-config \
