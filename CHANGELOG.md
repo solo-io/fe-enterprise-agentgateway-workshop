@@ -3,6 +3,9 @@
 0.10.7 - (6-8-26)
 ---
 - `mcp-eager-auth-okta.md` / `mcp-eager-auth-auth0.md` / `mcp-eager-auth-auth0-pre-issuance-authz.md`: add CORS filter on `.well-known/oauth-*/mcp` rules so MCP Inspector's browser-side OAuth discovery preflight passes; troubleshooting row added
+- Add new lab: `mcp-tool-federation.md` — federates four real-world MCP servers (arXiv, FRED, SEC EDGAR, BLS) behind one `EnterpriseAgentgatewayBackend` with four label-selector `spec.mcp.targets` and `failureMode: FailOpen`; covers tool-name prefixing (`<service>-<port>_<tool>`), FailOpen drop-one-backend demo, single JWT auth gating the whole union, and a four-persona tool-filtering policy attached to the backend via `spec.backend.mcp.authorization` that uses `mcp.tool.target == "<service>-<port>"` + `jwt.persona` to carve a different `tools/list` per identity (academic / economist / analyst / admin)
+- Add `lib/jwt/`: a non-interactive RS256 JWT signer for workshop labs that need to mint tokens with arbitrary claims — `generate-jwt.sh` (reads claims from file or stdin, prints JWT to stdout), committed demo keypair (`private.pem` / `public.pem`) with matching `jwks.json` (kid `workshop-jwt-key-001`, issuer `workshop.solo.io` — deliberately distinct from the `solo.io` issuer used elsewhere so this lab's JWTs don't cross-validate against other labs' policies), four persona claims files under `claims/`, and a usage README
+- `README.md`: add "MCP Tool Federation" entry to the MCP (Model Context Protocol) section
 
 0.10.6 - (6-5-26)
 ---
