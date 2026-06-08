@@ -1,5 +1,9 @@
 # Changelog
 
+0.10.7 - (6-8-26)
+---
+- `mcp-eager-auth-okta.md` / `mcp-eager-auth-auth0.md` / `mcp-eager-auth-auth0-pre-issuance-authz.md`: add CORS filter on `.well-known/oauth-*/mcp` rules so MCP Inspector's browser-side OAuth discovery preflight passes; troubleshooting row added
+
 0.10.6 - (6-5-26)
 ---
 - Quick fix for Agentgateway Grafana dashboard
