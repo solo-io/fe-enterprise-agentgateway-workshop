@@ -1,0 +1,8 @@
+{
+  "iss": "workshop.solo.io",
+  "sub": "analyst-user",
+  "exp": 4070908800,
+  "persona": "analyst",
+  "org": "equity-research",
+  "team": "fundamentals"
+}

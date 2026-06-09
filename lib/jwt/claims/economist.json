@@ -1,0 +1,8 @@
+{
+  "iss": "workshop.solo.io",
+  "sub": "economist-user",
+  "exp": 4070908800,
+  "persona": "economist",
+  "org": "macro-research",
+  "team": "monetary-policy"
+}

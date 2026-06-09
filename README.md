@@ -126,6 +126,7 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 - [In-Cluster MCP](in-cluster-mcp.md)
 - [Remote MCP](remote-mcp.md)
 - [Dynamic MCP](dynamic-mcp.md)
+- [MCP Tool Federation](mcp-tool-federation.md)
 - [MCP Tool Mode — Search](mcp-tool-mode-search.md)
 - [MCP Tool Mode — Code](mcp-tool-mode-code.md)
 - [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_

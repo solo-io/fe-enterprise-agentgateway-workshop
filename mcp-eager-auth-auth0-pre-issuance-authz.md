@@ -756,6 +756,18 @@ spec:
         - path:
             type: PathPrefix
             value: /.well-known/oauth-protected-resource/mcp
+      filters:
+        - type: CORS
+          cors:
+            allowOrigins:
+              - "*"
+            allowMethods: ["GET", "OPTIONS"]
+            allowHeaders:
+              - "Content-Type"
+              - "Authorization"
+              - "Accept"
+              - "mcp-protocol-version"
+            maxAge: 86400
       backendRefs:
         - name: mcp-backend
           group: enterpriseagentgateway.solo.io
@@ -764,6 +776,18 @@ spec:
         - path:
             type: PathPrefix
             value: /.well-known/oauth-authorization-server/mcp
+      filters:
+        - type: CORS
+          cors:
+            allowOrigins:
+              - "*"
+            allowMethods: ["GET", "OPTIONS"]
+            allowHeaders:
+              - "Content-Type"
+              - "Authorization"
+              - "Accept"
+              - "mcp-protocol-version"
+            maxAge: 86400
       backendRefs:
         - name: mcp-backend
           group: enterpriseagentgateway.solo.io
@@ -997,6 +1021,7 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | Auth0 error page after login (`client not found` / `invalid_client`) | `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` don't match the Auth0 app, or the app is disabled / not assigned to the Auth0 connection | Auth0 admin → Applications → *your app* → Settings (Client ID, Client Secret), and Connections tab |
 | 401 after browser flow with a valid-looking JWT | `mcp.authentication.audiences` doesn't include the `aud` claim Auth0 actually issued, or the `issuer` value's trailing slash doesn't match | Decode the JWT at `jwt.io`; compare `iss` to `${AUTH0_ISSUER}` (trailing slash) and `aud` to `${AUTH0_AUDIENCE}`. See the audience-injection callout in Step 5. |
 | Inspector shows "fetch failed" or `unable to verify the first certificate` | Inspector's Node process rejected the self-signed gateway cert | Restart Inspector with `NODE_TLS_REJECT_UNAUTHORIZED=0` (Step 10) |
+| Inspector loops on connect with no Auth0 redirect; browser DevTools console (F12) shows `Access to fetch at '.../.well-known/oauth-*-resource/mcp' has been blocked by CORS policy` or `mcp-protocol-version is not allowed by Access-Control-Allow-Headers` | OAuth metadata discovery runs in the **browser** (Inspector UI), not through Inspector's `localhost:6277` proxy. Inspector sends `mcp-protocol-version` on the preflight, but agentgateway's internal handler hardcodes `Access-Control-Allow-Headers: content-type` and rejects it | The Step 9 `mcp-route` HTTPRoute must attach a Gateway API `CORS` filter to both `/.well-known/oauth-*/mcp` rules that allows `mcp-protocol-version` (and `Authorization`). Confirm with `kubectl get httproute -n agentgateway-system mcp-route -o yaml \| grep -A6 'type: CORS'` |
 | Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-auth0.glootest.com/.well-known/oauth-protected-resource/mcp` and click through the warning |
 | `mcp-auth0.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
 | **Every login redirects to `https://example.com/no-access`** (or your custom deny page) | The Auth0 sub of the user you logged in as is not in `ALLOWED_PRINCIPALS`. This is the expected deny-path behavior — but if you meant to be on the allow path, the allowlist needs to be updated. | `kubectl logs -n agentgateway-system deployment/grpc-ext-authz --tail=20` — every Check prints one line including the `source.principal` it saw. Edit `ALLOWED_PRINCIPALS` per Step 7's BYO sub-section. |

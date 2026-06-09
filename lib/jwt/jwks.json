@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "workshop-jwt-key-001",
+      "use": "sig",
+      "alg": "RS256",
+      "n": "x0WUh5Pyx5CS9piu7QPMtaB7d2cJPDhV1DJVOwdTOVi39g1eP0it1TKJ4kSvEWsAc-L1KOTsTjfEGNUfIdKfPk8E8_vY3JHBBrN1pg0iwEX31xGdAGOGkGks-oT5Ois2MXlHzMYz2Hhok0GfUTPc2W8V4_POexx-Kpsyac_6_V2mbsHy9W1jUBrVaaC0t8SeFuxeE39Huzys9moCN4dMfMOy18svga06aGtAbTo_MVtVthGXU_Bwe3GWSCOL62E2f8C4XHSo-9ttte-pqgjLYSnz9vUvYp4zSUMqQtZ-XVZ-n26XZNVIBDtB23hBlC8KHmDnMh5yZ2Ye2A7a5uXFNw",
+      "e": "AQAB"
+    }
+  ]
+}
