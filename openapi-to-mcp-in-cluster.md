@@ -253,6 +253,13 @@ kubectl get httproute openapi-mcp-stripe -n agentgateway-system \
   -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}{"\n"}'
 ```
 
+Also verify that the backend itself is accepted. This is where the most likely misconfigurations surface — a wrong `schemaRef.name` or a ConfigMap missing the `data.schema` key — and they would otherwise show up only as an empty tool list later:
+```bash
+kubectl get enterpriseagentgatewaybackend stripe-mock-openapi -n agentgateway-system \
+  -o jsonpath='{.status.conditions[?(@.type=="Accepted")].status}{"\n"}'
+```
+Both commands should print `True`.
+
 ---
 
 ## Step 4: Verify the generated tools with MCP Inspector
@@ -357,6 +364,8 @@ You should see MCP request counters, including:
 - `agentgateway_mcp_requests_total` — total MCP requests handled
 - `agentgateway_requests_total{...protocol="mcp"...}` — overall request counter, labeled with `protocol="mcp"` for this backend
 - `agentgateway_request_duration_seconds_*` — request latency histogram (also carries the `protocol="mcp"` label)
+
+> **Multiple replicas:** `/metrics` is scraped **per pod**. If your gateway runs more than one replica, the `port-forward` above lands on a single pod, and because OpenAPI-to-MCP is stateless the tool calls load-balance across replicas — so the counts you see reflect only that one pod's share and will likely be lower than the number of calls you made. For an aggregate across all replicas, use the Grafana/Prometheus view below.
 
 ### View in Grafana
 1. Port-forward Grafana:
