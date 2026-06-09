@@ -126,6 +126,8 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 - [In-Cluster MCP](in-cluster-mcp.md)
 - [Remote MCP](remote-mcp.md)
 - [Dynamic MCP](dynamic-mcp.md)
+- [OpenAPI to MCP — External API](openapi-to-mcp-external-api.md)
+- [OpenAPI to MCP — In-Cluster Deployment](openapi-to-mcp-in-cluster.md)
 - [MCP Tool Federation](mcp-tool-federation.md)
 - [MCP Tool Mode — Search](mcp-tool-mode-search.md)
 - [MCP Tool Mode — Code](mcp-tool-mode-code.md)
@@ -190,16 +192,18 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 - Unified access point for consumption of LLMs
     - LLM Providers supported in this repo:
         - OpenAI
-        - AWS Bedrock (IAM credentials and API keys)
+        - AWS Bedrock (IAM credentials, API keys, and EKS IRSA)
         - Anthropic (Claude)
         - Azure OpenAI
-        - Google Vertex AI
+        - Google Vertex AI (user auth and GCP service account)
     - OpenAI Embeddings support
+    - AWS Bedrock Titan embeddings support
     - OpenAI Batches API support (asynchronous batch processing)
     - Streaming responses support for real-time token generation
     - OpenAI Audio API support (Text-to-Speech and Speech-to-Text)
     - OpenAI Video Generation support (Sora)
     - Claude Code CLI integration with full observability
+    - Claude Desktop integration as an MCP client
     - CrewAI multi-agent workflow integration
     - LangChain multi-agent pipeline integration
 - Identity & Delegation
@@ -208,9 +212,10 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
     - Microsoft Entra ID On-Behalf-Of (OBO) token exchange
 - LLM API Key Management
     - API Key masking in logs
+    - Virtual keys — per-user API keys with independent token budgets and budget isolation
 - Token-based metrics from LLM
 - LLM request/response metadata in Traces
-- Traffic Routing patterns (path, host, header, queryparameter)
+- Traffic Routing patterns (path, host, header, query parameter, request body)
 - Inference routing to in-cluster LLMs via the Gateway API Inference Extension (`InferencePool` + `llm-d` Endpoint Picker)
 - Model Evaluations
 - Security & Access Control
@@ -221,6 +226,7 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
     - Frontend mTLS with client certificate validation
     - SNI (Server Name Indication) matching for multi-domain HTTPS
     - OPA authorization with custom Rego policies (ext-auth)
+    - BYO gRPC external authorization (ext-authz) for LLM and MCP routes
 - Prompt Guard & Content Moderation
     - Comprehensive built-in Prompt Guard (prompt injection, jailbreak, PII, secrets, harmful content, encoding evasion, and more)
     - External moderation guardrails (OpenAI moderation API)
@@ -236,10 +242,16 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 - MCP (Model Context Protocol)
     - Route to in-cluster MCP servers
     - Route to external/remote MCP servers through AgentGateway
+    - Dynamic MCP backends via label selectors (scale targets without editing the backend)
+    - Expose existing REST APIs as MCP tools from an OpenAPI spec (external public APIs and in-cluster services)
+    - Federate multiple MCP servers behind one backend (tool-name prefixing, FailOpen, per-persona tool filtering)
+    - MCP tool modes — Search (`get_tool` / `invoke_tool` meta-tools) and Code (`run_code` in a sandboxed JS runtime)
     - Secure MCP servers with JWT auth
-    - Eager OAuth with a pre-registered upstream IdP (Auth0) — gateway acts as the OAuth Authorization Server visible to MCP clients
+    - BYO gRPC external authorization (ext-authz) for MCP routes
+    - Eager OAuth with a pre-registered upstream IdP (Auth0 and Okta) — gateway acts as the OAuth Authorization Server visible to MCP clients
     - Pre-issuance entitlement gating — gRPC ext_authz hook gates OAuth token issuance per user, redirects denied users to a configurable URL
     - Tool-level access control
+    - Per-tool rate limiting for MCP traffic
     - Integration with Claude Code CLI
 - Direct Response / Health Checks
     - Configure fixed responses without backend calls
@@ -251,15 +263,21 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
     - Priority group failover between LLM providers
     - Health-based routing across multiple backends
     - Failover on rate limit errors (429)
+    - Intra-priority-group failover with per-provider eviction and P2C load balancing
+    - 5XX server-error failover via a CEL `unhealthyCondition`
 - Load Testing with k6
     - Performance testing with k6 load generator
+    - LLM and MCP traffic load testing
     - Ramping and constant load patterns
     - Integration with Grafana and Prometheus metrics
+- Observability & Cost Management
+    - Per-user / per-key LLM cost tracking and chargeback via access logs and PromQL
+    - Production observability, alerting, and autoscaling guidance
 
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway 2.1.0
+- Enterprise Agentgateway v2026.5.2
 
 
 ## User Stories / Acceptance Criteria
