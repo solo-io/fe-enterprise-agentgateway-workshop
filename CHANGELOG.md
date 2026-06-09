@@ -1,5 +1,12 @@
 # Changelog
 
+0.10.9 - (6-9-26)
+---
+- Add new lab: `openapi-to-mcp-external-api.md` — expose a live public REST API (Open-Meteo) as MCP tools via `entMcp` + `protocol: OpenAPI` with an OpenAPI 3.0 schema in a ConfigMap; covers target-level `static.policies.tls.sni` to the HTTPS upstream and MCP Inspector + curl validation
+- Add new lab: `openapi-to-mcp-in-cluster.md` — expose an in-cluster deployment's OpenAPI spec as MCP tools using the Stripe mock server (`stripe/stripe-mock`); `entMcp` + `protocol: OpenAPI` over plain in-cluster HTTP (no TLS), with `policies.auth.secretRef` injecting the upstream `Authorization: Bearer` header that stripe-mock requires; curated three-operation schema (`listCustomers`, `listCharges`, `retrieveBalance`), MCP Inspector + curl validation; generated tools nest query params under a `query` object
+- Update README.md
+
+
 0.10.8 - (6-9-26)
 ---
 - Updates to agentgateway grafana dashboard
