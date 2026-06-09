@@ -3,6 +3,7 @@
 0.10.8 - (6-9-26)
 ---
 - Updates to agentgateway grafana dashboard
+- `byo-opa-grpc-ext-authz.md`: add Part 3 — body-aware OPA policy
 
 0.10.7 - (6-8-26)
 ---
