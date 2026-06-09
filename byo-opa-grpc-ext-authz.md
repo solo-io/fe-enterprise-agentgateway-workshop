@@ -471,6 +471,184 @@ Expected:
 
 ---
 
+## Part 3: Body-aware policy — gate by MCP JSON-RPC method
+
+ext-authz at the HTTP layer can't see MCP semantics from headers alone — `tools/call` looks identical to `tools/list` on the wire. To gate per-tool, the gateway has to forward the request body to OPA, and the Rego has to parse the JSON-RPC payload.
+
+By default the gateway sends an **empty body** in the `CheckRequest` — body forwarding is opt-in via the `forwardBody` field on the `extAuth` policy. Once enabled, the body is available in Rego at `input.attributes.request.http.body`.
+
+### Step 1: Enable body forwarding on the MCP policy
+
+Patch the MCP ext-authz policy from Part 2 to buffer up to 16 KiB of body and send it to OPA. Only the MCP policy needs this — the OpenAI policy in Part 1 stays header-only.
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  namespace: agentgateway-system
+  name: mcp-opa-ext-auth-policy
+  labels:
+    app: opa-ext-authz
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: soloio-docs-mcp
+  traffic:
+    extAuth:
+      backendRef:
+        name: opa-ext-authz
+        namespace: agentgateway-system
+        port: 9191
+      grpc: {}
+      forwardBody:
+        maxSize: 16384
+EOF
+```
+
+> **Note:** `forwardBody.maxSize` is the per-request buffer ceiling. Bodies larger than `maxSize` are **truncated** to `maxSize` bytes and the partial body is forwarded to OPA — the gateway does not reject up front. A Rego policy that calls `json.unmarshal` on a truncated body will fail to parse, the rule body fails, and Rego falls through to `default allow := false`. The client sees a `403` (not a `413`). Size with enough headroom for real payloads so legitimate requests aren't silently denied as collateral.
+
+### Step 2: Update the Rego policy to read the JSON-RPC method
+
+Replace the ConfigMap with a policy that:
+- keeps the header-only check for `/openai` (body is not forwarded there, so don't try to parse it), and
+- adds an MCP-aware branch that unmarshals the body and decides based on the JSON-RPC `method` — for `tools/call`, also on `params.name`.
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opa-ext-authz-config
+  namespace: agentgateway-system
+data:
+  config.yaml: |
+    plugins:
+      envoy_ext_authz_grpc:
+        addr: :9191
+        path: envoy/authz/allow
+        dry-run: false
+        enable-reflection: false
+    decision_logs:
+      console: true
+  policy.rego: |
+    package envoy.authz
+    import rego.v1
+
+    default allow := false
+
+    # OpenAI route: header-only (body is not forwarded here)
+    allow if {
+      startswith(input.attributes.request.http.path, "/openai")
+      input.attributes.request.http.headers["x-ext-authz"] == "allow"
+    }
+
+    # MCP route: header + JSON-RPC method gate
+    mcp_setup_methods := {"initialize", "notifications/initialized", "tools/list"}
+    mcp_allowed_tools := {"search", "get_chunks"}
+
+    # Allow setup/listing methods unconditionally (still requires the header)
+    allow if {
+      startswith(input.attributes.request.http.path, "/mcp")
+      input.attributes.request.http.headers["x-ext-authz"] == "allow"
+      body := json.unmarshal(input.attributes.request.http.body)
+      body.method in mcp_setup_methods
+    }
+
+    # Allow tools/call only for tools on the allow-list
+    allow if {
+      startswith(input.attributes.request.http.path, "/mcp")
+      input.attributes.request.http.headers["x-ext-authz"] == "allow"
+      body := json.unmarshal(input.attributes.request.http.body)
+      body.method == "tools/call"
+      body.params.name in mcp_allowed_tools
+    }
+EOF
+
+# OPA hot-reloads ConfigMap-mounted policies, but a restart picks the change up immediately
+kubectl rollout restart deployment/opa-ext-authz -n agentgateway-system
+kubectl rollout status deployment/opa-ext-authz -n agentgateway-system --timeout=60s
+```
+
+If `json.unmarshal` fails (empty or non-JSON body), the rule body fails and Rego falls through to `default allow := false` — fail-closed by construction.
+
+### Step 3: Test — calling an allowed tool
+
+Re-initialize the MCP session and call `search` (on the allow-list):
+
+```bash
+curl -s -D /tmp/mcp-headers.txt "$GATEWAY_IP:8080/mcp" \
+  -H "content-type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "x-ext-authz: allow" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": {"name": "test", "version": "1.0"}
+    },
+    "id": 1
+  }'
+
+SESSION=$(grep -i "mcp-session-id" /tmp/mcp-headers.txt | awk '{print $2}' | tr -d '\r')
+
+curl -s "$GATEWAY_IP:8080/mcp" \
+  -H "content-type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION" \
+  -H "x-ext-authz: allow" \
+  -d '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+
+sleep 2
+
+curl -i "$GATEWAY_IP:8080/mcp" \
+  -H "content-type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION" \
+  -H "x-ext-authz: allow" \
+  -d '{
+    "jsonrpc":"2.0",
+    "method":"tools/call",
+    "params":{"name":"search","arguments":{"query":"agentgateway extauth","product":"solo-enterprise-for-agentgateway"}},
+    "id":2
+  }'
+```
+
+Expected: `HTTP/1.1 200 OK` with a search result payload.
+
+### Step 4: Test — calling a denied tool
+
+Call a tool that isn't on the allow-list (e.g. `get_full_page`) on the same session — the header is present and identical to Step 3, so any deny here is purely body-driven:
+
+```bash
+curl -i "$GATEWAY_IP:8080/mcp" \
+  -H "content-type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -H "Mcp-Session-Id: $SESSION" \
+  -H "x-ext-authz: allow" \
+  -d '{
+    "jsonrpc":"2.0",
+    "method":"tools/call",
+    "params":{"name":"get_full_page","arguments":{"url":"https://example.com"}},
+    "id":3
+  }'
+```
+
+Expected: `HTTP/1.1 403 Forbidden`. The OPA decision log will show `"result": false` and the full JSON-RPC payload in `input.attributes.request.http.body` — proof the decision was made off the body, not the header.
+
+### Caveats
+
+- **Per-request cost.** Body buffering adds latency and memory per request — keep `maxSize` as low as your real payloads tolerate.
+- **Oversize is silent.** As noted above, oversize bodies are truncated and the partial payload is sent to OPA. If your Rego depends on full-body inspection (e.g. `json.unmarshal`), oversize requests will be denied indirectly — not with `413`. Size `maxSize` accordingly.
+- **No streaming bodies.** `forwardBody` is request-side only and buffers to completion; chunked uploads or SSE responses are not exposed to OPA.
+- **Path-conditional Rego.** When one OPA service backs multiple routes with different forwarding settings, branch on `input.attributes.request.http.path` so rules don't try to parse a body that wasn't sent.
+- **Complement, not replace.** For richer per-tool authorization tied to MCP session state and tool metadata, layer the built-in `mcpAuthorization` CEL policy on top of this ext-authz check.
+
+---
+
 ## View Access Logs
 
 OPA decision logs (every allow/deny with full request attributes):

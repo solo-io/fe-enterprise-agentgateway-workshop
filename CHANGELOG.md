@@ -1,5 +1,10 @@
 # Changelog
 
+0.10.8 - (6-9-26)
+---
+- Updates to agentgateway grafana dashboard
+- `byo-opa-grpc-ext-authz.md`: add Part 3 — body-aware OPA policy
+
 0.10.7 - (6-8-26)
 ---
 - `mcp-eager-auth-okta.md` / `mcp-eager-auth-auth0.md` / `mcp-eager-auth-auth0-pre-issuance-authz.md`: add CORS filter on `.well-known/oauth-*/mcp` rules so MCP Inspector's browser-side OAuth discovery preflight passes; troubleshooting row added
