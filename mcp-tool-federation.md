@@ -589,9 +589,7 @@ TOKEN=$(./lib/jwt/generate-jwt.sh lib/jwt/claims/admin.json) && echo "$TOKEN"
 
 Same federated endpoint, same backend, same policy — four distinct tool surfaces, decided per-request from the JWT.
 
-### Verify catalog-and-call enforcement
-
-The policy gates both `tools/list` **and** `tools/call`. To confirm: with the **academic** token active, try invoking `mcp-sec-edgar-80_get_cik_by_ticker` directly (it won't appear in the list, but you can type the name manually in MCP Inspector if you've explored it before). The call is rejected by the gateway — a client can't bypass the catalog filter by guessing tool names.
+The policy gates both `tools/list` **and** `tools/call`, so clients can't bypass the catalog filter by sending a raw `tools/call` for a tool the filter would hide.
 
 ### Want to add a persona?
 
