@@ -1,5 +1,12 @@
 # Changelog
 
+0.11.0 - (6-10-26)
+---
+- Update wording around experimental channel usage for K8s gateway api, no longer required since previous experimental features graduated to standard in v1.5.0
+- Update Grafana dashboard screenshots and descriptions in `002`
+- Add `llm.prompt` and `llm.completion` to the tracing config example in `001` as a reference, commented out by default due to performance implications for large prompts or completions
+- Add `tracks/llm-track.md` and `tracks/mcp-track.md` — structured learning tracks that map business use cases and value to specific labs; each covers introduction, goals, prerequisites, and a curriculum table organized by use case with links to relevant lab files
+
 0.10.10 - (6-9-26)
 ---
 - Update scenario in `openapi-to-mcp-in-cluster.md` to query known working stripe-mock endpoints to showcase a realistic use case.

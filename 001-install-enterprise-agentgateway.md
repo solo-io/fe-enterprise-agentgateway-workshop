@@ -15,7 +15,7 @@ In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on 
 
 ### Kubernetes Gateway API CRDs
 
-Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway. We're using the experimental CRDs to enable advanced features like mTLS frontend validation (see the [Frontend mTLS lab](frontend-mtls.md)). If frontend mTLS is not a requirement, you can continue with the standard install.
+Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway.
 
 ```bash
 kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
@@ -345,9 +345,15 @@ spec:
         # --- Capture the claims from a verified JWT token if JWT policy is enabled
         - name: jwt
           expression: jwt
+        # --- Capture the LLM prompt (warning: performance impact for large prompts)
+        #- name: llm.prompt
+        #  expression: llm.prompt
+        # --- Capture the LLM completion (warning: performance impact for large responses)
+        #- name: llm.completion
+        #  expression: llm.completion
         # --- Capture entire response body and parse it as JSON
-        - name: response.body
-          expression: json(response.body)
+        #- name: response.body
+        #  expression: json(response.body)
         # --- Capture a single request header by name (example: x-foo)
         #- name: x-foo
         #  expression: 'request.headers["x-foo"]'
