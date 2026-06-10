@@ -91,7 +91,7 @@ kubectl wait --for=condition=available deployment/stripe-mock -n stripe-mock --t
 
 ## Step 2: Store the OpenAPI schema in a ConfigMap
 
-The full Stripe spec describes hundreds of operations, which would generate hundreds of MCP tools. Here we curate a small subset — three read-only operations — so the generated tools stay focused and the ConfigMap stays small.
+The full Stripe spec describes hundreds of operations, which would generate hundreds of MCP tools. Here we curate a small subset — four read-only operations (`listProducts`, `listPrices`, `listCustomers`, `listCharges`) — so the generated tools stay focused and the ConfigMap stays small. These were chosen because stripe-mock returns recognizable, non-empty sample data for them (a "T-shirt" product priced at $20.00/month, a sample customer, and a $1.00 charge), which makes the generated tools satisfying to call.
 
 > The `servers.url` is left as `/` on purpose: the actual host and port come from the `EnterpriseAgentgatewayBackend` in the next step, not from the schema.
 
@@ -115,6 +115,44 @@ data:
         { "url": "/" }
       ],
       "paths": {
+        "/v1/products": {
+          "get": {
+            "operationId": "listProducts",
+            "summary": "List products",
+            "description": "Returns the product catalog. stripe-mock returns hardcoded sample products (e.g. a 'T-shirt'), each with a name, description, and default price.",
+            "parameters": [
+              {
+                "name": "limit",
+                "in": "query",
+                "required": false,
+                "description": "Maximum number of products to return (1-100).",
+                "schema": { "type": "integer" }
+              }
+            ],
+            "responses": {
+              "200": { "description": "A list of products" }
+            }
+          }
+        },
+        "/v1/prices": {
+          "get": {
+            "operationId": "listPrices",
+            "summary": "List prices",
+            "description": "Returns prices for products in the catalog. Monetary amounts are in the smallest currency unit, so unit_amount 2000 means $20.00 USD. stripe-mock returns hardcoded sample data.",
+            "parameters": [
+              {
+                "name": "limit",
+                "in": "query",
+                "required": false,
+                "description": "Maximum number of prices to return (1-100).",
+                "schema": { "type": "integer" }
+              }
+            ],
+            "responses": {
+              "200": { "description": "A list of prices" }
+            }
+          }
+        },
         "/v1/customers": {
           "get": {
             "operationId": "listCustomers",
@@ -145,7 +183,7 @@ data:
           "get": {
             "operationId": "listCharges",
             "summary": "List charges",
-            "description": "Returns a list of charges. stripe-mock returns hardcoded sample data.",
+            "description": "Returns a list of charges. Monetary amounts (e.g. amount) are in the smallest currency unit, so 100 means $1.00 USD. stripe-mock returns hardcoded sample data.",
             "parameters": [
               {
                 "name": "limit",
@@ -157,16 +195,6 @@ data:
             ],
             "responses": {
               "200": { "description": "A list of charges" }
-            }
-          }
-        },
-        "/v1/balance": {
-          "get": {
-            "operationId": "retrieveBalance",
-            "summary": "Retrieve account balance",
-            "description": "Returns the current account balance. Takes no parameters.",
-            "responses": {
-              "200": { "description": "The account balance" }
             }
           }
         }
@@ -287,10 +315,10 @@ Connect to your AgentGateway:
 - Click **Connect**
 
 ### List and run a tool
-1. Click the **Tools** tab, then **List Tools**. You should see three tools — `listCustomers`, `listCharges`, and `retrieveBalance` — each with an input schema derived from the OpenAPI spec.
-2. Select **retrieveBalance** (it takes no parameters) and click **Run Tool**.
-3. Verify that the tool returns a hardcoded Stripe balance object, for example an object with `"object": "balance"` and `available` / `pending` arrays.
-4. (Optional) Run **listCustomers** with `limit` = `3` (the parameter is nested under a `query` object — see the **Tool input shape** note in Step 5) and confirm you get a Stripe list object (`"object": "list"`) with sample customer data.
+1. Click the **Tools** tab, then **List Tools**. You should see four tools — `listProducts`, `listPrices`, `listCustomers`, and `listCharges` — each with an input schema derived from the OpenAPI spec.
+2. Select **listProducts** and click **Run Tool** (leave the optional `limit` blank). It returns a Stripe list object (`"object": "list"`) whose `data` contains a sample product — a `"T-shirt"` described as `"Comfortable gray cotton t-shirt"`.
+3. Run **listPrices** the same way and confirm you get a price with `"unit_amount": 2000` and a monthly `recurring` interval — i.e. $20.00/month. (Stripe amounts are in the smallest currency unit, so `2000` = $20.00 USD.)
+4. (Optional) Run **listCharges** with `limit` = `3` (the parameter is nested under a `query` object — see the **Tool input shape** note in Step 5) and confirm you get a charge with `"amount": 100` ($1.00) and `"status": "succeeded"`.
 
 ---
 
@@ -323,20 +351,20 @@ These steps assume the proxy is reachable at `http://localhost:8080` (via port-f
      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
    ```
 
-   Confirm that `listCustomers`, `listCharges`, and `retrieveBalance` appear in the tool list.
+   Confirm that `listProducts`, `listPrices`, `listCustomers`, and `listCharges` appear in the tool list.
 
-3. Call the zero-argument `retrieveBalance` tool.
+3. Call the `listProducts` tool (its `limit` parameter is optional, so empty arguments are valid).
    ```bash
    curl -s "http://localhost:8080/mcp" \
      -H "Content-Type: application/json" \
      -H "Accept: application/json, text/event-stream" \
      -H "Mcp-Session-Id: $SESSION" \
-     -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"retrieveBalance","arguments":{}}}'
+     -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"listProducts","arguments":{}}}'
    ```
 
-   You should get back a hardcoded Stripe balance object wrapped in an MCP `tools/call` result.
+   You should get back a Stripe list object (`"object": "list"`) containing a sample `"T-shirt"` product, wrapped in an MCP `tools/call` result.
 
-> **Tool input shape:** for operations that take query parameters (`listCustomers`, `listCharges`), the generated `inputSchema` groups them under a top-level `query` object. Inspect the `inputSchema` in the `tools/list` output and nest the arguments accordingly — for example, `"arguments":{"query":{"limit":3}}` for `listCustomers`.
+> **Tool input shape:** every operation here takes an optional `limit` query parameter, and the generated `inputSchema` groups query parameters under a top-level `query` object. Inspect the `inputSchema` in the `tools/list` output and nest the arguments accordingly — for example, `"arguments":{"query":{"limit":3}}` for `listCharges`.
 
 ---
 
