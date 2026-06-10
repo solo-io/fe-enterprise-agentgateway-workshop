@@ -1,5 +1,9 @@
 # Changelog
 
+0.11.0 - (6-10-26)
+---
+- Update Grafana dashboard screenshots and descriptions in `002`
+
 0.10.10 - (6-9-26)
 ---
 - Update scenario in `openapi-to-mcp-in-cluster.md` to query known working stripe-mock endpoints to showcase a realistic use case.

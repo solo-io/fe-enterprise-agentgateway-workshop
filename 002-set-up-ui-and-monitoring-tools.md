@@ -176,11 +176,12 @@ EOF
 
 Install the AgentGateway dashboard that provides comprehensive metrics visualization including:
 - Core GenAI metrics (request rates, token usage, model breakdown)
-- Cost Tracking
-- Infrastructure Performance
+- Cost Tracking (by model, organization, team, route, and provider)
+- Infrastructure Performance (data plane and control plane)
+- Context Size (cache read/write token metrics)
 - Streaming metrics (TTFT, TPOT)
-- MCP metrics (tool calls, server requests)
-- Connection and runtime metrics
+- MCP metrics (tool calls, server requests, latency)
+- Usage Tracking by Organization
 
 ```bash
 kubectl create configmap agentgateway-dashboard \
@@ -260,48 +261,83 @@ The AgentGateway dashboard provides comprehensive observability into your AI gat
 The dashboard is organized into several key metric categories:
 
 **Overview**
-- High level summary of important details
+- Total Requests, Input/Output Token counts
+- P50, P90, P95 latency
+- Request rate, token throughput (input/output tokens per second)
+- Error rates (4xx, 429, 5xx)
+- Average token usage per request and average GenAI response size
+- Connection Rate, Active Tasks, MCP Tool Calls
+- Token Usage breakdown by Model
 
-![overview-1.png](images/grafana-dashboard/overview-1.png)
+![overview-v2-1.png](images/grafana-dashboard/overview-v2-1.png)
 
 **Cost Tracking**
-- Cost Rate ($/hour)
-- Total Cost (1h, 24h, 7d)
-- Projected Monthly Cost (30d)
-- Average cost per 1M requests by Model (Input, Output, Total)
+- Total Cost (5h, 24h, 7d windows) and Projected Monthly Cost
+- Average cost per request and token spend (input, output, cache read, cache write)
+- Cost Rate ($/hour) over time
+- Cost breakdown by Model, Organization, Team, Route, and Provider
+- Per-model pricing reference tables (OpenAI, Anthropic/Claude, API Gateway)
+- Token throughput consumption by model
 
-![llm-cost-tracking-1.png](images/grafana-dashboard/llm-cost-tracking-1.png)
+![llm-cost-tracking-v2-1.png](images/grafana-dashboard/llm-cost-tracking-v2-1.png)
+![llm-cost-tracking-v2-2.png](images/grafana-dashboard/llm-cost-tracking-v2-2.png)
 
 **Infrastructure Overview**
-- Control Plane Health
-- Data Plane Health
-- CPU/MEM Resource Requests
-- CPU/MEM Utilization
 
-![infrastructure-overview-1.png](images/grafana-dashboard/infrastructure-overview-1.png)
-![infrastructure-overview-2.png](images/grafana-dashboard/infrastructure-overview-2.png)
+*Data Plane (AgentGateway Proxy):*
+- Proxy replica counts (expected vs. available) and container restarts
+- CPU and memory requests and utilization
+- Per-instance CPU and memory usage charts
+- CPU and memory utilization normalized per request
+
+![infrastructure-overview-v2-1.png](images/grafana-dashboard/infrastructure-overview-v2-1.png)
+
+*Control Plane:*
+- Control plane replica health and restarts
+- CPU and memory usage over time
+
+![infrastructure-overview-v2-2.png](images/grafana-dashboard/infrastructure-overview-v2-2.png)
 
 **Core GenAI Metrics**
-- Request rates and throughput across all routes
-- Token usage breakdown (input/output tokens)
-- Per-model request distribution and performance
-- Cost tracking and analysis
+- Total request counts and throughput by model
+- Token usage by type (input, output, cache read, cache write)
+- Request duration percentiles (p50, p90, p99) overall and per model
+- Response code distribution and average response size
+- Top routes by request volume and latency
 
-![core-genai-metrics-1.png](images/grafana-dashboard/core-genai-metrics-1.png)
-![core-genai-metrics-2.png](images/grafana-dashboard/core-genai-metrics-2.png)
-![core-genai-metrics-3.png](images/grafana-dashboard/core-genai-metrics-3.png)
+![core-genai-metrics-v2-1.png](images/grafana-dashboard/core-genai-metrics-v2-1.png)
+![core-genai-metrics-v2-2.png](images/grafana-dashboard/core-genai-metrics-v2-2.png)
+
+**Context Size**
+- Cache Read Tokens Per Request (context size) — p50, p95, p99 percentiles
+- Cache Write Tokens Per Request (cache churn) — p50, p95, p99 percentiles
+- Cache Read Tokens Per Request — p95 breakdown by model
+
+![context-size-v2-1.png](images/grafana-dashboard/context-size-v2-1.png)
 
 **Streaming and Request Metrics**
-- Time to First Token (TTFT) - measures latency before streaming begins
-- Tokens Per Output Token (TPOT) - measures streaming throughput
-- Streaming request success rates
+- Time per Output Token (TPOT) — measures streaming throughput
+- Time to First Token (TTFT) — measures latency before streaming begins
+- Request rate by route and by status code
+- Request latency by route
+- Response throughput by route
 
-![streaming-and-request-metrics-1.png](images/grafana-dashboard/streaming-and-request-metrics-1.png)
+![streaming-and-requests-metrics-v2-1.png](images/grafana-dashboard/streaming-and-requests-metrics-v2-1.png)
 
 **MCP (Model Context Protocol) Metrics**
-- Tool call frequency and patterns
-- MCP server request rates
-- Tool execution performance
+- MCP Tool Calls by Tool
+- MCP Requests by Server
+- MCP Request Latency (P50, P90, P99)
+- MCP Error Rate (Success vs Errors)
+- MCP Requests by Route
+
+![mcp-metrics-v2-1.png](images/grafana-dashboard/mcp-metrics-v2-1.png)
+
+**Usage Tracking by Organization**
+- LLM Requests by Organization
+- Token Consumption by Organization (input tokens per org)
+
+![usage-tracking-by-org-v2-1.png](images/grafana-dashboard/usage-tracking-by-org-v2-1.png)
 
 ## Uninstall
 
