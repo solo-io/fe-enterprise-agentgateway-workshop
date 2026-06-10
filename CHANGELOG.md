@@ -1,5 +1,9 @@
 # Changelog
 
+0.10.10 - (6-9-26)
+---
+- Update scenario in `openapi-to-mcp-in-cluster.md` to query known working stripe-mock endpoints to showcase a realistic use case.
+
 0.10.9 - (6-9-26)
 ---
 - Add new lab: `openapi-to-mcp-external-api.md` — expose a live public REST API (Open-Meteo) as MCP tools via `entMcp` + `protocol: OpenAPI` with an OpenAPI 3.0 schema in a ConfigMap; covers target-level `static.policies.tls.sni` to the HTTPS upstream and MCP Inspector + curl validation
