@@ -345,9 +345,15 @@ spec:
         # --- Capture the claims from a verified JWT token if JWT policy is enabled
         - name: jwt
           expression: jwt
+        # --- Capture the LLM prompt (warning: performance impact for large prompts)
+        #- name: llm.prompt
+        #  expression: llm.prompt
+        # --- Capture the LLM completion (warning: performance impact for large responses)
+        #- name: llm.completion
+        #  expression: llm.completion
         # --- Capture entire response body and parse it as JSON
-        - name: response.body
-          expression: json(response.body)
+        #- name: response.body
+        #  expression: json(response.body)
         # --- Capture a single request header by name (example: x-foo)
         #- name: x-foo
         #  expression: 'request.headers["x-foo"]'

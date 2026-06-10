@@ -3,6 +3,7 @@
 0.11.0 - (6-10-26)
 ---
 - Update Grafana dashboard screenshots and descriptions in `002`
+- Add `llm.prompt` and `llm.completion` to the tracing config example in `001` as a reference, commented out by default due to performance implications for large prompts or completions
 
 0.10.10 - (6-9-26)
 ---
