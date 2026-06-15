@@ -1,6 +1,8 @@
-# Install Enterprise Agentgateway on Openshift
+# Install Enterprise Agentgateway (Air-Gap / Private Registry)
 
-In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on labs that showcase routing, security, observability, and agentic capabilities.
+In this workshop, you'll deploy Enterprise Agentgateway and complete hands-on labs that showcase routing, security, observability, and agentic capabilities.
+
+> **Air-gap note:** This lab uses `docker.io/ably7`, a public Docker Hub repo that stands in for the private registry you'd mirror to in a real air-gapped environment. Every chart-managed image is pulled from this single registry — swap `docker.io/ably7` for your own private registry to reproduce a true air-gap install with no access to `us-docker.pkg.dev`, `gcr.io`, or upstream public images at runtime.
 
 ## Pre-requisites
 - Kubernetes > 1.31
@@ -15,7 +17,7 @@ In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on 
 
 ### Kubernetes Gateway API CRDs
 
-Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway
+Installing the Kubernetes Gateway API custom resources is a pre-requisite to using Enterprise Agentgateway.
 
 ```bash
 kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
@@ -59,32 +61,33 @@ kubectl create namespace agentgateway-system
 
 ```bash
 helm upgrade -i --create-namespace --namespace agentgateway-system \
-    --version $ENTERPRISE_AGW_VERSION enterprise-agentgateway-crds \
-    oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds
+--version $ENTERPRISE_AGW_VERSION enterprise-agentgateway-crds \
+oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds
 ```
 
 To check if the the Enterprise Agentgateway CRDs are installed-
 
 ```bash
-kubectl get crds | grep -E "solo.io|agentgateway" | awk '{ print $1 }'
+kubectl api-resources | awk 'NR==1 || /enterpriseagentgateway\.solo\.io|agentgateway\.dev|ratelimit\.solo\.io|extauth\.solo\.io/'
 ```
 
 Expected output
 
 ```bash
-enterpriseagentgatewaybackends.agentgateway.dev
-agentgatewayparameters.agentgateway.dev
-agentgatewaypolicies.agentgateway.dev
-authconfigs.extauth.solo.io
-enterpriseagentgatewayparameters.enterpriseagentgateway.solo.io
-enterpriseagentgatewaypolicies.enterpriseagentgateway.solo.io
-ratelimitconfigs.ratelimit.solo.io
+NAME                                SHORTNAMES        APIVERSION                                NAMESPACED   KIND
+agentgatewaybackends                agbe              agentgateway.dev/v1alpha1                 true         AgentgatewayBackend
+agentgatewayparameters              agpar             agentgateway.dev/v1alpha1                 true         AgentgatewayParameters
+agentgatewaypolicies                agpol             agentgateway.dev/v1alpha1                 true         AgentgatewayPolicy
+enterpriseagentgatewayparameters    eagpar            enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
+enterpriseagentgatewaypolicies      eagpol            enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
+authconfigs                         ac                extauth.solo.io/v1                        true         AuthConfig
+ratelimitconfigs                    rlc               ratelimit.solo.io/v1alpha1                true         RateLimitConfig
 ```
 
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> The top-level Helm `image.registry` and `image.tag` are the global default for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, and `ext-cache`/`redis`). For a private-registry or air-gapped install, set `image.registry` to your mirror and ensure all images, extensions included, are mirrored there. See the [image list](../image-list.md) for the full set of charts and images to mirror, or the [air-gapped install guide](https://docs.solo.io/agentgateway/latest/install/airgap/) for more detail.
+> The top-level Helm `image.registry` and `image.tag` are the global default for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers all five images; extensions inherit it and are pinned to the chart-version tag (`2026.6.0`), matching the mirrored tags in the [image list](ably7-image-list.md).
 
 Using Helm:
 ```bash
@@ -93,28 +96,28 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.p
 --version $ENTERPRISE_AGW_VERSION \
 --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
 -f -<<EOF
-# --- Optional: point all chart-managed images at a private registry (air-gap) ---
+# --- Point all chart-managed images at a private registry (air-gap) ---
 # The top-level 'image' block is the GLOBAL default for the controller, the
 # agentgateway proxy, AND the auto-provisioned extensions (ext-auth-service,
 # rate-limiter, ext-cache/redis). A single registry override covers everything.
 # The tag defaults to the chart version, so you normally do not set it here.
-#image:
-#  registry: us-docker.pkg.dev/solo-public/enterprise-agentgateway
-#  pullPolicy: IfNotPresent
+image:
+  registry: docker.io/ably7
+  pullPolicy: IfNotPresent
 # Controller-only pull secret (proxy/extensions need it on the CR — see next step):
 #imagePullSecrets:
 #- name: my-registry-secret
 # Extensions inherit image.registry; their tags are pinned by the chart.
 # The default repositories below already match the chart's image names:
-#extAuth:
-#  image:
-#    repository: ext-auth-service
-#rateLimiter:
-#  image:
-#    repository: rate-limiter
-#extCache:
-#  image:
-#    repository: redis
+extAuth:
+  image:
+    repository: ext-auth-service
+rateLimiter:
+  image:
+    repository: rate-limiter
+extCache:
+  image:
+    repository: redis
 # Register the operator's GatewayClass-wide parameters default.
 # Shared extensions apply at the GatewayClass level, so they live in
 # 'agentgateway-shared-extensions' (applied in the next step). If the referenced
@@ -143,7 +146,7 @@ enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 
 ### Shared extensions (operator)
 
-Apply the GatewayClass-wide parameters the controller install referenced above. This is the operator's slice — it enables the shared extensions, sets their replica counts, and deletes their `securityContext` so OpenShift assigns one from its SCC. It is attached at the GatewayClass level, so every Gateway of the `enterprise-agentgateway` class inherits it.
+Apply the GatewayClass-wide parameters the controller install referenced above. This is the operator's slice — it enables the shared extensions and sets their replica counts. It is attached at the GatewayClass level, so every Gateway of the `enterprise-agentgateway` class inherits it.
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -159,64 +162,39 @@ spec:
       deployment:
         spec:
           replicas: 1
-          template:
-            spec:
-              #--- Private registry: pull secret for the ext-auth-service pod ---
-              #imagePullSecrets:
-              #- name: my-registry-secret
-              # Delete pod-level securityContext for OpenShift
-              securityContext:
-                $patch: delete
-              containers:
-              - name: ext-auth-service
-                # Delete container-level securityContext for OpenShift
-                securityContext:
-                  $patch: delete
+          #--- Private registry: pull secret for the ext-auth-service pod ---
+          #template:
+          #  spec:
+          #    imagePullSecrets:
+          #    - name: my-registry-secret
     ratelimiter:
       enabled: true
       deployment:
         spec:
           replicas: 1
-          template:
-            spec:
-              #--- Private registry: pull secret for the rate-limiter pod ---
-              #imagePullSecrets:
-              #- name: my-registry-secret
-              # Delete pod-level securityContext for OpenShift
-              securityContext:
-                $patch: delete
-              containers:
-              - name: rate-limiter
-                # Delete container-level securityContext for OpenShift
-                securityContext:
-                  $patch: delete
+          #--- Private registry: pull secret for the rate-limiter pod ---
+          #template:
+          #  spec:
+          #    imagePullSecrets:
+          #    - name: my-registry-secret
     extCache:
       enabled: true
       deployment:
         spec:
           replicas: 1
-          template:
-            spec:
-              #--- Private registry: pull secret for the ext-cache (redis) pod ---
-              #imagePullSecrets:
-              #- name: my-registry-secret
-              # Delete pod-level securityContext for OpenShift
-              securityContext:
-                $patch: delete
-              containers:
-              - name: redis
-                # Delete container-level securityContext for OpenShift
-                securityContext:
-                  $patch: delete
+          #--- Private registry: pull secret for the ext-cache (redis) pod ---
+          #template:
+          #  spec:
+          #    imagePullSecrets:
+          #    - name: my-registry-secret
 EOF
 ```
 
 ## Deploy Agentgateway with customizations
-The configuration below shows the customizations exposed through `EnterpriseAgentgatewayParameters`, such as adding annotations or labels, modifying deployment and service settings, extending observability capabilities, and configuration for deploying on OpenShift.
 
-This is the developer's slice: a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the settings the app team owns — deployment, service, logging, observability, and the proxy's OpenShift `securityContext` deletion — and omits `sharedExtensions`, which the operator set at the GatewayClass level in the previous step. The two resources merge, with this per-Gateway config layering on top of the class default. The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`.
+This is the developer's slice: a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the settings the app team owns — deployment, service, logging, and observability — and omits `sharedExtensions`, which the operator set at the GatewayClass level in the previous step. The two resources merge, with this per-Gateway config layering on top of the class default. The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`.
 
-For air-gapped or private-registry installs, set the registry once at the Helm chart level with the global `image.registry` value shown in the controller install step above — as of `v2026.6.0` that value flows through to the proxy and all extension images automatically, so no per-image overrides are needed here. (If a single extension ever needs a different registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` supports a highest-precedence `spec.sharedExtensions.<name>.image` override.)
+(If a single extension ever needs a different registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` supports a highest-precedence `spec.sharedExtensions.<name>.image` override.)
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -227,7 +205,29 @@ metadata:
   name: agentgateway-config
   namespace: agentgateway-system
 spec:
-  #--- Required for Openshift: Delete securityContext to let OpenShift generate it based on SCC ---
+  logging:
+    level: info
+  service:
+    metadata:
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    spec:
+      type: LoadBalancer
+  #--- Use rawConfig to inline custom configuration from ConfigMap ---
+  rawConfig:
+    config:
+      # --- Label all metrics using a value extracted from the request body
+      metrics:
+        fields:
+          add:
+            # --- Label all metrics with a value extracted from a verified JWT token if present,
+            #     falling back to the `x-org` request header (e.g. ANTHROPIC_CUSTOM_HEADERS from Claude Code)
+            user_org: default(jwt.org, default(request.headers["x-org"], "public-tier"))
+            user_team: default(jwt.team, "public-tier")
+            user_tier: default(jwt.tier, "public-tier")
+            user_name: default(jwt.preferred_username, default(request.headers["x-user"], "public-tier"))
+            # --- Label all metrics using a value extracted from the request body
+            #modelId: json(request.body).modelId
   deployment:
     spec:
       replicas: 2
@@ -240,26 +240,12 @@ spec:
           #--- Private registry: pull secret for the agentgateway proxy pod ---
           #imagePullSecrets:
           #- name: my-registry-secret
-          # Delete pod-level securityContext
-          securityContext:
-            $patch: delete
           containers:
           - name: agentgateway
-            # Delete container-level securityContext
-            securityContext:
-              $patch: delete
             resources:
               requests:
                 cpu: 300m
                 memory: 128Mi
-  logging:
-    level: info
-  service:
-    metadata:
-      annotations:
-        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    spec:
-      type: LoadBalancer
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -294,7 +280,8 @@ Expected Output:
 
 ```bash
 NAME                                                        READY   STATUS    RESTARTS   AGE
-agentgateway-proxy-7d4c8c4d4b-lvdsq                               1/1     Running   0          11m
+agentgateway-proxy-7d4c8c4d4b-lvdsq                         1/1     Running   0          11m
+agentgateway-proxy-9f8e7d6c5b-xkpqr                         1/1     Running   0          11m
 enterprise-agentgateway-5f9c5b95b4-gjblt                    1/1     Running   0          11m
 ext-auth-service-enterprise-agentgateway-6fcc5bc989-22wgd   1/1     Running   0          11m
 ext-cache-enterprise-agentgateway-6bfcb8c87d-vjzxn          1/1     Running   0          11m
@@ -356,7 +343,7 @@ EOF
 
 ## Configure tracing
 
-Apply an `EnterpriseAgentgatewayPolicy` to export traces to the Jaeger collector deployed in `002`. Skip this step if you are not setting up Jaeger.
+Apply an `EnterpriseAgentgatewayPolicy` to export traces to the telemetry collector deployed in `002`. Skip this step if you are not setting up the Solo UI.
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -373,24 +360,113 @@ spec:
   frontend:
     tracing:
       backendRef:
-        name: jaeger
-        namespace: observability
+        name: solo-enterprise-telemetry-collector
+        namespace: agentgateway-system
         port: 4317
       protocol: GRPC
       randomSampling: "true"
       attributes:
         add:
-        # --- Capture all request headers as a single map under rq.headers.all
-        - name: rq.headers.all
-          expression: request.headers
-        # --- Capture claims from a verified JWT token if JWT policy is enabled
+        # --- Capture the claims from a verified JWT token if JWT policy is enabled
         - name: jwt
           expression: jwt
-        # --- Capture the whole response body as JSON
+        # --- Capture entire response body and parse it as JSON
         - name: response.body
           expression: json(response.body)
+        # --- Capture a single request header by name (example: x-foo)
+        #- name: x-foo
+        #  expression: 'request.headers["x-foo"]'
 EOF
 ```
+
+## Deploy Solo UI
+
+The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
+
+### Set required variables
+
+```bash
+export AGW_UI_VERSION=0.4.5
+```
+
+### Step 1: Install/upgrade CRDs
+
+```bash
+helm upgrade -i management-crds oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management-crds \
+  --namespace agentgateway-system \
+  --create-namespace \
+  --version "$AGW_UI_VERSION"
+```
+
+### Step 2: Install/upgrade the chart
+
+The `management-crds` subchart is bundled inside `management` and enabled by default. Since we installed it separately in Step 1, disable it here to avoid ownership conflicts:
+
+```bash
+helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
+--namespace agentgateway-system \
+--create-namespace \
+--version "$AGW_UI_VERSION" \
+-f - <<EOF
+management-crds:
+  enabled: false
+licensing:
+  licenseKey: "${SOLO_TRIAL_LICENSE_KEY}"
+global:
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  image:
+    registry: docker.io
+    repository: ably7
+    tag: ""
+service:
+  type: ClusterIP
+  clusterIP: ""
+products:
+  kagent:
+    enabled: false
+  agentgateway:
+    enabled: true
+    namespace: agentgateway-system
+  mesh:
+    enabled: false
+  agentregistry:
+    enabled: false
+idp:
+  registry: docker.io
+  repository: ably7
+  name: solo-enterprise-autoauth
+  tag: "v0.2.2"
+telemetry:
+  image:
+    registry: docker.io
+    repository: ably7
+    name: opentelemetry-collector-contrib
+    tag: "0.153.0"
+clickhouse:
+  enabled: true
+  image:
+    repository: docker.io/ably7/clickhouse-server
+    tag: "26.1.11.9-alpine"
+tracing:
+  verbose: true
+EOF
+```
+
+Check that the Solo UI components are running:
+
+```bash
+kubectl get pods -n agentgateway-system -l app.kubernetes.io/instance=management
+```
+
+## Access Solo UI
+
+1. Port-forward to the Solo UI service:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
+
+2. Open your browser and navigate to `http://localhost:4000`
 
 ## Uninstall
 
@@ -400,6 +476,8 @@ To tear everything down, work in reverse order. Delete the `Gateway` first so th
 kubectl delete enterpriseagentgatewaypolicy access-logs tracing -n agentgateway-system --ignore-not-found
 kubectl delete gateway agentgateway-proxy -n agentgateway-system --ignore-not-found
 kubectl delete enterpriseagentgatewayparameters agentgateway-config agentgateway-shared-extensions -n agentgateway-system --ignore-not-found
+helm uninstall management -n agentgateway-system
+helm uninstall management-crds -n agentgateway-system
 helm uninstall enterprise-agentgateway -n agentgateway-system
 helm uninstall enterprise-agentgateway-crds -n agentgateway-system
 kubectl delete gatewayclass enterprise-agentgateway enterprise-agentgateway-waypoint --ignore-not-found
@@ -407,6 +485,3 @@ kubectl delete namespace agentgateway-system
 # (Optional) Remove the Kubernetes Gateway API CRDs only if nothing else on the cluster uses them
 kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
 ```
-
-## Next Steps
-Enterprise Agentgateway is now installed and configured with observability. Continue with `002` to set up monitoring tools (Prometheus, Grafana, Jaeger) to visualize metrics, logs, and traces.

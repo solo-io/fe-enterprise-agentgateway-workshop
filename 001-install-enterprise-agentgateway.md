@@ -1,9 +1,9 @@
 # Install Enterprise Agentgateway
 
-In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on labs that showcase routing, security, observability, and Gen AI features.
+In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on labs that showcase routing, security, observability, and agentic capabilities.
 
 ## Pre-requisites
-- Kubernetes > 1.30
+- Kubernetes > 1.31
 - Kubernetes Gateway API
 
 ## Lab Objectives
@@ -49,7 +49,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.5.2
+export ENTERPRISE_AGW_VERSION=v2026.6.0
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -83,30 +83,16 @@ ratelimitconfigs                    rlc               ratelimit.solo.io/v1alpha1
 ```
 
 ## Install Enterprise Agentgateway Controller
+
+> [!NOTE]
+> **Air-gapped or private-registry install?** This lab pulls images from the public registry. For the full set of charts and images to mirror, see the [image list](image-list.md). To mirror all chart-managed images into a private registry, follow the dedicated [air-gap install lab](airgap/001-airgap.md) instead.
+
 Using Helm:
 ```bash
 helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $ENTERPRISE_AGW_VERSION \
---set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
--f -<<EOF
-#--- Optional: override for image registry/tag for the controller
-#controller:
-#  image:
-#    registry: us-docker.pkg.dev/solo-public/enterprise-agentgateway
-#    tag: "$ENTERPRISE_AGW_VERSION"
-#    pullPolicy: IfNotPresent
-#  imagePullSecrets:
-#  - name: my-registry-secret
-# --- Override the default Agentgateway parameters used by this GatewayClass
-# If the referenced parameters are not found, the controller will use the defaults
-gatewayClassParametersRefs:
-  enterprise-agentgateway:
-    group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-config
-    namespace: agentgateway-system
-EOF
+--set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
 ```
 
 Check that the Enterprise Agentgateway Controller is now running:
@@ -123,7 +109,9 @@ enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 ```
 
 ## Deploy Agentgateway with customizations
-The configuration below demonstrates how to override container images for air-gapped environments by sourcing them from a private registry, along with other customizations exposed through `EnterpriseAgentgatewayParameters`, such as adding annotations or labels, modifying deployment and service settings, and extending observability capabilities. While this example uses the default public images, it illustrates how those images can be replaced with ones hosted in a private repository.
+This applies a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the gateway-specific settings — deployment, service, logging, and observability.
+
+The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`, so the linkage is explicit on the Gateway that consumes it. Apply the parameters before or alongside the Gateway. If the Gateway is applied first, the proxy simply won't deploy until the referenced parameters exist.
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -134,60 +122,8 @@ metadata:
   name: agentgateway-config
   namespace: agentgateway-system
 spec:
-  ### -- uncomment to override shared extensions -- ###
-  sharedExtensions:
-    extauth:
-      enabled: true
-      deployment:
-        spec:
-          replicas: 1
-          #--- imagePullSecrets for private registry ---
-          #template:
-          #  spec:
-          #    imagePullSecrets:
-          #    - name: my-registry-secret
-      #--- Image overrides for deployment ---
-      #image:
-      #  registry: gcr.io
-      #  repository: gloo-mesh/ext-auth-service
-      #  tag: ""
-    ratelimiter:
-      enabled: true
-      deployment:
-        spec:
-          replicas: 1
-          #--- imagePullSecrets for private registry ---
-          #template:
-          #  spec:
-          #    imagePullSecrets:
-          #    - name: my-registry-secret
-      #--- Image overrides for deployment ---
-      #image:
-      #  registry: gcr.io
-      #  repository: gloo-mesh/rate-limiter
-      #  tag: ""
-    extCache:
-      enabled: true
-      deployment:
-        spec:
-          replicas: 1
-          #--- imagePullSecrets for private registry ---
-          #template:
-          #  spec:
-          #    imagePullSecrets:
-          #    - name: my-registry-secret
-      #--- Image overrides for deployment ---
-      #image:
-      #  registry: docker.io
-      #  repository: redis
-      #  tag: ""
   logging:
     level: info
-  #--- Image overrides for deployment ---
-  #image:
-  #  registry: us-docker.pkg.dev
-  #  repository: solo-public/enterprise-agentgateway/agentgateway-enterprise
-  #  tag: ""
   service:
     metadata:
       annotations:
@@ -218,9 +154,6 @@ spec:
         #  labels:
         #    istio.io/dataplane-mode: ambient
         spec:
-          #--- imagePullSecrets for private registry ---
-          #imagePullSecrets:
-          #- name: my-registry-secret
           containers:
           - name: agentgateway
             resources:
@@ -235,6 +168,12 @@ metadata:
   namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
+  #--- Attach the EnterpriseAgentgatewayParameters above to this Gateway ---
+  infrastructure:
+    parametersRef:
+      group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayParameters
+      name: agentgateway-config
   listeners:
     - name: http
       port: 8080
@@ -358,6 +297,22 @@ spec:
         #- name: x-foo
         #  expression: 'request.headers["x-foo"]'
 EOF
+```
+
+## Uninstall
+
+To tear everything down, work in reverse order. Delete the `Gateway` first so the controller can clean up the proxy deployment and service before you remove the controller itself.
+
+```bash
+kubectl delete enterpriseagentgatewaypolicy access-logs tracing -n agentgateway-system --ignore-not-found
+kubectl delete gateway agentgateway-proxy -n agentgateway-system --ignore-not-found
+kubectl delete enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --ignore-not-found
+helm uninstall enterprise-agentgateway -n agentgateway-system
+helm uninstall enterprise-agentgateway-crds -n agentgateway-system
+kubectl delete gatewayclass enterprise-agentgateway enterprise-agentgateway-waypoint --ignore-not-found
+kubectl delete namespace agentgateway-system
+# (Optional) Remove the Kubernetes Gateway API CRDs only if nothing else on the cluster uses them
+kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
 ```
 
 ## Next Steps

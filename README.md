@@ -43,6 +43,10 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 >
 > [002 — Set Up Monitoring Tools (OCP)](install-on-openshift/002-set-up-monitoring-tools-ocp.md)
 
+> **Air-gapped / private-registry users:** Use the air-gap variant that mirrors all chart-managed images into a private registry:
+>
+> [001 — Install Enterprise Agentgateway (Air-Gap)](airgap/001-airgap.md)
+
 ---
 
 ## Routing
