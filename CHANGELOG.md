@@ -7,6 +7,7 @@
 - Split parameters by owner across the `001`, OpenShift, and air-gap labs — an operator `agentgateway-shared-extensions` registered as the GatewayClass default (`gatewayClassParametersRefs`, holds `sharedExtensions`) and a developer `agentgateway-config` attached per-Gateway via `spec.infrastructure.parametersRef`; the two merge
 - Add an **Uninstall** section to all three labs (reverse-order teardown, including a GatewayClass cleanup step that `helm uninstall` leaves behind)
 - Doc cleanup: clarify `parametersRef` apply ordering, drop the stale experimental-CRD note, and harmonize the controller-install image/pull-secret comments across the labs
+- Update `SOLO_MANAGEMENT_UI_VERSION` to `0.4.5`
 
 0.11.0 - (6-10-26)
 ---
