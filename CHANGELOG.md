@@ -1,8 +1,9 @@
 # Changelog
 
-0.11.1 - (6-15-26)
+0.11.1 - (6-16-26)
 ---
 - Bump to `v2026.6.0` (Kubernetes prereq now `> 1.31`). **Breaking:** the top-level Helm `image.registry`/`image.tag` is now the global default for every chart-managed image — controller, proxy, and auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `ext-cache`/`redis`); per-image override blocks are removed and `image-list.md` updated to match
+- Added `v2026.5.2` branch as an archive of the previous installation setup for airgapped environments
 - Add a new air-gap install lab (`airgap/001-airgap.md` + `airgap/ably7-image-list.md`) demonstrating a single-registry private install, linked from the `README`; cross-link the image lists across the `001`, OpenShift, and air-gap labs
 - Split parameters by owner across the `001`, OpenShift, and air-gap labs — an operator `agentgateway-shared-extensions` registered as the GatewayClass default (`gatewayClassParametersRefs`, holds `sharedExtensions`) and a developer `agentgateway-config` attached per-Gateway via `spec.infrastructure.parametersRef`; the two merge
 - Add an **Uninstall** section to all three labs (reverse-order teardown, including a GatewayClass cleanup step that `helm uninstall` leaves behind)
