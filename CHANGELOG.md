@@ -1,5 +1,9 @@
 # Changelog
 
+0.11.2 - (6-19-26)
+---
+- Add a JWT claim-based token rate limiting section to `global-token-rate-limiting.md` (CEL on `jwt.sub`, plus a composite `jwt.org`+`jwt.team` example)
+
 0.11.1 - (6-16-26)
 ---
 - Bump to `v2026.6.0` (Kubernetes prereq now `> 1.31`). **Breaking:** the top-level Helm `image.registry`/`image.tag` is now the global default for every chart-managed image — controller, proxy, and auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `ext-cache`/`redis`); per-image override blocks are removed and `image-list.md` updated to match
