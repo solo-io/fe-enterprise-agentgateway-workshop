@@ -36,7 +36,7 @@ After completing this track you should be able to:
 | Auth0 or Okta account | Required for OAuth labs only |
 | Claude Code or Claude Desktop | Required for agent harness labs |
 
-> If you haven't done the LLM Track yet, start with [001 — Install Enterprise Agentgateway](../labs/installation/001-install-enterprise-agentgateway.md) and [002 — Set Up UI and Monitoring Tools](../labs/installation/002-set-up-ui-and-monitoring-tools.md) before continuing here.
+> If you haven't done the LLM Track yet, start with [001 — Install Enterprise Agentgateway](../001-install-enterprise-agentgateway.md) and [002 — Set Up UI and Monitoring Tools](../002-set-up-ui-and-monitoring-tools.md) before continuing here.
 
 ---
 

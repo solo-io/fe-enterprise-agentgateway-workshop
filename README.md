@@ -34,8 +34,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 > **Start here.** All other labs depend on these two.
 
-- [001 — Install Enterprise Agentgateway](labs/installation/001-install-enterprise-agentgateway.md)
-- [002 — Set Up UI and Monitoring Tools](labs/installation/002-set-up-ui-and-monitoring-tools.md)
+- [001 — Install Enterprise Agentgateway](001-install-enterprise-agentgateway.md)
+- [002 — Set Up UI and Monitoring Tools](002-set-up-ui-and-monitoring-tools.md)
 
 > **OpenShift users:** Use the OpenShift-specific versions instead:
 >

@@ -47,8 +47,8 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 | Lab | What you'll do |
 |---|---|
-| [001 — Install Enterprise Agentgateway](../labs/installation/001-install-enterprise-agentgateway.md) | Deploy the gateway via Helm, apply a license key, and verify the control plane |
-| [002 — Set Up UI and Monitoring Tools](../labs/installation/002-set-up-ui-and-monitoring-tools.md) | Install Prometheus, Grafana, and the demo UI |
+| [001 — Install Enterprise Agentgateway](../001-install-enterprise-agentgateway.md) | Deploy the gateway via Helm, apply a license key, and verify the control plane |
+| [002 — Set Up UI and Monitoring Tools](../002-set-up-ui-and-monitoring-tools.md) | Install Prometheus, Grafana, and the demo UI |
 
 > OpenShift: [001 (OCP)](../labs/installation/openshift/001-set-up-enterprise-agentgateway-ocp.md) · [002 (OCP)](../labs/installation/openshift/002-set-up-monitoring-tools-ocp.md)
 

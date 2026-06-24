@@ -158,7 +158,7 @@ You'll see log entries for each API call — the initial POST, each polling GET,
 
 ### View Metrics in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../installation/002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 > **Note:** Since video endpoints use the `Passthrough` route type, token-level metrics are not available. AgentGateway still tracks request counts, latencies, and status codes.
 
