@@ -143,6 +143,10 @@ spec:
             user_team: default(jwt.team, "public-tier")
             user_tier: default(jwt.tier, "public-tier")
             user_name: default(jwt.preferred_username, default(request.headers["x-user"], "public-tier"))
+            # --- Label all metrics with the virtual-key user_id extracted from the validated
+            #     API key credential (empty when no API key is presented). The `llm-cost-tracking`
+            #     lab relies on this label for per-user token/cost queries.
+            user_id: default(apiKey.user_id, "")
             # --- Label all metrics using a value extracted from the request body
             #modelId: json(request.body).modelId
   deployment:

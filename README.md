@@ -85,7 +85,6 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Security
 
-- [API Key Masking](labs/security/api-key-masking.md)
 - [Virtual Keys](labs/security/virtual-keys.md) _(see also: Rate Limiting)_
 - [JWT Auth with RBAC](labs/security/jwt-auth-with-rbac.md)
 - [TLS Termination](labs/security/tls-termination.md)
@@ -186,7 +185,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Observability
 
-- [LLM Cost Tracking](labs/observability/llm-cost-tracking.md) _(see also: Security, Rate Limiting)_
+- [LLM Cost Tracking with Virtual Keys](labs/observability/llm-cost-tracking-with-virtual-keys.md) _(see also: Security, Rate Limiting)_
 - [Production Observability, Alerting, and Scaling](labs/observability/production-observability-alerting-and-scaling.md)
 
 # Use Cases

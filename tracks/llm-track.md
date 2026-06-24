@@ -14,7 +14,7 @@ After completing this track you should be able to:
 
 - **Unify LLM access** — route traffic to multiple providers from a single gateway endpoint without changing client code
 - **Enforce routing policies** — route by path, header, query parameter, or request body to control which model handles which request
-- **Secure the gateway** — apply API key masking, virtual keys, JWT-based RBAC, TLS/mTLS, OPA, and BYO external authorization
+- **Secure the gateway** — apply virtual keys (with upstream credential masking), JWT-based RBAC, TLS/mTLS, OPA, and BYO external authorization
 - **Control costs with rate limits** — enforce per-request, per-user, and global token quotas; reset them on a schedule
 - **Apply content guardrails** — block prompt injection, PII, and harmful content before requests reach the model
 - **Enrich and transform** — inject system prompts, rewrite headers, and shape request/response payloads
@@ -94,8 +94,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 | Lab | What you'll learn |
 |---|---|
-| [API Key Masking](../labs/security/api-key-masking.md) | Prevent upstream provider keys from appearing in logs |
-| [Virtual Keys](../labs/security/virtual-keys.md) | Issue per-user keys with independent token budgets |
+| [Virtual Keys](../labs/security/virtual-keys.md) | Issue per-user keys with independent token budgets; upstream provider key is masked from all callers |
 | [JWT Auth with RBAC](../labs/security/jwt-auth-with-rbac.md) | Validate JWTs and enforce role-based access |
 | [TLS Termination](../labs/security/tls-termination.md) | Terminate HTTPS at the gateway |
 | [Frontend mTLS](../labs/security/frontend-mtls.md) | Require and validate client certificates |
@@ -115,7 +114,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | [Local Token-Based Rate Limiting](../labs/rate-limiting/local-token-rate-limiting.md) | Enforce per-instance token quotas without a shared store |
 | [Global Token-Based Rate Limiting](../labs/rate-limiting/global-token-rate-limiting.md) | Enforce cluster-wide token quotas with a Redis backend |
 | [Virtual Keys](../labs/security/virtual-keys.md) | Per-key token budgets with budget isolation |
-| [LLM Cost Tracking](../labs/observability/llm-cost-tracking.md) | Prometheus metrics + PromQL for per-user chargeback |
+| [LLM Cost Tracking with Virtual Keys](../labs/observability/llm-cost-tracking-with-virtual-keys.md) | Prometheus metrics + PromQL for per-user chargeback |
 
 ---
 

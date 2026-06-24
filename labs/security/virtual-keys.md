@@ -1,12 +1,7 @@
 # Virtual Keys using Agentgateway
 
-## Pre-requisites
-This lab assumes that you have completed `001` and `api-key-masking`. `002` is optional but recommended if you want to observe metrics and traces.
-
-The following resources from the `api-key-masking` lab should still be running:
-- `openai-secret` — upstream OpenAI credentials
-- `openai-all-models` EnterpriseAgentgatewayBackend and `openai` HTTPRoute
-- `apikey-auth` AuthConfig and `api-key-auth` EnterpriseAgentgatewayPolicy
+## Prerequisites
+This lab assumes that you have completed `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Issue per-user virtual keys (alice and bob) with independent token budgets
@@ -16,79 +11,164 @@ The following resources from the `api-key-masking` lab should still be running:
 
 ## About virtual keys
 
-Virtual key management is a common feature in AI gateway solutions (LiteLLM, Portkey) that issues API keys to users or applications with independent token budgets and cost tracking. The `api-key-masking` lab showed how to issue a single team key to abstract the upstream OpenAI credential. This lab extends that pattern to per-user keys with budget enforcement.
+Virtual key management is a common feature in AI gateway solutions (LiteLLM, Portkey) that issues API keys to users or applications with independent token budgets and cost tracking.
 
 Agentgateway achieves virtual keys by composing three capabilities:
 
-1. **API key authentication** — already configured in the `api-key-masking` lab
+1. **API key authentication** — validates incoming keys and extracts per-key metadata
 2. **Token-based rate limiting** — enforces independent per-key token budgets
 3. **Observability** — tracks per-user spending via access logs and metrics
 
+The key security advantage over header-based rate limiting: the budget key (`user_id`) is extracted from the API key credential by the gateway — the client cannot forge or override it.
+
+## Set up the OpenAI backend
+
+Create the OpenAI credential secret. The gateway uses this to authenticate upstream — callers never see it.
+
+```bash
+kubectl create secret generic openai-secret -n agentgateway-system \
+  --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
+  --dry-run=client -oyaml | kubectl apply -f -
+```
+
+Create the backend and route:
+
+```bash
+kubectl apply -f- <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+      backendRefs:
+        - name: openai-all-models
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: openai-all-models
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai: {}
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+EOF
+```
+
+Verify both resources are accepted:
+
+```bash
+kubectl get enterpriseagentgatewaybackend openai-all-models -n agentgateway-system
+kubectl get httproute openai -n agentgateway-system \
+  -o jsonpath='{range .status.parents[*].conditions[*]}{.type}={.status}{"\n"}{end}'
+```
+
+The backend should show `ACCEPTED   True`. The route (which has no status column in plain `kubectl get`) should print `Accepted=True` and `ResolvedRefs=True`.
+
 ## Create per-user API keys
 
-Create API key secrets for alice and bob. The `api-key-group: llm-users` label lets the AuthConfig discover all user keys via label selector — adding a new user is as simple as creating a new secret with this label.
+Create one Secret per user, each carrying the label `app: llm-virtual-keys`. The auth policy discovers keys by this label (next section) instead of by a single Secret name, so the keys can live in separate Secrets — owned and RBAC-scoped by different teams — and new users are onboarded by adding another labeled Secret, with no edit to a central Secret or the policy.
+
+Each entry stores the API key and a `user_id` that the gateway extracts for rate limiting — the client never supplies it. (A single Secret may hold multiple entries; one-per-user is used here to demonstrate discovery across Secrets.)
 
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: user-alice-key
+  name: alice-key
   namespace: agentgateway-system
   labels:
-    api-key-group: llm-users
-type: extauth.solo.io/apikey
+    app: llm-virtual-keys
+type: Opaque
 stringData:
-  api-key: sk-alice-abc123def456
+  alice: |
+    {
+      "key": "sk-alice-abc123def456",
+      "metadata": {
+        "user_id": "alice"
+      }
+    }
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: user-bob-key
+  name: bob-key
   namespace: agentgateway-system
   labels:
-    api-key-group: llm-users
-type: extauth.solo.io/apikey
+    app: llm-virtual-keys
+type: Opaque
 stringData:
-  api-key: sk-bob-xyz789uvw012
+  bob: |
+    {
+      "key": "sk-bob-xyz789uvw012",
+      "metadata": {
+        "user_id": "bob"
+      }
+    }
 EOF
 ```
 
-## Update AuthConfig to use label selector
+> **Note — unique entry ids:** Each entry key (the `alice` / `bob` map key) must be unique across all labeled Secrets. If the same entry id appears in two matched Secrets, the resulting key set is undefined.
 
-Update `apikey-auth` to discover user keys by label instead of referencing a specific secret. This replaces the single `team1-apikey` reference from the `api-key-masking` lab with a dynamic selector that automatically includes any secret labeled `api-key-group: llm-users`.
+## Configure API key authentication
+
+Create an `EnterpriseAgentgatewayPolicy` that requires API key authentication for all gateway traffic. Instead of naming a single Secret with `secretRef`, use `secretSelector` to discover **every** Secret in the namespace carrying the `app: llm-virtual-keys` label and union their entries into the valid-key set. The `mode: Strict` setting rejects any request that does not present a recognized key.
 
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: extauth.solo.io/v1
-kind: AuthConfig
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
 metadata:
-  name: apikey-auth
+  name: api-key-auth
   namespace: agentgateway-system
 spec:
-  configs:
-    - apiKeyAuth:
-        headerName: vanity-auth
-        k8sSecretApikeyStorage:
-          labelSelector:
-            api-key-group: llm-users
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: agentgateway-proxy
+  traffic:
+    apiKeyAuthentication:
+      mode: Strict
+      secretSelector:
+        matchLabels:
+          app: llm-virtual-keys
 EOF
 ```
 
-## Test authentication with virtual keys
+`secretRef` and `secretSelector` are mutually exclusive — set exactly one. (`secretRef` by name is covered in the public docs; this lab uses the label-selector approach so keys can be spread across Secrets and discovered automatically.)
 
-Verify that alice and bob can both authenticate with their respective keys. Note the `X-User-ID` header — this identifies each user for independent token budget tracking.
+## Test authentication
+
+Export the gateway IP:
 
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
 Send a request as alice:
+
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
-  -H "vanity-auth: sk-alice-abc123def456" \
-  -H "X-User-ID: alice" \
+  -H "Authorization: Bearer sk-alice-abc123def456" \
   -d '{
     "model": "gpt-4o-mini",
     "messages": [{"role": "user", "content": "Hello!"}]
@@ -96,86 +176,107 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 
 Send a request as bob:
+
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
-  -H "vanity-auth: sk-bob-xyz789uvw012" \
-  -H "X-User-ID: bob" \
+  -H "Authorization: Bearer sk-bob-xyz789uvw012" \
   -d '{
     "model": "gpt-4o-mini",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
 
-Both requests should succeed with a 200 response.
+Both should return `HTTP 200`. Verify that an unknown key is rejected:
+
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer sk-invalid-key" \
+  -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello!"}]}'
+```
+
+Expected: `HTTP 401`.
 
 ## Add per-user token budgets
 
-Add the second pillar of virtual keys: token budget enforcement. Create a `RateLimitConfig` that enforces a limit of 100 input tokens per hour, keyed by the `X-User-ID` header. Each unique user ID gets its own independent counter. The `unit` field controls the budget window — `HOUR` suits sandbox quotas, `DAY` for production cost control, `MINUTE` for burst protection.
+Token budgets use **global rate limiting** against the rate limiter that already ships with the enterprise install. You declare the budget in a `RateLimitConfig` CRD; the controller pushes it to `rate-limiter-enterprise-agentgateway`, and counters are stored in the shared `ext-cache` Redis — so budgets stay consistent across every gateway replica with no extra components to deploy.
+
+### Configure the token budget
+
+Create a `RateLimitConfig` that defines the `token-budgets` domain, the per-user limit, and how to extract the user identity.
 
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: ratelimit.solo.io/v1alpha1
 kind: RateLimitConfig
 metadata:
-  name: virtual-key-budgets
+  name: token-budgets
   namespace: agentgateway-system
 spec:
   raw:
+    domain: token-budgets
     descriptors:
-    - key: X-User-ID
-      rateLimit:
-        unit: HOUR
-        requestsPerUnit: 100
+      - key: user_id
+        rateLimit:
+          unit: HOUR
+          requestsPerUnit: 100
     rateLimits:
-    - actions:
-      - requestHeaders:
-          descriptorKey: "X-User-ID"
-          headerName: "X-User-ID"
-      type: TOKEN
+      - actions:
+          - cel:
+              expression: 'apiKey.user_id'
+              key: "user_id"
+        type: TOKEN
 EOF
 ```
 
-Create an `EnterpriseAgentgatewayPolicy` to enforce the token budgets. This stacks on top of the existing auth policy — requests must first pass authentication, then have remaining budget available.
+Two fields make this a **token** budget rather than a request budget:
+
+- `type: TOKEN` — counts LLM tokens against the limit instead of requests. Without it, `requestsPerUnit: 100` would mean *100 requests per hour*; with it, it means *100 tokens per hour*.
+- `cel.expression: 'apiKey.user_id'` — extracts the user identity embedded in the API key credential. The key's `metadata` block is flattened onto `apiKey`, so the `user_id` field is referenced as **`apiKey.user_id`** (not `apiKey.metadata.user_id`). Clients cannot forge or override this value — it comes from the validated credential, not from a request header.
+
+### Create the token budget policy
+
+Create an `EnterpriseAgentgatewayPolicy` that attaches the token budget to the gateway via the `entRateLimit` API.
 
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
-  name: virtual-key-budget-policy
+  name: token-budget-policy
   namespace: agentgateway-system
 spec:
   targetRefs:
-    - name: agentgateway-proxy
-      group: gateway.networking.k8s.io
+    - group: gateway.networking.k8s.io
       kind: Gateway
+      name: agentgateway-proxy
   traffic:
     entRateLimit:
       global:
         rateLimitConfigRefs:
-        - name: virtual-key-budgets
+          - name: token-budgets
 EOF
 ```
 
 ## Test budget isolation
 
-> **Note — resetting rate limit counters:** Token counters are stored in `ext-cache` (Redis) and persist for the duration of the budget window. Any requests made during the auth testing steps above already consumed tokens against each user's budget. If alice hits `429` on the first request, reset the counters before continuing:
+> **Note — resetting rate limit counters:** Token counters are stored in `ext-cache` (Redis) and persist for the duration of the budget window. If alice hits `429` on the first request, reset the counters:
 > ```bash
 > kubectl rollout restart deployment/ext-cache-enterprise-agentgateway -n agentgateway-system
 > kubectl rollout status deployment/ext-cache-enterprise-agentgateway -n agentgateway-system
 > ```
 
-The defining property of virtual keys is that each user's budget is independent. Run several requests as alice to exhaust her 100-token hourly budget, then verify bob's budget is unaffected.
+The defining property of virtual keys is budget isolation. Exhaust alice's budget, then verify bob is unaffected.
 
-Send multiple requests as alice until her budget is exhausted:
+Send multiple requests as alice until her 100-token hourly budget is exhausted:
+
 ```bash
 for i in {1..20}; do
   echo "--- Alice request $i ---"
   curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
     -H "content-type: application/json" \
-    -H "vanity-auth: sk-alice-abc123def456" \
-    -H "X-User-ID: alice" \
+    -H "Authorization: Bearer sk-alice-abc123def456" \
     -d '{
       "model": "gpt-4o-mini",
       "messages": [{"role": "user", "content": "What is 1+1?"}]
@@ -183,183 +284,152 @@ for i in {1..20}; do
 done
 ```
 
-You should see `HTTP 200` responses until alice's 100-token budget is exhausted, then `HTTP 429`.
+You should see `HTTP 200` responses until the 100-token budget is exhausted, then `HTTP 429`.
 
-Now verify bob still has his full budget:
+Verify bob still has his full budget:
+
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
-  -H "vanity-auth: sk-bob-xyz789uvw012" \
-  -H "X-User-ID: bob" \
+  -H "Authorization: Bearer sk-bob-xyz789uvw012" \
   -d '{
     "model": "gpt-4o-mini",
     "messages": [{"role": "user", "content": "What is 2+2?"}]
   }'
 ```
 
-Bob's request succeeds with a 200 response. His token budget is tracked independently from alice's.
+Expected: `HTTP 200`. Bob's token budget is tracked independently from alice's.
 
 ## Advanced configuration
 
-These sections extend the lab. Each is independent — apply whichever patterns are relevant, replacing the `virtual-key-budgets` `RateLimitConfig` as needed.
+These sections extend the lab. Each is independent — apply whichever patterns are relevant. Each replaces the `token-budgets` RateLimitConfig from above.
 
-### Multi-tenant virtual keys
-
-Scope budgets to a user+tenant combination so that `alice` in `tenant-a` has an independent budget from `alice` in `tenant-b`. The `X-Tenant-ID` header is passed by the client alongside `X-User-ID` to identify the tenant context.
-
-Delete the existing budget config and replace it with a two-key descriptor:
-```bash
-kubectl delete ratelimitconfig -n agentgateway-system virtual-key-budgets
-
-kubectl apply -f- <<EOF
-apiVersion: ratelimit.solo.io/v1alpha1
-kind: RateLimitConfig
-metadata:
-  name: virtual-key-budgets
-  namespace: agentgateway-system
-spec:
-  raw:
-    descriptors:
-    - key: X-User-ID
-      descriptors:
-      - key: X-Tenant-ID
-        rateLimit:
-          unit: HOUR
-          requestsPerUnit: 100
-    rateLimits:
-    - actions:
-      - requestHeaders:
-          descriptorKey: "X-User-ID"
-          headerName: "X-User-ID"
-      - requestHeaders:
-          descriptorKey: "X-Tenant-ID"
-          headerName: "X-Tenant-ID"
-      type: TOKEN
-EOF
-```
-
-> **Note:** Replacing the `RateLimitConfig` does not reset the Redis counters. If needed, restart `ext-cache` to start with a clean slate: `kubectl rollout restart deployment/ext-cache-enterprise-agentgateway -n agentgateway-system`
-
-Test that alice has a separate budget per tenant:
-```bash
-# Alice in tenant-a
-curl -i "$GATEWAY_IP:8080/openai" \
-  -H "content-type: application/json" \
-  -H "vanity-auth: sk-alice-abc123def456" \
-  -H "X-User-ID: alice" \
-  -H "X-Tenant-ID: tenant-a" \
-  -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello!"}]}'
-
-# Same user, different tenant — separate budget counter
-curl -i "$GATEWAY_IP:8080/openai" \
-  -H "content-type: application/json" \
-  -H "vanity-auth: sk-alice-abc123def456" \
-  -H "X-User-ID: alice" \
-  -H "X-Tenant-ID: tenant-b" \
-  -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello!"}]}'
-```
-
-Exhaust alice's budget in `tenant-a` and verify requests to `tenant-b` still succeed — the budget key is the `(user, tenant)` pair, not the user alone.
+> **Note:** The `RateLimitConfig` CRD is watched by the controller and pushed to the rate limiter automatically — no restart is needed when you change it. Existing counters in `ext-cache` are **not** reset by a config change, though; to clear budgets between tests: `kubectl rollout restart deployment/ext-cache-enterprise-agentgateway -n agentgateway-system`
 
 ### Tiered budgets based on user type
 
-Embed the budget tier directly in the API key credential so users cannot self-upgrade their own quota. This reuses the `headersFromMetadataEntry` mechanism from the `api-key-masking` lab — the tier is stored in the secret's `stringData` and automatically injected as a request header by the auth system before rate limiting is evaluated.
+Embed the budget tier directly in the API key credential so users cannot self-upgrade their quota. The `tier` field in the key metadata is set by whoever creates the key — the client never touches it.
 
-1. Update alice to `premium` tier and add a new `free` user charlie:
+1. Update alice to `premium` tier and add a `free` user charlie:
 
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: user-alice-key
+  name: alice-key
   namespace: agentgateway-system
   labels:
-    api-key-group: llm-users
-type: extauth.solo.io/apikey
+    app: llm-virtual-keys
+type: Opaque
 stringData:
-  api-key: sk-alice-abc123def456
-  x-user-tier: premium
+  alice: |
+    {
+      "key": "sk-alice-abc123def456",
+      "metadata": {
+        "user_id": "alice",
+        "tier": "premium"
+      }
+    }
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: user-charlie-key
+  name: bob-key
   namespace: agentgateway-system
   labels:
-    api-key-group: llm-users
-type: extauth.solo.io/apikey
+    app: llm-virtual-keys
+type: Opaque
 stringData:
-  api-key: sk-charlie-ghi345jkl678
-  x-user-tier: free
-EOF
-```
-
-2. Update `apikey-auth` to inject `x-user-tier` from the secret into every request:
-
-```bash
-kubectl apply -f- <<EOF
-apiVersion: extauth.solo.io/v1
-kind: AuthConfig
+  bob: |
+    {
+      "key": "sk-bob-xyz789uvw012",
+      "metadata": {
+        "user_id": "bob",
+        "tier": "free"
+      }
+    }
+---
+apiVersion: v1
+kind: Secret
 metadata:
-  name: apikey-auth
+  name: charlie-key
   namespace: agentgateway-system
-spec:
-  configs:
-    - apiKeyAuth:
-        headerName: vanity-auth
-        k8sSecretApikeyStorage:
-          labelSelector:
-            api-key-group: llm-users
-        headersFromMetadataEntry:
-          x-user-tier:
-            name: x-user-tier
+  labels:
+    app: llm-virtual-keys
+type: Opaque
+stringData:
+  charlie: |
+    {
+      "key": "sk-charlie-ghi345jkl678",
+      "metadata": {
+        "user_id": "charlie",
+        "tier": "free"
+      }
+    }
 EOF
 ```
 
-The `x-user-tier` header is set by the gateway from the credential — the client never sees or controls it.
-
-3. Replace the `RateLimitConfig` with tiered descriptors. Free users get 50 tokens/hour; premium users get 500:
+2. Replace the `RateLimitConfig` with tiered budget descriptors. Free users get 50 tokens/hour; premium users get 500:
 
 ```bash
-kubectl delete ratelimitconfig -n agentgateway-system virtual-key-budgets
-
 kubectl apply -f- <<EOF
 apiVersion: ratelimit.solo.io/v1alpha1
 kind: RateLimitConfig
 metadata:
-  name: virtual-key-budgets
+  name: token-budgets
   namespace: agentgateway-system
 spec:
   raw:
+    domain: token-budgets
     descriptors:
-    - key: X-User-Tier
-      value: "free"
-      descriptors:
-      - key: X-User-ID
-        rateLimit:
-          unit: HOUR
-          requestsPerUnit: 50
-    - key: X-User-Tier
-      value: "premium"
-      descriptors:
-      - key: X-User-ID
-        rateLimit:
-          unit: HOUR
-          requestsPerUnit: 500
+      - key: tier
+        value: "free"
+        descriptors:
+          - key: user_id
+            rateLimit:
+              unit: HOUR
+              requestsPerUnit: 50
+      - key: tier
+        value: "premium"
+        descriptors:
+          - key: user_id
+            rateLimit:
+              unit: HOUR
+              requestsPerUnit: 500
     rateLimits:
-    - actions:
-      - requestHeaders:
-          descriptorKey: "X-User-Tier"
-          headerName: "X-User-Tier"
-      - requestHeaders:
-          descriptorKey: "X-User-ID"
-          headerName: "X-User-ID"
-      type: TOKEN
+      - actions:
+          - cel:
+              expression: 'apiKey.tier'
+              key: "tier"
+          - cel:
+              expression: 'apiKey.user_id'
+              key: "user_id"
+        type: TOKEN
 EOF
 ```
 
-> **Note:** If needed, restart `ext-cache` to ensure counters are clean: `kubectl rollout restart deployment/ext-cache-enterprise-agentgateway -n agentgateway-system`
+3. The `token-budget-policy` is unchanged — it already references `token-budgets` by name. Apply it again if needed:
+
+```bash
+kubectl apply -f- <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: token-budget-policy
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: agentgateway-proxy
+  traffic:
+    entRateLimit:
+      global:
+        rateLimitConfigRefs:
+          - name: token-budgets
+EOF
+```
 
 4. Exhaust charlie's free budget, then verify alice's premium budget is unaffected:
 
@@ -369,38 +439,135 @@ for i in {1..15}; do
   echo "--- Charlie request $i ---"
   curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
     -H "content-type: application/json" \
-    -H "vanity-auth: sk-charlie-ghi345jkl678" \
-    -H "X-User-ID: charlie" \
+    -H "Authorization: Bearer sk-charlie-ghi345jkl678" \
     -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "What is 1+1?"}]}'
 done
 ```
 
-Charlie hits 429 after her free-tier budget is exhausted. Verify alice's premium budget is untouched:
+Charlie hits `429` after her free-tier budget is exhausted. Verify alice's premium budget is untouched:
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
-  -H "vanity-auth: sk-alice-abc123def456" \
-  -H "X-User-ID: alice" \
+  -H "Authorization: Bearer sk-alice-abc123def456" \
   -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Still working?"}]}'
 ```
 
-Alice succeeds because her 500-token premium budget is tracked independently from charlie's free-tier counter.
+Expected: `HTTP 200`.
+
+### Multi-tenant virtual keys
+
+Scope budgets to a `(tenant_id, user_id)` pair so that `alice` in `tenant-a` has an independent budget from `alice` in `tenant-b`. Add `tenant_id` to each key's metadata. Because this reuses alice's key string under a new tenant entry, first clear the previous virtual-key Secrets so the old (tenant-less) entries don't linger with the same key value, then create the tenant-scoped Secrets:
+
+```bash
+kubectl delete secret -n agentgateway-system -l app=llm-virtual-keys
+
+kubectl apply -f- <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alice-tenant-a-key
+  namespace: agentgateway-system
+  labels:
+    app: llm-virtual-keys
+type: Opaque
+stringData:
+  alice-tenant-a: |
+    {
+      "key": "sk-alice-abc123def456",
+      "metadata": {
+        "user_id": "alice",
+        "tenant_id": "tenant-a"
+      }
+    }
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alice-tenant-b-key
+  namespace: agentgateway-system
+  labels:
+    app: llm-virtual-keys
+type: Opaque
+stringData:
+  alice-tenant-b: |
+    {
+      "key": "sk-alice-tenant-b-000111",
+      "metadata": {
+        "user_id": "alice",
+        "tenant_id": "tenant-b"
+      }
+    }
+EOF
+```
+
+Replace the `RateLimitConfig` with tenant-scoped descriptors:
+
+```bash
+kubectl apply -f- <<EOF
+apiVersion: ratelimit.solo.io/v1alpha1
+kind: RateLimitConfig
+metadata:
+  name: token-budgets
+  namespace: agentgateway-system
+spec:
+  raw:
+    domain: token-budgets
+    descriptors:
+      - key: tenant_id
+        descriptors:
+          - key: user_id
+            rateLimit:
+              unit: HOUR
+              requestsPerUnit: 100
+    rateLimits:
+      - actions:
+          - cel:
+              expression: 'apiKey.tenant_id'
+              key: "tenant_id"
+          - cel:
+              expression: 'apiKey.user_id'
+              key: "user_id"
+        type: TOKEN
+EOF
+```
+
+The `token-budget-policy` is unchanged — it references `token-budgets` by name.
+
+Exhaust alice's budget in `tenant-a`, then verify requests using `tenant-b` still succeed — the budget key is the `(tenant, user)` pair, not the user alone:
+
+```bash
+# Exhaust alice in tenant-a
+for i in {1..20}; do
+  echo "--- Alice (tenant-a) request $i ---"
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+    -H "content-type: application/json" \
+    -H "Authorization: Bearer sk-alice-abc123def456" \
+    -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "What is 1+1?"}]}'
+done
+
+# Alice in tenant-b still has her full budget
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer sk-alice-tenant-b-000111" \
+  -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello from tenant-b!"}]}'
+```
+
+Expected: `HTTP 200` for tenant-b despite tenant-a being exhausted.
 
 ### Observability
 
-Token usage visibility is covered in the standalone `llm-cost-tracking` lab, which includes access log inspection and Prometheus PromQL queries for per-user consumption and cost.
+Token usage visibility is covered in the standalone `llm-cost-tracking-with-virtual-keys` lab, which includes access log inspection and Prometheus PromQL queries for per-user consumption and cost.
 
 ## Cleanup
+
 ```bash
-# Virtual keys resources added in this lab
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system virtual-key-budget-policy
-kubectl delete ratelimitconfig -n agentgateway-system virtual-key-budgets
-kubectl delete secret -n agentgateway-system user-alice-key user-bob-key user-charlie-key
-# Base resources from api-key-masking
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system api-key-auth
-kubectl delete authconfig -n agentgateway-system apikey-auth
-kubectl delete secret -n agentgateway-system team1-apikey
+# Policies and rate limit config added in this lab
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system api-key-auth token-budget-policy
+kubectl delete ratelimitconfig -n agentgateway-system token-budgets
+kubectl delete secret -n agentgateway-system -l app=llm-virtual-keys
+
+# Backend resources set up at the start of this lab
 kubectl delete httproute -n agentgateway-system openai
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret

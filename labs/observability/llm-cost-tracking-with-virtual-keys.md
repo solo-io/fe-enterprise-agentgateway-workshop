@@ -1,13 +1,15 @@
-# LLM Cost Tracking
+# LLM Cost Tracking with Virtual Keys
 
 ## Pre-requisites
 This lab assumes that you have completed `001`, `002`, and `virtual-keys`. Lab `002` is required for the Prometheus metrics sections.
 
 The following resources from the `virtual-keys` lab should still be running:
-- Per-user API key secrets (`user-alice-key`, `user-bob-key`)
-- `apikey-auth` AuthConfig with label selector
-- `virtual-key-budget-policy` EnterpriseAgentgatewayPolicy
-- `virtual-key-budgets` RateLimitConfig
+- Per-user API key Secrets labeled `app: llm-virtual-keys` (e.g. `alice-key`, `bob-key`)
+- `api-key-auth` EnterpriseAgentgatewayPolicy (API key authentication)
+- `token-budget-policy` EnterpriseAgentgatewayPolicy (token budget enforcement)
+- `token-budgets` RateLimitConfig (budget configuration)
+
+This lab also relies on the `user_id` metric label configured in `001` (`metrics.fields.add.user_id: default(apiKey.user_id, "")`). Without it, the per-user queries below return no data.
 
 ## Lab Objectives
 - Inspect per-request token usage in Agentgateway access logs
@@ -35,14 +37,6 @@ Each log entry is a JSON object. Look for `gen_ai.usage.input_tokens` and `gen_a
 }
 ```
 
-> **Note:** The `X-User-ID` header is not captured in access logs by default. To add it, extend the `logging.fields.add` block in `EnterpriseAgentgatewayParameters` (configured in `001`):
-> ```yaml
-> logging:
->   fields:
->     add:
->       x-user-id: 'request.headers["x-user-id"]'
-> ```
-
 ## Prometheus metrics
 
 Port-forward to the Prometheus service:
@@ -55,7 +49,7 @@ Open [http://localhost:9090](http://localhost:9090) and search for `agentgateway
 
 ### Token usage per user
 
-Total input and output tokens broken down by user. The `user_id` label is populated from the `X-User-ID` header via the `EnterpriseAgentgatewayParameters` metrics config in `001`:
+Total input and output tokens broken down by user. The `user_id` label is the custom metric field configured in `001`, populated from the validated API key credential via the CEL expression `apiKey.user_id` (the key's `metadata` block is flattened onto `apiKey`, so it is `apiKey.user_id`, not `apiKey.metadata.user_id`):
 
 ```promql
 sum by (user_id, gen_ai_token_type) (
@@ -71,7 +65,7 @@ sum by (user_id, gen_ai_token_type) (
 )
 ```
 
-> **Note:** `increase()` extrapolates between scrape intervals, so fractional token values are expected and normal. Series without a `user_id` label are from requests made before the `user_id` metric field was enabled in `001` — they age out after the budget window passes.
+> **Note:** `increase()` extrapolates between scrape intervals, so fractional token values are expected and normal. The `user_id!=""` filter drops requests that carried no API key (the label defaults to an empty string), so only per-virtual-key traffic is counted.
 
 ### Cumulative cost per user
 
