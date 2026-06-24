@@ -1,0 +1,6 @@
+{
+  "iss": "workshop.solo.io",
+  "sub": "standard-user",
+  "exp": 4070908800,
+  "plan": "standard"
+}

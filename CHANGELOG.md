@@ -3,6 +3,14 @@
 0.11.3 - (6-23-26)
 ---
 - Update `ENTERPRISE_AGW_VERSION` to `v2026.6.1`
+- Update `global-token-rate-limiting.md` to cover the following scenarios:
+  1. Global shared counter
+  2. Per-user via header (CEL)
+  3. Multi-header composite (CEL)
+  4. JWT claim (jwt.sub)
+  5. Tier-based (jwt.plan, nested value descriptors)
+  6. IP-based (source.address)
+  7. Mixed time windows (two separate RateLimitConfig objects)
 
 0.11.2 - (6-19-26)
 ---
