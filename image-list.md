@@ -1,6 +1,6 @@
 # Image list for Enterprise Agentgateway
 
-**v2026.6.0**
+**v2026.6.1**
 
 ## Helm Charts
 
@@ -21,31 +21,31 @@ helm pull oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/ent
 ### controller
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2026.6.0
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2026.6.1
 ```
 
 ### agentgateway proxy
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/agentgateway-enterprise:2026.6.0
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/agentgateway-enterprise:2026.6.1
 ```
 
 ### ext-cache (redis)
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/redis:2026.6.0
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/redis:2026.6.1
 ```
 
 ### ext-auth-service
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/ext-auth-service:2026.6.0
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/ext-auth-service:2026.6.1
 ```
 
 ### rate-limiter
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/rate-limiter:2026.6.0
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/rate-limiter:2026.6.1
 ```
 
 ### Image list for Solo UI
@@ -54,7 +54,7 @@ us-docker.pkg.dev/solo-public/enterprise-agentgateway/rate-limiter:2026.6.0
 
 > The Solo UI (`management` chart) versions independently of Enterprise
 > Agentgateway and is not installed in this cluster. Versions below are the
-> v2026.6.0 companions from the air-gapped install guide, not a live read.
+> v2026.6.1 companions from the air-gapped install guide, not a live read.
 
 Helm chart:
 

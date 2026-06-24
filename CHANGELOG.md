@@ -1,5 +1,9 @@
 # Changelog
 
+0.11.3 - (6-23-26)
+---
+- Update `ENTERPRISE_AGW_VERSION` to `v2026.6.1`
+
 0.11.2 - (6-19-26)
 ---
 - Add a JWT claim-based token rate limiting section to `global-token-rate-limiting.md` (CEL on `jwt.sub`, plus a composite `jwt.org`+`jwt.team` example)

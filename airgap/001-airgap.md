@@ -51,7 +51,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.6.0
+export ENTERPRISE_AGW_VERSION=v2026.6.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -87,7 +87,7 @@ ratelimitconfigs                    rlc               ratelimit.solo.io/v1alpha1
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> The top-level Helm `image.registry` and `image.tag` are the global default for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers all five images; extensions inherit it and are pinned to the chart-version tag (`2026.6.0`), matching the mirrored tags in the [image list](ably7-image-list.md).
+> The top-level Helm `image.registry` and `image.tag` are the global default for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers all five images; extensions inherit it and are pinned to the chart-version tag (`2026.6.1`), matching the mirrored tags in the [image list](ably7-image-list.md).
 
 Using Helm:
 ```bash
