@@ -36,7 +36,7 @@ After completing this track you should be able to:
 | Auth0 or Okta account | Required for OAuth labs only |
 | Claude Code or Claude Desktop | Required for agent harness labs |
 
-> If you haven't done the LLM Track yet, start with [001 — Install Enterprise Agentgateway](../001-install-enterprise-agentgateway.md) and [002 — Set Up UI and Monitoring Tools](../002-set-up-ui-and-monitoring-tools.md) before continuing here.
+> If you haven't done the LLM Track yet, start with [001 — Install Enterprise Agentgateway](../labs/installation/001-install-enterprise-agentgateway.md) and [002 — Set Up UI and Monitoring Tools](../labs/installation/002-set-up-ui-and-monitoring-tools.md) before continuing here.
 
 ---
 
@@ -48,9 +48,9 @@ After completing this track you should be able to:
 
 | Lab | What you'll learn |
 |---|---|
-| [In-Cluster MCP](../in-cluster-mcp.md) | Route agent traffic to an MCP server running inside the Kubernetes cluster |
-| [Remote MCP](../remote-mcp.md) | Proxy agent traffic to an MCP server running outside the cluster |
-| [Dynamic MCP](../dynamic-mcp.md) | Use label selectors to automatically pick up new MCP backend pods — no backend edits needed at scale |
+| [In-Cluster MCP](../labs/mcp/in-cluster-mcp.md) | Route agent traffic to an MCP server running inside the Kubernetes cluster |
+| [Remote MCP](../labs/mcp/remote-mcp.md) | Proxy agent traffic to an MCP server running outside the cluster |
+| [Dynamic MCP](../labs/mcp/dynamic-mcp.md) | Use label selectors to automatically pick up new MCP backend pods — no backend edits needed at scale |
 
 ---
 
@@ -60,8 +60,8 @@ After completing this track you should be able to:
 
 | Lab | What you'll learn |
 |---|---|
-| [OpenAPI to MCP — External API](../openapi-to-mcp-external-api.md) | Point the gateway at a public OpenAPI spec and expose its operations as MCP tools |
-| [OpenAPI to MCP — In-Cluster Deployment](../openapi-to-mcp-in-cluster.md) | Do the same for an in-cluster service, keeping all traffic inside the mesh |
+| [OpenAPI to MCP — External API](../labs/mcp/openapi-to-mcp-external-api.md) | Point the gateway at a public OpenAPI spec and expose its operations as MCP tools |
+| [OpenAPI to MCP — In-Cluster Deployment](../labs/mcp/openapi-to-mcp-in-cluster.md) | Do the same for an in-cluster service, keeping all traffic inside the mesh |
 
 ---
 
@@ -71,9 +71,9 @@ After completing this track you should be able to:
 
 | Lab | What you'll learn |
 |---|---|
-| [MCP Tool Federation](../mcp-tool-federation.md) | Merge multiple MCP backends behind one backend address with tool-name prefixing, FailOpen, and per-persona filtering |
-| [MCP Tool Mode — Search](../mcp-tool-mode-search.md) | Expose `get_tool` and `invoke_tool` meta-tools so agents can discover and call tools programmatically |
-| [MCP Tool Mode — Code](../mcp-tool-mode-code.md) | Expose a `run_code` tool that executes JavaScript in a sandboxed runtime on the gateway |
+| [MCP Tool Federation](../labs/mcp/mcp-tool-federation.md) | Merge multiple MCP backends behind one backend address with tool-name prefixing, FailOpen, and per-persona filtering |
+| [MCP Tool Mode — Search](../labs/mcp/mcp-tool-mode-search.md) | Expose `get_tool` and `invoke_tool` meta-tools so agents can discover and call tools programmatically |
+| [MCP Tool Mode — Code](../labs/mcp/mcp-tool-mode-code.md) | Expose a `run_code` tool that executes JavaScript in a sandboxed runtime on the gateway |
 
 ---
 
@@ -83,10 +83,10 @@ After completing this track you should be able to:
 
 | Lab | What you'll learn |
 |---|---|
-| [MCP BYO gRPC External Authorization](../mcp-byo-grpc-ext-authz.md) | Integrate your own ext-authz gRPC service for custom tool-level policy |
-| [MCP Eager OAuth with Auth0](../mcp-eager-auth-auth0.md) | Configure the gateway as the OAuth Authorization Server for Auth0; agents get tokens directly from the gateway |
-| [MCP Eager OAuth with Okta](../mcp-eager-auth-okta.md) | Same pattern with Okta as the backing IdP |
-| [MCP Pre-Issuance Entitlement Gating with Auth0](../mcp-eager-auth-auth0-pre-issuance-authz.md) | Add a gRPC ext-authz hook that checks entitlements before issuing OAuth tokens — denied users are redirected before they get any credentials |
+| [MCP BYO gRPC External Authorization](../labs/mcp/mcp-byo-grpc-ext-authz.md) | Integrate your own ext-authz gRPC service for custom tool-level policy |
+| [MCP Eager OAuth with Auth0](../labs/mcp/mcp-eager-auth-auth0.md) | Configure the gateway as the OAuth Authorization Server for Auth0; agents get tokens directly from the gateway |
+| [MCP Eager OAuth with Okta](../labs/mcp/mcp-eager-auth-okta.md) | Same pattern with Okta as the backing IdP |
+| [MCP Pre-Issuance Entitlement Gating with Auth0](../labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) | Add a gRPC ext-authz hook that checks entitlements before issuing OAuth tokens — denied users are redirected before they get any credentials |
 
 ---
 
@@ -96,7 +96,7 @@ After completing this track you should be able to:
 
 | Lab | What you'll learn |
 |---|---|
-| [MCP Tool Rate Limiting](../mcp-tool-rate-limiting.md) | Configure per-tool rate limits and observe enforcement in Grafana |
+| [MCP Tool Rate Limiting](../labs/mcp/mcp-tool-rate-limiting.md) | Configure per-tool rate limits and observe enforcement in Grafana |
 
 ---
 
@@ -106,9 +106,9 @@ After completing this track you should be able to:
 
 | Lab | What you'll learn |
 |---|---|
-| [OBO Token Exchange Fundamentals](../obo-token-exchange-fundamentals.md) | Understand impersonation vs. delegation; walk through an OBO token exchange end-to-end |
-| [Microsoft Entra ID OBO](../msft-entra-obo.md) | Configure OBO token exchange with Microsoft Entra ID (formerly Azure AD) |
-| [CrewAI Agent with MCP and OBO Auth](../obo-crewai-agent-with-mcp.md) | Wire a real CrewAI multi-agent workflow through the gateway with OBO delegation on every tool call |
+| [OBO Token Exchange Fundamentals](../labs/identity-delegation/obo-token-exchange-fundamentals.md) | Understand impersonation vs. delegation; walk through an OBO token exchange end-to-end |
+| [Microsoft Entra ID OBO](../labs/identity-delegation/msft-entra-obo.md) | Configure OBO token exchange with Microsoft Entra ID (formerly Azure AD) |
+| [CrewAI Agent with MCP and OBO Auth](../labs/mcp/obo-crewai-agent-with-mcp.md) | Wire a real CrewAI multi-agent workflow through the gateway with OBO delegation on every tool call |
 
 ---
 
@@ -118,12 +118,12 @@ After completing this track you should be able to:
 
 | Lab | What you'll learn |
 |---|---|
-| [CrewAI with Agentgateway](../crewai-with-agentgateway.md) | Connect a CrewAI multi-agent workflow to LLM and MCP backends through the gateway |
-| [LangChain with Agentgateway](../langchain-with-agentgateway.md) | Connect a LangChain agent pipeline to the gateway |
-| [Claude Code](../claude-code.md) | Configure Claude Code CLI to use the gateway as its MCP server |
-| [Claude Desktop](../claude-desktop.md) | Configure Claude Desktop as an MCP client pointing at the gateway |
-| [Claude Code with Eager OAuth (Auth0)](../mcp-eager-auth-auth0.md#step-10--test-with-claude-code) | Use Claude Code as an OAuth-authenticated MCP client against the Auth0-secured gateway |
-| [Claude Code with Eager OAuth (Okta)](../mcp-eager-auth-okta.md#step-10--test-with-claude-code) | Same with Okta as the IdP |
+| [CrewAI with Agentgateway](../labs/agent-frameworks/crewai-with-agentgateway.md) | Connect a CrewAI multi-agent workflow to LLM and MCP backends through the gateway |
+| [LangChain with Agentgateway](../labs/agent-frameworks/langchain-with-agentgateway.md) | Connect a LangChain agent pipeline to the gateway |
+| [Claude Code](../labs/agent-harnesses/claude-code.md) | Configure Claude Code CLI to use the gateway as its MCP server |
+| [Claude Desktop](../labs/agent-harnesses/claude-desktop.md) | Configure Claude Desktop as an MCP client pointing at the gateway |
+| [Claude Code with Eager OAuth (Auth0)](../labs/mcp/mcp-eager-auth-auth0.md#step-10--test-with-claude-code) | Use Claude Code as an OAuth-authenticated MCP client against the Auth0-secured gateway |
+| [Claude Code with Eager OAuth (Okta)](../labs/mcp/mcp-eager-auth-okta.md#step-10--test-with-claude-code) | Same with Okta as the IdP |
 
 ---
 
@@ -133,8 +133,8 @@ After completing this track you should be able to:
 
 | Lab | What you'll learn |
 |---|---|
-| [MCP Load Testing with k6](../mcp-load-testing-k6.md) | Generate realistic MCP tool-call traffic at ramping and constant load; observe in Grafana |
-| [Production Observability, Alerting, and Scaling](../production-observability-alerting-and-scaling.md) | Configure Prometheus alerts, Grafana dashboards, and HPA rules for the gateway |
+| [MCP Load Testing with k6](../labs/load-testing/mcp-load-testing-k6.md) | Generate realistic MCP tool-call traffic at ramping and constant load; observe in Grafana |
+| [Production Observability, Alerting, and Scaling](../labs/observability/production-observability-alerting-and-scaling.md) | Configure Prometheus alerts, Grafana dashboards, and HPA rules for the gateway |
 
 ---
 

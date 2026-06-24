@@ -21,7 +21,7 @@ MCP traffic flows over HTTP (POST requests to your MCP endpoint), so all standar
 | Path | `/mcp` (or your MCP route path) |
 | Headers | All HTTP headers (Authorization, custom headers, etc.) |
 
-This means the same gRPC ext-authz server used for [LLM ext-authz](llm-byo-grpc-ext-authz.md) works for MCP without any code changes.
+This means the same gRPC ext-authz server used for [LLM ext-authz](../security/llm-byo-grpc-ext-authz.md) works for MCP without any code changes.
 
 > **Note:** ext-authz operates at the HTTP transport layer. It does not inspect the MCP protocol payload (e.g., which tool is being called). For per-tool authorization, use the built-in `mcpAuthorization` CEL policy instead, or combine both for layered security.
 
@@ -227,7 +227,7 @@ spec:
 EOF
 ```
 
-> **Note:** You can also target the Gateway to apply ext-authz to all routes (LLM + MCP). See the [LLM BYO gRPC ext-authz](llm-byo-grpc-ext-authz.md) lab for a Gateway-level example.
+> **Note:** You can also target the Gateway to apply ext-authz to all routes (LLM + MCP). See the [LLM BYO gRPC ext-authz](../security/llm-byo-grpc-ext-authz.md) lab for a Gateway-level example.
 
 ## Test: MCP request denied without required header
 

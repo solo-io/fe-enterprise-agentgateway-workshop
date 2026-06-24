@@ -1,5 +1,9 @@
 # Changelog
 
+0.11.4 - (6-24-26)
+---
+- Move all labs into `labs/<category>/` subdirectories and update all relative links in labs, tracks, and README
+
 0.11.3 - (6-23-26)
 ---
 - Update `ENTERPRISE_AGW_VERSION` to `v2026.6.1`

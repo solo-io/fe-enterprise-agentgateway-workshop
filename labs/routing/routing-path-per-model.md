@@ -1,10 +1,11 @@
-# Configure Fixed Path + Query Parameter Matching Routing Example
+# Configure path-per-model Routing Example
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
-- Configure LLM routing example with fixed-path + queryparameter matcher to access endpoint
+- Configure `EnterpriseAgentgatewayBackend` per model using model override parameter
+- Configure LLM routing example with path-per-model to access endpoint
 - Curl OpenAI endpoints through the agentgateway proxy
 - Validate path to model mapping
 - Cleanup routes to start fresh for the next lab
@@ -16,7 +17,20 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Lets create an OpenAI `EnterpriseAgentgatewayBackend` per specific-model if you haven't already
+### Configure LLM routing example with path-per-model to access endpoints
+Our previous `EnterpriseAgentgatewayBackend` allows the user to specify any `model` parameter in the request body. In order to restrict access to specific models, we can configure a model override in the `EnterpriseAgentgatewayBackend`
+```
+provider:
+  openai:
+    model: "gpt-4o-mini"
+```
+When a model override is configured, the gateway will override any user-input `model` parameter in the request body (e.g. if user supplies `model: gpt-5-2025-08-07` it will be overridden to `gpt-4o-mini`)
+
+With this option, we can create an `EnterpriseAgentgatewayBackend` per model if we want more granular control of access to models. 
+
+**Additionally, when model overrides are specified, the client does not have to supply a `model` parameter in the request body, since the gateway will inject it. The client can input a model in the request body, but effectively it will just be overwritten.**
+
+Lets create an OpenAI `EnterpriseAgentgatewayBackend` per specific-model
 ```bash
 kubectl apply -f - <<EOF
 ---
@@ -70,9 +84,7 @@ spec:
 EOF
 ```
 
-### Configure LLM routing example with fixed path + header matching to access endpoints
-
-Now we can configure a `HTTPRoute` that has a specific path-per-model endpoint using the same backends we used previously
+Now we can configure a `HTTPRoute` that has a specific path-per-model endpoint
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -88,11 +100,7 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /openai
-          queryParams:
-          - type: Exact
-            name: model
-            value: gpt-3.5-turbo
+            value: /openai/gpt-3.5-turbo
       backendRefs:
         - name: openai-gpt-3.5-turbo
           group: enterpriseagentgateway.solo.io
@@ -102,11 +110,7 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /openai
-          queryParams:
-          - type: Exact
-            name: model
-            value: gpt-4o-mini
+            value: /openai/gpt-4o-mini
       backendRefs:
         - name: openai-gpt-4o-mini
           group: enterpriseagentgateway.solo.io
@@ -116,11 +120,7 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /openai
-          queryParams:
-          - type: Exact
-            name: model
-            value: gpt-4o
+            value: /openai/gpt-4o
       backendRefs:
         - name: openai-gpt-4o
           group: enterpriseagentgateway.solo.io
@@ -130,11 +130,11 @@ spec:
 EOF
 ```
 
-## curl /openai with the "model=gpt-3.5-turbo" query parameter
+## curl /openai/gpt-3.5-turbo
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai?model=gpt-3.5-turbo" \
+curl -i "$GATEWAY_IP:8080/openai/gpt-3.5-turbo" \
   -H "content-type: application/json" \
   -d '{
     "messages": [
@@ -147,9 +147,9 @@ curl -i "$GATEWAY_IP:8080/openai?model=gpt-3.5-turbo" \
 ```
 We should see that the response shows that the model used was `gpt-3.5-turbo-0125`
 
-## curl /openai with the "model=gpt-4o-mini" query parameter
+## curl /openai/gpt-4o-mini
 ```bash
-curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o-mini" \
+curl -i "$GATEWAY_IP:8080/openai/gpt-4o-mini" \
   -H "content-type: application/json" \
   -d '{
     "messages": [
@@ -162,9 +162,9 @@ curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o-mini" \
 ```
 We should see that the response shows that the model used was `gpt-4o-mini-2024-07-18`
 
-## curl /openai with the "model=gpt-4o" query parameter
+## curl /openai/gpt-4o
 ```bash
-curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o" \
+curl -i "$GATEWAY_IP:8080/openai/gpt-4o" \
   -H "content-type: application/json" \
   -d '{
     "messages": [
@@ -190,7 +190,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../installation/002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash
@@ -246,7 +246,7 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 ```bash
 kubectl delete httproute -n agentgateway-system openai
 kubectl delete secret -n agentgateway-system openai-secret
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-3.5-turbo
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o-mini
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-3.5-turbo
 ```

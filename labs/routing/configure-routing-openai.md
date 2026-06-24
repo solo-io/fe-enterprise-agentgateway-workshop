@@ -1,49 +1,34 @@
-# Configure Basic Routing to Azure OpenAI
+# Configure Basic Routing to OpenAI
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
-- Create a Kubernetes secret that contains our Azure OpenAI api-key credentials
-- Create a route to Azure OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
-- Curl Azure OpenAI through the agentgateway proxy
+- Create a Kubernetes secret that contains our OpenAI api-key credentials
+- Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Curl OpenAI through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
 ### Configure Required Variables
-
-Set the following environment variables to match your Azure OpenAI deployment.
-For reference, an endpoint typically follows this format:
-`https://${ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-01`
-
-**Note:** The ENDPOINT should be just the hostname without the `https://` scheme (e.g., `my-endpoint.openai.azure.com`)
-
+Replace with a valid OpenAI API key
 ```bash
-export AZURE_OPENAI_API_KEY="<API-KEY>"
-export ENDPOINT="<AZURE-OPENAI-ENDPOINT>"  # Just the hostname, no https://
-export DEPLOYMENT_NAME="<DEPLOYMENT-NAME>"
+export OPENAI_API_KEY=$OPENAI_API_KEY
 ```
 
-Create azure openai api-key secret
+Create openai api-key secret
 ```bash
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: azureopenai-secret
-  namespace: agentgateway-system # Putting in same ns where the redis, ext auth is getting deployed
-type: Opaque
-stringData:
-  Authorization: "Bearer ${AZURE_OPENAI_API_KEY}"
-EOF
+kubectl create secret generic openai-secret -n agentgateway-system \
+--from-literal="Authorization=Bearer $OPENAI_API_KEY" \
+--dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create azure openai route and backend
+Create openai route and backend
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: azure-openai
+  name: openai
   namespace: agentgateway-system
 spec:
   parentRefs:
@@ -53,9 +38,9 @@ spec:
     - matches:
         - path:
             type: PathPrefix
-            value: /azure
+            value: /openai
       backendRefs:
-        - name: azure-openai
+        - name: openai-all-models
           group: enterpriseagentgateway.solo.io
           kind: EnterpriseAgentgatewayBackend
       timeouts:
@@ -64,26 +49,26 @@ spec:
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayBackend
 metadata:
-  name: azure-openai
+  name: openai-all-models
   namespace: agentgateway-system
 spec:
   ai:
     provider:
-      azureopenai:
-        endpoint: "${ENDPOINT}"
-        deploymentName: "${DEPLOYMENT_NAME}"
+      openai: {}
+        #--- Uncomment to configure model override ---
+        #model: ""
   policies:
     auth:
       secretRef:
-        name: azureopenai-secret
+        name: openai-secret
 EOF
 ```
 
-## curl azure openai
+## curl openai
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/azure" \
+curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-4o-mini",
@@ -109,7 +94,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../installation/002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash
@@ -163,7 +148,7 @@ Navigate to http://localhost:16686 in your browser to see traces with LLM-specif
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n agentgateway-system azure-openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system azure-openai
-kubectl delete secret -n agentgateway-system azureopenai-secret
+kubectl delete httproute -n agentgateway-system openai
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete secret -n agentgateway-system openai-secret
 ```

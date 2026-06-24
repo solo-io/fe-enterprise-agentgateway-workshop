@@ -293,7 +293,7 @@ Look for `gRPC server listening` on port `9002` — this is the ext-proc endpoin
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](002-set-up-ui-and-monitoring-tools.md). For traces, use Tempo through the Grafana **Explore** view.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../installation/002-set-up-ui-and-monitoring-tools.md). For traces, use Tempo through the Grafana **Explore** view.
 
 1. Port-forward to the Grafana service:
    ```bash

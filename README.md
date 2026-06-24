@@ -10,7 +10,7 @@ Before starting this workshop, you will need:
 - kubectl CLI installed and configured
 - helm CLI installed
 
-See [System Requirements](system-requirements.md) for detailed cluster sizing, version support, and resource recommendations.
+See [System Requirements](labs/installation/system-requirements.md) for detailed cluster sizing, version support, and resource recommendations.
 
 # Table of Contents
 
@@ -34,160 +34,160 @@ See [System Requirements](system-requirements.md) for detailed cluster sizing, v
 
 > **Start here.** All other labs depend on these two.
 
-- [001 — Install Enterprise Agentgateway](001-install-enterprise-agentgateway.md)
-- [002 — Set Up UI and Monitoring Tools](002-set-up-ui-and-monitoring-tools.md)
+- [001 — Install Enterprise Agentgateway](labs/installation/001-install-enterprise-agentgateway.md)
+- [002 — Set Up UI and Monitoring Tools](labs/installation/002-set-up-ui-and-monitoring-tools.md)
 
 > **OpenShift users:** Use the OpenShift-specific versions instead:
 >
-> [001 — Install Enterprise Agentgateway (OCP)](install-on-openshift/001-set-up-enterprise-agentgateway-ocp.md)
+> [001 — Install Enterprise Agentgateway (OCP)](labs/installation/openshift/001-set-up-enterprise-agentgateway-ocp.md)
 >
-> [002 — Set Up Monitoring Tools (OCP)](install-on-openshift/002-set-up-monitoring-tools-ocp.md)
+> [002 — Set Up Monitoring Tools (OCP)](labs/installation/openshift/002-set-up-monitoring-tools-ocp.md)
 
 > **Air-gapped / private-registry users:** Use the air-gap variant that mirrors all chart-managed images into a private registry:
 >
-> [001 — Install Enterprise Agentgateway (Air-Gap)](airgap/001-airgap.md)
+> [001 — Install Enterprise Agentgateway (Air-Gap)](labs/installation/airgap/001-airgap.md)
 
 ---
 
 ## Routing
 
-- [Configure Mock OpenAI Server](configure-mock-openai-server.md) _(OpenAI)_
-- [Basic Routing to OpenAI](configure-routing-openai.md) _(OpenAI)_
-- [Path-per-Model Routing](routing-path-per-model.md) _(OpenAI)_
-- [Header Matching Routing](routing-header-matching.md) _(OpenAI)_
-- [Query Parameter Matching Routing](routing-query-parameter-matching.md) _(OpenAI)_
-- [Body-Based Routing](configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
-- [Routing to AWS Bedrock](configure-routing-aws-bedrock.md) _(AWS Bedrock)_
-- [Routing to AWS Bedrock via API Keys](configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
-- [AWS Bedrock with IRSA](configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_
-- [AWS Bedrock Titan Embeddings](configure-routing-aws-bedrock-titan-embeddings.md) _(AWS Bedrock)_
-- [Routing to Anthropic](configure-routing-anthropic.md) _(Anthropic)_
-- [Routing to Azure OpenAI](configure-routing-azure-openai.md) _(Azure OpenAI)_
-- [Routing to Google Vertex AI](configure-routing-vertexai.md) _(Google Vertex AI)_
-- [Routing to Google Vertex AI via Service Account](configure-routing-vertexai-service-account.md) _(Google Vertex AI)_
-- [OpenAI Embeddings](configure-openai-embeddings.md) _(OpenAI)_
-- [OpenAI Batch API](configure-openai-batches.md) _(OpenAI)_
-- [OpenAI Streaming](openai-streaming.md) _(OpenAI)_
-- [OpenAI Audio (TTS & STT)](openai-audio.md) _(OpenAI)_
-- [OpenAI Video Generation (Sora)](openai-video.md) _(OpenAI)_
-- [Direct Response](direct-response.md)
-- [Timeouts and Retries](timeouts-and-retries.md)
-- [LLM Failover](llm-failover.md)
-- [Advanced LLM Failover Patterns](llm-failover-advanced.md)
+- [Configure Mock OpenAI Server](labs/routing/configure-mock-openai-server.md) _(OpenAI)_
+- [Basic Routing to OpenAI](labs/routing/configure-routing-openai.md) _(OpenAI)_
+- [Path-per-Model Routing](labs/routing/routing-path-per-model.md) _(OpenAI)_
+- [Header Matching Routing](labs/routing/routing-header-matching.md) _(OpenAI)_
+- [Query Parameter Matching Routing](labs/routing/routing-query-parameter-matching.md) _(OpenAI)_
+- [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
+- [Routing to AWS Bedrock](labs/routing/configure-routing-aws-bedrock.md) _(AWS Bedrock)_
+- [Routing to AWS Bedrock via API Keys](labs/routing/configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
+- [AWS Bedrock with IRSA](labs/routing/configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_
+- [AWS Bedrock Titan Embeddings](labs/routing/configure-routing-aws-bedrock-titan-embeddings.md) _(AWS Bedrock)_
+- [Routing to Anthropic](labs/routing/configure-routing-anthropic.md) _(Anthropic)_
+- [Routing to Azure OpenAI](labs/routing/configure-routing-azure-openai.md) _(Azure OpenAI)_
+- [Routing to Google Vertex AI](labs/routing/configure-routing-vertexai.md) _(Google Vertex AI)_
+- [Routing to Google Vertex AI via Service Account](labs/routing/configure-routing-vertexai-service-account.md) _(Google Vertex AI)_
+- [OpenAI Embeddings](labs/routing/configure-openai-embeddings.md) _(OpenAI)_
+- [OpenAI Batch API](labs/routing/configure-openai-batches.md) _(OpenAI)_
+- [OpenAI Streaming](labs/routing/openai-streaming.md) _(OpenAI)_
+- [OpenAI Audio (TTS & STT)](labs/routing/openai-audio.md) _(OpenAI)_
+- [OpenAI Video Generation (Sora)](labs/routing/openai-video.md) _(OpenAI)_
+- [Direct Response](labs/routing/direct-response.md)
+- [Timeouts and Retries](labs/routing/timeouts-and-retries.md)
+- [LLM Failover](labs/routing/llm-failover.md)
+- [Advanced LLM Failover Patterns](labs/routing/llm-failover-advanced.md)
 
 ---
 
 ## Inference
 
-- [Inference Routing with vLLM](configure-inference-routing-with-vllm.md) _(in-cluster vLLM + Gateway API Inference Extension)_
+- [Inference Routing with vLLM](labs/inference/configure-inference-routing-with-vllm.md) _(in-cluster vLLM + Gateway API Inference Extension)_
 
 ---
 
 ## Security
 
-- [API Key Masking](api-key-masking.md)
-- [Virtual Keys](virtual-keys.md) _(see also: Rate Limiting)_
-- [JWT Auth with RBAC](jwt-auth-with-rbac.md)
-- [TLS Termination](tls-termination.md)
-- [Frontend mTLS](frontend-mtls.md)
-- [SNI Matching](sni-matching.md)
-- [LLM BYO gRPC External Authorization (ext-authz)](llm-byo-grpc-ext-authz.md)
-- [OPA Authorization](opa-authorization.md)
-- [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: MCP)_
-- [MCP Eager OAuth with Okta](mcp-eager-auth-okta.md) _(see also: MCP)_
-- [MCP Pre-Issuance Entitlement Gating with Auth0](mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Identity & Delegation)_
+- [API Key Masking](labs/security/api-key-masking.md)
+- [Virtual Keys](labs/security/virtual-keys.md) _(see also: Rate Limiting)_
+- [JWT Auth with RBAC](labs/security/jwt-auth-with-rbac.md)
+- [TLS Termination](labs/security/tls-termination.md)
+- [Frontend mTLS](labs/security/frontend-mtls.md)
+- [SNI Matching](labs/security/sni-matching.md)
+- [LLM BYO gRPC External Authorization (ext-authz)](labs/security/llm-byo-grpc-ext-authz.md)
+- [OPA Authorization](labs/security/opa-authorization.md)
+- [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: MCP)_
+- [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: MCP)_
+- [MCP Pre-Issuance Entitlement Gating with Auth0](labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Identity & Delegation)_
 
 ---
 
 ## Rate Limiting
 
-- [Request-Based Rate Limiting](request-based-rate-limiting.md)
-- [Local Token-Based Rate Limiting](local-token-rate-limiting.md)
-- [Global Token-Based Rate Limiting](global-token-rate-limiting.md)
-- [Virtual Keys](virtual-keys.md) _(see also: Security)_
-- [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: MCP)_
+- [Request-Based Rate Limiting](labs/rate-limiting/request-based-rate-limiting.md)
+- [Local Token-Based Rate Limiting](labs/rate-limiting/local-token-rate-limiting.md)
+- [Global Token-Based Rate Limiting](labs/rate-limiting/global-token-rate-limiting.md)
+- [Virtual Keys](labs/security/virtual-keys.md) _(see also: Security)_
+- [MCP Tool Rate Limiting](labs/mcp/mcp-tool-rate-limiting.md) _(see also: MCP)_
 
 ---
 
 ## Guardrails
 
-- [Built-in Guardrails](builtin-guardrails.md)
-- [External Moderation (OpenAI)](external-moderation-guardrails.md)
-- [Advanced Guardrails Webhook](advanced-guardrails-webhook.md)
+- [Built-in Guardrails](labs/guardrails/builtin-guardrails.md)
+- [External Moderation (OpenAI)](labs/guardrails/external-moderation-guardrails.md)
+- [Advanced Guardrails Webhook](labs/guardrails/advanced-guardrails-webhook.md)
 
 ---
 
 ## Transformations
 
-- [Prompt Enrichment](prompt-enrichment.md)
-- [Request/Response Transformations](transformations.md)
-- [Body-Based Routing](configure-body-based-routing.md) _(see also: Routing)_
+- [Prompt Enrichment](labs/transformations/prompt-enrichment.md)
+- [Request/Response Transformations](labs/transformations/transformations.md)
+- [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(see also: Routing)_
 
 ---
 
 ## MCP (Model Context Protocol)
 
-- [In-Cluster MCP](in-cluster-mcp.md)
-- [Remote MCP](remote-mcp.md)
-- [Dynamic MCP](dynamic-mcp.md)
-- [OpenAPI to MCP — External API](openapi-to-mcp-external-api.md)
-- [OpenAPI to MCP — In-Cluster Deployment](openapi-to-mcp-in-cluster.md)
-- [MCP Tool Federation](mcp-tool-federation.md)
-- [MCP Tool Mode — Search](mcp-tool-mode-search.md)
-- [MCP Tool Mode — Code](mcp-tool-mode-code.md)
-- [MCP Tool Rate Limiting](mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
-- [MCP BYO gRPC External Authorization (ext-authz)](mcp-byo-grpc-ext-authz.md) _(see also: Security)_
-- [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: Security, Identity & Delegation)_
-- [MCP Eager OAuth with Okta](mcp-eager-auth-okta.md) _(see also: Security, Identity & Delegation)_
-- [MCP Pre-Issuance Entitlement Gating with Auth0](mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: Security, Identity & Delegation)_
-- [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
+- [In-Cluster MCP](labs/mcp/in-cluster-mcp.md)
+- [Remote MCP](labs/mcp/remote-mcp.md)
+- [Dynamic MCP](labs/mcp/dynamic-mcp.md)
+- [OpenAPI to MCP — External API](labs/mcp/openapi-to-mcp-external-api.md)
+- [OpenAPI to MCP — In-Cluster Deployment](labs/mcp/openapi-to-mcp-in-cluster.md)
+- [MCP Tool Federation](labs/mcp/mcp-tool-federation.md)
+- [MCP Tool Mode — Search](labs/mcp/mcp-tool-mode-search.md)
+- [MCP Tool Mode — Code](labs/mcp/mcp-tool-mode-code.md)
+- [MCP Tool Rate Limiting](labs/mcp/mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
+- [MCP BYO gRPC External Authorization (ext-authz)](labs/mcp/mcp-byo-grpc-ext-authz.md) _(see also: Security)_
+- [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: Security, Identity & Delegation)_
+- [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: Security, Identity & Delegation)_
+- [MCP Pre-Issuance Entitlement Gating with Auth0](labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: Security, Identity & Delegation)_
+- [CrewAI Agent with MCP and OBO Auth](labs/mcp/obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
 
 ---
 
 ## Agent Frameworks
 
-- [CrewAI](crewai-with-agentgateway.md)
-- [LangChain](langchain-with-agentgateway.md)
+- [CrewAI](labs/agent-frameworks/crewai-with-agentgateway.md)
+- [LangChain](labs/agent-frameworks/langchain-with-agentgateway.md)
 
 ---
 
 ## Agent Harnesses
 
-- [Claude Code](claude-code.md)
-- [Claude Desktop](claude-desktop.md)
-- [Claude Code as MCP Client with Eager OAuth (Auth0)](mcp-eager-auth-auth0.md#step-10--test-with-claude-code)
-- [Claude Code as MCP Client with Eager OAuth (Okta)](mcp-eager-auth-okta.md#step-10--test-with-claude-code)
+- [Claude Code](labs/agent-harnesses/claude-code.md)
+- [Claude Desktop](labs/agent-harnesses/claude-desktop.md)
+- [Claude Code as MCP Client with Eager OAuth (Auth0)](labs/mcp/mcp-eager-auth-auth0.md#step-10--test-with-claude-code)
+- [Claude Code as MCP Client with Eager OAuth (Okta)](labs/mcp/mcp-eager-auth-okta.md#step-10--test-with-claude-code)
 
 ---
 
 ## Identity & Delegation
 
-- [OBO Token Exchange Fundamentals](obo-token-exchange-fundamentals.md)
-- [CrewAI Agent with MCP and OBO Auth](obo-crewai-agent-with-mcp.md) _(see also: MCP)_
-- [Microsoft Entra ID OBO](msft-entra-obo.md)
-- [MCP Eager OAuth with Auth0](mcp-eager-auth-auth0.md) _(see also: MCP)_
-- [MCP Eager OAuth with Okta](mcp-eager-auth-okta.md) _(see also: MCP)_
-- [MCP Pre-Issuance Entitlement Gating with Auth0](mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Security)_
+- [OBO Token Exchange Fundamentals](labs/identity-delegation/obo-token-exchange-fundamentals.md)
+- [CrewAI Agent with MCP and OBO Auth](labs/mcp/obo-crewai-agent-with-mcp.md) _(see also: MCP)_
+- [Microsoft Entra ID OBO](labs/identity-delegation/msft-entra-obo.md)
+- [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: MCP)_
+- [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: MCP)_
+- [MCP Pre-Issuance Entitlement Gating with Auth0](labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Security)_
 
 ---
 
 ## Evaluations
 
-- [Evaluate OpenAI Model Performance](evaluate-openai-model-performance.md)
+- [Evaluate OpenAI Model Performance](labs/evaluations/evaluate-openai-model-performance.md)
 
 ---
 
 ## Load Testing
 
-- [LLM Load Testing with k6](llm-load-testing-k6.md)
-- [MCP Load Testing with k6](mcp-load-testing-k6.md)
+- [LLM Load Testing with k6](labs/load-testing/llm-load-testing-k6.md)
+- [MCP Load Testing with k6](labs/load-testing/mcp-load-testing-k6.md)
 
 ---
 
 ## Observability
 
-- [LLM Cost Tracking](llm-cost-tracking.md) _(see also: Security, Rate Limiting)_
-- [Production Observability, Alerting, and Scaling](production-observability-alerting-and-scaling.md)
+- [LLM Cost Tracking](labs/observability/llm-cost-tracking.md) _(see also: Security, Rate Limiting)_
+- [Production Observability, Alerting, and Scaling](labs/observability/production-observability-alerting-and-scaling.md)
 
 # Use Cases
 - Support Kubernetes Gateway API
