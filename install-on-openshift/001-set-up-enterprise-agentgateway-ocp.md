@@ -49,7 +49,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.6.0
+export ENTERPRISE_AGW_VERSION=v2026.6.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -216,7 +216,7 @@ The configuration below shows the customizations exposed through `EnterpriseAgen
 
 This is the developer's slice: a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the settings the app team owns — deployment, service, logging, observability, and the proxy's OpenShift `securityContext` deletion — and omits `sharedExtensions`, which the operator set at the GatewayClass level in the previous step. The two resources merge, with this per-Gateway config layering on top of the class default. The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`.
 
-For air-gapped or private-registry installs, set the registry once at the Helm chart level with the global `image.registry` value shown in the controller install step above — as of `v2026.6.0` that value flows through to the proxy and all extension images automatically, so no per-image overrides are needed here. (If a single extension ever needs a different registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` supports a highest-precedence `spec.sharedExtensions.<name>.image` override.)
+For air-gapped or private-registry installs, set the registry once at the Helm chart level with the global `image.registry` value shown in the controller install step above — as of `v2026.6.1` that value flows through to the proxy and all extension images automatically, so no per-image overrides are needed here. (If a single extension ever needs a different registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` supports a highest-precedence `spec.sharedExtensions.<name>.image` override.)
 
 ```bash
 kubectl apply -f- <<'EOF'

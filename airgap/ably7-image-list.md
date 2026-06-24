@@ -2,31 +2,31 @@
 
 Mirrored from the Enterprise Agentgateway workshop image list to `docker.io/ably7`.
 
-## Enterprise Agentgateway (v2026.6.0)
+## Enterprise Agentgateway (v2026.6.1)
 
 ### controller
 ```
-docker.io/ably7/enterprise-agentgateway-controller:2026.6.0
+docker.io/ably7/enterprise-agentgateway-controller:2026.6.1
 ```
 
 ### agentgateway proxy
 ```
-docker.io/ably7/agentgateway-enterprise:2026.6.0
+docker.io/ably7/agentgateway-enterprise:2026.6.1
 ```
 
 ### ext-cache (redis)
 ```
-docker.io/ably7/redis:2026.6.0
+docker.io/ably7/redis:2026.6.1
 ```
 
 ### ext-auth-service
 ```
-docker.io/ably7/ext-auth-service:2026.6.0
+docker.io/ably7/ext-auth-service:2026.6.1
 ```
 
 ### rate-limiter
 ```
-docker.io/ably7/rate-limiter:2026.6.0
+docker.io/ably7/rate-limiter:2026.6.1
 ```
 
 ## Solo UI (0.4.5)
