@@ -1,0 +1,255 @@
+# Configure Fixed Path + Header Matching Routing Example
+
+## Pre-requisites
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+
+## Lab Objectives
+- Configure LLM routing example with fixed-path + header match to access endpoint
+- Curl OpenAI endpoints through the agentgateway proxy
+- Validate path to model mapping
+- Cleanup routes to start fresh for the next lab
+
+Create openai api-key secret if it has not been created already
+```bash
+kubectl create secret generic openai-secret -n agentgateway-system \
+--from-literal="Authorization=Bearer $OPENAI_API_KEY" \
+--dry-run=client -oyaml | kubectl apply -f -
+```
+
+Lets create an OpenAI `EnterpriseAgentgatewayBackend` per specific-model if you haven't already
+```bash
+kubectl apply -f - <<EOF
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: openai-gpt-3.5-turbo
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai:
+        #--- Uncomment to configure model override ---
+        model: "gpt-3.5-turbo"
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: openai-gpt-4o-mini
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai:
+        #--- Uncomment to configure model override ---
+        model: "gpt-4o-mini"
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: openai-gpt-4o
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      openai:
+        #--- Uncomment to configure model override ---
+        model: "gpt-4o"
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+EOF
+```
+
+### Configure LLM routing example with fixed path + header matching to access endpoints
+
+Now we can configure a `HTTPRoute` that has a specific path-per-model endpoint using the same backends we used previously
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+          headers:
+          - type: Exact
+            name: model
+            value: gpt-3.5-turbo
+      backendRefs:
+        - name: openai-gpt-3.5-turbo
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+          headers:
+          - type: Exact
+            name: model
+            value: gpt-4o-mini
+      backendRefs:
+        - name: openai-gpt-4o-mini
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+          headers:
+          - type: Exact
+            name: model
+            value: gpt-4o
+      backendRefs:
+        - name: openai-gpt-4o
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+EOF
+```
+
+## curl /openai with the "model: gpt-3.5-turbo" header
+```bash
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "model: gpt-3.5-turbo" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+We should see that the response shows that the model used was `gpt-3.5-turbo-0125`
+
+## curl /openai with the "model: gpt-4o-mini" header
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "model: gpt-4o-mini" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+We should see that the response shows that the model used was `gpt-4o-mini-2024-07-18`
+
+## curl /openai with the "model: gpt-4o" header
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "model: gpt-4o" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+We should see that the response shows that the model used was `gpt-4o-2024-08-06`
+
+## Observability
+
+### View Metrics Endpoint
+
+AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
+
+```bash
+kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
+sleep 1 && curl -s http://localhost:15020/metrics && kill $!
+```
+
+### View Metrics and Traces in Grafana
+
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+
+1. Port-forward to the Grafana service:
+```bash
+kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
+```
+
+2. Open http://localhost:3000 in your browser
+
+3. Login with credentials:
+   - Username: `admin`
+   - Password: Value of `$GRAFANA_ADMIN_PASSWORD` (default: `prom-operator`)
+
+4. Navigate to **Dashboards > AgentGateway Dashboard** to view metrics
+
+The dashboard provides real-time visualization of:
+- Core GenAI metrics (request rates, token usage by model)
+- Streaming metrics (TTFT, TPOT)
+- MCP metrics (tool calls, server requests)
+- Connection and runtime metrics
+
+### View Traces in Grafana
+
+To view distributed traces with LLM-specific spans:
+
+1. In Grafana, navigate to **Home > Explore**
+2. Select **Tempo** from the data source dropdown
+3. Click **Search** to see all traces
+4. Filter traces by service, operation, or trace ID to find AgentGateway requests
+
+Traces include LLM-specific spans with information like `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more.
+
+### View Access Logs
+
+AgentGateway automatically logs detailed information about LLM requests to stdout:
+
+```bash
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
+```
+
+Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
+
+### (Optional) View Traces in Jaeger
+
+If you installed Jaeger in lab `/install-on-openshift/002-set-up-monitoring-tools-ocp.md` instead of Tempo, you can view traces in the UI:
+
+```bash
+kubectl port-forward svc/jaeger -n observability 16686:16686
+```
+
+Navigate to http://localhost:16686 in your browser to see traces with LLM-specific spans including `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
+
+## Cleanup
+```bash
+kubectl delete httproute -n agentgateway-system openai
+kubectl delete secret -n agentgateway-system openai-secret
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o-mini
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-3.5-turbo
+```

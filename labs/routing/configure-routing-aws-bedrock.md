@@ -1,0 +1,358 @@
+# Configure Routing to AWS Bedrock Provider
+
+## Pre-requisites
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+
+## Lab Objectives
+- Create a Kubernetes secret that contains our AWS Access Key credentials
+- Create a route to AWS Bedrock as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Curl AWS Bedrock through the agentgateway proxy
+- Validate the request went through the gateway in the Grafana UI
+
+## Export AWS Credentials
+Log in to AWS console and export the following variables
+```bash
+export AWS_ACCESS_KEY_ID="<aws access key id>"
+export AWS_SECRET_ACCESS_KEY="<aws secret access key>"
+export AWS_SESSION_TOKEN="<aws session token>"
+```
+
+echo the vars to make sure that they were exported
+```bash
+echo $AWS_ACCESS_KEY_ID
+echo $AWS_SECRET_ACCESS_KEY
+echo $AWS_SESSION_TOKEN
+```
+
+Create a secret containing an AWS access key
+```bash
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: bedrock-secret
+  namespace: agentgateway-system
+type: Opaque
+stringData:
+  accessKey: ${AWS_ACCESS_KEY_ID}
+  secretKey: ${AWS_SECRET_ACCESS_KEY}
+  sessionToken: ${AWS_SESSION_TOKEN}
+EOF
+```
+
+Create AWS Bedrock route and `EnterpriseAgentgatewayBackend`. For this setup we will configure multiple `AgentgatewayBackends` using a single provider (AWS Bedrock) in a path-per-model routing configuration
+```bash
+kubectl apply -f - <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: bedrock-mistral
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      bedrock:
+        model: mistral.voxtral-mini-3b-2507
+        region: us-west-2
+  policies:
+    auth:
+      aws:
+        secretRef:
+          name: bedrock-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: bedrock-haiku4.5
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      bedrock:
+        model: us.anthropic.claude-haiku-4-5-20251001-v1:0
+        region: us-west-2
+  policies:
+    auth:
+      aws:
+        secretRef:
+          name: bedrock-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: bedrock-opus
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      bedrock:
+        model: us.anthropic.claude-opus-4-7
+        region: us-west-2
+  policies:
+    auth:
+      aws:
+        secretRef:
+          name: bedrock-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: bedrock-sonnet
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      bedrock:
+        model: us.anthropic.claude-sonnet-4-6
+        region: us-west-2
+  policies:
+    auth:
+      aws:
+        secretRef:
+          name: bedrock-secret
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: bedrock-llama3-8b
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      bedrock:
+        model: meta.llama3-1-8b-instruct-v1:0
+        region: us-west-2
+  policies:
+    auth:
+      aws:
+        secretRef:
+          name: bedrock-secret
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: bedrock
+  namespace: agentgateway-system
+  labels:
+    example: bedrock-route
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bedrock/haiku
+      backendRefs:
+        - name: bedrock-haiku4.5
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bedrock/opus
+      backendRefs:
+        - name: bedrock-opus
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bedrock/sonnet
+      backendRefs:
+        - name: bedrock-sonnet
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bedrock/mistral
+      backendRefs:
+        - name: bedrock-mistral
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /bedrock/llama3-8b
+      backendRefs:
+        - name: bedrock-llama3-8b
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    # catch-all will route to the bedrock mistral upstream
+    - matches:
+        - path:
+            type: Exact
+            value: /bedrock
+      backendRefs:
+        - name: bedrock-mistral
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+EOF
+```
+
+## curl AWS Bedrock Mistral endpoint
+```bash
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+
+curl -i "$GATEWAY_IP:8080/bedrock/mistral" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+## curl AWS Bedrock Haiku endpoint
+```bash
+curl -i "$GATEWAY_IP:8080/bedrock/haiku" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+## curl AWS Bedrock Opus endpoint
+```bash
+curl -i "$GATEWAY_IP:8080/bedrock/opus" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+## curl AWS Bedrock Sonnet endpoint
+```bash
+curl -i "$GATEWAY_IP:8080/bedrock/sonnet" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+## curl AWS Bedrock llama3-8b endpoint
+```bash
+curl -i "$GATEWAY_IP:8080/bedrock/llama3-8b" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+## Observability
+
+### View Metrics Endpoint
+
+AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
+
+```bash
+kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
+sleep 1 && curl -s http://localhost:15020/metrics && kill $!
+```
+
+### View Metrics and Traces in Grafana
+
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+
+1. Port-forward to the Grafana service:
+```bash
+kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
+```
+
+2. Open http://localhost:3000 in your browser
+
+3. Login with credentials:
+   - Username: `admin`
+   - Password: Value of `$GRAFANA_ADMIN_PASSWORD` (default: `prom-operator`)
+
+4. Navigate to **Dashboards > AgentGateway Dashboard** to view metrics
+
+The dashboard provides real-time visualization of:
+- Core GenAI metrics (request rates, token usage by model)
+- Streaming metrics (TTFT, TPOT)
+- MCP metrics (tool calls, server requests)
+- Connection and runtime metrics
+
+### View Traces in Grafana
+
+To view distributed traces with LLM-specific spans:
+
+1. In Grafana, navigate to **Home > Explore**
+2. Select **Tempo** from the data source dropdown
+3. Click **Search** to see all traces
+4. Filter traces by service, operation, or trace ID to find AgentGateway requests
+
+Traces include LLM-specific spans with information like `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more.
+
+### View Access Logs
+
+AgentGateway automatically logs detailed information about LLM requests to stdout:
+
+```bash
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
+```
+
+Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
+
+### (Optional) View Traces in Jaeger
+
+If you installed Jaeger in lab `/install-on-openshift/002-set-up-monitoring-tools-ocp.md` instead of Tempo, you can view traces in the UI:
+
+```bash
+kubectl port-forward svc/jaeger -n observability 16686:16686
+```
+
+Navigate to http://localhost:16686 in your browser to see traces with LLM-specific spans including `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
+
+## Cleanup
+```bash
+kubectl delete httproute -n agentgateway-system bedrock
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-mistral
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-haiku3.5
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-opus
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-sonnet
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-llama3-8b
+kubectl delete secret -n agentgateway-system bedrock-secret
+```

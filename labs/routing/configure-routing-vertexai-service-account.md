@@ -1,0 +1,211 @@
+# Configure Basic Routing to Vertex AI (Service Account Auth)
+
+## Pre-requisites
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+
+## Lab Objectives
+- Create a Kubernetes secret that contains our Vertex AI OAuth credentials using a GCP service account
+- Create a route to Vertex AI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Curl Vertex AI through the agentgateway proxy
+- Validate the request went through the gateway in the Grafana UI
+
+### Benefits of Service Account Authentication
+
+- **Explicit and reproducible identity**: Authentication is tied to a specific service account, not a local user.
+- **CI/CD friendly**: Works consistently across machines, environments, and automation pipelines.
+- **Least-privilege access**: Permissions are controlled through IAM roles assigned to the service account.
+- **Production-aligned**: Mirrors how AI Gateways typically authenticate to cloud providers in real deployments.
+- **Auditable and predictable**: All requests are clearly attributable to a known service account.
+
+### Caveats to Service Account Authentication
+
+- **Requires credential management**: Service account keys must be created, stored securely, and rotated, which adds operational overhead compared to user-based authentication.
+
+### Configure Required Variables
+
+Set the following environment variables to match your GCP Vertex AI project.
+
+**Note:** This demo uses a GCP service account with a JSON key file to mint an OAuth access token for routing requests to Vertex AI through the AI Gateway.
+
+```bash
+export GCP_PROJECT_ID="<YOUR-GCP-PROJECT-ID>"
+export GCP_REGION="us-central1"  # or your preferred region
+```
+
+### Set up Service Account Authentication
+
+Set the path to your service account key file:
+```bash
+export VERTEX_SA_KEY="./.vertex-ai-gcp.json"  # or your custom path
+```
+
+If you don't have a service account key yet, create one:
+1. Go to the [GCP Console](https://console.cloud.google.com/iam-admin/serviceaccounts)
+2. Select your project
+3. Create a new service account or select an existing one
+4. Grant the service account the "Vertex AI User" role
+5. Create and download a JSON key file
+6. Save it to the path specified in `VERTEX_SA_KEY`
+
+Activate the service account and set credentials:
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="$VERTEX_SA_KEY"
+
+gcloud auth activate-service-account \
+  --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+```
+
+Verify that the service account is now the active identity:
+```bash
+# Show all authenticated accounts (active one is marked with *)
+gcloud auth list
+
+# Show the currently active account
+gcloud config get-value account
+```
+
+The output should show your service account email (e.g., `my-service-account@my-project.iam.gserviceaccount.com`) as the active account, not your user email.
+
+Retrieve an OAuth access token using the service account:
+```bash
+export VERTEXAI_ACCESS_TOKEN=$(gcloud auth print-access-token)
+```
+
+Create vertex ai oauth secret
+```bash
+kubectl create secret generic vertex-ai-secret -n agentgateway-system \
+  --from-literal="Authorization=Bearer $VERTEXAI_ACCESS_TOKEN" \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+Create vertex ai route and backend
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: vertex-ai
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /vertex
+      backendRefs:
+        - name: vertex-ai
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: vertex-ai
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      vertexai:
+        model: "google/gemini-2.5-flash-lite"
+        projectId: "${GCP_PROJECT_ID}"
+        region: "${GCP_REGION}"
+  policies:
+    auth:
+      secretRef:
+        name: vertex-ai-secret
+EOF
+```
+
+## curl vertex ai
+```bash
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+
+curl -i "$GATEWAY_IP:8080/vertex" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "google/gemini-2.5-flash-lite",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+## Observability
+
+### View Metrics Endpoint
+
+AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
+
+```bash
+kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
+sleep 1 && curl -s http://localhost:15020/metrics && kill $!
+```
+
+### View Metrics and Traces in Grafana
+
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+
+1. Port-forward to the Grafana service:
+```bash
+kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
+```
+
+2. Open http://localhost:3000 in your browser
+
+3. Login with credentials:
+   - Username: `admin`
+   - Password: Value of `$GRAFANA_ADMIN_PASSWORD` (default: `prom-operator`)
+
+4. Navigate to **Dashboards > AgentGateway Dashboard** to view metrics
+
+The dashboard provides real-time visualization of:
+- Core GenAI metrics (request rates, token usage by model)
+- Streaming metrics (TTFT, TPOT)
+- MCP metrics (tool calls, server requests)
+- Connection and runtime metrics
+
+### View Traces in Grafana
+
+To view distributed traces with LLM-specific spans:
+
+1. In Grafana, navigate to **Home > Explore**
+2. Select **Tempo** from the data source dropdown
+3. Click **Search** to see all traces
+4. Filter traces by service, operation, or trace ID to find AgentGateway requests
+
+Traces include LLM-specific spans with information like `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more.
+
+### View Access Logs
+
+AgentGateway automatically logs detailed information about LLM requests to stdout:
+
+```bash
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
+```
+
+Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
+
+### (Optional) View Traces in Jaeger
+
+If you installed Jaeger in lab `/install-on-openshift/002-set-up-monitoring-tools-ocp.md` instead of Tempo, you can view traces in the UI:
+
+```bash
+kubectl port-forward svc/jaeger -n observability 16686:16686
+```
+
+Navigate to http://localhost:16686 in your browser to see traces with LLM-specific spans including `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
+
+## Cleanup
+```bash
+kubectl delete httproute -n agentgateway-system vertex-ai
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system vertex-ai
+kubectl delete secret -n agentgateway-system vertex-ai-secret
+```
