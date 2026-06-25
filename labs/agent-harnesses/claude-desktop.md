@@ -280,7 +280,7 @@ The **Configure third-party inference** panel is gated behind Claude Desktop's d
 1. Launch Claude Desktop
 2. From the macOS menu bar, open **Help > Troubleshooting > Enable Developer Mode**
 
-![enable-developer-mode-1.png](images/claude-desktop/enable-developer-mode-1.png)
+![enable-developer-mode-1.png](../../images/claude-desktop/enable-developer-mode-1.png)
 
 Once developer mode is on, the third-party inference settings become available under **Settings**.
 
@@ -289,7 +289,7 @@ Once developer mode is on, the third-party inference settings become available u
 1. Open **Settings** and navigate to **Configure third-party inference**
 2. Under **Connection**, open the provider dropdown and select **Gateway** (the "Connect to your own gateway" option)
 
-![3P-1.png](images/claude-desktop/3P-1.png)
+![3P-1.png](../../images/claude-desktop/3P-1.png)
 
 ### Fill in the Gateway Credentials
 
@@ -306,7 +306,7 @@ Under **Models**, leave **Model discovery** enabled so Claude Desktop auto-popul
 
 Click **Test connection** to confirm the gateway is reachable. You should see green confirmation messages for both **Model discovery** (e.g., *"found 10 models"*) and **Inference** (e.g., *"1-token completion in 810 ms (claude-haiku-4-5-20251001) — via static key"*).
 
-![3P-2.png](images/claude-desktop/3P-2.png)
+![3P-2.png](../../images/claude-desktop/3P-2.png)
 
 Click **Apply Changes**. Claude Desktop will now send all inference traffic through Enterprise AgentGateway.
 
@@ -337,7 +337,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 
 4. Navigate to **Dashboards > AgentGateway Dashboard** to view metrics
 
-![grafana-1.png](images/claude-desktop/grafana-1.png)
+![grafana-1.png](../../images/claude-desktop/grafana-1.png)
 
 The dashboard provides real-time visualization of:
 - Core GenAI metrics (request rates, token usage by model — you should see `claude-haiku-4-5-*` and `claude-opus-4-*` / `claude-sonnet-4-*` rows populate as you chat with Claude Desktop)
@@ -359,7 +359,7 @@ kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
 
 3. Click **Tracing** in the left nav
 
-![solo-ui-tracing-1.png](images/claude-desktop/solo-ui-tracing-1.png)
+![solo-ui-tracing-1.png](../../images/claude-desktop/solo-ui-tracing-1.png)
 
 You will see a table of recent spans with the following columns:
 
@@ -377,7 +377,7 @@ Use the **search spans** box at the top to filter, the time-range selector to sc
 
 4. Click any row to open the trace detail view
 
-![solo-ui-tracing-2.png](images/claude-desktop/solo-ui-tracing-2.png)
+![solo-ui-tracing-2.png](../../images/claude-desktop/solo-ui-tracing-2.png)
 
 The detail view gives you three coordinated panels:
 

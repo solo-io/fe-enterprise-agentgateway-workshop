@@ -1,5 +1,16 @@
 # Changelog
 
+0.11.5 - (6-24-26)
+---
+- Add `labs/upgrades/` category covering zero-downtime upgrades
+- Add `in-place-rolling-upgrades.md`: validates zero downtime under continuous k6 traffic for short completions, long-lived streaming, and discrete-POST (StreamableHTTP) MCP; explains why persistent long-lived SSE MCP cannot be made zero-downtime by adding replicas (described, not demonstrated)
+- Add `blue-green-namespaces.md` and `multi-cluster-upgrades.md` as planned stubs
+- Cross-link the rolling-upgrade section of `production-observability-alerting-and-scaling.md` to the new validation lab
+- Add "Upgrades & Lifecycle" section to `README.md`
+- Update image paths in `claude-code.md` and `claude-desktop.md`
+- Implement `blue-green-namespaces.md`: blue/green upgrades via route delegation — a thin edge proxy delegates `/openai` with weighted backendRefs to independent blue and green proxies in separate namespaces; validates zero-downtime cutover and instant rollback under continuous k6 traffic
+- Implement `multi-cluster-upgrades.md`: upgrade Enterprise Agentgateway in one cluster while a peer serves the same global LLM over a Solo ambient multicluster mesh
+
 0.11.4 - (6-24-26)
 ---
 - Move all labs into `labs/<category>/` subdirectories and update all relative links in labs, tracks, and README
