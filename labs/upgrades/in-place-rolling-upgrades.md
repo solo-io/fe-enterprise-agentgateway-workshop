@@ -4,6 +4,8 @@ In this lab you'll configure Enterprise Agentgateway for zero-downtime in-place 
 
 This lab focuses on validating upgrade behavior. The configuration reference for graceful shutdown, Pod Disruption Budgets, and topology spread lives in the [Production Observability, Alerting & Scaling](../observability/production-observability-alerting-and-scaling.md) lab; here we apply a minimal subset and measure the outcome.
 
+To take an entire cluster out of service for an upgrade while a peer keeps serving, see [Multi-Cluster Upgrades](multi-cluster-upgrades.md), which reuses this per-cluster posture across two clusters.
+
 ## Pre-requisites
 - [001 — Install Enterprise Agentgateway](../../001-install-enterprise-agentgateway.md)
 - [002 — Set Up UI and Monitoring Tools](../../002-set-up-ui-and-monitoring-tools.md)

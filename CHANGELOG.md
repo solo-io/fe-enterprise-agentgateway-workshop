@@ -1,9 +1,5 @@
 # Changelog
 
-0.11.6 - (6-24-26)
----
-
-
 0.11.5 - (6-24-26)
 ---
 - Add `labs/upgrades/` category covering zero-downtime upgrades
@@ -13,6 +9,7 @@
 - Add "Upgrades & Lifecycle" section to `README.md`
 - Update image paths in `claude-code.md` and `claude-desktop.md`
 - Implement `blue-green-namespaces.md`: blue/green upgrades via route delegation — a thin edge proxy delegates `/openai` with weighted backendRefs to independent blue and green proxies in separate namespaces; validates zero-downtime cutover and instant rollback under continuous k6 traffic
+- Implement `multi-cluster-upgrades.md`: upgrade Enterprise Agentgateway in one cluster while a peer serves the same global LLM over a Solo ambient multicluster mesh
 
 0.11.4 - (6-24-26)
 ---

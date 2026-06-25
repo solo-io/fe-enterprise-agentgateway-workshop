@@ -411,6 +411,8 @@ kubectl logs job/k6-zdt-bluegreen -n loadgenerator | grep -E 'http_req_failed|ch
 
 The blue/green advantage over in-place: **green is validated as a real, running proxy before it takes traffic, and rollback is a traffic flip rather than a second rollout.** The cost is running two data planes at once.
 
+Both this lab and in-place keep the upgrade within a single cluster. To move the boundary up a level — taking a whole cluster out of service while a peer cluster serves the same global LLM — see [Multi-Cluster Upgrades](multi-cluster-upgrades.md).
+
 > **Sessions across a cutover:** weights are evaluated per request, so stateless completions cut over cleanly. A sticky or long-lived SSE session that is pinned to one proxy will treat a cutover as a session boundary unless you add session persistence (consistent hashing / `sessionPersistence`). For long-lived MCP/SSE specifics, see the [In-Place Rolling Upgrades](in-place-rolling-upgrades.md) lab's MCP section — the same single-replica session caveat applies.
 
 > **In production**, green is the proxy you install at the new `--version` (or with new config/policies). The mechanism is identical: stand green up, validate it, shift weight, and keep blue as instant rollback until you're confident.

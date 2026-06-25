@@ -197,7 +197,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [In-Place Rolling Upgrades — Validate Zero Downtime](labs/upgrades/in-place-rolling-upgrades.md)
 - [Blue/Green Upgrades Across Namespaces](labs/upgrades/blue-green-namespaces.md)
-- [Multi-Cluster Upgrades](labs/upgrades/multi-cluster-upgrades.md) *(planned)*
+- [Multi-Cluster Upgrades](labs/upgrades/multi-cluster-upgrades.md) — upgrade a whole cluster while a peer serves the same global LLM over an ambient multicluster mesh
 
 ---
 
