@@ -196,7 +196,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 > Strategies for upgrading Enterprise Agentgateway without dropping traffic.
 
 - [In-Place Rolling Upgrades — Validate Zero Downtime](labs/upgrades/in-place-rolling-upgrades.md)
-- [Blue/Green Upgrades Across Namespaces](labs/upgrades/blue-green-namespaces.md) *(planned)*
+- [Blue/Green Upgrades Across Namespaces](labs/upgrades/blue-green-namespaces.md)
 - [Multi-Cluster Upgrades](labs/upgrades/multi-cluster-upgrades.md) *(planned)*
 
 ---

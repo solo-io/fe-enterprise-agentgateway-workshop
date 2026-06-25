@@ -25,6 +25,23 @@ When a proxy pod is replaced during a rollout, Kubernetes sends it `SIGTERM`. Ag
 3. Maximum drain period (`spec.shutdown.max`, default `60s`) — a hard deadline. Connections still active after this are forcibly closed.
 4. SIGKILL — sent by Kubernetes at `terminationGracePeriodSeconds`, which must be greater than or equal to `spec.shutdown.max`. The operator derives this value automatically from `shutdown.max`, so you do not set it by hand.
 
+```
+  Kubernetes sends SIGTERM ──▶ graceful drain begins
+  │
+  │   ┌─ Phase 1 ── 0 → shutdown.min (default 10s) ───────────────────────────┐
+  │   │   proxy STILL accepts connections, but signals clients to migrate:    │
+  │   │   "Connection: close" (HTTP/1)  ·  "GOAWAY" (HTTP/2)                   │
+  │   ├─ Phase 2 ── shutdown.min → shutdown.max ─────────────────────────────┤
+  │   │   stops accepting NEW connections; waits for in-flight requests       │
+  │   └─ Phase 3 ── at shutdown.max (default 60s) ───────────────────────────┘
+  │       connections still active are force-closed
+  ▼
+  SIGKILL at terminationGracePeriodSeconds  (= shutdown.max, set by the operator)
+
+  Throughout the drain: new traffic routes to the OTHER healthy replica, and the
+  PodDisruptionBudget (minAvailable: 1) guarantees a pod is always serving.
+```
+
 What this means for AI traffic:
 
 | Traffic | What draining means |
