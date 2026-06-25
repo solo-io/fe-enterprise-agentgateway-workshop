@@ -27,6 +27,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Evaluations](#evaluations)
 - [Load Testing](#load-testing)
 - [Observability](#observability)
+- [Upgrades & Lifecycle](#upgrades--lifecycle)
 
 ---
 
@@ -187,6 +188,18 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [LLM Cost Tracking with Virtual Keys](labs/observability/llm-cost-tracking-with-virtual-keys.md) _(see also: Security, Rate Limiting)_
 - [Production Observability, Alerting, and Scaling](labs/observability/production-observability-alerting-and-scaling.md)
+
+---
+
+## Upgrades & Lifecycle
+
+> Strategies for upgrading Enterprise Agentgateway without dropping traffic.
+
+- [In-Place Rolling Upgrades — Validate Zero Downtime](labs/upgrades/in-place-rolling-upgrades.md)
+- [Blue/Green Upgrades Across Namespaces](labs/upgrades/blue-green-namespaces.md) *(planned)*
+- [Multi-Cluster Upgrades](labs/upgrades/multi-cluster-upgrades.md) *(planned)*
+
+---
 
 # Use Cases
 - Support Kubernetes Gateway API

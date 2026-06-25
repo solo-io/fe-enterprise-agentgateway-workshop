@@ -702,6 +702,8 @@ kubectl get pods -n agentgateway-system -l app.kubernetes.io/name=agentgateway-p
 
 ## Rolling Upgrades
 
+> **Hands-on validation:** To *prove* zero downtime by driving continuous traffic through a rollout, see [In-Place Rolling Upgrades — Validate Zero Downtime](../upgrades/in-place-rolling-upgrades.md).
+
 With PDBs, graceful shutdown, and topology spread configured, rolling upgrades can be performed with minimal disruption. AgentGateway's config propagation is fast — [benchmarks show ~30ms route propagation](https://github.com/howardjohn/gateway-api-bench/blob/v2/README-v2.md) even under concurrent traffic load — but real-world upgrades involve pod restarts, connection draining, and load balancer health checks, so brief interruptions are possible depending on your environment.
 
 ### Pre-Upgrade Checklist

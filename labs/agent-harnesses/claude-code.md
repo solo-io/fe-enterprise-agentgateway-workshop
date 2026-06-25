@@ -336,7 +336,7 @@ kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
 
 3. Click **Tracing** in the left nav
 
-![solo-ui-tracing-1.png](images/claude-desktop/solo-ui-tracing-1.png)
+![solo-ui-tracing-1.png](../../images/claude-desktop/solo-ui-tracing-1.png)
 
 You will see a table of recent spans with the following columns:
 
@@ -354,7 +354,7 @@ Use the **search spans** box at the top to filter, the time-range selector to sc
 
 4. Click any row to open the trace detail view
 
-![solo-ui-tracing-2.png](images/claude-desktop/solo-ui-tracing-2.png)
+![solo-ui-tracing-2.png](../../images/claude-desktop/solo-ui-tracing-2.png)
 
 The detail view gives you three coordinated panels:
 
