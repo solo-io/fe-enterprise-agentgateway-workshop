@@ -2,31 +2,36 @@
 
 Mirrored from the Enterprise Agentgateway workshop image list to `docker.io/ably7`.
 
-## Enterprise Agentgateway (v2026.6.1)
+## Enterprise Agentgateway (v2026.6.3)
 
 ### controller
 ```
-docker.io/ably7/enterprise-agentgateway-controller:2026.6.1
+docker.io/ably7/enterprise-agentgateway-controller:2026.6.3
 ```
 
 ### agentgateway proxy
 ```
-docker.io/ably7/agentgateway-enterprise:2026.6.1
+docker.io/ably7/agentgateway-enterprise:2026.6.3
 ```
 
 ### ext-cache (redis)
 ```
-docker.io/ably7/redis:2026.6.1
+docker.io/ably7/redis:8.6.4-alpine
 ```
 
 ### ext-auth-service
 ```
-docker.io/ably7/ext-auth-service:2026.6.1
+docker.io/ably7/ext-auth-service:2026.6.3
 ```
 
 ### rate-limiter
 ```
-docker.io/ably7/rate-limiter:2026.6.1
+docker.io/ably7/rate-limiter:2026.6.3
+```
+
+### waf-server
+```
+docker.io/ably7/waf-server:2026.6.3
 ```
 
 ## Solo UI (0.4.5)
@@ -44,11 +49,6 @@ docker.io/ably7/solo-enterprise-ui-backend:0.4.5
 ### autoauth
 ```
 docker.io/ably7/solo-enterprise-autoauth:v0.2.2
-```
-
-### tunnel-server
-```
-docker.io/ably7/solo-enterprise-tunnel-server:0.4.5
 ```
 
 ### opentelemetry-collector

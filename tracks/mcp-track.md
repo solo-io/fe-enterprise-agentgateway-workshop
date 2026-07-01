@@ -87,6 +87,7 @@ After completing this track you should be able to:
 | [MCP Eager OAuth with Auth0](../labs/mcp/mcp-eager-auth-auth0.md) | Configure the gateway as the OAuth Authorization Server for Auth0; agents get tokens directly from the gateway |
 | [MCP Eager OAuth with Okta](../labs/mcp/mcp-eager-auth-okta.md) | Same pattern with Okta as the backing IdP |
 | [MCP Pre-Issuance Entitlement Gating with Auth0](../labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) | Add a gRPC ext-authz hook that checks entitlements before issuing OAuth tokens — denied users are redirected before they get any credentials |
+| [Web Application Firewall (WAF) for Agentic Traffic](../labs/security/WAF.md) | Attach a `WAFPolicy` to harden the HTTP surface and block tool-call payload abuse (command-exec, file-exfil signatures) and credential leakage — the deterministic layer beneath semantic guardrails |
 
 ---
 
