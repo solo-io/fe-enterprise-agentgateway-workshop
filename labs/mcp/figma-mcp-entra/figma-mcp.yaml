@@ -1,0 +1,181 @@
+# =============================================================================
+# Figma OpenAPI -> MCP, protected by Microsoft Entra ID (Layer A) + Figma OAuth
+# via token-exchange elicitation (Layer B).
+#
+# This is the Entra variant of ../figma-mcp-auth0/figma-mcp.yaml. Only Layer A
+# (the inbound MCP auth) changed: the JWKS/issuer/audience now point at Entra
+# instead of Auth0. Layer B (the Figma elicitation) is byte-for-byte identical —
+# elicitation is IdP-agnostic and does NOT use the Entra OBO code path (the one
+# that disables elicitation).
+#
+# Apply with envsubst so the ${...} placeholders are filled from your shell:
+#   envsubst < figma-mcp.yaml | kubectl apply -f -
+#
+# Requires the eager-OAuth + Entra base from README.md Steps 2/4/5/6 to be in
+# place first, and the figma-openapi-schema ConfigMap (created from
+# figma-openapi.json — see README Step 6).
+#
+# Required env vars (see README Step 1):
+#   ENTRA_TENANT_ID ENTRA_CLIENT_ID ENTRA_API_SCOPE ENTRA_GATEWAY_HOST
+#   FIGMA_CLIENT_ID FIGMA_CLIENT_SECRET
+# =============================================================================
+---
+# Static backend the controller uses to fetch Entra's JWKS for JWT validation.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: entra-jwks
+  namespace: agentgateway-system
+spec:
+  static:
+    host: login.microsoftonline.com
+    port: 443
+  policies:
+    tls: {}
+---
+# The Figma OpenAPI target, wrapped as an MCP backend.
+#   - policies.mcp.authentication  -> Layer A: validate the inbound Entra JWT
+#     and advertise the gateway's own eager-OAuth AS via issuer-proxy.
+#   - the token-exchange elicitation (Layer B) is attached by a separate
+#     EnterpriseAgentgatewayPolicy below.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: ent-figma-openapi-backend
+  namespace: agentgateway-system
+spec:
+  policies:
+    tls: {}
+    mcp:
+      authentication:
+        mode: Strict
+        # Entra v1 issuer format. A token minted for the audience
+        # api://${ENTRA_CLIENT_ID} carries iss = https://sts.windows.net/<tenant>/
+        # UNLESS the app's accessTokenAcceptedVersion is 2 (then it is
+        # https://login.microsoftonline.com/<tenant>/v2.0). This value MUST match
+        # the iss of the token your eager-OAuth login actually returns — decode it
+        # at jwt.io if a valid-looking token still 401s. See README Troubleshooting.
+        issuer: https://sts.windows.net/${ENTRA_TENANT_ID}/
+        audiences:
+          - api://${ENTRA_CLIENT_ID}
+        jwks:
+          backendRef:
+            group: agentgateway.dev
+            kind: AgentgatewayBackend
+            name: entra-jwks
+          cacheDuration: 5m
+          # NO leading slash: the controller joins the backend URL and this path
+          # with a '/', so a leading '/' would become '//<tenant>/...' which Entra
+          # returns 404 for (policy goes PartiallyValid, /mcp 406s).
+          jwksPath: ${ENTRA_TENANT_ID}/discovery/v2.0/keys
+        resourceMetadata:
+          # Serve the gateway's OWN AS metadata (eager-OAuth issuer on :7777)
+          # for .well-known/oauth-authorization-server/figma/openapi/mcp.
+          agentgateway.dev/issuer-proxy: http://enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777/oauth-issuer
+          authorizationServers:
+            - https://${ENTRA_GATEWAY_HOST}/figma/openapi/mcp
+          resource: https://${ENTRA_GATEWAY_HOST}/figma/openapi/mcp
+          # The custom API scope you exposed on the Entra app (README Pre-reqs).
+          scopesSupported:
+            - ${ENTRA_API_SCOPE}
+  entMcp:
+    targets:
+      - name: ent-figma-openapi
+        static:
+          host: api.figma.com
+          port: 443
+          protocol: OpenAPI
+          openAPI:
+            schemaRef:
+              name: figma-openapi-schema
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: figma-openapi-mcp
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+      sectionName: https
+  hostnames:
+    - ${ENTRA_GATEWAY_HOST}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /figma/openapi/mcp
+        - path:
+            type: PathPrefix
+            value: /.well-known/oauth-protected-resource/figma/openapi/mcp
+        - path:
+            type: PathPrefix
+            value: /.well-known/oauth-authorization-server/figma/openapi/mcp
+      backendRefs:
+        - group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+          name: ent-figma-openapi-backend
+---
+# CORS for browser-driven OAuth discovery (MCP Inspector etc.). Blanket '*'
+# allowHeaders also covers the mcp-protocol-version preflight header.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: figma-openapi-policy
+  namespace: agentgateway-system
+spec:
+  backend:
+    tls: {}
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: figma-openapi-mcp
+  traffic:
+    cors:
+      allowCredentials: false
+      allowHeaders:
+        - '*'
+      allowMethods:
+        - '*'
+      allowOrigins:
+        - '*'
+---
+# Layer B: elicit a per-user Figma OAuth token via the gateway's eager-OAuth
+# issuer and inject it into calls to api.figma.com. IDENTICAL to the Auth0 lab —
+# Figma is a foreign IdP, so this stays elicitation regardless of the Layer A IdP.
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: ent-figma-openapi-exchange
+  namespace: agentgateway-system
+spec:
+  backend:
+    tokenExchange:
+      elicitation:
+        secretName: figma-token-exchange
+  targetRefs:
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: ent-figma-openapi-backend
+---
+# Figma OAuth app credentials + endpoints for the elicitation flow.
+# mcp_resource (instead of redirect_uri) routes the callback through the
+# eager-OAuth issuer at /oauth-issuer/callback/upstream — which is the URL you
+# must register in the Figma app's OAuth redirect settings.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: figma-token-exchange
+  namespace: agentgateway-system
+type: Opaque
+stringData:
+  app_id: figma
+  client_id: "${FIGMA_CLIENT_ID}"
+  client_secret: "${FIGMA_CLIENT_SECRET}"
+  authorize_url: "https://www.figma.com/oauth"
+  access_token_url: "https://api.figma.com/v1/oauth/token"
+  # Figma retired files:read for NEW OAuth apps; use the granular *_read scopes.
+  # These must ALSO be enabled in the Figma app dashboard (OAuth scopes tab).
+  scopes: "current_user:read file_content:read file_metadata:read file_comments:read file_versions:read"
+  mcp_resource: "/figma/openapi/mcp"

@@ -3,6 +3,7 @@
 0.11.6 - (6-30-26)
 ---
 - Add `/labs/mcp/figma-mcp-auth0` configuring MCP auth with Figma (Auth0 + Token-Exchange Elicitation)
+- Add `/labs/mcp/figma-mcp-entra`: Entra variant of the Figma MCP lab
 
 0.11.5 - (6-24-26)
 ---

@@ -420,10 +420,7 @@ What happens the first time:
 
    ![Callback received](images/05-callback-received.png)
 
-4. Claude Code retries; the gateway injects your Figma token and the call returns real data — no 401.
-
-Subsequent runs reuse both tokens (until the SQLite state is wiped by a controller restart,
-per the Step 2 callout).
+4. Claude Code retries; the gateway injects your Figma token and the call returns real data — no 401. Subsequent runs reuse both tokens.
 
 > **Note on token binding:** the Figma token is stored bound to the **Auth0 identity** (`sub`) that
 > made the call. Each distinct user identity gets its own Figma elicitation the first time — this
