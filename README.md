@@ -96,6 +96,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: MCP)_
 - [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: MCP)_
 - [MCP Pre-Issuance Entitlement Gating with Auth0](labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Identity & Delegation)_
+- [Figma MCP with Auth0 + Token-Exchange Elicitation](labs/mcp/figma-mcp-auth0/README.md) _(see also: MCP, Identity & Delegation)_
+- [Figma MCP with Microsoft Entra ID + Token-Exchange Elicitation](labs/mcp/figma-mcp-entra/README.md) _(see also: MCP, Identity & Delegation)_
 
 ---
 
@@ -140,6 +142,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: Security, Identity & Delegation)_
 - [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: Security, Identity & Delegation)_
 - [MCP Pre-Issuance Entitlement Gating with Auth0](labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: Security, Identity & Delegation)_
+- [Figma MCP with Auth0 + Token-Exchange Elicitation](labs/mcp/figma-mcp-auth0/README.md) — OpenAPI→MCP + eager OAuth (Auth0) + per-user Figma OAuth via elicitation _(see also: Security, Identity & Delegation)_
+- [Figma MCP with Microsoft Entra ID + Token-Exchange Elicitation](labs/mcp/figma-mcp-entra/README.md) — Entra front-door variant of the Auth0 lab _(see also: Security, Identity & Delegation)_
 - [CrewAI Agent with MCP and OBO Auth](labs/mcp/obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
 
 ---
@@ -157,6 +161,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Claude Desktop](labs/agent-harnesses/claude-desktop.md)
 - [Claude Code as MCP Client with Eager OAuth (Auth0)](labs/mcp/mcp-eager-auth-auth0.md#step-10--test-with-claude-code)
 - [Claude Code as MCP Client with Eager OAuth (Okta)](labs/mcp/mcp-eager-auth-okta.md#step-10--test-with-claude-code)
+- [Claude Code → Figma MCP with Auth0 + Elicitation](labs/mcp/figma-mcp-auth0/README.md#step-7--connect-claude-code)
+- [Claude Code → Figma MCP with Microsoft Entra ID + Elicitation](labs/mcp/figma-mcp-entra/README.md#step-7--connect-claude-code)
 
 ---
 
@@ -168,6 +174,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: MCP)_
 - [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: MCP)_
 - [MCP Pre-Issuance Entitlement Gating with Auth0](labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Security)_
+- [Figma MCP with Auth0 + Token-Exchange Elicitation](labs/mcp/figma-mcp-auth0/README.md) — per-user credential forwarding to a vendor-provided IdP (Figma) via elicitation _(see also: MCP, Security)_
+- [Figma MCP with Microsoft Entra ID + Token-Exchange Elicitation](labs/mcp/figma-mcp-entra/README.md) — Entra front-door + Figma elicitation (why not OBO for a vendor-provided IdP) _(see also: MCP, Security)_
 
 ---
 
@@ -266,6 +274,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - BYO gRPC external authorization (ext-authz) for MCP routes
     - Eager OAuth with a pre-registered upstream IdP (Auth0 and Okta) — gateway acts as the OAuth Authorization Server visible to MCP clients
     - Pre-issuance entitlement gating — gRPC ext_authz hook gates OAuth token issuance per user, redirects denied users to a configurable URL
+    - Two-layer OAuth for a real SaaS API (Figma) — eager OAuth front door (Auth0 or Microsoft Entra ID) plus per-user downstream credential forwarding to a vendor-provided IdP via token-exchange elicitation
     - Tool-level access control
     - Per-tool rate limiting for MCP traffic
     - Integration with Claude Code CLI
