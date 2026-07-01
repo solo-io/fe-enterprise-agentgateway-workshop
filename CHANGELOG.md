@@ -1,5 +1,9 @@
 # Changelog
 
+0.11.6 - (6-30-26)
+---
+- Add `/labs/mcp/figma-mcp-auth0` configuring MCP auth with Figma (Auth0 + Token-Exchange Elicitation)
+
 0.11.5 - (6-24-26)
 ---
 - Add `labs/upgrades/` category covering zero-downtime upgrades
