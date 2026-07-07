@@ -1,0 +1,27 @@
+# Apply the whole Keycloak stack (namespace, realm ConfigMap, Deployment,
+# Service) in one shot:
+#
+#     kubectl apply -k lib/keycloak/mcp-enterprise/
+#
+# The realm ConfigMap is generated from mcp-enterprise.json, so that file stays
+# the single source of truth - no JSON duplicated inside YAML. Kustomize adds a
+# content hash to the ConfigMap name and rewires the Deployment's volume
+# reference automatically, so editing the realm rolls Keycloak forward on the
+# next apply.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: keycloak
+
+resources:
+  - namespace.yaml
+  - keycloak-deployment.yaml
+
+configMapGenerator:
+  - name: keycloak-realm
+    files:
+      # Do NOT rename this to *-realm.json. Keycloak 26 has a bug
+      # (keycloak/keycloak#36284) where an --import-realm file matching the
+      # pattern `*-realm.json` imports the realm but then crashes the server
+      # with "Session not bound to a realm". Keep it named for the realm.
+      - mcp-enterprise.json

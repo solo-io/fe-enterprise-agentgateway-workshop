@@ -1,5 +1,14 @@
 # Changelog
 
+0.11.7 - (7-6-26)
+---
+- Add `labs/security/WAF.md`: WAF for agentic traffic (shape/model allow-list, tool-payload abuse, credential block on request/response, layering with `promptGuard`)
+- Bump `ENTERPRISE_AGW_VERSION` to `v2026.6.3` across install labs (WAF ships in 6.3)
+- Update image lists: add `waf-server`, fix `redis` tag, reconcile Solo UI `0.4.5` section
+- Add WAF lab to `README.md` and `tracks/mcp-track.md`
+- Add `labs/mcp/mcp-eager-auth-keycloak.md`: eager-OAuth MCP authentication lab using an in-cluster Keycloak with declarative realm import (no external IdP account needed)
+- Move Keycloak deployment manifests for `mcp-eager-auth-keycloak.md` from `labs/mcp/keycloak/` to `lib/keycloak/mcp-enterprise/`; update `kubectl apply -k`/`delete -k` pointers in the lab
+
 0.11.6 - (7-1-26)
 ---
 - Add `/labs/mcp/figma-mcp-auth0` configuring MCP auth with Figma (Auth0 + Token-Exchange Elicitation)

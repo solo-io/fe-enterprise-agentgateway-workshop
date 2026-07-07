@@ -1,0 +1,75 @@
+# Keycloak Deployment + Service for the in-cluster OIDC provider used by the
+# MCP eager-auth lab.
+#
+# Do NOT `kubectl apply -f` this file on its own - the realm is imported from a
+# ConfigMap that Kustomize generates from mcp-enterprise.json. Apply the whole
+# directory instead:
+#
+#     kubectl apply -k lib/keycloak/mcp-enterprise/
+#
+# On first boot Keycloak imports /opt/keycloak/data/import/*.json, which creates
+# the mcp-enterprise realm (client, audience mapper, test user) with no admin
+# REST calls. start-dev uses an ephemeral in-memory DB, so the realm is
+# re-imported fresh on every pod restart - nothing to clean up.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: quay.io/keycloak/keycloak:26.0
+          args: ["start-dev", "--import-realm"]
+          env:
+            - name: KEYCLOAK_ADMIN
+              value: admin
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              value: admin123
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            # hostname-strict=false => Keycloak derives its issuer/frontend URLs
+            # from the request host. Because the browser, the controller, and the
+            # proxy all reach Keycloak via the same LoadBalancer address (the one
+            # you put in KC_ISSUER), the issuer stays consistent without pinning a
+            # hostname - so no second rollout is needed after the LB IP appears.
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            - name: KC_HOSTNAME_STRICT_HTTPS
+              value: "false"
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: realm-import
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /realms/mcp-enterprise
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: realm-import
+          configMap:
+            name: keycloak-realm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+spec:
+  type: LoadBalancer
+  selector:
+    app: keycloak
+  ports:
+    - port: 8080
+      targetPort: 8080

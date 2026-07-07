@@ -93,6 +93,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [SNI Matching](labs/security/sni-matching.md)
 - [LLM BYO gRPC External Authorization (ext-authz)](labs/security/llm-byo-grpc-ext-authz.md)
 - [OPA Authorization](labs/security/opa-authorization.md)
+- [Web Application Firewall (WAF) for Agentic Traffic](labs/security/WAF.md) _(see also: Guardrails, MCP)_
 - [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: MCP)_
 - [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: MCP)_
 - [MCP Pre-Issuance Entitlement Gating with Auth0](labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Identity & Delegation)_
