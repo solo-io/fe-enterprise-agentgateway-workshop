@@ -1,0 +1,43 @@
+{
+  "realm": "mcp-enterprise",
+  "enabled": true,
+  "sslRequired": "none",
+  "loginWithEmailAllowed": true,
+  "users": [
+    {
+      "username": "mcp-user",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "mcp-user@example.com",
+      "firstName": "mcp",
+      "lastName": "user",
+      "credentials": [
+        { "type": "password", "value": "mcp-user", "temporary": false }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "mcp-gateway",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "mcpGatewayWorkshopSecret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["*"],
+      "webOrigins": ["*"],
+      "protocolMappers": [
+        {
+          "name": "mcp-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "mcp-gateway",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}
