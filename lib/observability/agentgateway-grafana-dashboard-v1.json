@@ -4718,7 +4718,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\"})",
+          "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -4792,7 +4792,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\", resource=\"cpu\"})",
+          "expr": "max(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\", resource=\"cpu\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -4866,7 +4866,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\", resource=\"cpu\"})",
+          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\", resource=\"cpu\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -4932,7 +4932,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n    sum(increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\"}[$__range])) / ($__range_s)\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\", resource=\"cpu\"})\n  ) * 100",
+          "expr": "(\n    sum(increase(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\"}[$__range])) / ($__range_s)\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\", resource=\"cpu\"})\n  ) * 100",
           "format": "time_series",
           "instant": true,
           "legendFormat": "",
@@ -4998,7 +4998,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "max(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\", resource=\"memory\"})",
+          "expr": "max(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\", resource=\"memory\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -5063,7 +5063,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\", resource=\"memory\"})",
+          "expr": "sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\", resource=\"memory\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -5128,7 +5128,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(\n    sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\"})\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\", resource=\"memory\"})\n  ) * 100",
+          "expr": "(\n    sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\"})\n    /\n    sum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\", resource=\"memory\"})\n  ) * 100",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -5225,7 +5225,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\", cpu=\"total\"}[$__rate_interval])) by (pod)",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\", cpu=\"total\"}[$__rate_interval])) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }
@@ -5321,7 +5321,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-proxy-.*\"}) by (pod)",
+          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"(agentgateway-proxy|agentregistry-gateway)-.*\"}) by (pod)",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }

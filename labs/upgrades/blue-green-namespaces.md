@@ -352,7 +352,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: k6
-        image: grafana/k6:latest
+        image: grafana/k6:0.54.0
         command: ["k6","run","/scripts/bluegreen.js"]
         env:
         - name: GATEWAY_URL

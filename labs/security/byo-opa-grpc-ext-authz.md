@@ -426,8 +426,8 @@ HTTP/1.1 403 Forbidden
 ### Step 4: Test — MCP request allowed with required header
 
 ```bash
-# Initialize
-curl -s -D /tmp/mcp-headers.txt "$GATEWAY_IP:8080/mcp" \
+# Initialize (capture response headers to extract the session ID)
+INIT_HEADERS=$(curl -s -D - -o /dev/null "$GATEWAY_IP:8080/mcp" \
   -H "content-type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "x-ext-authz: allow" \
@@ -440,10 +440,10 @@ curl -s -D /tmp/mcp-headers.txt "$GATEWAY_IP:8080/mcp" \
       "clientInfo": {"name": "test", "version": "1.0"}
     },
     "id": 1
-  }'
+  }')
 
 # Grab session ID
-SESSION=$(grep -i "mcp-session-id" /tmp/mcp-headers.txt | awk '{print $2}' | tr -d '\r')
+SESSION=$(echo "$INIT_HEADERS" | grep -i "mcp-session-id" | awk '{print $2}' | tr -d '\r')
 
 # Send initialized notification
 curl -s "$GATEWAY_IP:8080/mcp" \
@@ -578,7 +578,7 @@ If `json.unmarshal` fails (empty or non-JSON body), the rule body fails and Rego
 Re-initialize the MCP session and call `search` (on the allow-list):
 
 ```bash
-curl -s -D /tmp/mcp-headers.txt "$GATEWAY_IP:8080/mcp" \
+INIT_HEADERS=$(curl -s -D - -o /dev/null "$GATEWAY_IP:8080/mcp" \
   -H "content-type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "x-ext-authz: allow" \
@@ -591,9 +591,9 @@ curl -s -D /tmp/mcp-headers.txt "$GATEWAY_IP:8080/mcp" \
       "clientInfo": {"name": "test", "version": "1.0"}
     },
     "id": 1
-  }'
+  }')
 
-SESSION=$(grep -i "mcp-session-id" /tmp/mcp-headers.txt | awk '{print $2}' | tr -d '\r')
+SESSION=$(echo "$INIT_HEADERS" | grep -i "mcp-session-id" | awk '{print $2}' | tr -d '\r')
 
 curl -s "$GATEWAY_IP:8080/mcp" \
   -H "content-type: application/json" \

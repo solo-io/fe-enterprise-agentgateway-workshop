@@ -434,7 +434,7 @@ spec:
           k6 \$ARGS
         env:
         - name: ENDPOINT
-          value: "http://agentgateway.agentgateway-system.svc.cluster.local:8080/openai/gpt-4o"
+          value: "http://agentgateway-proxy.agentgateway-system.svc.cluster.local:8080/openai/gpt-4o"
         - name: MODEL
           value: "mock-gpt-4o"
         - name: TIMEOUT
@@ -511,7 +511,7 @@ spec:
           k6 \$ARGS
         env:
         - name: ENDPOINT
-          value: "http://agentgateway.agentgateway-system.svc.cluster.local:8080/openai/gpt-5.2"
+          value: "http://agentgateway-proxy.agentgateway-system.svc.cluster.local:8080/openai/gpt-5.2"
         - name: MODEL
           value: "mock-gpt-5.2"
         - name: TIMEOUT

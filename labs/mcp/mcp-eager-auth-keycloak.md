@@ -757,7 +757,7 @@ https://mcp-keycloak.glootest.com/.well-known/oauth-protected-resource/mcp
 
 Click "Advanced → proceed" (Chrome) / "Accept the risk" (Firefox). You should see the JSON discovery document. Without this step, the browser blocks the OAuth redirect chain silently.
 
-![Chrome self-signed cert warning for mcp-keycloak.glootest.com](keycloak/images/01-cert-warning.png)
+![Chrome self-signed cert warning for mcp-keycloak.glootest.com](../../images/keycloak/01-cert-warning.png)
 
 ### Launch Inspector locally
 
@@ -777,7 +777,7 @@ In the Inspector UI:
 - **Server URL:** `https://mcp-keycloak.glootest.com/mcp` (replace any URL left over from a previous session)
 - Click **Connect**.
 
-![Inspector configured with Streamable HTTP transport and the gateway's /mcp URL](keycloak/images/02-inspector-config.png)
+![Inspector configured with Streamable HTTP transport and the gateway's /mcp URL](../../images/keycloak/02-inspector-config.png)
 
 ### Walk through the OAuth flow
 
@@ -785,20 +785,20 @@ Inspector follows the protected-resource discovery automatically. You should see
 
 1. A redirect to the **Keycloak** login page at `http://${KC_IP}:8080` (plain HTTP — expected for this lab). **Verify the URL bar shows the Keycloak host `${KC_IP}:8080`, not the gateway hostname** — this confirms the eager-OAuth issuer correctly delegated downstream. Sign in as `mcp-user` / `mcp-user`.
 
-   ![Keycloak "Sign in to mcp-enterprise" login page, reached via the LoadBalancer IP](keycloak/images/03-keycloak-login.png)
+   ![Keycloak "Sign in to mcp-enterprise" login page, reached via the LoadBalancer IP](../../images/keycloak/03-keycloak-login.png)
 
 2. After completing the Keycloak login, a redirect back to Inspector's local callback.
 3. Inspector status flips to **Connected**, with a "Successfully authenticated with OAuth" toast.
 
-   ![Inspector showing Connected status and the mcp-servers/everything server](keycloak/images/04-inspector-connected.png)
+   ![Inspector showing Connected status and the mcp-servers/everything server](../../images/keycloak/04-inspector-connected.png)
 
 ### Confirm tools are reachable
 
 In the Inspector left panel, click **Tools → List Tools**. The `mcp-server-everything` tools should render (`echo`, `add`, `printEnv`, `longRunningOperation`, `getTinyImage`, …). Run one (`echo` with `{"message":"hi"}`) — you should get a tool result, not a 401.
 
-![Inspector Tools tab listing the mcp-server-everything tool set](keycloak/images/05-tools-list.png)
+![Inspector Tools tab listing the mcp-server-everything tool set](../../images/keycloak/05-tools-list.png)
 
-![Echo tool run showing "Tool Result: Success" with the echoed message](keycloak/images/06-echo-tool-success.png)
+![Echo tool run showing "Tool Result: Success" with the echoed message](../../images/keycloak/06-echo-tool-success.png)
 
 ### What proves what
 
@@ -888,7 +888,7 @@ Use the echo tool from mcp-keycloak-gateway to echo "hello from agentgateway"
 
 Expected: Claude Code calls the `echo` tool and returns the echoed message without a 401 error. You should see the tool invocation appear in the Claude Code output (tool name, input, result).
 
-![claude mcp list showing mcp-keycloak-gateway as Connected after OAuth](keycloak/images/07-claude-code-mcp-connected.png)
+![claude mcp list showing mcp-keycloak-gateway as Connected after OAuth](../../images/keycloak/07-claude-code-mcp-connected.png)
 
 ### What proves what
 
