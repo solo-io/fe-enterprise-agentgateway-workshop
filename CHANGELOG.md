@@ -16,6 +16,9 @@
 - Add `labs/mcp/figma-mcp-entra/.figma-creds.env.example` template; reference it in Step 1 and the folder manifest table
 - Live-verified on v2026.6.3: both `appProtocol: kgateway.dev/mcp` and `agentgateway.dev/mcp` route MCP through selector-based backends; a Service port with **no** MCP appProtocol is silently not discovered (documented in `style-guide.md` §16)
 - Sync agentgateway Grafana dashboard
+- Add `labs/upgrades/migrate-v2026.5.x-to-v2026.6.x.md`: version migration guide (v2026.5.x → v2026.6.x) covering the image-registry consolidation, Kubernetes floor bump, prerequisites, downtime, and the exact upgrade commands; validated live on a v2026.5.2 → v2026.6.3 upgrade
+- Fix `labs/upgrades/in-place-rolling-upgrades.md` Step 5: replace `helm upgrade --reuse-values` (fails to template the 6.x chart — `.Values.externalSecrets.stores` nil pointer) with an explicit `-f` values file on the OCI chart
+- Add the migration guide to the `README.md` Upgrades & Lifecycle section
 
 0.11.7 - (7-6-26)
 ---

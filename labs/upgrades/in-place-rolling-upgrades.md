@@ -594,14 +594,18 @@ If you are running SSE-backed MCP agents, plan upgrades as a maintenance window,
 `kubectl rollout restart` exercised the exact drain-and-replace path you just measured. A production version upgrade is the same data-plane path, driven by Helm and including the controller:
 
 ```bash
-helm upgrade enterprise-agentgateway solo/enterprise-agentgateway \
+helm upgrade enterprise-agentgateway \
+  oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --namespace agentgateway-system \
   --version <new-version> \
-  --reuse-values
+  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
+  -f your-values.yaml
 
 kubectl rollout status deployment/enterprise-agentgateway -n agentgateway-system --timeout=300s
 kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system --timeout=300s
 ```
+
+> Pass your values with `-f`, not `--reuse-values`: `--reuse-values` does not merge the new chart's defaults and can fail to template across a version bump (`<.Values.externalSecrets.stores>: nil pointer`). For a cross-minor upgrade, also reconcile image settings — see the [migration guide](migrate-v2026.5.x-to-v2026.6.x.md).
 
 Run any of the k6 Jobs above during the upgrade to confirm the same zero-downtime behavior end-to-end.
 
