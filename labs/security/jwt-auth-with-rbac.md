@@ -153,7 +153,7 @@ We should see that we get a response from the backend LLM when JWT is provided
 {"id":"chatcmpl-CDwyrpA4JiYZtZqykYZoH6a4Ea7hL","choices":[{"index":0,"message":{"content":"I don't have personal preferences, but one widely admired poem is \"The Road Not Taken\" by Robert Frost. It explores themes of choice, individuality, and the paths we take in life. Many find its reflective nature and imagery to be profound. If you're interested, I can provide an analysis or discuss its themes!","role":"assistant"},"finish_reason":"stop"}],"created":1757441021,"model":"gpt-4o-mini-2024-07-18","service_tier":"default","system_fingerprint":"fp_8bda4d3a2c","object":"chat.completion","usage":{"prompt_tokens":12,"completion_tokens":63,"total_tokens":75,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0}}}
 ```
 
-If you decode the JWT, you’ll see that agentgateway successfully verified it and enforced RBAC based on the `jwt.org` and `jwt.group` claims
+If you decode the JWT, you’ll see that agentgateway successfully verified it and enforced RBAC based on the `jwt.org` and `jwt.team` claims
 ```
 {
   "iss": "solo.io",
@@ -172,10 +172,10 @@ If you decode the JWT, you’ll see that agentgateway successfully verified it a
 Bonus Exercise:
 Update the CEL expression in the EnterpriseAgentgatewayPolicy to experiment with RBAC behavior. For example, adjust the claims in your JWT and resend the request to see when access is allowed or denied:
 ```
-rbac:
-    policy:
-      matchExpressions:
-        - '(jwt.org == "internal") && (jwt.group == "engineering")'
+authorization:
+  policy:
+    matchExpressions:
+      - '(jwt.org == "internal") && (jwt.team == "engineering")'
 ```
 
 ## Claims Based Routing using JWT Auth and Transformations
@@ -313,7 +313,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-The JWT is valid and passes authorization, but the transformation produces `x-team: team-id`, which does not match the route's `x-team: enterprise-team` requirement. With no fallback route defined, the gateway returns `404 Not Found`.
+The JWT is valid and passes authorization, but the transformation produces `x-team: team-id`, which does not match the route's `x-team: other-team-id` requirement. With no fallback route defined, the gateway returns `404 Not Found`.
 
 To extend this pattern to multi-tenant routing, create additional HTTPRoutes with different `x-team` header values pointing to different backends. Requests whose JWT does not produce a matching `x-team` value will fall through to any default route or receive a 404 if no default exists.
 
@@ -470,9 +470,9 @@ Example output shows comprehensive request details including model information, 
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
-kubectl delete agentgatewaybackend -n agentgateway-system okta-jwks
-kubectl delete secret -n agentgateway-system openai-secret
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system agentgateway-jwt-auth
+kubectl delete httproute -n agentgateway-system openai --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete agentgatewaybackend -n agentgateway-system okta-jwks --ignore-not-found
+kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system agentgateway-jwt-auth --ignore-not-found
 ```

@@ -234,7 +234,7 @@ Example output shows comprehensive request details including model information, 
 
 ### (Optional) View Traces in Jaeger
 
-If you installed Jaeger in lab `/install-on-openshift/002-set-up-monitoring-tools-ocp.md` instead of Tempo, you can view traces in the UI:
+If you installed Jaeger in the [002 — Set Up Monitoring Tools (OCP)](../installation/openshift/002-set-up-monitoring-tools-ocp.md) lab instead of Tempo, you can view traces in the UI:
 
 ```bash
 kubectl port-forward svc/jaeger -n observability 16686:16686

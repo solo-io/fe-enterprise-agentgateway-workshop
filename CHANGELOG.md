@@ -1,5 +1,21 @@
 # Changelog
 
+0.11.8 - (7-7-26)
+---
+- Add `style-guide.md`: lab-authoring style guide (archetypes, canonical skeleton, command/YAML/callout/cleanup conventions, repo-maintenance checklist) distilled from a full-corpus audit
+- Fix `labs/security/jwt-auth-with-rbac.md` stale narrative: `jwt.group` → `jwt.team`, invalid `rbac:` bonus block → `authorization:` (no `rbac` field exists in the CRD schema), and correct the no-matching-route explanation to `x-team: other-team-id`
+- Fix `labs/load-testing/llm-load-testing-k6.md`: k6 Job ENDPOINT host `agentgateway.agentgateway-system` → `agentgateway-proxy.agentgateway-system` (old name fails DNS; verified live on v2026.6.3)
+- Fix stale Jaeger cross-link `/install-on-openshift/002-...` → `labs/installation/openshift/002-set-up-monitoring-tools-ocp.md` in 12 routing labs and `labs/mcp/in-cluster-mcp.md`
+- Fix `lib/jwt/README.md` links to `labs/mcp/mcp-tool-federation.md` (stale since the labs/ reorg)
+- Remove dead `$CLAUDE_GATEWAY_IP:4040` substitution note in `labs/agent-harnesses/claude-code.md`
+- Rework MCP session-ID capture in `labs/security/opa-authorization.md` and `labs/security/byo-opa-grpc-ext-authz.md` to use a shell variable instead of `/tmp/mcp-headers.txt`
+- Pin `grafana/k6:latest` → `grafana/k6:0.54.0` in `labs/upgrades/in-place-rolling-upgrades.md` and `labs/upgrades/blue-green-namespaces.md`
+- Add `--ignore-not-found` to Cleanup deletes in `jwt-auth-with-rbac.md`, `virtual-keys.md`, and `evaluate-openai-model-performance.md`
+- Update `README.md` Validated on → v2026.6.3; update `labs/installation/system-requirements.md` to the v2026.6.x support matrix (Kubernetes 1.32–1.36, Gateway API 1.3–1.5, Solo UI 0.4.6)
+- Move `labs/mcp/keycloak/images/` → `images/keycloak/` and update the 7 screenshot refs in `mcp-eager-auth-keycloak.md`
+- Add `labs/mcp/figma-mcp-entra/.figma-creds.env.example` template; reference it in Step 1 and the folder manifest table
+- Live-verified on v2026.6.3: both `appProtocol: kgateway.dev/mcp` and `agentgateway.dev/mcp` route MCP through selector-based backends; a Service port with **no** MCP appProtocol is silently not discovered (documented in `style-guide.md` §16)
+
 0.11.7 - (7-6-26)
 ---
 - Add `labs/security/WAF.md`: WAF for agentic traffic (shape/model allow-list, tool-payload abuse, credential block on request/response, layering with `promptGuard`)

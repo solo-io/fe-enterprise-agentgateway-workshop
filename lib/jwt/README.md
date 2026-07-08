@@ -7,7 +7,7 @@ A small RS256 JWT signer for workshop demos that need to mint tokens with arbitr
 - `generate-jwt.sh` — non-interactive signer. Prints a JWT to stdout.
 - `private.pem` / `public.pem` — committed RSA keypair. **Demo-only — do not use outside this workshop.**
 - `jwks.json` — JWKS document encoding `public.pem`, ready to paste into an `EnterpriseAgentgatewayPolicy.spec.traffic.jwtAuthentication.providers[0].jwks.inline` block.
-- `claims/` — sample claims files used by [`mcp-tool-federation.md`](../../mcp-tool-federation.md) (academic / economist / analyst / admin personas).
+- `claims/` — sample claims files used by [`mcp-tool-federation.md`](../../labs/mcp/mcp-tool-federation.md) (academic / economist / analyst / admin personas).
 
 ## Usage
 
@@ -26,4 +26,4 @@ Requires `openssl` and `base64` on `PATH`.
 
 ## Used by
 
-- [`mcp-tool-federation.md`](../../mcp-tool-federation.md) — persona-based tool filtering across a federated MCP backend.
+- [`mcp-tool-federation.md`](../../labs/mcp/mcp-tool-federation.md) — persona-based tool filtering across a federated MCP backend.

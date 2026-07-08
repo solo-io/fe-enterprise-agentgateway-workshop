@@ -563,12 +563,12 @@ Token usage visibility is covered in the standalone `llm-cost-tracking-with-virt
 
 ```bash
 # Policies and rate limit config added in this lab
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system api-key-auth token-budget-policy
-kubectl delete ratelimitconfig -n agentgateway-system token-budgets
-kubectl delete secret -n agentgateway-system -l app=llm-virtual-keys
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system api-key-auth token-budget-policy --ignore-not-found
+kubectl delete ratelimitconfig -n agentgateway-system token-budgets --ignore-not-found
+kubectl delete secret -n agentgateway-system -l app=llm-virtual-keys --ignore-not-found
 
 # Backend resources set up at the start of this lab
-kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
-kubectl delete secret -n agentgateway-system openai-secret
+kubectl delete httproute -n agentgateway-system openai --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
 ```

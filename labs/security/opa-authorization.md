@@ -405,8 +405,8 @@ Access denied: missing or invalid API key
 **Allowed -- valid api-key (initialize + list tools):**
 
 ```bash
-# Initialize
-curl -s -D /tmp/mcp-headers.txt "$GATEWAY_IP:8080/mcp" \
+# Initialize (capture response headers to extract the session ID)
+INIT_HEADERS=$(curl -s -D - -o /dev/null "$GATEWAY_IP:8080/mcp" \
   -H "content-type: application/json" \
   -H "Accept: application/json, text/event-stream" \
   -H "api-key: authorized-user-key" \
@@ -419,10 +419,10 @@ curl -s -D /tmp/mcp-headers.txt "$GATEWAY_IP:8080/mcp" \
       "clientInfo": {"name": "test", "version": "1.0"}
     },
     "id": 1
-  }'
+  }')
 
 # Grab session ID
-SESSION=$(grep -i "mcp-session-id" /tmp/mcp-headers.txt | awk '{print $2}' | tr -d '\r')
+SESSION=$(echo "$INIT_HEADERS" | grep -i "mcp-session-id" | awk '{print $2}' | tr -d '\r')
 
 # Send initialized notification
 curl -s "$GATEWAY_IP:8080/mcp" \

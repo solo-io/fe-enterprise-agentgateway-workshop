@@ -112,8 +112,8 @@ Feel free to review or test out the other evaluation examples in `/evaluations`
 
 ## Cleanup
 ```bash
-kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
-kubectl delete secret -n agentgateway-system openai-secret
+kubectl delete httproute -n agentgateway-system openai --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
 rm -f promptfoo-errors.log
 ```

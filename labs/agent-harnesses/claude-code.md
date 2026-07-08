@@ -298,7 +298,7 @@ unset ANTHROPIC_BASE_URL CLAUDE_API_KEY GATEWAY_IP
 
 ## Observability
 
-These steps apply to both Option A and Option B. For Option B, substitute `$GATEWAY_IP:8080/claude` wherever `$CLAUDE_GATEWAY_IP:4040` appears in the examples.
+These steps apply to both Option A and Option B.
 
 ### View Metrics in Grafana
 

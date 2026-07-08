@@ -303,7 +303,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway v2026.5.2
+- Enterprise Agentgateway v2026.6.3
 
 
 ## User Stories / Acceptance Criteria

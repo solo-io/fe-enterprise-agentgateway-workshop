@@ -50,6 +50,7 @@ Files in this folder:
 | `figma-mcp.yaml` | Figma-specific CRs (backend, route, CORS, elicitation policy+secret, entra-jwks) — `envsubst`-templated |
 | `figma-openapi.json` | Full Figma REST OpenAPI spec (v0.40.0, 42 paths, down-converted 3.1→3.0) → loaded into a ConfigMap |
 | `images/` | Screenshots referenced by this runbook (Entra + Figma config, runtime OAuth) |
+| `.figma-creds.env.example` | Template for a gitignored `.figma-creds.env` holding your Entra/Figma credentials (see Step 1) |
 
 ---
 
@@ -121,6 +122,8 @@ Identical to the Auth0 lab. Go to [figma.com/developers/apps](https://www.figma.
 ---
 
 ## Step 1 — Environment variables + DNS
+
+> **Tip — reusable credentials file:** copy `.figma-creds.env.example` to `.figma-creds.env` (gitignored), fill in the values from your Entra and Figma app registrations, and `source .figma-creds.env` instead of re-exporting everything each session. Never commit a populated copy.
 
 Run every command in this runbook from **this lab folder** — Step 6 reads `figma-openapi.json`
 by relative path, and the certs land in `./example_certs`:
