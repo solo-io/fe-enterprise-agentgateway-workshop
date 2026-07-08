@@ -136,6 +136,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [OpenAPI to MCP — External API](labs/mcp/openapi-to-mcp-external-api.md)
 - [OpenAPI to MCP — In-Cluster Deployment](labs/mcp/openapi-to-mcp-in-cluster.md)
 - [MCP Tool Federation](labs/mcp/mcp-tool-federation.md)
+- [Composable MCP — Tool Aggregation & Orchestration](labs/mcp/composable-mcp.md) — one tool call fans out to distinct MCP + HTTP backends and merges the responses (vs. federation, which routes each call)
 - [MCP Tool Mode — Search](labs/mcp/mcp-tool-mode-search.md)
 - [MCP Tool Mode — Code](labs/mcp/mcp-tool-mode-code.md)
 - [MCP Tool Rate Limiting](labs/mcp/mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
@@ -271,6 +272,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - Dynamic MCP backends via label selectors (scale targets without editing the backend)
     - Expose existing REST APIs as MCP tools from an OpenAPI spec (external public APIs and in-cluster services)
     - Federate multiple MCP servers behind one backend (tool-name prefixing, FailOpen, per-persona tool filtering)
+    - Composite MCP tools that fan out to multiple MCP + HTTP backends and merge the responses — aggregation, sequential orchestration, and structured output
     - MCP tool modes — Search (`get_tool` / `invoke_tool` meta-tools) and Code (`run_code` in a sandboxed JS runtime)
     - Secure MCP servers with JWT auth
     - BYO gRPC external authorization (ext-authz) for MCP routes

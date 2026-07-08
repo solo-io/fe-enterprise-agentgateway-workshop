@@ -1,5 +1,10 @@
 # Changelog
 
+0.11.9 - (7-8-26)
+---
+- Add `labs/mcp/composable-mcp.md`: Composable MCP lab — one composite MCP tool (`account-brief`) fans a single call out to distinct MCP + HTTP backends and merges the responses into one result (declarative `entMcp.targets[].custom`, no custom server); progresses through baseline HTTP aggregation, an MCP-step leg (openapi-to-mcp `accounts-mcp`/`getAccount`), sequential orchestration (a later step consumes `output.<step>.field`), string vs. structured (`structuredContent`) output, and an optional route-scoped JWT that injects the caller's identity into a backend call via CEL; verified live on v2026.6.3
+- Add Composable MCP lab to `README.md` (MCP section + Use Cases checklist)
+
 0.11.8 - (7-8-26)
 ---
 - Add `style-guide.md`: lab-authoring style guide (archetypes, canonical skeleton, command/YAML/callout/cleanup conventions, repo-maintenance checklist) distilled from a full-corpus audit
