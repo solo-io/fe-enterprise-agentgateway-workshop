@@ -1,6 +1,6 @@
 # Changelog
 
-0.11.8 - (7-7-26)
+0.11.8 - (7-8-26)
 ---
 - Add `style-guide.md`: lab-authoring style guide (archetypes, canonical skeleton, command/YAML/callout/cleanup conventions, repo-maintenance checklist) distilled from a full-corpus audit
 - Fix `labs/security/jwt-auth-with-rbac.md` stale narrative: `jwt.group` → `jwt.team`, invalid `rbac:` bonus block → `authorization:` (no `rbac` field exists in the CRD schema), and correct the no-matching-route explanation to `x-team: other-team-id`
@@ -15,6 +15,7 @@
 - Move `labs/mcp/keycloak/images/` → `images/keycloak/` and update the 7 screenshot refs in `mcp-eager-auth-keycloak.md`
 - Add `labs/mcp/figma-mcp-entra/.figma-creds.env.example` template; reference it in Step 1 and the folder manifest table
 - Live-verified on v2026.6.3: both `appProtocol: kgateway.dev/mcp` and `agentgateway.dev/mcp` route MCP through selector-based backends; a Service port with **no** MCP appProtocol is silently not discovered (documented in `style-guide.md` §16)
+- Sync agentgateway Grafana dashboard
 
 0.11.7 - (7-6-26)
 ---
