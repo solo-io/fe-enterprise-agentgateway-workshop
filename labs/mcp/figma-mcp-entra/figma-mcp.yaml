@@ -21,8 +21,8 @@
 # =============================================================================
 ---
 # Static backend the controller uses to fetch Entra's JWKS for JWT validation.
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: entra-jwks
   namespace: agentgateway-system
@@ -60,8 +60,8 @@ spec:
           - api://${ENTRA_CLIENT_ID}
         jwks:
           backendRef:
-            group: agentgateway.dev
-            kind: AgentgatewayBackend
+            group: enterpriseagentgateway.solo.io
+            kind: EnterpriseAgentgatewayBackend
             name: entra-jwks
           cacheDuration: 5m
           # NO leading slash: the controller joins the backend URL and this path

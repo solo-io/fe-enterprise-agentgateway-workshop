@@ -10,14 +10,14 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Deploy a Squid forward proxy to simulate a corporate network boundary
-- Create an `AgentgatewayBackend` for the proxy, and a second `AgentgatewayBackend` for Okta's JWKS endpoint that tunnels through it via `policies.tunnel`
+- Create an `EnterpriseAgentgatewayBackend` for the proxy, and a second `EnterpriseAgentgatewayBackend` for Okta's JWKS endpoint that tunnels through it via `policies.tunnel`
 - Configure JWT authentication (no authorization) against the tunneled JWKS endpoint
 - Validate that the JWKS fetch — and JWT validation — succeeds even though Okta is only reachable through the proxy
 - Confirm from the proxy's own access log that traffic actually transited the tunnel
 
 ## Overview
 
-`BackendTunnel` lets an `AgentgatewayBackend` reach its destination by issuing an HTTP `CONNECT` to an intermediary proxy first, then tunneling the real (typically TLS) connection through it — the same behavior `HTTPS_PROXY` gives you in a standard HTTP client. The backend being tunneled just needs a `policies.tunnel.backendRef` pointing at another `AgentgatewayBackend` that represents the proxy:
+`BackendTunnel` lets an `EnterpriseAgentgatewayBackend` reach its destination by issuing an HTTP `CONNECT` to an intermediary proxy first, then tunneling the real (typically TLS) connection through it — the same behavior `HTTPS_PROXY` gives you in a standard HTTP client. The backend being tunneled just needs a `policies.tunnel.backendRef` pointing at another `EnterpriseAgentgatewayBackend` that represents the proxy:
 
 ```
  client              agentgateway            corporate-proxy (squid)              Okta
@@ -121,12 +121,12 @@ kubectl get pods -n corporate-proxy
 
 ## Configure the Tunnel to Okta's JWKS Endpoint
 
-First, create an `AgentgatewayBackend` that represents the Squid proxy itself:
+First, create an `EnterpriseAgentgatewayBackend` that represents the Squid proxy itself:
 
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: corporate-proxy
   namespace: agentgateway-system
@@ -141,8 +141,8 @@ Now create the Okta JWKS backend, and set `policies.tunnel.backendRef` to route 
 
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: okta-jwks
   namespace: agentgateway-system
@@ -154,8 +154,8 @@ spec:
     tls: {}
     tunnel:
       backendRef:
-        group: agentgateway.dev
-        kind: AgentgatewayBackend
+        group: enterpriseagentgateway.solo.io
+        kind: EnterpriseAgentgatewayBackend
         name: corporate-proxy
         port: 3128
 EOF
@@ -238,8 +238,8 @@ spec:
               backendRef:
                 name: okta-jwks
                 namespace: agentgateway-system
-                kind: AgentgatewayBackend
-                group: agentgateway.dev
+                kind: EnterpriseAgentgatewayBackend
+                group: enterpriseagentgateway.solo.io
               jwksPath: /oauth2/ausxkvmeftgcdj6HA697/v1/keys
 EOF
 ```
@@ -322,7 +322,7 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system agentgateway-
 kubectl delete httproute -n agentgateway-system openai --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
-kubectl delete agentgatewaybackend -n agentgateway-system okta-jwks --ignore-not-found
-kubectl delete agentgatewaybackend -n agentgateway-system corporate-proxy --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system okta-jwks --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system corporate-proxy --ignore-not-found
 kubectl delete namespace corporate-proxy --ignore-not-found
 ```

@@ -2,9 +2,11 @@
 
 0.11.9 - (7-10-26)
 ---
-- Add `labs/security/jwt-auth-through-corporate-proxy.md`: routes an external JWKS fetch (Okta) through a corporate forward proxy using agentgateway's `BackendTunnel` (`policies.tunnel.backendRef`) — deploys an in-cluster Squid proxy, tunnels the JWKS `AgentgatewayBackend` through it, configures JWT authentication only (no RBAC), and verifies from Squid's own access log that the tunnel was actually used
+- Add `labs/security/jwt-auth-through-corporate-proxy-okta.md`: routes an external JWKS fetch (Okta) through a corporate forward proxy using agentgateway's `BackendTunnel` (`policies.tunnel.backendRef`)
+- Add `labs/security/jwt-auth-through-corporate-proxy-entra.md`: routes an external JWKS fetch (Entra) through a corporate forward proxy using agentgateway's `BackendTunnel` (`policies.tunnel.backendRef`)
 - Add `labs/mcp/composable-mcp.md`: Composable MCP lab — one composite MCP tool (`account-brief`) fans a single call out to distinct MCP + HTTP backends and merges the responses into one result
 - Updates to the `style-guide.md`
+- Complete migration of `AgentgatewayBackend` to `EnterpriseAgentgatewayBackend` across all labs
 
 0.11.8 - (7-8-26)
 ---

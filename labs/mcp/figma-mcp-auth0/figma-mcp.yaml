@@ -15,8 +15,8 @@
 # =============================================================================
 ---
 # Static backend the controller uses to fetch Auth0's JWKS for JWT validation.
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayBackend
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
 metadata:
   name: auth0-jwks
   namespace: agentgateway-system
@@ -48,8 +48,8 @@ spec:
           - ${AUTH0_AUDIENCE}
         jwks:
           backendRef:
-            group: agentgateway.dev
-            kind: AgentgatewayBackend
+            group: enterpriseagentgateway.solo.io
+            kind: EnterpriseAgentgatewayBackend
             name: auth0-jwks
           cacheDuration: 5m
           # NO leading slash: the controller joins the backend URL and this path
