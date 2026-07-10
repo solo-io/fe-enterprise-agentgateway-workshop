@@ -88,6 +88,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [Virtual Keys](labs/security/virtual-keys.md) _(see also: Rate Limiting)_
 - [JWT Auth with RBAC](labs/security/jwt-auth-with-rbac.md)
+- [JWT Auth Through a Corporate Proxy (Tunnel)](labs/security/jwt-auth-through-corporate-proxy-okta.md) _(Okta)_
+- [JWT Auth Through a Corporate Proxy (Tunnel)](labs/security/jwt-auth-through-corporate-proxy-entra.md) _(Entra)_
 - [TLS Termination](labs/security/tls-termination.md)
 - [Frontend mTLS](labs/security/frontend-mtls.md)
 - [SNI Matching](labs/security/sni-matching.md)
@@ -136,6 +138,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [OpenAPI to MCP — External API](labs/mcp/openapi-to-mcp-external-api.md)
 - [OpenAPI to MCP — In-Cluster Deployment](labs/mcp/openapi-to-mcp-in-cluster.md)
 - [MCP Tool Federation](labs/mcp/mcp-tool-federation.md)
+- [Composable MCP — Tool Aggregation & Orchestration](labs/mcp/composable-mcp.md) — one tool call fans out to distinct MCP + HTTP backends and merges the responses (vs. federation, which routes each call)
 - [MCP Tool Mode — Search](labs/mcp/mcp-tool-mode-search.md)
 - [MCP Tool Mode — Code](labs/mcp/mcp-tool-mode-code.md)
 - [MCP Tool Rate Limiting](labs/mcp/mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
@@ -253,6 +256,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - SNI (Server Name Indication) matching for multi-domain HTTPS
     - OPA authorization with custom Rego policies (ext-auth)
     - BYO gRPC external authorization (ext-authz) for LLM and MCP routes
+    - Tunnel a backend connection (e.g. JWKS fetch) through a corporate forward proxy via `BackendTunnel` (`HTTPS_PROXY`-style CONNECT)
 - Prompt Guard & Content Moderation
     - Comprehensive built-in Prompt Guard (prompt injection, jailbreak, PII, secrets, harmful content, encoding evasion, and more)
     - External moderation guardrails (OpenAI moderation API)
@@ -271,6 +275,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - Dynamic MCP backends via label selectors (scale targets without editing the backend)
     - Expose existing REST APIs as MCP tools from an OpenAPI spec (external public APIs and in-cluster services)
     - Federate multiple MCP servers behind one backend (tool-name prefixing, FailOpen, per-persona tool filtering)
+    - Composite MCP tools that fan out to multiple MCP + HTTP backends and merge the responses — aggregation, sequential orchestration, and structured output
     - MCP tool modes — Search (`get_tool` / `invoke_tool` meta-tools) and Code (`run_code` in a sandboxed JS runtime)
     - Secure MCP servers with JWT auth
     - BYO gRPC external authorization (ext-authz) for MCP routes

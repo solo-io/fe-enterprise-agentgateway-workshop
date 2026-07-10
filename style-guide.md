@@ -252,6 +252,8 @@ For a substantial new lab, the repo workflow is brainstorm → design → plan �
 
 ## 15. Repo maintenance when adding a lab
 
+**A README.md bullet and a CHANGELOG.md entry are required for every new lab — not optional cleanup.** A lab isn't done until both are updated in the same change. `tracks/` is the one exception: it's a curated, opt-in learning path, so only add a row there when the lab genuinely fits an existing `### Use Case` grouping; skip it otherwise without treating that as unfinished work.
+
 **README.md** (the index):
 
 - Add a bullet under the correct `## <Category>` section: `- [Lab Title](labs/<category>/<name>.md) _(Provider)_`. Provider/tech tags in trailing italics: `_(OpenAI)_`, `_(AWS Bedrock / EKS)_`.
@@ -300,7 +302,7 @@ Also watch for: stale relative links after files move (update `lib/*/README.md` 
 - [ ] Manifests: `agentgateway-system` namespace, kebab-case names, group/kind on backendRefs, `#---` uncomment markers (§8)
 - [ ] Cleanup deletes in reverse order with `--ignore-not-found` and restores all mutated global state (§10)
 - [ ] Shared/reusable assets placed in `lib/<concern>/`, referenced root-relative; secrets gitignored, never committed populated (§4, §11)
-- [ ] README.md: category bullet + provider italics + reciprocal `_(see also:)_` + Use Cases bullets (§15)
-- [ ] tracks/: row added to the relevant use-case table (§15)
+- [ ] **(required)** README.md: category bullet + provider italics + reciprocal `_(see also:)_` + Use Cases bullets (§15)
+- [ ] **(required)** CHANGELOG.md: new version block; commit as `see CHANGELOG (X.Y.Z)` (§15)
+- [ ] (optional) tracks/: row added to the relevant use-case table, only if the lab fits an existing use case (§15)
 - [ ] image-list.md / system-requirements.md updated if images or versions changed (§15)
-- [ ] CHANGELOG.md: new version block; commit as `see CHANGELOG (X.Y.Z)` (§15)

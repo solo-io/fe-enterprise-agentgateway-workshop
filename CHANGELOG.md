@@ -1,5 +1,13 @@
 # Changelog
 
+0.11.9 - (7-10-26)
+---
+- Add `labs/security/jwt-auth-through-corporate-proxy-okta.md`: routes an external JWKS fetch (Okta) through a corporate forward proxy using agentgateway's `BackendTunnel` (`policies.tunnel.backendRef`)
+- Add `labs/security/jwt-auth-through-corporate-proxy-entra.md`: routes an external JWKS fetch (Entra) through a corporate forward proxy using agentgateway's `BackendTunnel` (`policies.tunnel.backendRef`)
+- Add `labs/mcp/composable-mcp.md`: Composable MCP lab — one composite MCP tool (`account-brief`) fans a single call out to distinct MCP + HTTP backends and merges the responses into one result
+- Updates to the `style-guide.md`
+- Complete migration of `AgentgatewayBackend` to `EnterpriseAgentgatewayBackend` across all labs
+
 0.11.8 - (7-8-26)
 ---
 - Add `style-guide.md`: lab-authoring style guide (archetypes, canonical skeleton, command/YAML/callout/cleanup conventions, repo-maintenance checklist) distilled from a full-corpus audit
