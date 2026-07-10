@@ -88,6 +88,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [Virtual Keys](labs/security/virtual-keys.md) _(see also: Rate Limiting)_
 - [JWT Auth with RBAC](labs/security/jwt-auth-with-rbac.md)
+- [JWT Auth Through a Corporate Proxy (Tunnel)](labs/security/jwt-auth-through-corporate-proxy.md) _(Okta)_
 - [TLS Termination](labs/security/tls-termination.md)
 - [Frontend mTLS](labs/security/frontend-mtls.md)
 - [SNI Matching](labs/security/sni-matching.md)
@@ -254,6 +255,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - SNI (Server Name Indication) matching for multi-domain HTTPS
     - OPA authorization with custom Rego policies (ext-auth)
     - BYO gRPC external authorization (ext-authz) for LLM and MCP routes
+    - Tunnel a backend connection (e.g. JWKS fetch) through a corporate forward proxy via `BackendTunnel` (`HTTPS_PROXY`-style CONNECT)
 - Prompt Guard & Content Moderation
     - Comprehensive built-in Prompt Guard (prompt injection, jailbreak, PII, secrets, harmful content, encoding evasion, and more)
     - External moderation guardrails (OpenAI moderation API)
