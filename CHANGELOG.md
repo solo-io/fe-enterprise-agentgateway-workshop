@@ -1,5 +1,9 @@
 # Changelog
 
+0.11.10 - (7-10-26)
+---
+- Minor updates to `labs/security/jwt-auth-through-corporate-proxy-entra.md`
+
 0.11.9 - (7-10-26)
 ---
 - Add `labs/security/jwt-auth-through-corporate-proxy-okta.md`: routes an external JWKS fetch (Okta) through a corporate forward proxy using agentgateway's `BackendTunnel` (`policies.tunnel.backendRef`)
