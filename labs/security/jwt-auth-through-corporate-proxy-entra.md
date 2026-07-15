@@ -19,6 +19,7 @@ export ENTRA_TENANT_ID="$ENTRA_TENANT_ID"                             # e.g. "11
 - Configure JWT authentication (no authorization) against the tunneled JWKS endpoint
 - Validate that the JWKS fetch and JWT validation succeed even though Entra is only reachable through the proxy
 - Confirm from the proxy's own access log that traffic actually transited the tunnel
+- Run the negative test: deny Entra at the proxy and confirm the JWKS fetch fails rather than falling back to direct egress
 - Reuse the same tunneled JWKS to protect an MCP backend instead of an LLM backend (see [MCP Backend Variant](#mcp-backend-variant))
 
 ## Overview
@@ -332,6 +333,118 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ```
 
 For metrics and traces on this traffic, see `002`.
+
+## Negative Test: Deny Entra at the Proxy
+
+The `TCP_TUNNEL/200` entry above proves the JWKS fetch went *through* Squid. It doesn't yet prove the opposite direction: that agentgateway won't silently fall back to direct egress when the proxy refuses. In a real corporate network that fallback would be a policy violation, so close the loop by blocking Entra at the proxy and confirming the fetch actually breaks.
+
+Add a deny rule for `login.microsoftonline.com` ahead of the allow rules:
+
+```bash
+kubectl apply -f- <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: corporate-proxy-config
+  namespace: corporate-proxy
+data:
+  squid.conf: |
+    http_port 3128
+
+    acl SSL_ports port 443
+    acl SSL_ports port 8443
+    acl blocked_idp dstdomain login.microsoftonline.com
+
+    http_access deny blocked_idp
+    http_access allow CONNECT SSL_ports
+    http_access deny CONNECT !SSL_ports
+    http_access allow all
+
+    dns_v4_first on
+EOF
+```
+
+> **Restart required.** `squid.conf` is mounted with `subPath`, and subPath mounts never pick up ConfigMap updates — roll the pod to load the deny rule:
+
+```bash
+kubectl -n corporate-proxy rollout restart deploy/corporate-proxy
+kubectl -n corporate-proxy rollout status deploy/corporate-proxy
+```
+
+The controller caches every keyset it has fetched in an `enterprise-jwks-store-*` ConfigMap and won't re-contact Entra for a URL it already knows, even across controller restarts. Force a fresh fetch by giving it a URL it hasn't seen: re-apply the policy with a trailing slash on `jwksPath` (Entra serves the same keys at both paths):
+
+```bash
+kubectl apply -f- <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: agentgateway-jwt-auth-tunnel
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  traffic:
+    jwtAuthentication:
+      mode: Strict
+      providers:
+        - issuer: https://sts.windows.net/${ENTRA_TENANT_ID}/
+          jwks:
+            remote:
+              backendRef:
+                name: entra-jwks
+                namespace: agentgateway-system
+                kind: EnterpriseAgentgatewayBackend
+                group: enterpriseagentgateway.solo.io
+              jwksPath: /${ENTRA_TENANT_ID}/discovery/v2.0/keys/
+EOF
+```
+
+Watch the fetch fail:
+
+```bash
+kubectl logs -n agentgateway-system deploy/enterprise-agentgateway --tail 200 | grep "error fetching jwks"
+```
+
+Expected output:
+
+```
+{"level":"error","msg":"error fetching jwks","component":"jwks_store","target":"https://login.microsoftonline.com:443/<tenant>/discovery/v2.0/keys/","error":"Get \"https://login.microsoftonline.com:443/<tenant>/discovery/v2.0/keys/\": Forbidden","retryAttempt":0,"next":"200ms"}
+```
+
+And confirm from Squid's side that it refused the `CONNECT` before any bytes reached Entra:
+
+```bash
+kubectl exec -n corporate-proxy deploy/corporate-proxy -- tail -n 5 /var/log/squid/access.log
+```
+
+Expected output:
+
+```
+1770000000.456      0 10.244.0.12 TCP_DENIED/403 3482 CONNECT login.microsoftonline.com:443 - HIER_NONE/- text/html
+```
+
+Together the two tests prove the tunnel is the only path the fetch will take: with the proxy open it transits Squid, and with the proxy closed it fails outright instead of falling back to direct egress.
+
+> **Reading the failure mode.** A blocked proxy path always surfaces as a transport-level error — `Forbidden` here, or a `dial tcp ... i/o timeout` / `proxyconnect` error when egress is black-holed. If you instead see `unexpected status code from jwks endpoint ... 404`, the request completed against *some* HTTP server: that response came from whatever answered the connection (perhaps a TLS-intercepting appliance on the egress path), not from a blocked proxy, so investigate what's terminating the connection rather than the tunnel config.
+
+### Restore the Proxy
+
+Re-apply the original Squid config from [Deploy the Corporate Proxy (Squid)](#deploy-the-corporate-proxy-squid) (the version without the `blocked_idp` ACL), then roll the pod again:
+
+```bash
+kubectl -n corporate-proxy rollout restart deploy/corporate-proxy
+kubectl -n corporate-proxy rollout status deploy/corporate-proxy
+```
+
+The controller is still retrying the failed fetch on a backoff; once Squid allows the tunnel again, the next retry succeeds on its own. Within a minute a fresh `TCP_TUNNEL/200` entry appears:
+
+```bash
+kubectl exec -n corporate-proxy deploy/corporate-proxy -- tail -n 5 /var/log/squid/access.log
+```
+
+Finally, re-apply the policy from [Configure JWT Auth](#configure-jwt-auth) to revert `jwksPath` to its original value.
 
 ## MCP Backend Variant
 
