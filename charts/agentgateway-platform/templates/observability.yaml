@@ -1,0 +1,47 @@
+{{- if .Values.observability.accessLog.enabled }}
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: {{ .Values.gateway.name }}-access-log
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.gateway.name }}
+  frontend:
+    accessLog:
+      {{- with .Values.observability.accessLog.attributes }}
+      attributes:
+        add:
+          {{- range . }}
+          - name: {{ .name }}
+            expression: {{ .expression }}
+          {{- end }}
+      {{- end }}
+{{- end }}
+{{- if .Values.observability.tracing.enabled }}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: {{ .Values.gateway.name }}-tracing
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.gateway.name }}
+  frontend:
+    tracing:
+      backendRef:
+        name: {{ .Values.observability.tracing.backendRef.name }}
+        namespace: {{ .Values.observability.tracing.backendRef.namespace }}
+        port: {{ .Values.observability.tracing.backendRef.port }}
+      protocol: {{ .Values.observability.tracing.protocol }}
+      randomSampling: {{ .Values.observability.tracing.randomSampling | quote }}
+{{- end }}

@@ -1,0 +1,106 @@
+# -- Gateway owned by the platform team. All resources render into the release namespace.
+gateway:
+  name: agentgateway-proxy
+  gatewayClassName: enterprise-agentgateway
+  listeners:
+    http:
+      port: 8080
+    https:
+      enabled: false
+      port: 443
+      tls:
+        # -- Name of a pre-provisioned kubernetes.io/tls Secret in the release namespace
+        secretRef: gateway-tls
+
+# -- Proxy fleet shape (rendered as EnterpriseAgentgatewayParameters <gateway.name>-config)
+proxy:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 300m
+      memory: 128Mi
+  service:
+    type: LoadBalancer
+    annotations: {}
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  # -- Graceful drain window in seconds (zero-downtime rollouts)
+  shutdown:
+    min: 10
+    max: 60
+
+observability:
+  # -- Proxy log level (info|debug|warn|error)
+  logging:
+    level: info
+  accessLog:
+    enabled: true
+    # -- Extra attributes recorded on every access log entry (CEL expressions)
+    attributes:
+      - name: llm.streaming
+        expression: llm.streaming
+      - name: llm.cached_tokens
+        expression: llm.cachedInputTokens
+  tracing:
+    enabled: false
+    # -- OTLP collector Service to export spans to
+    backendRef:
+      name: ""
+      namespace: ""
+      port: 4317
+    protocol: GRPC
+    randomSampling: "true"
+  metrics:
+    # -- Requires the prometheus-operator PodMonitor CRD
+    enabled: false
+
+security:
+  jwt:
+    enabled: false
+    issuer: ""
+    jwks:
+      # -- Either set inline JWKS JSON (testing), or host/port/path for a remote JWKS
+      inline: ""
+      host: ""
+      port: 443
+      # -- No leading slash
+      path: ""
+  waf:
+    enabled: false
+    # -- Extra ModSecurity directives appended to the baseline rules
+    customDirectives: []
+
+# -- Tier definitions. The platform team dictates what each tier means;
+#    teams are assigned a tier at onboarding and cannot change it.
+tiers:
+  gold:
+    rateLimit:
+      # -- Input-token budget, enforced per proxy replica (traffic.rateLimit.local).
+      #    Meters LLM traffic; MCP requests carry no token usage and are not counted.
+      tokensPerMinute: 100000
+      # -- Optional MCP tool-call budget (tools/call requests per minute), enforced
+      #    globally via a RateLimitConfig + entRateLimit on the team's parent route.
+      #    Other MCP operations (initialize, tools/list) and LLM requests are not
+      #    counted. Unset by default so deployments without MCP render no
+      #    rate-limit resources.
+      # toolCallsPerMinute: 300
+    retry:
+      attempts: 3
+      backoff: 500ms
+      codes: [429, 502, 503, 504]
+    timeouts:
+      request: 120s
+  silver:
+    rateLimit:
+      tokensPerMinute: 10000
+    timeouts:
+      request: 60s
+
+# -- Onboarded application teams. Each entry creates a parent HTTPRoute
+#    /teams/<name> delegating to labeled child routes in <namespace>,
+#    plus that team's tier policy bundle.
+teams: []
+#  - name: team-alpha
+#    namespace: team-alpha
+#    tier: gold

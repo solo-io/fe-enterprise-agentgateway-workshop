@@ -1,0 +1,11 @@
+# Patterns to ignore when building packages.
+.git/
+.gitignore
+tests/
+__pycache__/
+*.pyc
+*.swp
+*.bak
+*.orig
+*~
+.DS_Store

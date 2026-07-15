@@ -1,0 +1,6 @@
+apiVersion: v2
+name: agentgateway-platform
+description: Platform-team chart for Enterprise Agentgateway — Gateway, proxy parameters, observability, security baseline, and per-team onboarding (delegation routes + tier policies)
+type: application
+version: 0.1.0
+appVersion: "v2026.6.3"

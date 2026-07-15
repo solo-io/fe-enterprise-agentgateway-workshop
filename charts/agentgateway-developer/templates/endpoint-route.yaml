@@ -1,0 +1,20 @@
+{{- range .Values.endpoints }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ include "agentgateway-developer.team" $ }}-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-developer.labels" $ | nindent 4 }}
+spec:
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ include "agentgateway-developer.pathPrefix" $ }}{{ .path }}
+      backendRefs:
+        - name: {{ include "agentgateway-developer.team" $ }}-{{ .name }}
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+{{- end }}

@@ -1,0 +1,47 @@
+{{- range .Values.teams }}
+{{- $tier := get $.Values.tiers .tier }}
+{{- if and $tier $tier.rateLimit $tier.rateLimit.toolCallsPerMinute }}
+---
+apiVersion: ratelimit.solo.io/v1alpha1
+kind: RateLimitConfig
+metadata:
+  name: team-{{ .name }}-tool-calls
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" $ | nindent 4 }}
+    agentgateway.solo.io/tier: {{ .tier }}
+spec:
+  raw:
+    domain: team-{{ .name }}-tool-calls
+    descriptors:
+      - key: mcp_tool_call
+        value: "true"
+        rateLimit:
+          requestsPerUnit: {{ $tier.rateLimit.toolCallsPerMinute }}
+          unit: MINUTE
+    rateLimits:
+      - actions:
+          - cel:
+              expression: 'json(request.body).with(body, has(body.method) && body.method == "tools/call" ? "true" : "none")'
+              key: "mcp_tool_call"
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: team-{{ .name }}-tool-calls
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" $ | nindent 4 }}
+    agentgateway.solo.io/tier: {{ .tier }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: team-{{ .name }}
+  traffic:
+    entRateLimit:
+      global:
+        rateLimitConfigRefs:
+          - name: team-{{ .name }}-tool-calls
+{{- end }}
+{{- end }}

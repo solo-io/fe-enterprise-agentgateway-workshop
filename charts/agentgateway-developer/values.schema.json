@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["team", "endpoints"],
+  "properties": {
+    "global": {"type": "object"},
+    "team": {"type": "string", "minLength": 1, "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+    "endpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "type", "path"],
+        "allOf": [
+          {
+            "if": {"properties": {"type": {"const": "llm"}}},
+            "then": {"required": ["provider", "auth"]}
+          },
+          {
+            "if": {"properties": {"type": {"const": "mcp"}}},
+            "then": {"required": ["targets"]}
+          }
+        ],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+          "type": {"enum": ["llm", "mcp"]},
+          "path": {"type": "string", "pattern": "^/"},
+          "provider": {"enum": ["openai", "anthropic", "bedrock", "vertexai", "azureopenai"]},
+          "model": {"type": "string"},
+          "host": {"type": "string"},
+          "port": {"type": "integer"},
+          "apiPath": {"type": "string"},
+          "auth": {
+            "type": "object",
+            "additionalProperties": false,
+            "not": {"required": ["secretRef", "passthrough"]},
+            "properties": {
+              "secretRef": {"type": "string"},
+              "passthrough": {"type": "boolean"}
+            }
+          },
+          "failover": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["provider"],
+              "not": {"required": ["secretRef", "passthrough"]},
+              "properties": {
+                "provider": {"enum": ["openai", "anthropic", "bedrock", "vertexai", "azureopenai"]},
+                "model": {"type": "string"},
+                "secretRef": {"type": "string"},
+                "passthrough": {"type": "boolean"},
+                "host": {"type": "string"},
+                "port": {"type": "integer"},
+                "apiPath": {"type": "string"}
+              }
+            }
+          },
+          "guardrails": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "promptGuard": {"type": "object"}
+            }
+          },
+          "toolMode": {"enum": ["search", "code"]},
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "host", "port"],
+              "properties": {
+                "name": {"type": "string"},
+                "host": {"type": "string"},
+                "port": {"type": "integer"},
+                "protocol": {"enum": ["StreamableHTTP", "SSE"]}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
