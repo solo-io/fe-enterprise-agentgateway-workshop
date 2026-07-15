@@ -16,6 +16,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - **Helm 3** installed.
 - Run every command **from the workshop root** (the directory that contains `charts/`). Chart paths below are repo-root-relative.
 - The two charts referenced here live at `charts/agentgateway-platform` and `charts/agentgateway-developer`.
+- A valid **OpenAI API key**. Team beta's endpoint routes to the real OpenAI API to show that the same developer chart configures both a self-hosted backend and an external provider; the request in [Step 3](#step-3-cost-tiers-in-action) is a real, billed OpenAI call.
 
 > **Note:** The platform chart installs its **own** `Gateway` named `agw-platform`, alongside the `agentgateway-proxy` gateway from `001`. The two coexist; this lab never modifies `001`.
 
@@ -76,7 +77,8 @@ The developer chart's `values.schema.json` uses `"additionalProperties": false` 
 
 The platform team owns a single values file. It defines the gateway, the tier catalog, and the roster of onboarded teams. Create `platform-values.yaml`:
 
-```yaml
+```bash
+cat > platform-values.yaml <<'EOF'
 gateway:
   name: agw-platform
 tiers:
@@ -106,6 +108,7 @@ teams:
   - name: team-beta
     namespace: team-beta
     tier: silver
+EOF
 ```
 
 > **Note on the tiny budgets:** `gold` at `1000` and `silver` at `5` input tokens/minute are set small so you can trip a `429` in a couple of requests. Production tiers would be far higher (the chart's own defaults are `100000` and `10000`). What matters about a tier is who sets the number: the platform assigns it, and the team never chooses it. `gold` also carries a retry policy while `silver` does not, because a tier bundles cost *and* resilience, all platform-owned.
@@ -180,21 +183,20 @@ echo "GATEWAY_IP=${GATEWAY_IP}"
 
 ## Step 2: Developers self-serve their endpoints
 
-Now the application teams take over. Each team runs its own model backend and declares its endpoints with the developer chart. Nothing a team does here touches security, rate limits, or logging.
+Now the application teams take over, and each one wires up a different kind of backend to show the developer chart handles both: team alpha runs its own mock model in-namespace and points its endpoint at it with a host/port override, while team beta skips that entirely and points its endpoint straight at the real OpenAI API. Same chart, same schema, two backend shapes. Nothing either team does here touches security, rate limits, or logging.
 
-### Deploy each team's model backend
+### Team alpha deploys a mock model backend
 
-Each team namespace runs the mock OpenAI server from the [Mock OpenAI Server lab](../routing/configure-mock-openai-server.md): the same simulator, deployed into the **team's** namespace (`team-alpha`, `team-beta`) instead of `agentgateway-system`. Create the namespaces and deploy one mock per team:
+Team alpha runs the mock OpenAI server from the [Mock OpenAI Server lab](../routing/configure-mock-openai-server.md): the same simulator, deployed into the **team-alpha** namespace instead of `agentgateway-system`. Create the namespace and deploy the mock:
 
 ```bash
-for NS in team-alpha team-beta; do
-  kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
-  kubectl apply -f - <<EOF
+kubectl create namespace team-alpha --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: mock-gpt-4o
-  namespace: ${NS}
+  namespace: team-alpha
 spec:
   replicas: 1
   selector:
@@ -227,7 +229,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mock-gpt-4o-svc
-  namespace: ${NS}
+  namespace: team-alpha
   labels:
     app: mock-gpt-4o
 spec:
@@ -240,16 +242,13 @@ spec:
       targetPort: 8000
   type: ClusterIP
 EOF
-done
 
 kubectl rollout status -n team-alpha deploy/mock-gpt-4o --timeout=180s
-kubectl rollout status -n team-beta  deploy/mock-gpt-4o --timeout=180s
 ```
 
 Expected output:
 
 ```
-deployment "mock-gpt-4o" successfully rolled out
 deployment "mock-gpt-4o" successfully rolled out
 ```
 
@@ -257,7 +256,8 @@ deployment "mock-gpt-4o" successfully rolled out
 
 Team alpha creates `team-alpha-values.yaml`. It names its team (the label + prefix contract), then declares one LLM endpoint pointing at its in-namespace mock via an OpenAI-compatible host override:
 
-```yaml
+```bash
+cat > team-alpha-values.yaml <<'EOF'
 team: team-alpha
 endpoints:
   - name: chat
@@ -270,6 +270,7 @@ endpoints:
     apiPath: /v1/chat/completions
     auth:
       passthrough: true
+EOF
 ```
 
 Install the developer chart as the team's own release, in the team's namespace:
@@ -301,24 +302,36 @@ enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/team-alpha-chat   T
 
 The chart stamped `team: team-alpha` on the route, and that label is what makes the platform's parent route pick this child up. The child route matches `/teams/team-alpha/chat` because the developer chart prepended the platform-owned `/teams/team-alpha` prefix to the team's `/chat`; the team typed only `/chat`.
 
-### Team beta declares its endpoint
+### Team beta configures a route to real OpenAI
 
-Team beta repeats this with its own values (`team-beta-values.yaml`); only the team name and host change:
+Team beta's endpoint needs no in-namespace backend at all: `provider: openai` with no `host` override sends traffic straight to OpenAI's real API instead of a self-hosted or mock serving the OpenAI spec as in the previous example. Create the namespace and an OpenAI credentials secret in it:
 
-```yaml
+```bash
+kubectl create namespace team-beta --dry-run=client -o yaml | kubectl apply -f -
+
+export OPENAI_API_KEY=$OPENAI_API_KEY
+kubectl create secret generic openai-secret -n team-beta \
+  --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
+  --dry-run=client -oyaml | kubectl apply -f -
+```
+
+Team beta creates `team-beta-values.yaml`. It names its team (the same label + prefix contract as team alpha), then declares one LLM endpoint that omits `host`, `port`, and `apiPath` — those fields exist only to override the real provider with a self-hosted endpoint, and team beta doesn't need one — and references the secret instead of using `passthrough`:
+
+```bash
+cat > team-beta-values.yaml <<'EOF'
 team: team-beta
 endpoints:
   - name: chat
     type: llm
     provider: openai
-    model: mock-gpt-4o
+    model: gpt-4o-mini
     path: /chat
-    host: mock-gpt-4o-svc.team-beta.svc.cluster.local
-    port: 8000
-    apiPath: /v1/chat/completions
     auth:
-      passthrough: true
+      secretRef: openai-secret
+EOF
 ```
+
+Install the developer chart as the team's own release, in the team's namespace:
 
 ```bash
 helm install team-beta charts/agentgateway-developer \
@@ -353,7 +366,7 @@ The request flowed `Gateway agw-platform → parent route team-team-alpha (/team
 
 Team alpha is `gold`; team beta is `silver`. Neither team chose this; the platform assigned it in its `teams` list. The difference is enforced entirely by the platform's tier policies on the parent routes.
 
-Each proxy replica enforces the tier budget as a **local** token limit, independently of the other replicas. The test prompt below costs about 10 input tokens (the gateway's access log reports `gen_ai.usage.input_tokens=10` for this request). The limiter checks admission *before* it debits the request's cost, so `silver`'s 5-token/minute budget still admits the first request, which then overdraws the budget by 10 tokens. The second request finds the budget negative and gets a `429`. `gold` (1000 tokens/minute) has plenty of headroom and sustains the same traffic.
+Each proxy replica enforces the tier budget as a **local** token limit, independently of the other replicas. Team alpha's mock backend reports a fixed input-token count for the test prompt (the gateway's access log shows `gen_ai.usage.input_tokens=10`); team beta's request goes to the real OpenAI API, which tokenizes the same prompt to a similarly small, real count. Either way, the limiter checks admission *before* it debits the request's cost, so `silver`'s 5-token/minute budget still admits the first request, which then overdraws the budget. The second request finds the budget negative and gets a `429`. `gold` (1000 tokens/minute) has plenty of headroom and sustains the same traffic.
 
 > **Note on timing and replicas:** Local token-limit enforcement can lag a few seconds after install, so wait about 12 seconds before the counted requests. Because the budget is per replica and the proxy runs 2 replicas, which `silver` request draws the first `429` depends on which replica served each one. If `beta-2` below still returns `200`, send one more request and it will be `429`.
 
@@ -371,7 +384,7 @@ echo "== team-beta (silver) =="
 for i in 1 2; do
   curl -s -o /dev/null -w "beta-$i: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-beta/chat" \
     -H "content-type: application/json" \
-    -d '{"model":"mock-gpt-4o","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
+    -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
 done
 ```
 
@@ -502,7 +515,30 @@ The developer chart already makes traffic policies un-representable, which cover
 
 A tier change is a one-line edit in the platform's values file; no team release changes. Move team alpha from `gold` to `silver` in `platform-values.yaml`:
 
-```yaml
+```bash
+cat > platform-values.yaml <<'EOF'
+gateway:
+  name: agw-platform
+tiers:
+  gold:
+    rateLimit:
+      # -- Input-token budget per proxy replica, per minute
+      tokensPerMinute: 1000
+    retry:
+      attempts: 3
+      backoff: 500ms
+      codes:
+        - 429
+        - 502
+        - 503
+        - 504
+    timeouts:
+      request: 120s
+  silver:
+    rateLimit:
+      tokensPerMinute: 5
+    timeouts:
+      request: 60s
 teams:
   - name: team-alpha
     namespace: team-alpha
@@ -510,6 +546,7 @@ teams:
   - name: team-beta
     namespace: team-beta
     tier: silver
+EOF
 ```
 
 Apply it:
@@ -551,7 +588,43 @@ alpha-silver-1: 200
 alpha-silver-2: 429
 ```
 
-Team alpha now behaves like team beta, and it never touched its own release. Flip it back to `gold` (restore the `tier: gold` line for team-alpha in `platform-values.yaml`) and upgrade again:
+Team alpha now behaves like team beta, and it never touched its own release. Flip it back to `gold`:
+
+```bash
+cat > platform-values.yaml <<'EOF'
+gateway:
+  name: agw-platform
+tiers:
+  gold:
+    rateLimit:
+      # -- Input-token budget per proxy replica, per minute
+      tokensPerMinute: 1000
+    retry:
+      attempts: 3
+      backoff: 500ms
+      codes:
+        - 429
+        - 502
+        - 503
+        - 504
+    timeouts:
+      request: 120s
+  silver:
+    rateLimit:
+      tokensPerMinute: 5
+    timeouts:
+      request: 60s
+teams:
+  - name: team-alpha
+    namespace: team-alpha
+    tier: gold
+  - name: team-beta
+    namespace: team-beta
+    tier: silver
+EOF
+```
+
+Upgrade again:
 
 ```bash
 helm upgrade agw-platform charts/agentgateway-platform \
@@ -651,7 +724,7 @@ Team beta is protected too, even though its release was never touched:
 ```bash
 curl -s -o /dev/null -w "beta no-token: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-beta/chat" \
   -H "content-type: application/json" \
-  -d '{"model":"mock-gpt-4o","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
 ```
 
 Expected output:
@@ -695,7 +768,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agw-platform --pre
 Each LLM request shows its route, status, token usage, and the platform-added `llm.streaming` attribute, for example:
 
 ```
-...route=team-beta/team-beta-chat ... http.status=200 protocol=llm gen_ai.usage.input_tokens=10 gen_ai.usage.output_tokens=40 llm.streaming=false
+...route=team-alpha/team-alpha-chat ... http.status=200 protocol=llm gen_ai.usage.input_tokens=10 gen_ai.usage.output_tokens=40 llm.streaming=false
 ...route=team-beta/team-beta-chat ... http.status=429 protocol=llm error="rate limit exceeded" reason=RateLimit
 ...route=team-alpha/team-alpha-chat ... http.status=401 protocol=http error="authentication failure: no bearer token found" reason=JwtAuth
 ```

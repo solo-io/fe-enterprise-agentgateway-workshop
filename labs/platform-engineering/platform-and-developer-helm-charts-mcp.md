@@ -11,6 +11,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - **Helm 3** installed.
 - Run every command **from the workshop root** (the directory that contains `charts/`). Chart paths below are repo-root-relative.
 - The two charts referenced here live at `charts/agentgateway-platform` and `charts/agentgateway-developer`.
+- Outbound internet access from the cluster to `arxiv.org` — the team's MCP server (the same `airxiv-mcp` server used in the [MCP Tool Federation lab](../mcp/mcp-tool-federation.md)) calls the real arXiv API. No API key is required.
 
 > **Note:** The platform chart installs its **own** `Gateway` named `agw-platform`, alongside the `agentgateway-proxy` gateway from `001`. The two coexist; this lab never modifies `001`. This lab uses the same release name as the [LLM lab](platform-and-developer-helm-charts-llm.md) — if you still have `agw-platform` installed from that lab, run its Cleanup first.
 
@@ -45,7 +46,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
       │  namespace: team-tools                          │
       │  child HTTPRoute: team-tools-tools              │
       │  matches  /teams/team-tools/mcp                 │
-      │  backend: team-tools-tools (entMcp) ──► mcp-server-everything
+      │  backend: team-tools-tools (entMcp) ──► mcp-airxiv
       └─────────────────────────────────────────────────┘
 ```
 
@@ -57,7 +58,8 @@ The contract is the same as in the LLM lab: the platform assigns the team its na
 
 The platform team owns a single values file: the gateway, the tier catalog, and the roster of onboarded teams. Create `platform-values.yaml`:
 
-```yaml
+```bash
+cat > platform-values.yaml <<'EOF'
 gateway:
   name: agw-platform
 tiers:
@@ -85,6 +87,7 @@ teams:
   - name: team-tools
     namespace: team-tools
     tier: silver
+EOF
 ```
 
 > **Note on the tier:** the platform assigns `team-tools` to `silver` at onboarding, exactly as in the LLM lab. A tier carries two budgets: `tokensPerMinute` meters **LLM** traffic (MCP requests carry no token usage), and `toolCallsPerMinute` meters **MCP tool calls** — a global counter on the team's parent route that counts only `tools/call` requests. `silver`'s 5 tool calls/minute is set tiny so you can trip a `429` in [Step 3](#step-3-the-tier-budgets-the-teams-tool-calls); a production tier would be far higher (e.g. `gold`'s `300`). As always, what matters is who sets the number: the platform assigns it, and the team never chooses it.
@@ -152,7 +155,7 @@ Now the application team takes over. Nothing the team does here touches security
 
 ### Deploy the team's MCP server
 
-The team runs the reference `mcp-server-everything` in its own namespace. It serves MCP over **Streamable HTTP**, where every request is independent — so it works unchanged behind the platform's 2-replica proxy fleet. (An SSE-transport server would need the fleet scaled to a single replica, and the fleet shape is platform-owned, not the team's to change.)
+The team runs `airxiv-mcp` — a real MCP server that wraps the arXiv API for academic paper search, the same image used in the [MCP Tool Federation lab](../mcp/mcp-tool-federation.md) — in its own namespace. It serves MCP over **Streamable HTTP**, where every request is independent — so it works unchanged behind the platform's 2-replica proxy fleet. (An SSE-transport server would need the fleet scaled to a single replica, and the fleet shape is platform-owned, not the team's to change.)
 
 ```bash
 kubectl create namespace team-tools --dry-run=client -o yaml | kubectl apply -f -
@@ -160,82 +163,77 @@ kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mcp-server-everything
+  name: mcp-airxiv
   namespace: team-tools
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mcp-server-everything
+      app: mcp-airxiv
   template:
     metadata:
       labels:
-        app: mcp-server-everything
+        app: mcp-airxiv
     spec:
       containers:
-        - name: mcp-everything
-          image: node:20-alpine
-          command:
-            - sh
-            - -c
-            - |
-              npx -y @modelcontextprotocol/server-everything streamableHttp
-          env:
-            - name: PORT
-              value: "3001"
+        - name: mcp-airxiv
+          image: ably7/airxiv-mcp:0.1.0
+          imagePullPolicy: Always
           ports:
             - name: mcp-http
-              containerPort: 3001
+              containerPort: 8000
           readinessProbe:
             tcpSocket:
-              port: 3001
-            initialDelaySeconds: 15
+              port: 8000
+            initialDelaySeconds: 5
             periodSeconds: 10
             failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mcp-server-everything
+  name: mcp-airxiv
   namespace: team-tools
   labels:
-    app: mcp-server-everything
+    app: mcp-airxiv
 spec:
   selector:
-    app: mcp-server-everything
+    app: mcp-airxiv
   ports:
     - name: mcp-http
       port: 8080
-      targetPort: 3001
+      targetPort: 8000
 EOF
 
-kubectl rollout status -n team-tools deploy/mcp-server-everything --timeout=180s
+kubectl rollout status -n team-tools deploy/mcp-airxiv --timeout=180s
 ```
 
-Expected output (the `npx` download can take up to a minute on first start):
+Expected output:
 
 ```
-deployment "mcp-server-everything" successfully rolled out
+deployment "mcp-airxiv" successfully rolled out
 ```
 
 ### Declare the endpoint
 
 The team creates `team-tools-values.yaml`. It names its team (the label + prefix contract), then declares one MCP endpoint pointing at its in-namespace server:
 
-```yaml
+```bash
+cat > team-tools-values.yaml <<'EOF'
 team: team-tools
 endpoints:
   - name: tools
     type: mcp
     path: /mcp
     targets:
-      - name: everything
-        host: mcp-server-everything.team-tools.svc.cluster.local
+      - name: arxiv
+        host: mcp-airxiv.team-tools.svc.cluster.local
         port: 8080
         protocol: StreamableHTTP
+EOF
 ```
 
-`targets` is a list: a single endpoint can federate several MCP servers behind one URL, each declared the same way. This lab uses one.
+`targets` is a list: a single endpoint can federate several MCP servers behind one URL, each declared the same way. This lab uses one; for a federated endpoint with several MCP servers behind a single URL, see the [MCP Tool Federation lab](../mcp/mcp-tool-federation.md).
 
 Install the developer chart as the team's own release, in the team's namespace:
 
@@ -302,30 +300,30 @@ curl -s "http://${GATEWAY_IP}:8080/teams/team-tools/mcp" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 ```
 
-Expected output (trimmed; the server advertises a dozen tools):
+Expected output (trimmed; the server advertises 5 tools):
 
 ```
 initialized: 202
-data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"echo","title":"Echo Tool","description":"Echoes back the input string",...
+data: {"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"search_arxiv","title":"Search arXiv","description":"Search arXiv for academic papers matching a query",...
 ```
 
-Call the `echo` tool through the gateway:
+Call the `search_arxiv` tool through the gateway:
 
 ```bash
 curl -s "http://${GATEWAY_IP}:8080/teams/team-tools/mcp" \
   -H "content-type: application/json" \
   -H "accept: application/json, text/event-stream" \
   -H "mcp-session-id: ${MCP_SESSION}" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo","arguments":{"message":"hello from team-tools"}}}'
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search_arxiv","arguments":{"keyword":"quantitative finance","max_results":3}}}'
 ```
 
-Expected output:
+Expected output (trimmed; this is a real call to arXiv, so the papers returned will vary):
 
 ```
-data: {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"Echo: hello from team-tools"}]}}
+data: {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"..."}]}}
 ```
 
-The request flowed `Gateway agw-platform → parent route team-team-tools (/teams/team-tools) → delegates to child team-tools-tools (/teams/team-tools/mcp) → entMcp backend → mcp-server-everything`. Any MCP client works the same way — point the [MCP Inspector](../mcp/in-cluster-mcp.md) at `http://<GATEWAY_IP>:8080/teams/team-tools/mcp` with transport **Streamable HTTP**.
+The request flowed `Gateway agw-platform → parent route team-team-tools (/teams/team-tools) → delegates to child team-tools-tools (/teams/team-tools/mcp) → entMcp backend → mcp-airxiv`. Any MCP client works the same way — point the [MCP Inspector](../mcp/in-cluster-mcp.md) at `http://<GATEWAY_IP>:8080/teams/team-tools/mcp` with transport **Streamable HTTP**.
 
 > **What the team did NOT configure.** A team name and one endpoint. No authentication, no access-log format, no rate limit, no proxy fleet settings — the platform attaches all of those to the parent route or the gateway, and this child inherits them.
 
@@ -344,7 +342,7 @@ for i in $(seq 1 8); do
     -H "content-type: application/json" \
     -H "accept: application/json, text/event-stream" \
     -H "mcp-session-id: ${MCP_SESSION}" \
-    -d '{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"echo","arguments":{"message":"budget probe"}}}'
+    -d '{"jsonrpc":"2.0","id":99,"method":"tools/call","params":{"name":"search_arxiv","arguments":{"keyword":"budget probe","max_results":1}}}'
 done
 ```
 
@@ -393,8 +391,8 @@ endpoints:
     type: mcp
     path: /mcp
     targets:
-      - name: everything
-        host: mcp-server-everything.team-tools.svc.cluster.local
+      - name: arxiv
+        host: mcp-airxiv.team-tools.svc.cluster.local
         port: 8080
         protocol: StreamableHTTP
     rateLimit:
@@ -506,13 +504,13 @@ curl -s "http://${GATEWAY_IP}:8080/teams/team-tools/mcp" \
   -H "accept: application/json, text/event-stream" \
   -H "Authorization: Bearer $DEV_TOKEN_1" \
   -H "mcp-session-id: ${MCP_SESSION}" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"echo","arguments":{"message":"hello with a token"}}}'
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"search_arxiv","arguments":{"keyword":"transformer models","max_results":3}}}'
 ```
 
-Expected output:
+Expected output (trimmed; this is a real call to arXiv, so the papers returned will vary):
 
 ```
-data: {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"Echo: hello with a token"}]}}
+data: {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"..."}]}}
 ```
 
 One platform-side change put every endpoint on the gateway behind JWT — the team's MCP endpoint included — and the team's release was never touched. Turning JWT back off is symmetric: upgrade with the base values file alone:
@@ -549,7 +547,7 @@ Each MCP request shows its route, status, and MCP-specific attributes, for examp
 
 ```
 ...route=team-tools/team-tools-tools ... http.status=200 protocol=mcp mcp.method.name=initialize mcp.session.id=9309830d-... duration=8ms
-...route=team-tools/team-tools-tools ... http.status=200 jwt.sub=user-id protocol=mcp mcp.method.name=tools/call mcp.target=everything mcp.resource.type=tool gen_ai.tool.name=echo ...
+...route=team-tools/team-tools-tools ... http.status=200 jwt.sub=user-id protocol=mcp mcp.method.name=tools/call mcp.target=arxiv mcp.resource.type=tool gen_ai.tool.name=search_arxiv ...
 ...route=team-tools/team-tools-tools ... http.status=429 protocol=http reason=DirectResponse duration=0ms
 ...route=team-tools/team-tools-tools ... http.status=401 protocol=http error="authentication failure: no bearer token found" reason=JwtAuth duration=0ms
 ```
