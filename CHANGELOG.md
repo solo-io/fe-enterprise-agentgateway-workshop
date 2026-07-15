@@ -1,6 +1,6 @@
 # Changelog
 
-0.12.0 - (7-14-26)
+0.12.0 - (7-15-26)
 ---
 - Add `labs/platform-engineering/` category: platform/developer separation of concerns via two Helm charts
 - Add `charts/agentgateway-platform`: platform-team chart owning the `Gateway`, cost tiers, security baseline (JWT/WAF), observability, and URL space; onboards teams via route delegation (label + namespace + prefix contract)
