@@ -1,8 +1,8 @@
-# Platform and Developer Helm Charts: Self-Service MCP Endpoints
+# MCP Endpoints, Delegated: Self-Service Within Guardrails
 
-Give every application team direct access to the raw `HTTPRoute`, `EnterpriseAgentgatewayBackend`, and `EnterpriseAgentgatewayPolicy` CRDs and any team can grant itself a bigger rate limit, disable JWT on its own route, or claim a URL prefix that belongs to someone else. Security, observability, and cost control then depend on someone catching each mistake in review.
+An MCP server is a **team workload**. It wraps the team's own APIs and tools, ships alongside the team's code, and changes whenever the team's tools change; only the team that owns the tools can own the server. A platform team that tried to operate every team's MCP server centrally would become the bottleneck for every tool any team ships. So exposing an MCP endpoint has to be self-service. But naive self-service (handing teams the raw `HTTPRoute`, `EnterpriseAgentgatewayBackend`, and `EnterpriseAgentgatewayPolicy` CRDs) means any team can grant itself a bigger rate limit, disable JWT on its own route, or claim a URL prefix that belongs to someone else, and governance depends on someone catching each mistake in review.
 
-This lab uses two Helm charts to split the gateway into two personas instead: `agentgateway-platform`, owned by the platform team, owns the `Gateway`, the security baseline, the observability pipeline, the **URL space**, and the **cost tiers**, and also onboards application teams. `agentgateway-developer`, owned by an application team, lets that team self-serve endpoints under the path prefix the platform assigned it — its `values.schema.json` has **no field** for rate limits, auth, WAF, or logging, so a team cannot express a traffic policy even if it wanted to. This lab demonstrates the model with **MCP servers**: a team declares its server as a `type: mcp` endpoint in the developer chart, and the chart renders an `EnterpriseAgentgatewayBackend` (`entMcp`) plus a prefix-enforced, team-labeled child route. The platform's controls attach to the parent route, so tier budgets, JWT, and access logging cover MCP tool calls exactly as they cover any other traffic — the team never configures any of them. For the LLM counterpart to this two-chart model, see [Centralized LLM Ops: One Chart, One Persona](centralized-llm-ops-helm-chart.md).
+This lab uses **delegation**: teams self-serve the endpoint, and the platform owns the front door structurally. It splits the gateway into two Helm charts for two personas. `agentgateway-platform`, owned by the platform team, owns the `Gateway`, the security baseline, the observability pipeline, the **URL space**, and the **cost tiers**, and onboards application teams. `agentgateway-developer`, owned by an application team, lets that team self-serve endpoints under the path prefix the platform assigned it; its `values.schema.json` has **no field** for rate limits, auth, WAF, or logging, so a team cannot express a traffic policy even if it wanted to. A team declares its server as a `type: mcp` endpoint, and the chart renders an `EnterpriseAgentgatewayBackend` (`entMcp`) plus a prefix-enforced, team-labeled child route. The platform's controls attach to the parent route, so tier budgets, JWT, and access logging cover MCP tool calls as they cover any other traffic; the team never configures any of them. A backend that is a vendor relationship rather than a team workload calls for the opposite governance model: see [LLM Access, Centralized: The Platform as Provider](centralized-llm-ops-helm-chart.md).
 
 > This lab requires Enterprise Agentgateway **v2026.6.3** or later (the version installed in `001`).
 
@@ -31,7 +31,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ![Platform and developer chart architecture for MCP: the platform team owns the Gateway, security baseline, and cost tiers; the app team self-serves an MCP endpoint under its platform-assigned prefix](../../images/platform-engineering/platform-and-developer-helm-charts-mcp-architecture.png)
 
-The contract: the platform assigns the team its namespace, its path prefix (`/teams/team-tools`), and its tier at onboarding; the developer chart stamps the `team: team-tools` delegation label on every route it creates and prepends the platform-owned prefix to every path. The parent route delegates **only** to child routes that carry the label **and** live in the team's namespace, and everything the platform attaches to the parent — authentication, logging, tier policies — is inherited by every child the team adds.
+The contract: the platform assigns the team its namespace, its path prefix (`/teams/team-tools`), and its tier at onboarding; the developer chart stamps the `team: team-tools` delegation label on every route it creates and prepends the platform-owned prefix to every path. The parent route delegates **only** to child routes that carry the label **and** live in the team's namespace, and every child the team adds inherits what the platform attaches to the parent: authentication, logging, and tier policies.
 
 ---
 
@@ -69,7 +69,7 @@ teams:
 EOF
 ```
 
-> **Note on the tier:** the platform assigns `team-tools` to `silver` at onboarding. A tier's `rateLimit.toolCallsPerMinute` meters **MCP tool calls** — a global counter on the team's parent route that counts only `tools/call` requests. `silver`'s 5 tool calls/minute is set tiny so you can trip a `429` in [Step 3](#step-3-the-tier-budgets-the-teams-tool-calls); a production tier would be far higher (e.g. `gold`'s `300`). As always, what matters is who sets the number: the platform assigns it, and the team never chooses it.
+> **Note on the tier:** the platform assigns `team-tools` to `silver` at onboarding. A tier's `rateLimit.toolCallsPerMinute` meters **MCP tool calls**: a global counter on the team's parent route counts only `tools/call` requests. `silver`'s 5 tool calls/minute is tiny so you can trip a `429` in [Step 3](#step-3-the-tier-budgets-the-teams-tool-calls); a production tier would be far higher (e.g. `gold`'s `300`). As in the companion lab, the platform assigns the number, and the team never chooses it.
 
 Install the chart into `agentgateway-system` (run from the workshop root):
 
@@ -107,7 +107,7 @@ NAME                                                                            
 enterpriseagentgatewayparameters.enterpriseagentgateway.solo.io/agw-platform-config   11s
 ```
 
-The team is onboarded: it has a parent route (`team-team-tools`), a tier policy, and — because `silver` sets `toolCallsPerMinute` — a tool-call budget (`team-team-tools-tool-calls`, a `RateLimitConfig` plus the policy that attaches it to the parent route). No endpoints yet. Wait for the proxy fleet to roll out:
+That onboards the team: it now has a parent route (`team-team-tools`), a tier policy, and, because `silver` sets `toolCallsPerMinute`, a tool-call budget (`team-team-tools-tool-calls`, a `RateLimitConfig` plus the policy that attaches it to the parent route). It has no endpoints yet. Wait for the proxy fleet to roll out:
 
 ```bash
 kubectl rollout status -n agentgateway-system deploy/agw-platform --timeout=180s
@@ -134,7 +134,7 @@ Now the application team takes over. Nothing the team does here touches security
 
 ### Deploy the team's MCP server
 
-The team runs `airxiv-mcp` — a real MCP server that wraps the arXiv API for academic paper search, the same image used in the [MCP Tool Federation lab](../mcp/mcp-tool-federation.md) — in its own namespace. It serves MCP over **Streamable HTTP**, where every request is independent — so it works unchanged behind the platform's 2-replica proxy fleet. (An SSE-transport server would need the fleet scaled to a single replica, and the fleet shape is platform-owned, not the team's to change.)
+The team runs `airxiv-mcp` (a real MCP server that wraps the arXiv API for academic paper search, the same image used in the [MCP Tool Federation lab](../mcp/mcp-tool-federation.md)) in its own namespace. It serves MCP over **Streamable HTTP**, where every request is independent, so it works unchanged behind the platform's 2-replica proxy fleet. (An SSE-transport server would need the fleet scaled to a single replica, and the platform owns the fleet shape; the team cannot change it.)
 
 ```bash
 kubectl create namespace team-tools --dry-run=client -o yaml | kubectl apply -f -
@@ -212,7 +212,7 @@ endpoints:
 EOF
 ```
 
-`targets` is a list: a single endpoint can federate several MCP servers behind one URL, each declared the same way. This lab uses one; for a federated endpoint with several MCP servers behind a single URL, see the [MCP Tool Federation lab](../mcp/mcp-tool-federation.md).
+`targets` is a list: a single endpoint can federate several MCP servers behind one URL, each declared the same way. This lab uses one; the [MCP Tool Federation lab](../mcp/mcp-tool-federation.md) federates several.
 
 Install the developer chart as the team's own release, in the team's namespace:
 
@@ -241,7 +241,7 @@ enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/team-tools-tools   
 {"app.kubernetes.io/instance":"team-tools","app.kubernetes.io/managed-by":"Helm","team":"team-tools"}
 ```
 
-The chart stamped `team: team-tools` on the route, which is what makes the platform's parent route pick this child up, and prepended the platform-owned prefix: the route matches `/teams/team-tools/mcp` even though the team typed only `/mcp`.
+The chart stamped `team: team-tools` on the route, so the platform's parent route picks this child up, and prepended the platform-owned prefix: the route matches `/teams/team-tools/mcp` even though the team typed only `/mcp`.
 
 ### Call the tools
 
@@ -304,13 +304,13 @@ data: {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"..."}]
 
 The request flowed `Gateway agw-platform → parent route team-team-tools (/teams/team-tools) → delegates to child team-tools-tools (/teams/team-tools/mcp) → entMcp backend → mcp-airxiv`. Any MCP client works the same way — point the [MCP Inspector](../mcp/in-cluster-mcp.md) at `http://<GATEWAY_IP>:8080/teams/team-tools/mcp` with transport **Streamable HTTP**.
 
-> **What the team did NOT configure.** A team name and one endpoint. No authentication, no access-log format, no rate limit, no proxy fleet settings — the platform attaches all of those to the parent route or the gateway, and this child inherits them.
+> **What the team configured:** a team name and one endpoint. The platform attaches everything else (authentication, access-log format, rate limits, proxy fleet settings) to the parent route or the gateway, and this child inherits it.
 
 ---
 
 ## Step 3: The tier budgets the team's tool calls
 
-`silver` allows 5 tool calls per minute. The budget lives in a `RateLimitConfig` the platform chart rendered at onboarding: a CEL expression inspects each JSON-RPC body and counts only `tools/call` requests, against a **global** counter — one budget for the team, no matter how many proxy replicas serve it or how many sessions the team opens.
+`silver` allows 5 tool calls per minute. The budget lives in a `RateLimitConfig` the platform chart rendered at onboarding: a CEL expression inspects each JSON-RPC body and counts only `tools/call` requests against a **global** counter. The team gets one budget, no matter how many proxy replicas serve it or how many sessions it opens.
 
 The counter's window is a fixed clock minute, so start from a fresh window and send eight tool calls:
 
@@ -338,7 +338,7 @@ tool-call-7: 429
 tool-call-8: 429
 ```
 
-Five calls admitted, then `429` — the platform-assigned budget, enforced with no involvement from the team. Only tool calls are counted: with the budget exhausted, the session itself still works fine:
+The gateway admits five calls and rejects the rest with `429`, enforcing the platform-assigned budget with no involvement from the team. The counter sees only tool calls: with the budget exhausted, the session itself still works:
 
 ```bash
 curl -s -o /dev/null -w "tools/list: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-tools/mcp" \
@@ -354,7 +354,7 @@ Expected output:
 tools/list: 200
 ```
 
-Clients can keep connecting, discovering, and listing tools; only *executing* them draws down the budget. The budget resets at the next minute. For rate limits on *individual* tools (for example, a tighter budget for one expensive tool), see the [MCP Tool Rate Limiting lab](../mcp/mcp-tool-rate-limiting.md).
+Clients can keep connecting, discovering, and listing tools; only *executing* a tool draws down the budget. The budget resets at the next minute. For rate limits on *individual* tools (for example, a tighter budget for one expensive tool), see the [MCP Tool Rate Limiting lab](../mcp/mcp-tool-rate-limiting.md).
 
 ### The platform re-tiers the team
 
@@ -437,7 +437,7 @@ tool-call-7: 200
 tool-call-8: 200
 ```
 
-All eight calls are admitted — the same burst that tripped a `429` under `silver` now sustains under `gold`'s 300 calls/minute, and `team-tools` never touched its own release. Flip the team back to `silver`:
+The gateway admits all eight calls: the burst that tripped a `429` under `silver` sits well inside `gold`'s 300 calls/minute, and `team-tools` never touched its own release. Flip the team back to `silver`:
 
 ```bash
 cat > platform-values.yaml <<'EOF'
@@ -483,7 +483,7 @@ helm upgrade agw-platform charts/agentgateway-platform \
 
 Try the escapes a team might attempt. Each one fails inside the tooling or the routing layer, with no human review involved.
 
-### It cannot smuggle a traffic policy
+### The team cannot smuggle a traffic policy
 
 The developer chart's `values.schema.json` uses `"additionalProperties": false`, so a traffic knob smuggled onto an MCP endpoint fails at `helm` time, before anything reaches the cluster. Try it:
 
@@ -514,13 +514,13 @@ agentgateway-developer:
 - at '/endpoints/0': additional properties 'rateLimit' not allowed
 ```
 
-Tiers and traffic policies exist only in the platform chart; the developer chart has no vocabulary to express a bigger budget. Remove the file:
+Tiers and traffic policies exist only in the platform chart; the developer chart's schema cannot express a bigger budget. Remove the file:
 
 ```bash
 rm -f team-tools-cheat.yaml
 ```
 
-### It cannot claim another team's path
+### The team cannot claim another team's path
 
 Suppose someone tries to serve traffic under `team-tools`'s prefix by creating a correctly-labeled route in the **wrong** namespace:
 
@@ -563,7 +563,7 @@ The route exists, carries the right label, and matches the path, but the `team-t
 kubectl delete httproute hijack -n default --ignore-not-found
 ```
 
-> **Both halves of the contract are required.** Delegation demands the `team: team-tools` label **and** the team's own namespace (`team-tools`). A hand-rolled route in the correct namespace that omits the label stays invisible too: the parent route's label selector never matches it, so it also returns `404`. Routes created through the developer chart satisfy both halves, and those inherit the platform's tier and security policies.
+> **Delegation requires both halves of the contract:** the `team: team-tools` label **and** the team's own namespace (`team-tools`). A hand-rolled route in the correct namespace that omits the label stays invisible too: the parent route's label selector never matches it, so it also returns `404`. Routes created through the developer chart satisfy both halves, and those inherit the platform's tier and security policies.
 
 ### Optional RBAC hardening
 
@@ -573,7 +573,7 @@ The developer chart already makes traffic policies un-representable, which cover
 
 ## Step 5: The platform enables JWT for everyone
 
-The platform turns on JWT authentication for the whole gateway with a single upgrade. The JWT policy targets the `Gateway`, so it protects every endpoint at once — including MCP endpoints — and no team release changes.
+The platform turns on JWT authentication for the whole gateway with a single upgrade. The JWT policy targets the `Gateway`, so it protects every endpoint at once, MCP endpoints included, and no team release changes.
 
 This step reuses the inline JWKS and the static `DEV_TOKEN_1` from the [JWT Auth with RBAC lab](../security/jwt-auth-with-rbac.md). Save that lab's `keys` block into a file named `jwks.json`:
 
@@ -665,7 +665,7 @@ Expected output (trimmed; this is a real call to arXiv, so the papers returned w
 data: {"jsonrpc":"2.0","id":3,"result":{"content":[{"type":"text","text":"..."}]}}
 ```
 
-One platform-side change put every endpoint on the gateway behind JWT — the team's MCP endpoint included — and the team's release was never touched. Turning JWT back off is symmetric: upgrade with the base values file alone:
+One platform-side change put every endpoint on the gateway behind JWT, the team's MCP endpoint included, and the team's release never changed. Turning JWT back off is symmetric: upgrade with the base values file alone:
 
 ```bash
 helm upgrade agw-platform charts/agentgateway-platform \
@@ -689,7 +689,7 @@ Error from server (NotFound): enterpriseagentgatewaypolicies.enterpriseagentgate
 
 ## Observability
 
-Access logging is on because the platform chart enabled it, so every MCP request the team serves is logged from the shared gateway. The proxy understands the MCP protocol, so the log records which method and which tool was called — not just an opaque POST. View the logs:
+Access logging is on because the platform chart enabled it, so the shared gateway logs every MCP request the team serves. The proxy understands the MCP protocol, so the log records which method and which tool each request called, rather than an opaque POST. View the logs:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agw-platform --prefix --tail 20
@@ -704,7 +704,7 @@ Each MCP request shows its route, status, and MCP-specific attributes, for examp
 ...route=team-tools/team-tools-tools ... http.status=401 protocol=http error="authentication failure: no bearer token found" reason=JwtAuth duration=0ms
 ```
 
-Note the second line: with JWT enabled, the platform's logs attribute every tool call to a subject (`jwt.sub=user-id`) — per-user MCP auditing, with zero configuration by the team. To enable Prometheus scraping, the platform team sets `observability.metrics.enabled=true` (requires the prometheus-operator `PodMonitor` CRD). For dashboards and traces, use the Grafana stack from `002`; the AgentGateway dashboard has dedicated MCP panels (tool calls, server requests).
+Note the second line: with JWT enabled, the platform's logs attribute every tool call to a subject (`jwt.sub=user-id`). That is per-user MCP auditing with zero configuration by the team. To enable Prometheus scraping, the platform team sets `observability.metrics.enabled=true` (requires the prometheus-operator `PodMonitor` CRD). For dashboards and traces, use the Grafana stack from `002`; the AgentGateway dashboard has dedicated MCP panels (tool calls, server requests).
 
 ---
 

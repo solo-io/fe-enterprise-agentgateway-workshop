@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="diagram-shared.css">
+<style>
+.catalog-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px; }
+.catalog-card {
+  background: #10122200;
+  background: #101223;
+  border: 1px solid rgba(157, 161, 189, 0.14);
+  border-radius: 10px;
+  padding: 20px;
+}
+.catalog-card .path {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 16px;
+  color: #6CB8FF;
+  margin: 14px 0 10px;
+}
+.catalog-card .spec {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  color: #9DA1BD;
+  line-height: 1.6;
+  margin-bottom: 10px;
+}
+.catalog-card .desc { font-size: 13.5px; color: #B5B8CD; line-height: 1.6; }
+
+.team-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 16px 0;
+}
+.team-row .name { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 15px; color: #FFFFFF; width: 150px; }
+.team-row .creds { flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #C9CCDE; line-height: 1.9; }
+.team-row .creds .k { color: #5C6178; }
+.team-row .quota {
+  border: 1px solid rgba(157, 161, 189, 0.35);
+  border-radius: 9999px;
+  padding: 7px 16px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12.5px;
+  color: #E6E8F2;
+  white-space: nowrap;
+}
+</style>
+</head>
+<body>
+
+<div class="overline">Enterprise Agentgateway &nbsp;·&nbsp; Platform Engineering</div>
+<h1>Centralized LLM Ops: Platform&#8209;Owned Model Catalog</h1>
+
+<div class="panel accent-top">
+  <div class="panel-head">
+    <span class="panel-title">Platform Team</span>
+    <span class="panel-sub"><span class="lit">owns</span> charts/agentgateway-llm-ops &nbsp;·&nbsp; the only chart</span>
+  </div>
+  <div class="chips">
+    <span class="chip"><b>Gateway</b> agw-llm-ops</span>
+    <span class="chip">Model catalog</span>
+    <span class="chip">Provider credentials</span>
+    <span class="chip">API keys · grants</span>
+    <span class="chip">Token budgets</span>
+  </div>
+</div>
+
+<div class="connector">
+  <div class="line"></div>
+  <div class="dot"></div>
+  <div class="pill">publishes stable aliases &nbsp;·&nbsp; /llm/&lt;alias&gt;</div>
+  <div class="dot"></div>
+  <div class="line"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <span class="panel-title mono">modelCatalog</span>
+  </div>
+  <div class="catalog-cards">
+    <div class="catalog-card">
+      <span class="badge green">FREE &nbsp;·&nbsp; TESTS / CI</span>
+      <div class="path">/llm/chat-mock</div>
+      <div class="spec">&rarr; mock-model &nbsp;·&nbsp; in-cluster sim</div>
+      <div class="desc">LLM-shaped endpoint for CI and integration tests. Auth, budgets, and WAF behave as in production; every token is free.</div>
+    </div>
+    <div class="catalog-card">
+      <span class="badge purple">SWAPPABLE</span>
+      <div class="path">/llm/chat-real</div>
+      <div class="spec">&rarr; gpt-4o-mini &nbsp;·&nbsp; OpenAI &nbsp;·&nbsp; platform-held secret</div>
+      <div class="desc">Real completions. OpenAI today; the platform can swap the model or provider tomorrow.</div>
+    </div>
+  </div>
+  <div class="panel-foot">Swapping the backing model or provider is <b>one values line</b>; teams change nothing.</div>
+</div>
+
+<div class="connector">
+  <div class="line"></div>
+  <div class="dot"></div>
+  <div class="pill">grants &nbsp;·&nbsp; API key + aliases + tokensPerMinute</div>
+  <div class="dot"></div>
+  <div class="line"></div>
+</div>
+
+<div class="panel purple">
+  <div class="panel-head">
+    <span class="panel-title">App Teams</span>
+    <span class="panel-sub">no chart &nbsp;·&nbsp; no CRDs &nbsp;·&nbsp; no namespace</span>
+  </div>
+  <div class="team-row">
+    <div class="name">team-alpha</div>
+    <div class="creds"><span class="k">key</span> alpha-key-8f3a<br><span class="k">aliases</span> chat-real, chat-mock</div>
+    <div class="quota">1000 tok/min</div>
+  </div>
+  <div class="divider" style="margin: 6px 0;"></div>
+  <div class="team-row">
+    <div class="name">team-beta</div>
+    <div class="creds"><span class="k">key</span> beta-key-2c71<br><span class="k">aliases</span> chat-mock only</div>
+    <div class="quota">5 tok/min</div>
+  </div>
+  <div class="divider" style="margin: 6px 0 20px;"></div>
+  <div class="panel-foot">A team receives three things: <b>a URL, an API key, and a budget</b>.</div>
+</div>
+
+<div class="caption">
+  There is no developer chart. A team <b>requests</b> an endpoint with a ticket, and the platform turns it into one <b>grants</b> entry and a <b>helm upgrade</b>. <span class="mono">No key &rarr; 401. Non-granted alias &rarr; 401. Over budget &rarr; 429.</span> Offboarding deletes the grant and its key.
+</div>
+
+<script>
+window.addEventListener('load', () => {
+  document.body.setAttribute('data-h', document.documentElement.scrollHeight);
+});
+</script>
+</body>
+</html>

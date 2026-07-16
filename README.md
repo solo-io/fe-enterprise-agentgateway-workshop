@@ -217,8 +217,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Platform Engineering
 
-- [Platform and Developer Helm Charts: Self-Service MCP Endpoints](labs/platform-engineering/platform-and-developer-helm-charts-mcp.md) — a platform-team chart owns the gateway, cost tiers, security, and URL space; a developer chart lets app teams self-serve MCP endpoints without being able to escape their tier, their prefix, or weaken a control _(see also: Rate Limiting, Security, MCP)_
-- [Centralized LLM Ops: One Chart, One Persona](labs/platform-engineering/centralized-llm-ops-helm-chart.md) — the platform team runs LLM consumption as an internal product: a model-alias catalog, per-team API keys and token budgets, one chart, no self-service
+- [MCP Endpoints, Delegated: Self-Service Within Guardrails](labs/platform-engineering/platform-and-developer-helm-charts-mcp.md) — MCP servers are team workloads, so teams self-serve their endpoints; a platform chart owns the gateway, cost tiers, security, and URL space, and teams structurally cannot escape their tier, their prefix, or weaken a control _(see also: Rate Limiting, Security, MCP)_
+- [LLM Access, Centralized: The Platform as Provider](labs/platform-engineering/centralized-llm-ops-helm-chart.md) — LLM backends are a vendor relationship, so the platform runs LLM consumption as an internal product: a model-alias catalog, per-team API keys and token budgets, one chart, no self-service
 
 ---
 
