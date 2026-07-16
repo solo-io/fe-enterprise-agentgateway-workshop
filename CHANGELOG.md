@@ -1,5 +1,9 @@
 # Changelog
 
+0.12.3 - (7-16-26)
+---
+- Add `labs/agent-harnesses/claude-desktop-sso-entra.md`: Claude Desktop SSO via Microsoft Entra ID — per-user interactive sign-in validated at the gateway (issuer + audience), with MDM rollout guidance and screenshots
+
 0.12.2 - (7-16-26)
 ---
 - Minor updates to `labs/platform-engineering`
