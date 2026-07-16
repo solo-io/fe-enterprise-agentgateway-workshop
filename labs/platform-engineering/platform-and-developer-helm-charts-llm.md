@@ -307,7 +307,6 @@ The chart stamped `team: team-alpha` on the route, and that label is what makes 
 Before team beta joins, confirm team alpha's endpoint actually works end-to-end. Give the proxy a few seconds to program the new route, then call it:
 
 ```bash
-sleep 10
 curl -s -o /dev/null -w "team-alpha chat: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-alpha/chat" \
   -H "content-type: application/json" \
   -d '{"model":"mock-gpt-4o","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
@@ -359,6 +358,24 @@ helm install team-beta charts/agentgateway-developer \
   -n team-beta \
   --values team-beta-values.yaml
 ```
+
+### Verify team beta's endpoint
+
+Give the proxy a few seconds to program the new route, then call it. This is a real, billed call to the OpenAI API:
+
+```bash
+curl -s -o /dev/null -w "team-beta chat: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-beta/chat" \
+  -H "content-type: application/json" \
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
+```
+
+Expected output:
+
+```
+team-beta chat: 200
+```
+
+The request flowed the same path as team alpha's: `Gateway agw-platform → parent route team-team-beta (/teams/team-beta) → delegates to child team-beta-chat (/teams/team-beta/chat) → OpenAI`. Same chart, same delegation contract, a different backend shape.
 
 ---
 
