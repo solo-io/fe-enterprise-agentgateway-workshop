@@ -60,8 +60,17 @@ def test_access_log_default_on():
     p = pols[0]
     assert p["spec"]["targetRefs"][0] == {
         "group": "gateway.networking.k8s.io", "kind": "Gateway", "name": "agentgateway-proxy"}
-    attrs = p["spec"]["frontend"]["accessLog"]["attributes"]["add"]
-    assert {"name": "llm.streaming", "expression": "llm.streaming"} in attrs
+    # default attributes are empty (no LLM-only CEL survives in an MCP-only chart);
+    # the empty-attributes guard must render `accessLog: {}`, never a bare null
+    assert p["spec"]["frontend"]["accessLog"] == {}
+
+def test_access_log_custom_attributes():
+    docs = render("observability.accessLog.attributes[0].name=custom.attr",
+                   "observability.accessLog.attributes[0].expression=request.method")
+    pols = [d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
+            if "accessLog" in d["spec"].get("frontend", {})]
+    attrs = pols[0]["spec"]["frontend"]["accessLog"]["attributes"]["add"]
+    assert {"name": "custom.attr", "expression": "request.method"} in attrs
 
 def test_tracing_off_by_default_on_when_enabled():
     docs = render()
@@ -166,40 +175,70 @@ def test_tier_policies():
     gold = pols["team-team-alpha-tier"]["spec"]
     assert gold["targetRefs"][0] == {
         "group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "team-team-alpha"}
-    assert gold["traffic"]["rateLimit"]["local"] == [{"tokens": 100000, "unit": "Minutes"}]
+    assert "rateLimit" not in gold["traffic"], \
+        "tier policy no longer renders a token-bucket rateLimit.local"
     assert gold["traffic"]["retry"]["attempts"] == 3
     assert gold["traffic"]["timeouts"]["request"] == "120s"
     silver = pols["team-team-beta-tier"]["spec"]["traffic"]
-    assert silver["rateLimit"]["local"][0]["tokens"] == 10000
+    assert "rateLimit" not in silver
     assert "retry" not in silver, "silver tier defines no retry"
+    assert silver["timeouts"]["request"] == "60s"
+
+def test_ratelimit_only_tier_renders_no_tier_policy():
+    # A tier with only rateLimit.toolCallsPerMinute (no retry, no timeouts) is
+    # schema-legal but must not render a tier EnterpriseAgentgatewayPolicy: an
+    # empty `traffic: {}`/`traffic: null` block is invalid at apply time, and
+    # the tool-call budget already lives in the separate RateLimitConfig +
+    # entRateLimit pair.
+    docs = render("teams[0].name=team-gamma", "teams[0].namespace=team-gamma",
+                  "teams[0].tier=bronze",
+                  "tiers.bronze.rateLimit.toolCallsPerMinute=100")
+    tier_pols = [d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
+                 if d["metadata"]["name"].endswith("-tier")]
+    assert tier_pols == [], "rateLimit-only tier must not render a tier policy"
+    rlcs = by_kind(docs, "RateLimitConfig")
+    assert len(rlcs) == 1
+    assert rlcs[0]["metadata"]["name"] == "team-team-gamma-tool-calls"
+    entrl_pols = [d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
+                  if "entRateLimit" in d["spec"].get("traffic", {})]
+    assert len(entrl_pols) == 1
+    assert entrl_pols[0]["metadata"]["name"] == "team-team-gamma-tool-calls"
 
 def test_tool_call_limits():
+    # both default tiers now carry a toolCallsPerMinute budget, so every
+    # onboarded team gets a RateLimitConfig + entRateLimit policy
     docs = render(*TEAMS_ARGS)
-    assert not by_kind(docs, "RateLimitConfig"), "no RateLimitConfig unless toolCallsPerMinute set"
-    assert not [d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
-                if "entRateLimit" in d["spec"].get("traffic", {})]
-    docs = render(*TEAMS_ARGS, "tiers.silver.rateLimit.toolCallsPerMinute=5")
-    rlcs = by_kind(docs, "RateLimitConfig")
-    assert len(rlcs) == 1, "only the silver team renders a RateLimitConfig"
-    raw = rlcs[0]["spec"]["raw"]
-    assert rlcs[0]["metadata"]["name"] == "team-team-beta-tool-calls"
-    assert raw["domain"] == "team-team-beta-tool-calls"
-    assert raw["descriptors"][0] == {
+    rlcs = {d["metadata"]["name"]: d for d in by_kind(docs, "RateLimitConfig")}
+    assert set(rlcs) == {"team-team-alpha-tool-calls", "team-team-beta-tool-calls"}
+    alpha_raw = rlcs["team-team-alpha-tool-calls"]["spec"]["raw"]
+    assert alpha_raw["domain"] == "team-team-alpha-tool-calls"
+    assert alpha_raw["descriptors"][0] == {
         "key": "mcp_tool_call", "value": "true",
-        "rateLimit": {"requestsPerUnit": 5, "unit": "MINUTE"}}
-    cel = raw["rateLimits"][0]["actions"][0]["cel"]
+        "rateLimit": {"requestsPerUnit": 300, "unit": "MINUTE"}}
+    cel = alpha_raw["rateLimits"][0]["actions"][0]["cel"]
     assert cel["key"] == "mcp_tool_call"
     assert 'body.method == "tools/call"' in cel["expression"]
     assert "has(body.method)" in cel["expression"], "CEL must guard non-MCP bodies"
+    beta_raw = rlcs["team-team-beta-tool-calls"]["spec"]["raw"]
+    assert beta_raw["descriptors"][0]["rateLimit"] == {"requestsPerUnit": 60, "unit": "MINUTE"}
     pols = [d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
             if "entRateLimit" in d["spec"].get("traffic", {})]
-    assert len(pols) == 1
-    p = pols[0]
-    assert p["metadata"]["name"] == "team-team-beta-tool-calls"
-    assert p["spec"]["targetRefs"][0] == {
+    assert {p["metadata"]["name"] for p in pols} == {
+        "team-team-alpha-tool-calls", "team-team-beta-tool-calls"}
+    beta_pol = [p for p in pols if p["metadata"]["name"] == "team-team-beta-tool-calls"][0]
+    assert beta_pol["spec"]["targetRefs"][0] == {
         "group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "team-team-beta"}
-    assert p["spec"]["traffic"]["entRateLimit"]["global"]["rateLimitConfigRefs"] == [
+    assert beta_pol["spec"]["traffic"]["entRateLimit"]["global"]["rateLimitConfigRefs"] == [
         {"name": "team-team-beta-tool-calls"}]
+
+def test_tool_call_limits_absent_when_unset():
+    docs = render(*TEAMS_ARGS,
+                  "tiers.gold.rateLimit.toolCallsPerMinute=null",
+                  "tiers.silver.rateLimit.toolCallsPerMinute=null")
+    assert not by_kind(docs, "RateLimitConfig"), \
+        "no RateLimitConfig when a tier has no tool-call budget"
+    assert not [d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
+                if "entRateLimit" in d["spec"].get("traffic", {})]
 
 def test_unknown_tier_fails():
     import subprocess
@@ -213,6 +252,14 @@ def test_schema_rejects_unknown_key():
     cmd = ["helm", "template", "t", CHART, "--set", "trafficPolicy.foo=bar"]
     out = subprocess.run(cmd, capture_output=True, text=True)
     assert out.returncode != 0, "schema should reject unknown top-level keys"
+
+def test_schema_rejects_tokens_per_minute():
+    import subprocess
+    cmd = ["helm", "template", "t", CHART, "--set",
+           "tiers.gold.rateLimit.tokensPerMinute=100000"]
+    out = subprocess.run(cmd, capture_output=True, text=True)
+    assert out.returncode != 0, \
+        "schema should reject tokensPerMinute (MCP-only chart: no token budgets)"
 
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]

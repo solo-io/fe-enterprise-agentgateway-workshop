@@ -3,6 +3,7 @@
 {{- if not $tier }}
 {{- fail (printf "team %q references undefined tier %q (defined tiers: %s)" .name .tier (keys $.Values.tiers | sortAlpha | join ", ")) }}
 {{- end }}
+{{- if or $tier.retry $tier.timeouts }}
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
@@ -18,12 +19,6 @@ spec:
       kind: HTTPRoute
       name: team-{{ .name }}
   traffic:
-    {{- with $tier.rateLimit }}
-    rateLimit:
-      local:
-        - tokens: {{ .tokensPerMinute }}
-          unit: Minutes
-    {{- end }}
     {{- with $tier.retry }}
     retry:
       attempts: {{ .attempts }}
@@ -38,4 +33,5 @@ spec:
     timeouts:
       request: {{ .request }}
     {{- end }}
+{{- end }}
 {{- end }}

@@ -36,12 +36,9 @@ observability:
     level: info
   accessLog:
     enabled: true
-    # -- Extra attributes recorded on every access log entry (CEL expressions)
-    attributes:
-      - name: llm.streaming
-        expression: llm.streaming
-      - name: llm.cached_tokens
-        expression: llm.cachedInputTokens
+    # -- Extra attributes recorded on every access log entry (CEL expressions).
+    #    Empty by default; add protocol-agnostic attributes as needed.
+    attributes: []
   tracing:
     enabled: false
     # -- OTLP collector Service to export spans to
@@ -76,15 +73,11 @@ security:
 tiers:
   gold:
     rateLimit:
-      # -- Input-token budget, enforced per proxy replica (traffic.rateLimit.local).
-      #    Meters LLM traffic; MCP requests carry no token usage and are not counted.
-      tokensPerMinute: 100000
-      # -- Optional MCP tool-call budget (tools/call requests per minute), enforced
+      # -- MCP tool-call budget (tools/call requests per minute), enforced
       #    globally via a RateLimitConfig + entRateLimit on the team's parent route.
-      #    Other MCP operations (initialize, tools/list) and LLM requests are not
-      #    counted. Unset by default so deployments without MCP render no
-      #    rate-limit resources.
-      # toolCallsPerMinute: 300
+      #    Other MCP operations (initialize, tools/list) are not counted. Unset
+      #    a tier's value to render no rate-limit resources for that tier.
+      toolCallsPerMinute: 300
     retry:
       attempts: 3
       backoff: 500ms
@@ -93,7 +86,7 @@ tiers:
       request: 120s
   silver:
     rateLimit:
-      tokensPerMinute: 10000
+      toolCallsPerMinute: 60
     timeouts:
       request: 60s
 

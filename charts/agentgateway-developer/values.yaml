@@ -4,19 +4,7 @@ team: ""
 
 # -- Endpoints this team exposes through the gateway.
 endpoints: []
-#  - name: chat                # resource name suffix; URL becomes /teams/<team><path>
-#    type: llm                 # llm | mcp
-#    provider: openai          # llm only: openai|anthropic|bedrock|vertexai|azureopenai
-#    model: gpt-4o-mini        # optional model pin
-#    path: /chat
-#    auth:                     # llm only: exactly one of secretRef | passthrough
-#      secretRef: openai-creds
-#    host: ""                  # optional openai-compatible override (self-hosted/vLLM)
-#    port: 8000
-#    apiPath: /v1/chat/completions
-#    failover: []              # optional: [{provider, model, secretRef|passthrough, host, port, apiPath}]
-#    guardrails: {}            # optional: promptGuard config (backend-scoped)
-#  - name: tools
+#  - name: tools               # resource name suffix; URL becomes /teams/<team><path>
 #    type: mcp
 #    path: /mcp
 #    toolMode: search          # optional: search | code

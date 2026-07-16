@@ -159,9 +159,7 @@
           "rateLimit": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["tokensPerMinute"],
             "properties": {
-              "tokensPerMinute": {"type": "integer", "minimum": 1},
               "toolCallsPerMinute": {"type": "integer", "minimum": 1}
             }
           },

@@ -1,0 +1,72 @@
+{{- /* Per-team RateLimitConfig: one per grant, defines that team's own budget
+     descriptor (its own domain, keyed on its own user_id). Unaffected by the
+     alias-grouping below. */}}
+{{- range .Values.grants }}
+---
+apiVersion: ratelimit.solo.io/v1alpha1
+kind: RateLimitConfig
+metadata:
+  name: llm-budget-{{ .team }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-llm-ops.labels" $ | nindent 4 }}
+spec:
+  raw:
+    domain: llm-budget-{{ .team }}
+    descriptors:
+      - key: user_id
+        value: {{ .team }}
+        rateLimit:
+          unit: MINUTE
+          requestsPerUnit: {{ .tokensPerMinute }}
+    rateLimits:
+      - actions:
+          - cel:
+              expression: 'apiKey.user_id'
+              key: "user_id"
+        type: TOKEN
+{{- end }}
+
+{{- /* Per-alias EnterpriseAgentgatewayPolicy: exactly one single-targetRef
+     policy per alias this release's grants touch, its rateLimitConfigRefs
+     listing every one of this release's teams granted that alias. Grouped by
+     alias (never per team / multi-targetRef) and suffixed with an 8-hex hash
+     of the release name for unambiguous cross-release uniqueness -- see the
+     "Design note" in this chart's README.md for the live incident behind
+     both choices. */}}
+{{- $aliasTeams := dict }}
+{{- $aliasOrder := list }}
+{{- range .Values.grants }}
+{{- $team := .team }}
+{{- range (uniq .aliases) }}
+{{- if not (hasKey $aliasTeams .) }}
+{{- $_ := set $aliasTeams . (list) }}
+{{- $aliasOrder = append $aliasOrder . }}
+{{- end }}
+{{- $_ := set $aliasTeams . (append (get $aliasTeams .) $team) }}
+{{- end }}
+{{- end }}
+{{- range $aliasOrder }}
+{{- $alias := . }}
+{{- $teams := get $aliasTeams $alias }}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: llm-budget-{{ $alias }}-{{ sha256sum $.Release.Name | trunc 8 }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-llm-ops.labels" $ | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: llm-{{ $alias }}
+  traffic:
+    entRateLimit:
+      global:
+        rateLimitConfigRefs:
+          {{- range $teams }}
+          - name: llm-budget-{{ . }}
+          {{- end }}
+{{- end }}

@@ -1,0 +1,48 @@
+{{- $catalogAliases := list }}
+{{- range .Values.modelCatalog }}
+{{- $catalogAliases = append $catalogAliases .alias }}
+{{- end }}
+{{- $seenTeams := list }}
+{{- range .Values.grants }}
+{{- if has .team $seenTeams }}
+{{- fail (printf "duplicate grant for team %q (grant teams must be unique)" .team) }}
+{{- end }}
+{{- $seenTeams = append $seenTeams .team }}
+{{- end }}
+{{- /* Unknown-alias validation only applies when this release also renders
+     modelCatalog. A grant-only release can't see the catalog (it isn't
+     rendered here), so an alias with no matching catalog entry is not an
+     error -- the resulting label is simply inert until an infra-mode
+     release with that alias in its catalog targets this namespace. */}}
+{{- if .Values.modelCatalog }}
+{{- range .Values.grants }}
+{{- $team := .team }}
+{{- range .aliases }}
+{{- if not (has . $catalogAliases) }}
+{{- fail (printf "grant for team %q references unknown alias %q (modelCatalog aliases: %s)" $team . (join ", " $catalogAliases)) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range .Values.grants }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: llm-key-{{ .team }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-llm-ops.labels" $ | nindent 4 }}
+    {{- range (uniq .aliases) }}
+    {{ include "agentgateway-llm-ops.aliasLabel" . }}: granted
+    {{- end }}
+type: Opaque
+stringData:
+  {{ .team }}: |
+    {
+      "key": {{ quote .key }},
+      "metadata": {
+        "user_id": {{ quote .team }}
+      }
+    }
+{{- end }}
