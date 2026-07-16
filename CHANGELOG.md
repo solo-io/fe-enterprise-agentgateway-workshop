@@ -1,5 +1,9 @@
 # Changelog
 
+0.12.2 - (7-16-26)
+---
+- Minor updates to `labs/platform-engineering`
+
 0.12.1 - (7-16-26)
 ---
 - Refactor labs at `labs/platform-engineering` based on internal feedback

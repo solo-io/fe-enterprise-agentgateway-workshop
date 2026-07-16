@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="diagram-shared.css">
+<style>
+.backend-row { display: flex; align-items: center; gap: 14px; }
+.backend-row .lbl { font-size: 14px; color: #5C6178; white-space: nowrap; }
+.backend-row .arrow { color: #5C6178; font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+.backend-pill {
+  border: 1px solid rgba(108, 184, 255, 0.45);
+  border-radius: 9999px;
+  padding: 10px 20px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #6CB8FF;
+}
+.head-badge { margin-left: auto; }
+</style>
+</head>
+<body>
+
+<div class="overline">Enterprise Agentgateway &nbsp;·&nbsp; Platform Engineering</div>
+<h1>Platform &amp; Developer Helm Charts: Self&#8209;Service MCP Endpoints</h1>
+
+<div class="panel accent-top">
+  <div class="panel-head">
+    <span class="panel-title">Platform Team</span>
+    <span class="panel-sub"><span class="lit">owns</span> charts/agentgateway-platform</span>
+  </div>
+  <div class="chips">
+    <span class="chip"><b>Gateway</b> agw-platform</span>
+    <span class="chip">Proxy fleet</span>
+    <span class="chip">Access logs</span>
+    <span class="chip">Security baseline · JWT / WAF</span>
+    <span class="chip">Cost tiers · tokens + tool calls</span>
+  </div>
+</div>
+
+<div class="connector">
+  <div class="line"></div>
+  <div class="dot"></div>
+  <div class="pill">onboards team &nbsp;·&nbsp; assigns prefix, namespace, tier</div>
+  <div class="dot"></div>
+  <div class="line"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-head" style="align-items: center;">
+    <span class="panel-title mono">team-team-tools</span>
+    <span class="badge grey head-badge">SILVER</span>
+  </div>
+  <div class="kv">
+    <span class="k">parent route</span><span class="v">/teams/team-tools</span>
+    <span class="k">tier policy</span><span class="v">tokensPerMinute + toolCallsPerMinute</span>
+    <span class="k">delegates to</span><span class="v">team=team-tools in ns team-tools</span>
+  </div>
+</div>
+
+<div class="connector">
+  <div class="line"></div>
+  <div class="dot"></div>
+  <div class="pill">delegation &nbsp;·&nbsp; Gateway API</div>
+  <div class="dot"></div>
+  <div class="line"></div>
+</div>
+
+<div class="panel purple">
+  <div class="panel-head">
+    <span class="panel-title" style="font-size: 19px;">App Team <span class="mono">team-tools</span></span>
+  </div>
+  <div class="kv">
+    <span class="k">owns</span><span class="v">charts/agentgateway-developer</span>
+    <span class="k">namespace</span><span class="v">team-tools</span>
+    <span class="k">child route</span><span class="v">team-tools-tools</span>
+    <span class="k">label</span><span class="v">team=team-tools</span>
+    <span class="k">matches</span><span class="v">/teams/team-tools/mcp</span>
+  </div>
+  <div class="divider"></div>
+  <div class="backend-row">
+    <span class="lbl">entMcp backend</span>
+    <span class="arrow">&#10230;</span>
+    <span class="backend-pill">mcp-airxiv &nbsp;·&nbsp; arXiv API (real, StreamableHTTP)</span>
+  </div>
+</div>
+
+<div class="caption">
+  <b>Label + namespace</b> gate what a parent route accepts. Tier budgets, JWT, and access logging attach to the parent, and every MCP tool call inherits them; the team never configures them.
+</div>
+
+<script>
+window.addEventListener('load', () => {
+  document.body.setAttribute('data-h', document.documentElement.scrollHeight);
+});
+</script>
+</body>
+</html>

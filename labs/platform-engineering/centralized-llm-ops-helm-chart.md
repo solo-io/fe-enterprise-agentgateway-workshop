@@ -1,13 +1,13 @@
-# Centralized LLM Ops: One Chart, One Persona
+# LLM Access, Centralized: The Platform as Provider
 
-Give every application team a chart of their own and they will eventually self-serve a rate limit, a route, or a model they were never meant to have. The [platform and developer chart lab](platform-and-developer-helm-charts-mcp.md) solves that with schemas: two charts, two personas, and a developer chart whose values file has no field for a traffic policy — that lab demonstrates the model with MCP endpoints.
+An LLM backend is a **vendor relationship**. Everything that makes it work belongs to the organization: the provider credentials, the bill, the choice of model, the data-governance decision to send prompts to a third party. No application team differentiates by running its own copy of a frontier model behind the gateway; every team needs the same two things, an OpenAI-compatible endpoint and a budget. When every consumer needs the same thing and the risks (a leaked provider key, runaway spend) are company-wide, per-team self-service spreads that risk without adding value. **Centralize** instead, and let the platform be the provider.
 
-This lab goes one step further. There is no developer chart at all. The platform team runs LLM consumption as an internal product: it owns the model catalog, the provider credentials, and every API key. An application team never deploys a model, never sees a provider secret, and never runs `helm install`. A team's entire interaction with the platform is a request — "we need an endpoint for X" — and the platform's response is a grant. Exactly **one** Helm chart exists, `agentgateway-llm-ops`, and exactly one persona — the platform team — ever runs Helm against it.
+So this lab has no developer chart at all. The platform team runs LLM consumption as an internal product: it owns the model catalog, the provider credentials, and every API key. An application team never deploys a model, sees a provider secret, or runs `helm install`. A team's entire interaction with the platform is a request ("we need an endpoint for X"), and the platform's response is a grant. One Helm chart exists, `agentgateway-llm-ops`, and one persona, the platform team, ever runs Helm against it. Backends that *are* team workloads, such as MCP servers wrapping a team's own tools, call for delegation instead: see [MCP Endpoints, Delegated: Self-Service Within Guardrails](platform-and-developer-helm-charts-mcp.md).
 
 The chart operates a small catalog of named aliases, and this lab uses two of them to carry two different use cases:
 
-- **`chat-mock`** — an LLM-shaped endpoint for tests and CI, where nobody reads the answer. Auth, rate limiting, WAF, and routing behave exactly as they do for a real model, but every token is free.
-- **`chat-real`** — real completions, where the platform manages the provider relationship. Today that provider is OpenAI; tomorrow the platform can point the same alias at a different provider or model without any team noticing.
+- **`chat-mock`**: an LLM-shaped endpoint for tests and CI, where nobody reads the answer. Auth, rate limiting, WAF, and routing behave as they do for a real model, but every token is free.
+- **`chat-real`**: real completions, where the platform manages the provider relationship. Today that provider is OpenAI; tomorrow the platform can point the same alias at a different provider or model without any team noticing.
 
 > This lab requires Enterprise Agentgateway **v2026.6.3** or later (the version installed in [001](../../001-install-enterprise-agentgateway.md)).
 
@@ -38,7 +38,7 @@ This lab assumes you have completed the setup in [001](../../001-install-enterpr
 
 ![Centralized LLM-ops architecture: the platform team owns the gateway, model catalog, provider credentials, and grants; app teams hold only a URL, an API key, and a token budget](../../images/platform-engineering/centralized-llm-ops-architecture.png)
 
-Every alias is a stable URL, `/llm/<alias>`, backed by a provider and a model the platform chose. A grant is what connects a team to an alias: it mints the team's API key, adds that key to the key set of every alias the team was granted, and sets the team's token budget. A team that has no grant for an alias has no key in that alias's key set, so every request it sends there fails auth — the alias is closed by default.
+Every alias is a stable URL, `/llm/<alias>`, backed by a provider and a model the platform chose. A grant is what connects a team to an alias: it mints the team's API key, adds that key to the key set of every alias the team was granted, and sets the team's token budget. A team that has no grant for an alias has no key in that alias's key set, so every request it sends there fails auth; every alias is closed by default.
 
 | Contract element | Set by | Held by |
 |---|---|---|
@@ -49,7 +49,7 @@ Every alias is a stable URL, `/llm/<alias>`, backed by a provider and a model th
 | Provider credentials | Platform (pre-created Secret) | Never leaves `agentgateway-system` |
 | Key lifecycle (issue, rotate, revoke) | Platform (grant add/remove) | The team holds no lever over this |
 
-**Why there is no developer chart.** A team's only artifact in this model is the request itself — which alias, for what use case, at what volume — filed as a pull request or a service-desk ticket. Helm never sees it; a human on the platform team does, and translates it into a values change on the one chart that exists. There is nothing for a team to install, and therefore nothing for a team to misconfigure.
+**Why there is no developer chart.** A team's only artifact in this model is the request itself (which alias, for what use case, at what volume), filed as a pull request or a service-desk ticket. Helm never sees it; a human on the platform team does, and translates it into a values change on the one chart that exists. A team has nothing to install, and therefore nothing to misconfigure.
 
 ---
 
@@ -137,7 +137,7 @@ secret/openai-secret created
 
 ### Define the model catalog
 
-Create `llm-ops-values.yaml` with the two-alias catalog and an empty grant list — the service exists, but no team has access to it yet:
+Create `llm-ops-values.yaml` with the two-alias catalog and an empty grant list. The service exists, but no team has access to it yet:
 
 ```bash
 cat > llm-ops-values.yaml <<'EOF'
@@ -250,13 +250,13 @@ chat-mock no-key:  401
 chat-real bad-key: 401
 ```
 
-Access to a catalog alias only ever comes from a grant.
+Access to a catalog alias comes only from a grant.
 
 ---
 
 ## Step 2: Team alpha requests an endpoint
 
-Team alpha needs real completions for a customer-support summarization feature. It files a request with the platform team — a pull request to the platform's repo, a service-desk ticket, whatever the organization uses: **team `team-alpha` wants access to `chat-real` for customer-support summarization, at around 800 tokens per minute.** The request is a conversation between teams, not configuration; nothing about it touches the cluster.
+Team alpha needs real completions for a customer-support summarization feature. It files a request with the platform team (a pull request to the platform's repo, a service-desk ticket, whatever the organization uses): **team `team-alpha` wants access to `chat-real` for customer-support summarization, at around 800 tokens per minute.** The request is a conversation between teams; nothing about it touches the cluster.
 
 ### The platform reviews and grants
 
@@ -317,7 +317,7 @@ Expected output:
 
 ### Alpha calls chat-real
 
-The new key takes a few seconds to propagate to the proxy fleet. Send a real request — this is a real, billed call to the OpenAI API. If you see a `401`, the proxy hasn't picked up the key yet; wait a few seconds and re-run:
+The new key takes a few seconds to propagate to the proxy fleet. Send a request; this is a real, billed call to the OpenAI API. If you see a `401`, the proxy hasn't picked up the key yet; wait a few seconds and re-run:
 
 ```bash
 sleep 10
@@ -352,13 +352,13 @@ Expected output:
 alpha chat-mock: 200
 ```
 
-One key, two aliases. Team alpha received exactly three things: a URL, a key, and a budget.
+Team alpha received three things: a URL, a key, and a budget.
 
 ---
 
 ## Step 3: Team beta requests a test endpoint
 
-Team beta only needs to exercise the gateway integration in CI — responses are discarded, so a real model would be wasted spend. Its request: **access to `chat-mock` for gateway integration tests, at a trickle of a budget.** The platform grants it, appending a second entry to `llm-ops-values.yaml`:
+Team beta only needs to exercise the gateway integration in CI; it discards every response, so a real model would be wasted spend. Its request: **access to `chat-mock` for gateway integration tests, at a tiny budget.** The platform grants it, appending a second entry to `llm-ops-values.yaml`:
 
 ```bash
 cat > llm-ops-values.yaml <<'EOF'
@@ -406,11 +406,11 @@ REVISION: 3
 ...
 ```
 
-> **Note on the tiny budget:** `5` tokens/minute is demo-scale, set small enough to trip a `429` in two requests. What matters is not the number — it's that the platform sets it, and the team never chooses it.
+> **Note on the tiny budget:** `5` tokens/minute is demo-scale, small enough to trip a `429` in two requests. The number matters less than who sets it: the platform assigns the budget, and the team never chooses it.
 
 ### Budget demo
 
-Counters live in a fixed clock-minute window. If the first request already 429s, wait for the next minute and rerun. Token budgets are only known to be exceeded once a response comes back, so each call's usage is recorded a moment after the call returns; a short pause between the two calls gives that accounting time to land before the next request's budget check:
+Counters live in a fixed clock-minute window. If the first request already 429s, wait for the next minute and rerun. The gateway only learns a call's token usage once the response comes back, so it records each call's usage a moment after the call returns; a short pause between the two calls gives that accounting time to land before the next request's budget check:
 
 ```bash
 for i in 1 2; do
@@ -434,15 +434,15 @@ beta-2: 429
 alpha:  200
 ```
 
-Same URL, same request body — the budget comes from the validated key, not from anything the client can set. This is exactly what `chat-mock` exists for: team beta exercised auth and rate limiting in full without spending a single provider token.
+Both teams hit the same URL with the same request body; the budget comes from the validated key, and nothing the client sets can change it. `chat-mock` exists for this: team beta exercised auth and rate limiting in full without spending a single provider token.
 
 ---
 
 ## Step 4: What teams cannot do
 
-### It cannot reach an alias it wasn't granted
+### A team cannot reach an alias it wasn't granted
 
-Team beta's key is valid — just not for `chat-real`:
+Team beta's key is valid, just not for `chat-real`:
 
 ```bash
 curl -s -o /dev/null -w "beta on chat-real: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-real" \
@@ -457,11 +457,11 @@ Expected output:
 beta on chat-real: 401
 ```
 
-Team beta's Secret carries the `alias-chat-mock` label but not `alias-chat-real`. `chat-real`'s key set has never heard of it — team beta was granted a test endpoint, and it cannot quietly run up OpenAI spend on a different one.
+Team beta's Secret carries the `alias-chat-mock` label but not `alias-chat-real`, so its key never entered `chat-real`'s key set. The platform granted team beta a test endpoint, and team beta cannot run up OpenAI spend on a different one.
 
-### There is nothing else to attempt
+### A team has nothing else to attempt
 
-No developer chart exists for a team to install. A team holds no CRDs, no namespace of its own in this model, and no provider credentials. Even the model name in a request body cannot steer the backend: the alias's provider and model are pinned server-side. The only lever a team has is another request to the platform team.
+No developer chart exists for a team to install. A team holds no CRDs, no namespace of its own in this model, and no provider credentials. Even the model name in a request body cannot steer the backend: the platform pins the alias's provider and model server-side. The only lever a team holds is another request to the platform team.
 
 | Attempt | Outcome | Mechanism |
 |---|---|---|
@@ -469,7 +469,7 @@ No developer chart exists for a team to install. A team holds no CRDs, no namesp
 | Send more requests than the budget allows | `429` | The per-team `RateLimitConfig` descriptor caps tokens/minute at the gateway |
 | Ask for a bigger budget | Nothing to edit | Budgets live in a platform-held values file; the team holds no chart and no values file of its own |
 | Send a different model name in the request body | No effect on routing or policy | The alias's backend pins the platform-chosen model server-side; the request body's `model` field never selects a different provider or model |
-| Install a competing gateway, route, or policy | No standing to try | The team has no chart, no CRDs, and no release — there is nothing to install |
+| Install a competing gateway, route, or policy | No standing to try | The team has no chart, no CRDs, and no release; it has nothing to install |
 
 ---
 
@@ -523,7 +523,7 @@ REVISION: 4
 ...
 ```
 
-The catalog change takes a few seconds to propagate to the proxy fleet. Rerun the **exact same call** team alpha made in Step 2 — same URL, same key, same request body, `"model":"gpt-4o-mini"` included. If the response still shows the old model, wait a few seconds and re-run:
+The catalog change takes a few seconds to propagate to the proxy fleet. Rerun the **exact same call** team alpha made in Step 2: same URL, same key, same request body, `"model":"gpt-4o-mini"` included. If the response still shows the old model, wait a few seconds and re-run:
 
 ```bash
 sleep 10
@@ -541,15 +541,15 @@ gpt-4.1-nano
 
 (OpenAI may return a dated variant of this model name; either confirms the swap took effect.)
 
-Team alpha's request body still says `gpt-4o-mini` — byte-for-byte the same string it sent in Step 2 — and the answer still came back from `gpt-4.1-nano`. The `EnterpriseAgentgatewayBackend`'s pinned model wins every time; the request body's `model` field is never consulted for routing, so the platform can move an alias to a different model (or provider) without a team changing, or even noticing, a single byte of its own request. Swapping the *provider* instead of the model is the same one-line change (`provider: anthropic` plus a different platform-held `secretRef`); this lab swaps the model only because a second provider credential can't be assumed for every reader.
+Team alpha's request body still says `gpt-4o-mini`, byte for byte the string it sent in Step 2, and the answer still came back from `gpt-4.1-nano`. The `EnterpriseAgentgatewayBackend`'s pinned model wins every time; the gateway never consults the request body's `model` field for routing, so the platform can move an alias to a different model (or provider) without a team changing, or even noticing, a single byte of its own request. Swapping the *provider* instead of the model is the same one-line change (`provider: anthropic` plus a different platform-held `secretRef`); this lab swaps the model only because not every reader has a second provider credential.
 
 ---
 
 ## Step 6: Isolate a team's grant into its own release
 
-Every grant so far has lived in the platform's single values file, `llm-ops-values.yaml`, changed by one `helm upgrade` of one release, `agw-llm-ops`. That works as long as one team owns the file. It gets in the way once several application teams want independent change cadences — team beta wants to bump its own budget the day before a demo, without waiting on review of an unrelated catalog change team alpha is making the same week. The platform can give team beta its own values file and its own release without touching the shared `Gateway`, the catalog, or the URLs any team already calls.
+Every grant so far has lived in the platform's single values file, `llm-ops-values.yaml`, changed by one `helm upgrade` of one release, `agw-llm-ops`. That works as long as one team owns the file. It gets in the way once several application teams want independent change cadences: team beta wants to bump its own budget the day before a demo, without waiting on review of an unrelated catalog change team alpha is making the same week. The platform can give team beta its own values file and its own release without touching the shared `Gateway`, the catalog, or the URLs any team already calls.
 
-`agentgateway-llm-ops` supports this with the same chart, not a second one: a values file that sets `gateway: null` and carries only `grants` renders **only** that team's `Secret` and its `RateLimitConfig`/`EnterpriseAgentgatewayPolicy` budget pair into the same namespace as the infra release — no `Gateway`, no parameters, no catalog. The platform still runs `helm install` for team beta; nothing here is self-service. What moves is the release boundary: team beta's grant now has its own revision history and its own uninstall, decoupled from `agw-llm-ops`.
+`agentgateway-llm-ops` supports this with the same chart, not a second one: a values file that sets `gateway: null` and carries only `grants` renders just that team's `Secret` and its `RateLimitConfig`/`EnterpriseAgentgatewayPolicy` budget pair into the same namespace as the infra release, with no `Gateway`, parameters, or catalog. The platform still runs `helm install` for team beta; nothing here is self-service. Only the release boundary moves: team beta's grant now has its own revision history and its own uninstall, decoupled from `agw-llm-ops`.
 
 ### The platform removes beta's grant from the shared values file
 
@@ -596,7 +596,7 @@ REVISION: 5
 ...
 ```
 
-Beta's key dies with the grant, proving the platform's values file no longer carries it. The proxy fleet takes a few seconds to drop the key; if you see a `200`, wait a few seconds and re-run:
+Beta's key stops working once the grant leaves the values file, which confirms the shared release no longer carries it. The proxy fleet takes a few seconds to drop the key; if you see a `200`, wait a few seconds and re-run:
 
 ```bash
 sleep 10
@@ -646,7 +646,7 @@ REVISION: 1
 
 ### Beta's key and budget both come back
 
-The new key takes a few seconds to propagate to the proxy fleet. The 5 tokens/minute budget from Step 3 came along with the grant, so the first call succeeds and the second one 429s — counters live in a fixed clock-minute window; if the first request already 429s, wait for the next minute and rerun. As in Step 3, a short pause between the two calls gives the first call's token usage time to land before the second call's budget check:
+The new key takes a few seconds to propagate to the proxy fleet. The 5 tokens/minute budget from Step 3 came along with the grant, so the first call succeeds and the second one 429s. Counters live in a fixed clock-minute window; if the first request already 429s, wait for the next minute and rerun. As in Step 3, a short pause between the two calls gives the first call's token usage time to land before the second call's budget check:
 
 ```bash
 sleep 10
@@ -682,7 +682,7 @@ Expected output:
 {"app.kubernetes.io/instance":"grant-team-beta","app.kubernetes.io/managed-by":"Helm","app.kubernetes.io/part-of":"agentgateway-llm-ops"}
 ```
 
-Nothing about the URL, the catalog, or team alpha's grant changed. Team beta's interface to the platform is still a request, not a `helm install` it runs itself — the platform runs `grant-team-beta` from the same repo, under the same review process, as every other release in this lab. What changed is the release boundary: team beta's grant now upgrades and uninstalls on its own schedule. That's GitOps ergonomics for the platform team, not self-service for team beta.
+Nothing about the URL, the catalog, or team alpha's grant changed. Team beta still reaches the platform through requests and still runs no `helm install` of its own; the platform runs `grant-team-beta` from the same repo, under the same review process, as every other release in this lab. Only the release boundary changed: team beta's grant now upgrades and uninstalls on its own schedule. The platform team gains GitOps ergonomics; team beta gains no self-service.
 
 ---
 
@@ -728,13 +728,13 @@ Expected output:
 beta after offboarding: 401
 ```
 
-A team whose grant still lives in the platform's values file, like team alpha, would be offboarded with the same values edit and `helm upgrade` that removed beta's entry from `llm-ops-values.yaml` in Step 6; a team whose grant was isolated into its own release, like team beta here, is offboarded with a single `helm uninstall` and no values file to touch at all.
+To offboard a team whose grant still lives in the platform's values file, like team alpha, the platform makes the same values edit and `helm upgrade` that removed beta's entry from `llm-ops-values.yaml` in Step 6. For a team whose grant lives in its own release, like team beta here, offboarding is a single `helm uninstall` with no values file to touch.
 
 ---
 
 ## Observability
 
-Access logging is on because the chart enables it by default (`observability.accessLog`), so every request through `agw-llm-ops` is logged. View the proxy's logs:
+Access logging is on because the chart enables it by default (`observability.accessLog`), so the proxy logs every request through `agw-llm-ops`. View the proxy's logs:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agw-llm-ops --prefix --tail 20
@@ -748,7 +748,7 @@ Each LLM request shows its route, status, token usage, and whether the response 
 ...gateway=agentgateway-system/agw-llm-ops route=agentgateway-system/llm-chat-mock ... http.status=429 protocol=llm reason=DirectResponse
 ```
 
-The access log does not carry a per-team field — it shows route, status, and token counts, not which key made the call. A `429` from the budget limiter logs as `reason=DirectResponse` with no per-team detail in the line itself. Per-team accounting is enforced, and observable, at the rate limiter instead: each team gets its own `llm-budget-<team>` `RateLimitConfig`, tracked and capped independently, and each alias route carries one `EnterpriseAgentgatewayPolicy` that lists the budgets of every team the release granted that alias — so a `429` on a given alias is attributable to a specific team's usage even though the log line itself doesn't name the team. For dashboards and traces built on top of this, use the Grafana stack from `002`.
+The access log carries no per-team field: it shows route, status, and token counts, but not which key made the call. A `429` from the budget limiter logs as `reason=DirectResponse` with no per-team detail in the line itself. The rate limiter enforces per-team accounting and makes it observable: each team gets its own `llm-budget-<team>` `RateLimitConfig`, tracked and capped independently, and each alias route carries one `EnterpriseAgentgatewayPolicy` that lists the budgets of every team the release granted that alias, so a `429` on a given alias traces back to a specific team's usage even though the log line itself doesn't name the team. For dashboards and traces built on top of this, use the Grafana stack from `002`.
 
 ---
 
@@ -773,7 +773,7 @@ service "mock-model-svc" deleted
 secret "openai-secret" deleted
 ```
 
-(The tolerant `grant-team-beta` uninstall prints nothing when the release is already gone; if you skipped Step 7, it prints `release "grant-team-beta" uninstalled` instead — only stderr is suppressed.)
+(The tolerant `grant-team-beta` uninstall prints nothing when the release is already gone; if you skipped Step 7, it prints `release "grant-team-beta" uninstalled` instead; only stderr is suppressed.)
 
 (Newer kubectl clients append `from agentgateway-system namespace` to each delete line.)
 
