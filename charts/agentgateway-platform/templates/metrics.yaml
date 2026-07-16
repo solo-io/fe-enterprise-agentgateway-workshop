@@ -1,0 +1,18 @@
+{{- if .Values.observability.metrics.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .Values.gateway.name }}-metrics
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" . | nindent 4 }}
+spec:
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  podMetricsEndpoints:
+    - port: metrics
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.gateway.name }}
+{{- end }}

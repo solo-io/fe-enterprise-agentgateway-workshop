@@ -1,5 +1,15 @@
 # Changelog
 
+0.12.0 - (7-15-26)
+---
+- Add `labs/platform-engineering/` category: platform/developer separation of concerns via two Helm charts
+- Add `charts/agentgateway-platform`: platform-team chart owning the `Gateway`, cost tiers, security baseline (JWT/WAF), observability, and URL space; onboards teams via route delegation (label + namespace + prefix contract)
+- Add `charts/agentgateway-developer`: app-team chart for self-serving LLM/MCP endpoints under an assigned path prefix; strict `values.schema.json` has no vocabulary for rate limits, auth, WAF, or logging
+- Add `labs/platform-engineering/platform-and-developer-helm-charts-llm.md`: full separation-of-concerns lab — LLM endpoints, escape attempts, one-line team re-tiering, gateway-wide JWT enablement without touching team releases
+- Add `labs/platform-engineering/platform-and-developer-helm-charts-mcp.md`: standalone MCP variant — a `type: mcp` endpoint renders an `entMcp` backend, and tier budgets, JWT, and access logging cover MCP tool calls through the parent route
+- Add Platform Engineering section to `README.md` (TOC, lab listing, use cases)
+- Add "Negative Test: Deny Entra at the Proxy" section to `labs/security/jwt-auth-through-corporate-proxy-entra.md`: block the IdP in Squid and confirm the JWKS fetch fails (`Forbidden` / `TCP_DENIED/403`) instead of falling back to direct egress
+
 0.11.10 - (7-10-26)
 ---
 - Minor updates to `labs/security/jwt-auth-through-corporate-proxy-entra.md`

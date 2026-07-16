@@ -1,0 +1,37 @@
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayParameters
+metadata:
+  name: {{ include "agentgateway-platform.parametersName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" . | nindent 4 }}
+spec:
+  logging:
+    level: {{ .Values.observability.logging.level }}
+  service:
+    {{- with .Values.proxy.service.annotations }}
+    metadata:
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    spec:
+      type: {{ .Values.proxy.service.type }}
+  {{- if .Values.proxy.podDisruptionBudget.enabled }}
+  podDisruptionBudget:
+    spec:
+      minAvailable: {{ .Values.proxy.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  shutdown:
+    min: {{ .Values.proxy.shutdown.min }}
+    max: {{ .Values.proxy.shutdown.max }}
+  deployment:
+    spec:
+      replicas: {{ .Values.proxy.replicas }}
+      template:
+        spec:
+          containers:
+            - name: agentgateway
+              {{- with .Values.proxy.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}

@@ -1,0 +1,48 @@
+{{- if .Values.security.jwt.enabled }}
+{{- if not .Values.security.jwt.jwks.inline }}
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: {{ .Values.gateway.name }}-jwks
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" . | nindent 4 }}
+spec:
+  static:
+    host: {{ required "security.jwt.jwks.host is required when jwks.inline is not set" .Values.security.jwt.jwks.host }}
+    port: {{ .Values.security.jwt.jwks.port }}
+  policies:
+    tls: {}
+---
+{{- end }}
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: {{ .Values.gateway.name }}-jwt
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.gateway.name }}
+  traffic:
+    jwtAuthentication:
+      mode: Strict
+      providers:
+        - issuer: {{ required "security.jwt.issuer is required when jwt is enabled" .Values.security.jwt.issuer }}
+          jwks:
+            {{- if .Values.security.jwt.jwks.inline }}
+            inline: |-
+              {{- .Values.security.jwt.jwks.inline | nindent 14 }}
+            {{- else }}
+            remote:
+              backendRef:
+                name: {{ .Values.gateway.name }}-jwks
+                namespace: {{ .Release.Namespace }}
+                kind: EnterpriseAgentgatewayBackend
+                group: enterpriseagentgateway.solo.io
+              jwksPath: {{ .Values.security.jwt.jwks.path | trimPrefix "/" }}
+            {{- end }}
+{{- end }}

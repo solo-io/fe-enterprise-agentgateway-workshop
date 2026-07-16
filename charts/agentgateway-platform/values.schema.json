@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["gateway", "proxy", "observability", "security", "tiers", "teams"],
+  "properties": {
+    "global": {"type": "object"},
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "gatewayClassName", "listeners"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "gatewayClassName": {"type": "string"},
+        "listeners": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "http": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {"port": {"type": "integer"}}
+            },
+            "https": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {"type": "boolean"},
+                "port": {"type": "integer"},
+                "tls": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {"secretRef": {"type": "string"}}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": {"type": "integer", "minimum": 1},
+        "resources": {"type": "object"},
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {"enum": ["LoadBalancer", "ClusterIP", "NodePort"]},
+            "annotations": {"type": "object"}
+          }
+        },
+        "podDisruptionBudget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "minAvailable": {"type": "integer"}
+          }
+        },
+        "shutdown": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"min": {"type": "integer"}, "max": {"type": "integer"}}
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logging": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"level": {"enum": ["debug", "info", "warn", "error"]}}
+        },
+        "accessLog": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "attributes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "expression"],
+                "properties": {"name": {"type": "string"}, "expression": {"type": "string"}}
+              }
+            }
+          }
+        },
+        "tracing": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "backendRef": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "name": {"type": "string"},
+                "namespace": {"type": "string"},
+                "port": {"type": "integer"}
+              }
+            },
+            "protocol": {"type": "string"},
+            "randomSampling": {"type": "string"}
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"enabled": {"type": "boolean"}}
+        }
+      }
+    },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "jwt": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "issuer": {"type": "string"},
+            "jwks": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "inline": {"type": "string"},
+                "host": {"type": "string"},
+                "port": {"type": "integer"},
+                "path": {"type": "string"}
+              }
+            }
+          }
+        },
+        "waf": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "customDirectives": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "tiers": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rateLimit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["tokensPerMinute"],
+            "properties": {
+              "tokensPerMinute": {"type": "integer", "minimum": 1},
+              "toolCallsPerMinute": {"type": "integer", "minimum": 1}
+            }
+          },
+          "retry": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["attempts"],
+            "properties": {
+              "attempts": {"type": "integer", "minimum": 1},
+              "backoff": {"type": "string"},
+              "codes": {"type": "array", "items": {"type": "integer"}}
+            }
+          },
+          "timeouts": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["request"],
+            "properties": {"request": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "teams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "namespace", "tier"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+          "namespace": {"type": "string", "minLength": 1},
+          "tier": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

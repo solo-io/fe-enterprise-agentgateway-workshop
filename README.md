@@ -28,6 +28,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Load Testing](#load-testing)
 - [Observability](#observability)
 - [Upgrades & Lifecycle](#upgrades--lifecycle)
+- [Platform Engineering](#platform-engineering)
 
 ---
 
@@ -214,6 +215,12 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ---
 
+## Platform Engineering
+
+- [Platform and Developer Helm Charts: Separation of Concerns](labs/platform-engineering/platform-and-developer-helm-charts-llm.md) — a platform-team chart owns the gateway, cost tiers, security, and URL space; a developer chart lets app teams self-serve endpoints without being able to escape their tier or weaken a control _(see also: Rate Limiting, Security)_
+
+---
+
 # Use Cases
 - Support Kubernetes Gateway API
 - Install Enterprise Agentgateway
@@ -305,6 +312,12 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - Observability & Cost Management
     - Per-user / per-key LLM cost tracking and chargeback via access logs and PromQL
     - Production observability, alerting, and autoscaling guidance
+- Platform Engineering
+    - Platform/developer separation of concerns via two Helm charts
+    - Platform team owns the gateway, cost tiers, security baseline (JWT/WAF), observability, and URL space
+    - App teams self-serve LLM/MCP endpoints under a delegated path prefix without being able to set traffic policies
+    - Structural governance via route delegation (label + namespace + prefix contract) and a strict developer `values.schema.json`
+    - Assign and re-tier teams with a one-line platform values change; enable JWT gateway-wide without changing any team release
 
 
 ## Validated on

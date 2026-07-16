@@ -1,0 +1,23 @@
+{{- range .Values.teams }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: team-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" $ | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ $.Values.gateway.name }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ include "agentgateway-platform.teamPathPrefix" .name }}
+      backendRefs:
+        - group: gateway.networking.k8s.io
+          kind: HTTPRoute
+          name: team={{ .name }}
+          namespace: {{ .namespace }}
+{{- end }}

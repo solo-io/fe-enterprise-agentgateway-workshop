@@ -1,0 +1,27 @@
+{{- range .Values.endpoints }}
+{{- if eq .type "mcp" }}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: {{ include "agentgateway-developer.team" $ }}-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-developer.labels" $ | nindent 4 }}
+spec:
+  entMcp:
+    targets:
+      {{- range .targets }}
+      - name: {{ .name }}
+        static:
+          host: {{ .host }}
+          port: {{ .port }}
+          {{- with .protocol }}
+          protocol: {{ . }}
+          {{- end }}
+      {{- end }}
+    {{- with .toolMode }}
+    toolMode: {{ . | title }}
+    {{- end }}
+{{- end }}
+{{- end }}

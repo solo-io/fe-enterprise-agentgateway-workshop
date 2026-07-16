@@ -75,7 +75,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-## Configure global request rate limit of 5 requests per minute
+## Configure global request rate limit of 5 requests per hour
 Create rate limit config
 ```bash
 kubectl apply -f- <<EOF

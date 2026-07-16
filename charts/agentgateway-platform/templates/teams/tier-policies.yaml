@@ -1,0 +1,41 @@
+{{- range .Values.teams }}
+{{- $tier := get $.Values.tiers .tier }}
+{{- if not $tier }}
+{{- fail (printf "team %q references undefined tier %q (defined tiers: %s)" .name .tier (keys $.Values.tiers | sortAlpha | join ", ")) }}
+{{- end }}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: team-{{ .name }}-tier
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" $ | nindent 4 }}
+    agentgateway.solo.io/tier: {{ .tier }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: team-{{ .name }}
+  traffic:
+    {{- with $tier.rateLimit }}
+    rateLimit:
+      local:
+        - tokens: {{ .tokensPerMinute }}
+          unit: Minutes
+    {{- end }}
+    {{- with $tier.retry }}
+    retry:
+      attempts: {{ .attempts }}
+      {{- with .backoff }}
+      backoff: {{ . }}
+      {{- end }}
+      {{- with .codes }}
+      codes: {{ toJson . }}
+      {{- end }}
+    {{- end }}
+    {{- with $tier.timeouts }}
+    timeouts:
+      request: {{ .request }}
+    {{- end }}
+{{- end }}

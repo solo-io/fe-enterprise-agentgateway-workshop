@@ -1,0 +1,44 @@
+{{- if .Values.security.waf.enabled }}
+apiVersion: waf.solo.io/v1alpha1
+kind: WAFPolicy
+metadata:
+  name: {{ .Values.gateway.name }}-waf-baseline
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" . | nindent 4 }}
+spec:
+  processingConfig:
+    request:
+      mode: HeadersAndBody
+    response:
+      mode: None
+  ruleEngineSettings:
+    inline: |
+      SecRuleEngine On
+      SecRule REQUEST_HEADERS:Content-Type "^application/json" "id:200001,phase:1,t:none,t:lowercase,pass,nolog,ctl:requestBodyProcessor=JSON"
+  customDirectives:
+    - inline: |
+        SecRule REQUEST_BODY "@rx AKIA[0-9A-Z]{16}" "id:300001,phase:2,deny,status:403,msg:'AWS access key detected in request'"
+        SecRule REQUEST_BODY "@rx -----BEGIN (RSA |EC )?PRIVATE KEY-----" "id:300002,phase:2,deny,status:403,msg:'private key material detected in request'"
+    {{- range .Values.security.waf.customDirectives }}
+    - inline: |
+        {{- . | nindent 8 }}
+    {{- end }}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: {{ .Values.gateway.name }}-waf
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-platform.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.gateway.name }}
+  traffic:
+    entWAF:
+      wafPolicyRef:
+        name: {{ .Values.gateway.name }}-waf-baseline
+{{- end }}
