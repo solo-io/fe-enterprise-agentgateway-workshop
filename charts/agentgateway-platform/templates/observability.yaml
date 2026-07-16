@@ -12,15 +12,17 @@ spec:
       kind: Gateway
       name: {{ .Values.gateway.name }}
   frontend:
+    {{- if .Values.observability.accessLog.attributes }}
     accessLog:
-      {{- with .Values.observability.accessLog.attributes }}
       attributes:
         add:
-          {{- range . }}
+          {{- range .Values.observability.accessLog.attributes }}
           - name: {{ .name }}
             expression: {{ .expression }}
           {{- end }}
-      {{- end }}
+    {{- else }}
+    accessLog: {}
+    {{- end }}
 {{- end }}
 {{- if .Values.observability.tracing.enabled }}
 ---

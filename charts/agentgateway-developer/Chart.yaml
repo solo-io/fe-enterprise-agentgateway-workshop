@@ -1,6 +1,6 @@
 apiVersion: v2
 name: agentgateway-developer
-description: Application-team chart for Enterprise Agentgateway — declares LLM/MCP endpoints under the team's delegated path prefix. Traffic policies (auth, rate limits, WAF) are owned by the platform chart and cannot be set here.
+description: Application-team chart for Enterprise Agentgateway — declares MCP endpoints under the team's delegated path prefix. Traffic policies (auth, rate limits, WAF) are owned by the platform chart and cannot be set here.
 type: application
 version: 0.1.0
 appVersion: "v2026.6.3"

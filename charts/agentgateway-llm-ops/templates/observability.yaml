@@ -1,0 +1,26 @@
+{{- if and .Values.gateway .Values.observability.accessLog.enabled }}
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: {{ .Values.gateway.name }}-access-log
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-llm-ops.labels" . | nindent 4 }}
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: {{ .Values.gateway.name }}
+  frontend:
+    {{- if .Values.observability.accessLog.attributes }}
+    accessLog:
+      attributes:
+        add:
+          {{- range .Values.observability.accessLog.attributes }}
+          - name: {{ quote .name }}
+            expression: {{ quote .expression }}
+          {{- end }}
+    {{- else }}
+    accessLog: {}
+    {{- end }}
+{{- end }}

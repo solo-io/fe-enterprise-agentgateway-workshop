@@ -1,0 +1,39 @@
+{{- $seenAliases := list }}
+{{- range .Values.modelCatalog }}
+{{- if has .alias $seenAliases }}
+{{- fail (printf "modelCatalog contains duplicate alias %q (aliases must be unique)" .alias) }}
+{{- end }}
+{{- $seenAliases = append $seenAliases .alias }}
+{{- end }}
+{{- range .Values.modelCatalog }}
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: llm-{{ .alias }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-llm-ops.labels" $ | nindent 4 }}
+spec:
+  ai:
+    provider:
+      {{ .provider }}:
+        model: {{ quote .model }}
+      {{- with .host }}
+      host: {{ . }}
+      {{- end }}
+      {{- with .port }}
+      port: {{ . }}
+      {{- end }}
+      {{- with .apiPath }}
+      path: {{ quote . }}
+      {{- end }}
+  policies:
+    auth:
+      {{- if and .auth .auth.secretRef }}
+      secretRef:
+        name: {{ .auth.secretRef }}
+      {{- else }}
+      passthrough: {}
+      {{- end }}
+{{- end }}

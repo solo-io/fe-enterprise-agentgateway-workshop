@@ -1,0 +1,25 @@
+{{- if and .Values.modelCatalog (not .Values.gateway) }}
+{{- fail "modelCatalog requires gateway (infra mode); grant-only releases set gateway: null and must omit modelCatalog" }}
+{{- end }}
+{{- range .Values.modelCatalog }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: llm-{{ .alias }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "agentgateway-llm-ops.labels" $ | nindent 4 }}
+spec:
+  parentRefs:
+    - name: {{ $.Values.gateway.name }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /llm/{{ .alias }}
+      backendRefs:
+        - name: llm-{{ .alias }}
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+{{- end }}

@@ -2,22 +2,24 @@
 
 Installed per application team, once the platform team has onboarded that
 team in [`agentgateway-platform`](../agentgateway-platform/README.md). A team
-uses it to self-serve LLM and MCP endpoints under the path prefix the
-platform assigned it — configuring only what it owns.
+uses it to self-serve MCP endpoints under the path prefix the platform
+assigned it — configuring only what it owns.
 
 Its `values.schema.json` deliberately has no field for rate limits, auth
 policy, WAF, or logging. Those are platform-owned and attached to the
 team's parent route, so every endpoint the team adds inherits them
 automatically. A team cannot express a traffic policy here even if it tries.
 
+> Looking for LLM endpoints? Those are served by the platform-owned
+> [`agentgateway-llm-ops`](../agentgateway-llm-ops/README.md) chart instead.
+> This chart is MCP-only.
+
 ## What it renders
 
 - One `HTTPRoute` per entry in `endpoints`, labeled `team: <name>` and
   path-prefixed `/teams/<team><path>`
-- One `EnterpriseAgentgatewayBackend` per endpoint:
-  - `type: llm` — an AI backend for the given `provider`, with optional
-    failover groups and prompt-guard policies
-  - `type: mcp` — an MCP backend proxying the endpoint's `targets`
+- One `EnterpriseAgentgatewayBackend` per endpoint — an MCP backend
+  proxying the endpoint's `targets`
 - No `HTTPRoute` ever sets `parentRefs` — routes attach to the gateway only
   through the platform's delegation, never directly
 
@@ -43,28 +45,22 @@ Minimal `team-alpha-values.yaml`:
 ```yaml
 team: team-alpha
 endpoints:
-  - name: chat
-    type: llm
-    provider: openai
-    model: gpt-4o-mini
-    path: /chat
-    auth:
-      secretRef: openai-creds
+  - name: tools
+    type: mcp
+    path: /mcp
+    targets:
+      - name: arxiv
+        host: mcp-airxiv.team-alpha.svc.cluster.local
+        port: 8080
+        protocol: StreamableHTTP
 ```
 
 Because `team` is mandatory with no default, bare `helm lint` or
 `helm template` on this chart fails by design — pass `--set team=<name>`
 (or a values file) to lint or render it.
 
-## Secrets by reference only
-
-An endpoint's `auth` takes exactly one of `secretRef` (a Secret already
-present in the team's namespace) or `passthrough` (forward the caller's own
-credentials upstream) — never both, and never a raw key or token as a
-value. The same rule applies to each entry in an endpoint's `failover` list.
-
 ## Learn more
 
-See [`labs/platform-engineering/platform-and-developer-helm-charts-llm.md`](../../labs/platform-engineering/platform-and-developer-helm-charts-llm.md)
+See [`labs/platform-engineering/platform-and-developer-helm-charts-mcp.md`](../../labs/platform-engineering/platform-and-developer-helm-charts-mcp.md)
 for a full walkthrough, including what happens when a team tries to smuggle
 a traffic policy onto an endpoint or escape its assigned prefix.

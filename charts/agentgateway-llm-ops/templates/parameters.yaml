@@ -1,0 +1,18 @@
+{{- if .Values.gateway }}
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayParameters
+metadata:
+  name: {{ include "agentgateway-llm-ops.parametersName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-llm-ops.labels" . | nindent 4 }}
+spec:
+  logging:
+    level: {{ .Values.observability.logging.level }}
+  service:
+    spec:
+      type: {{ .Values.proxy.service.type }}
+  deployment:
+    spec:
+      replicas: {{ .Values.proxy.replicas }}
+{{- end }}

@@ -19,13 +19,12 @@ tier policy.
 - `PodMonitor`, when `observability.metrics.enabled` is set
 - Per team in `teams`: a parent `HTTPRoute` at that team's path prefix,
   delegating to child routes in that team's namespace, plus an
-  `EnterpriseAgentgatewayPolicy` carrying that team's tier (rate limit,
-  retry, timeout)
+  `EnterpriseAgentgatewayPolicy` carrying that team's tier (retry, timeout)
 - Per team whose tier sets `rateLimit.toolCallsPerMinute`: a
   `RateLimitConfig` and an attaching `EnterpriseAgentgatewayPolicy`
   (`entRateLimit`) that budget MCP `tools/call` requests on the team's
   parent route — a global counter, so it holds across proxy replicas.
-  Other MCP operations and LLM requests are not counted
+  Other MCP operations (`initialize`, `tools/list`) are not counted
 
 ## The contract with agentgateway-developer
 
@@ -59,7 +58,7 @@ gateway:
 tiers:
   gold:
     rateLimit:
-      tokensPerMinute: 100000
+      toolCallsPerMinute: 300
     retry:
       attempts: 3
       backoff: 500ms
@@ -72,7 +71,7 @@ tiers:
       request: 120s
   silver:
     rateLimit:
-      tokensPerMinute: 10000
+      toolCallsPerMinute: 60
     timeouts:
       request: 60s
 teams:
@@ -93,9 +92,8 @@ raw key material as a value.
 
 ## Learn more
 
-See [`labs/platform-engineering/platform-and-developer-helm-charts-llm.md`](../../labs/platform-engineering/platform-and-developer-helm-charts-llm.md)
-for a full walkthrough: onboarding two teams at two tiers, proving teams
-cannot escape their tier or prefix, re-tiering with a one-line values change,
-and turning on JWT for every team at once. For the MCP path — self-serving an
-MCP endpoint and budgeting tool calls by tier — see
-[`labs/platform-engineering/platform-and-developer-helm-charts-mcp.md`](../../labs/platform-engineering/platform-and-developer-helm-charts-mcp.md).
+See [`labs/platform-engineering/platform-and-developer-helm-charts-mcp.md`](../../labs/platform-engineering/platform-and-developer-helm-charts-mcp.md)
+for a full walkthrough: onboarding a team, self-serving an MCP endpoint,
+budgeting tool calls by tier, proving teams cannot escape their tier or
+prefix (including a cross-namespace hijack attempt), re-tiering with a
+one-line values change, and turning on JWT for every team at once.

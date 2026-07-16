@@ -1,5 +1,9 @@
 # Changelog
 
+0.12.1 - (7-16-26)
+---
+- Refactor labs at `labs/platform-engineering` based on internal feedback
+
 0.12.0 - (7-15-26)
 ---
 - Add `labs/platform-engineering/` category: platform/developer separation of concerns via two Helm charts

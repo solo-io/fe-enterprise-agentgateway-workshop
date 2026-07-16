@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["grants"],
+  "properties": {
+    "global": {"type": "object"},
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "gatewayClassName": {"type": "string"},
+        "listeners": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "http": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {"port": {"type": "integer"}}
+            }
+          }
+        }
+      }
+    },
+    "proxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "replicas": {"type": "integer", "minimum": 1},
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"type": {"enum": ["LoadBalancer", "ClusterIP", "NodePort"]}}
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "logging": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {"level": {"enum": ["info", "debug", "warn", "error"]}}
+        },
+        "accessLog": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "attributes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "expression"],
+                "properties": {
+                  "name": {"type": "string"},
+                  "expression": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "modelCatalog": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["alias", "provider", "model"],
+        "properties": {
+          "alias": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", "maxLength": 57},
+          "provider": {"enum": ["openai", "anthropic", "bedrock", "vertexai", "azureopenai"]},
+          "model": {"type": "string"},
+          "host": {"type": "string"},
+          "port": {"type": "integer"},
+          "apiPath": {"type": "string"},
+          "auth": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {"secretRef": {"type": "string"}}
+          }
+        }
+      }
+    },
+    "grants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["team", "key", "aliases", "tokensPerMinute"],
+        "properties": {
+          "team": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", "maxLength": 45},
+          "key": {"type": "string", "minLength": 8},
+          "aliases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string"}
+          },
+          "tokensPerMinute": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  }
+}

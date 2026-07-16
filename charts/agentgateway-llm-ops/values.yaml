@@ -1,0 +1,80 @@
+# -- Gateway owned by the platform team. All resources render into the release namespace.
+#    Set to `null` (along with leaving modelCatalog unset) for a "grant-only" release: a
+#    team-scoped install that renders ONLY that team's API-key Secret, its per-team
+#    token-budget RateLimitConfig, and one budget policy per granted alias -- no Gateway,
+#    no parameters, no observability, no catalog. Grant-only releases target a platform-owned infra
+#    release's alias routes (llm-<alias>) by name, so they need no gateway reference at
+#    all; they must land in the same namespace as that infra release. Example:
+#
+#      gateway: null   # grant-only release: null out the chart's default infra;
+#                      # this release carries only the grant
+#
+#      grants:
+#        - team: team-gamma
+#          key: gamma-secret-key
+#          aliases:
+#            - chat-real
+#          tokensPerMinute: 2000
+#
+#    WARNING: `gateway: null` is required, not optional -- a values file with only
+#    `grants:` makes helm merge this default gateway block back in, rendering a second
+#    Gateway/parameters/access-log set that fails with AlreadyExists next to an
+#    existing infra release.
+#
+#    Because a grant-only release doesn't render modelCatalog, it cannot validate its
+#    aliases against a catalog -- an alias with no matching infra-mode catalog entry is
+#    not an error; the resulting alias label is just inert until an infra release with
+#    that alias in its catalog shows up in the same namespace.
+gateway:
+  name: agw-llm-ops
+  gatewayClassName: enterprise-agentgateway
+  listeners:
+    http:
+      port: 8080
+
+# -- Proxy fleet shape (rendered as EnterpriseAgentgatewayParameters <gateway.name>-config)
+proxy:
+  replicas: 2
+  service:
+    type: LoadBalancer
+
+observability:
+  # -- Proxy log level (info|debug|warn|error)
+  logging:
+    level: info
+  accessLog:
+    enabled: true
+    # -- Extra attributes recorded on every access log entry (CEL expressions)
+    attributes:
+      - name: llm.streaming
+        expression: llm.streaming
+
+# -- Model catalog: the aliases the platform operates. Each alias becomes a stable
+#    endpoint /llm/<alias> backed by a platform-managed provider and model.
+#    Teams never see the provider, the model, or the credentials behind an alias,
+#    so the platform can swap any of them without any team changing anything.
+modelCatalog: []
+#  - alias: chat-mock          # LLM-shaped endpoint for tests/CI; no provider cost
+#    provider: openai
+#    model: mock-model
+#    host: mock-model-svc.agentgateway-system.svc.cluster.local
+#    port: 8000
+#    apiPath: /v1/chat/completions
+#  - alias: chat-real          # real completions; provider is a platform decision
+#    provider: openai
+#    model: gpt-4o-mini
+#    auth:
+#      secretRef: openai-secret   # platform-held provider credential (pre-created Secret)
+
+# -- Grants: which team may call which aliases, at what token budget.
+#    Each entry mints the team's API key Secret, adds it to the key set of every
+#    granted alias, and sets the team's tokens-per-minute budget.
+#    Keys are inline for workshop use; production platforms source them from an
+#    external secret manager (e.g. External Secrets Operator).
+grants: []
+#  - team: team-alpha
+#    key: alpha-key-8f3a
+#    aliases:
+#      - chat-real
+#      - chat-mock
+#    tokensPerMinute: 1000
