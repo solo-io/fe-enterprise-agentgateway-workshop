@@ -302,6 +302,27 @@ enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/team-alpha-chat   T
 
 The chart stamped `team: team-alpha` on the route, and that label is what makes the platform's parent route pick this child up. The child route matches `/teams/team-alpha/chat` because the developer chart prepended the platform-owned `/teams/team-alpha` prefix to the team's `/chat`; the team typed only `/chat`.
 
+### Verify team alpha's endpoint
+
+Before team beta joins, confirm team alpha's endpoint actually works end-to-end. Give the proxy a few seconds to program the new route, then call it:
+
+```bash
+sleep 10
+curl -s -o /dev/null -w "team-alpha chat: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-alpha/chat" \
+  -H "content-type: application/json" \
+  -d '{"model":"mock-gpt-4o","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
+```
+
+Expected output:
+
+```
+team-alpha chat: 200
+```
+
+The request flowed `Gateway agw-platform → parent route team-team-alpha (/teams/team-alpha) → delegates to child team-alpha-chat (/teams/team-alpha/chat) → backend`.
+
+> **What team alpha did NOT configure.** The team set a team name and one endpoint. It did **not** set a rate limit, a JWT policy, a WAF rule, an access-log format, or a timeout. The platform attaches all of those to the parent route, and this child inherits them. The team could not have set them if it wanted to; the chart has no field for them.
+
 ### Team beta configures a route to real OpenAI
 
 Team beta's endpoint needs no in-namespace backend at all: `provider: openai` with no `host` override sends traffic straight to OpenAI's real API instead of a self-hosted or mock serving the OpenAI spec as in the previous example. Create the namespace and an OpenAI credentials secret in it:
@@ -339,27 +360,6 @@ helm install team-beta charts/agentgateway-developer \
   --values team-beta-values.yaml
 ```
 
-### Call the endpoints
-
-Give the proxy a few seconds to program the new routes, then call team alpha's endpoint:
-
-```bash
-sleep 10
-curl -s -o /dev/null -w "team-alpha chat: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-alpha/chat" \
-  -H "content-type: application/json" \
-  -d '{"model":"mock-gpt-4o","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
-```
-
-Expected output:
-
-```
-team-alpha chat: 200
-```
-
-The request flowed `Gateway agw-platform → parent route team-team-alpha (/teams/team-alpha) → delegates to child team-alpha-chat (/teams/team-alpha/chat) → backend`.
-
-> **What team alpha did NOT configure.** The team set a team name and one endpoint. It did **not** set a rate limit, a JWT policy, a WAF rule, an access-log format, or a timeout. The platform attaches all of those to the parent route, and this child inherits them. The team could not have set them if it wanted to; the chart has no field for them.
-
 ---
 
 ## Step 3: Cost tiers in action
@@ -368,11 +368,7 @@ Team alpha is `gold`; team beta is `silver`. Neither team chose this; the platfo
 
 Each proxy replica enforces the tier budget as a **local** token limit, independently of the other replicas. Team alpha's mock backend reports a fixed input-token count for the test prompt (the gateway's access log shows `gen_ai.usage.input_tokens=10`); team beta's request goes to the real OpenAI API, which tokenizes the same prompt to a similarly small, real count. Either way, the limiter checks admission *before* it debits the request's cost, so `silver`'s 5-token/minute budget still admits the first request, which then overdraws the budget. The second request finds the budget negative and gets a `429`. `gold` (1000 tokens/minute) has plenty of headroom and sustains the same traffic.
 
-> **Note on timing and replicas:** Local token-limit enforcement can lag a few seconds after install, so wait about 12 seconds before the counted requests. Because the budget is per replica and the proxy runs 2 replicas, which `silver` request draws the first `429` depends on which replica served each one. If `beta-2` below still returns `200`, send one more request and it will be `429`.
-
 ```bash
-sleep 12
-
 echo "== team-alpha (gold) =="
 for i in 1 2; do
   curl -s -o /dev/null -w "alpha-$i: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-alpha/chat" \
@@ -485,7 +481,6 @@ spec:
           kind: EnterpriseAgentgatewayBackend
 EOF
 
-sleep 5
 curl -s -o /dev/null -w "cross-namespace hijack: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-alpha/hijack" \
   -H "content-type: application/json" \
   -d '{"model":"mock-gpt-4o","messages":[{"role":"user","content":"hi"}]}'
@@ -573,7 +568,6 @@ silver
 Give the new budget a few seconds to propagate, then send the same pair of requests to team alpha:
 
 ```bash
-sleep 8
 for i in 1 2; do
   curl -s -o /dev/null -w "alpha-silver-$i: %{http_code}\n" "http://${GATEWAY_IP}:8080/teams/team-alpha/chat" \
     -H "content-type: application/json" \
@@ -683,11 +677,10 @@ NAME               ACCEPTED   ATTACHED   AGE
 agw-platform-jwt   True       True       2s
 ```
 
-Export the demo token and give the policy a few seconds to program:
+Export the demo token:
 
 ```bash
 export DEV_TOKEN_1="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw"
-sleep 8
 ```
 
 Call team alpha's endpoint **without** a token; the gateway now rejects it:
