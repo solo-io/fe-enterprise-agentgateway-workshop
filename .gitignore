@@ -49,3 +49,6 @@ docs/
 
 # Migration scripts (one-shot, kept locally)
 scripts/
+
+# Diagram HTML sources (rendered PNGs are committed instead)
+images/platform-engineering/src/
