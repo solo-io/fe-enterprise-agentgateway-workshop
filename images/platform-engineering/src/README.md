@@ -19,4 +19,4 @@ Render at 2x using that height as the window height:
   "file://$PWD/centralized-llm-ops-architecture.html"
 ```
 
-Same two steps for `platform-and-developer-helm-charts-mcp-architecture.html`. Fonts (Figtree, DM Sans, JetBrains Mono) load from Google Fonts, so rendering needs network access.
+Same two steps for `platform-and-developer-helm-charts-mcp-architecture.html`. Fonts (Figtree, DM Sans, JetBrains Mono) load from Google Fonts, so rendering needs network access. `networking-architecture.html` renders at 1240px wide — use `--window-size=1240,...` in both commands for it.

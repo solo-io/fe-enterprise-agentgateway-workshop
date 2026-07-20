@@ -219,6 +219,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [MCP Endpoints, Delegated: Self-Service Within Guardrails](labs/platform-engineering/platform-and-developer-helm-charts-mcp.md) — MCP servers are team workloads, so teams self-serve their endpoints; a platform chart owns the gateway, cost tiers, security, and URL space, and teams structurally cannot escape their tier, their prefix, or weaken a control _(see also: Rate Limiting, Security, MCP)_
 - [LLM Access, Centralized: The Platform as Provider](labs/platform-engineering/centralized-llm-ops-helm-chart.md) — LLM backends are a vendor relationship, so the platform runs LLM consumption as an internal product: a model-alias catalog, per-team API keys and token budgets, one chart, no self-service
+- [Networking Architecture: Every Connection in a Single-Cluster Install](labs/platform-engineering/networking-architecture.md) — how the controller, proxies, extension services, and observability stack communicate: every port, protocol, and initiator, with a connection reference table for firewall and NetworkPolicy planning
 
 ---
 
