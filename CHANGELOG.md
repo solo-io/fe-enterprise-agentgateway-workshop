@@ -6,6 +6,7 @@
 - Update Solo UI to `0.5.0`
 - Update air-gapped install
 - Retarget `labs/upgrades/migrate-v2026.5.x-to-v2026.6.x.md` → `migrate-v2026.5.x-to-v2026.7.x.md`
+- Validate `labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md` end-to-end on v2026.7.0 and fold refresh-token grant testing into the flow (requires `offline_access` scope + Auth0 "Allow Offline Access")
 
 0.12.4 - (7-20-26)
 ---
