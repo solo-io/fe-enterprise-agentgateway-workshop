@@ -7,8 +7,6 @@ Most "give the agent one useful tool" stories actually require data from several
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
-Composable MCP is an **enterprise** feature that lives under `EnterpriseAgentgatewayBackend.spec.entMcp.targets[].custom`. It is present in Enterprise Agentgateway `v2026.6.3` (the version this workshop's `001` installs) — no special version bump is required to run this lab.
-
 ## Lab Objectives
 - Declare a composite MCP tool that fans out to distinct backends
 - Chain an MCP step and an HTTP step in the same composite tool

@@ -1,6 +1,6 @@
 # Image list for Enterprise Agentgateway
 
-**v2026.6.3**
+**v2026.7.0**
 
 ## Helm Charts
 
@@ -21,13 +21,13 @@ helm pull oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/ent
 ### controller
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2026.6.3
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/enterprise-agentgateway-controller:2026.7.0
 ```
 
 ### agentgateway proxy
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/agentgateway-enterprise:2026.6.3
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/agentgateway-enterprise:2026.7.0
 ```
 
 ### ext-cache (redis)
@@ -39,24 +39,24 @@ us-docker.pkg.dev/solo-public/enterprise-agentgateway/redis:8.6.4-alpine
 ### ext-auth-service
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/ext-auth-service:2026.6.3
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/ext-auth-service:2026.7.0
 ```
 
 ### rate-limiter
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/rate-limiter:2026.6.3
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/rate-limiter:2026.7.0
 ```
 
 ### waf-server
 
 ```bash
-us-docker.pkg.dev/solo-public/enterprise-agentgateway/waf-server:2026.6.3
+us-docker.pkg.dev/solo-public/enterprise-agentgateway/waf-server:2026.7.0
 ```
 
 ### Image list for Solo UI
 
-**0.4.5**
+**0.5.0**
 
 Helm chart:
 
@@ -67,8 +67,8 @@ oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management
 Images:
 
 ```bash
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-frontend:0.4.5
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-backend:0.4.5
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-frontend:0.5.0
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-backend:0.5.0
 us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-autoauth:v0.2.2
 docker.io/otel/opentelemetry-collector-contrib:0.153.0
 docker.io/clickhouse/clickhouse-server:26.1.11.9-alpine
@@ -85,7 +85,7 @@ global:
   #image:
   #  registry: my-registry.example.com
   #  repository: solo-enterprise
-  #  tag: "0.4.5"
+  #  tag: "0.5.0"
 clickhouse:
   #--- Image override for ClickHouse (embed registry in repository if using private registry) ---
   #image:

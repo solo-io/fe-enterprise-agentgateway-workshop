@@ -208,7 +208,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 > Strategies for upgrading Enterprise Agentgateway without dropping traffic.
 
-- [Migration Guide: v2026.5.x → v2026.6.x](labs/upgrades/migrate-v2026.5.x-to-v2026.6.x.md) — version-to-version deltas (image registry consolidation, Kubernetes floor), prerequisites, and the exact upgrade commands
+- [Migration Guide: v2026.5.x → v2026.7.x](labs/upgrades/migrate-v2026.5.x-to-v2026.7.x.md) — version-to-version deltas (image registry consolidation, Kubernetes floor, imagePullSecrets consolidation), prerequisites, and the exact upgrade commands
 - [In-Place Rolling Upgrades — Validate Zero Downtime](labs/upgrades/in-place-rolling-upgrades.md)
 - [Blue/Green Upgrades Across Namespaces](labs/upgrades/blue-green-namespaces.md)
 - [Multi-Cluster Upgrades](labs/upgrades/multi-cluster-upgrades.md) — upgrade a whole cluster while a peer serves the same global LLM over an ambient multicluster mesh
@@ -324,7 +324,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway v2026.6.3
+- Enterprise Agentgateway v2026.7.0
 
 
 ## User Stories / Acceptance Criteria

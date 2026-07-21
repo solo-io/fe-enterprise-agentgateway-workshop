@@ -1,5 +1,12 @@
 # Changelog
 
+0.12.5 - (7-21-26)
+---
+- Update Agentgateway version to `v2026.7.0`
+- Update Solo UI to `0.5.0`
+- Update air-gapped install
+- Retarget `labs/upgrades/migrate-v2026.5.x-to-v2026.6.x.md` → `migrate-v2026.5.x-to-v2026.7.x.md`
+
 0.12.4 - (7-20-26)
 ---
 - Add `labs/platform-engineering/networking-architecture.md`

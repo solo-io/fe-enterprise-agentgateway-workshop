@@ -51,7 +51,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.6.3
+export ENTERPRISE_AGW_VERSION=v2026.7.0
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -87,7 +87,7 @@ ratelimitconfigs                    rlc               ratelimit.solo.io/v1alpha1
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> The top-level Helm `image.registry` is the global default registry for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.6.x`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.4-alpine`). Mirror each image at the tag shown in the [image list](ably7-image-list.md).
+> The top-level Helm `image.registry` is the global default registry for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.7.0`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.4-alpine`). Mirror each image at the tag shown in the [image list](ably7-image-list.md). As of `v2026.7.0`, the top-level Helm `imagePullSecrets` is likewise the global default and propagates to the proxy and every extension automatically — no per-CR pull-secret overrides are needed unless a specific extension uses a different secret than the rest.
 
 Using Helm:
 ```bash
@@ -104,7 +104,7 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.p
 image:
   registry: docker.io/ably7
   pullPolicy: IfNotPresent
-# Controller-only pull secret (proxy/extensions need it on the CR — see next step):
+# Propagates to the controller, proxy, AND extensions automatically (v2026.7.0+):
 #imagePullSecrets:
 #- name: my-registry-secret
 # Extensions inherit image.registry; their tags are pinned by the chart.
@@ -162,31 +162,16 @@ spec:
       deployment:
         spec:
           replicas: 1
-          #--- Private registry: pull secret for the ext-auth-service pod ---
-          #template:
-          #  spec:
-          #    imagePullSecrets:
-          #    - name: my-registry-secret
     ratelimiter:
       enabled: true
       deployment:
         spec:
           replicas: 1
-          #--- Private registry: pull secret for the rate-limiter pod ---
-          #template:
-          #  spec:
-          #    imagePullSecrets:
-          #    - name: my-registry-secret
     extCache:
       enabled: true
       deployment:
         spec:
           replicas: 1
-          #--- Private registry: pull secret for the ext-cache (redis) pod ---
-          #template:
-          #  spec:
-          #    imagePullSecrets:
-          #    - name: my-registry-secret
 EOF
 ```
 
@@ -241,9 +226,6 @@ spec:
         #  labels:
         #    istio.io/dataplane-mode: ambient
         spec:
-          #--- Private registry: pull secret for the agentgateway proxy pod ---
-          #imagePullSecrets:
-          #- name: my-registry-secret
           containers:
           - name: agentgateway
             resources:
@@ -390,7 +372,7 @@ The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-teleme
 ### Set required variables
 
 ```bash
-export AGW_UI_VERSION=0.4.5
+export AGW_UI_VERSION=0.5.0
 ```
 
 ### Step 1: Install/upgrade CRDs
