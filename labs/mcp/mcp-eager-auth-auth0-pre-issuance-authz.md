@@ -4,7 +4,7 @@
 
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
-> ⚠ This lab requires enterprise-agentgateway **`v2026.5.x` or newer**. The `pre_issuance` field in `KGW_OAUTH_ISSUER_CONFIG` does not exist on earlier controllers, and `source.principal` is not populated on pre-issuance Checks before that version.
+> ⚠ This lab requires enterprise-agentgateway **`v2026.7.0` or newer** — needed for the refresh token grant tested in Step 10.
 
 This lab uses the same gateway hostname (`mcp-auth0.glootest.com`) as [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md). The two labs cannot run concurrently — clean up the other lab before starting this one. The Okta labs use `mcp-okta.glootest.com` and do not collide.
 
@@ -20,6 +20,8 @@ You need a registered application in Auth0 (Regular Web Application) with the **
 | `AUTH0_CLIENT_SECRET` | Client secret of the Auth0 application |
 | `AUTH0_AUDIENCE` | Auth0 API audience the JWT must carry |
 | `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-auth0.glootest.com` |
+
+> **Required:** this lab requests the `offline_access` scope so it can also test the refresh token grant. The Auth0 API behind `AUTH0_AUDIENCE` needs **Allow Offline Access** enabled — Auth0 Dashboard → Applications → APIs → *your API* → Settings → Access Settings → toggle "Allow Offline Access" → Save. Without this, Auth0 silently strips the `offline_access` scope and never issues a `refresh_token` — no error, the token response just omits it.
 
 ### Auth0 app callback URLs
 
@@ -53,7 +55,7 @@ This lab demonstrates both the allow and deny paths of the pre-issuance hook, so
 - Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-auth0.glootest.com`
 - **Multiplex two MCP upstreams (in-cluster `server-everything` + remote `search.solo.io`) behind one `EnterpriseAgentgatewayBackend`**
 - **Gate OAuth token issuance with a pre-issuance ext_authz hook so only allowlisted Auth0 users receive a token — others are redirected to a configurable deny page**
-- **Test both allow and deny paths end-to-end with MCP Inspector**
+- **Test both allow and deny paths end-to-end with MCP Inspector, including redeeming a `refresh_token` to renew an access token without a repeat interactive login**
 
 ---
 
@@ -121,6 +123,7 @@ The hook integrates with the existing `ably7/grpc-ext-authz` image in `AUTH_MODE
 - **Multiplexed MCP backend**: one `EnterpriseAgentgatewayBackend` fronts two upstreams — an in-cluster `server-everything` and the remote `search.solo.io` — letting one OAuth-protected MCP endpoint expose tools from both
 - **Pre-issuance ext_authz hook**: `KGW_OAUTH_ISSUER_CONFIG.pre_issuance` calls a gRPC service between Auth0 callback and gateway-issued token; allowlists by Auth0 `sub` via `source.principal`; on deny the browser is redirected to `denied_redirect`
 - **Frontend TLS termination**: HTTPS listener on `agentgateway-proxy` for `mcp-auth0.glootest.com` (recap)
+- **Refresh token grant**: `/oauth-issuer/token` accepts `grant_type=refresh_token` and forwards it to Auth0 as a stateless passthrough, letting a client renew its access token without a repeat browser login
 
 ---
 
@@ -444,7 +447,7 @@ controller:
           "authorize_url": "${AUTH0_ISSUER}authorize",
           "token_url": "${AUTH0_ISSUER}oauth/token",
           "redirect_uri": "https://${AUTH0_GATEWAY_HOST}/oauth-issuer/callback/downstream",
-          "scopes": ["openid", "profile", "email"]
+          "scopes": ["openid", "profile", "email", "offline_access"]
         },
         "pre_issuance": {
           "enabled": true,
@@ -469,6 +472,7 @@ What each setting does:
 | `gateway_config.base_url` | Public URL clients use to reach the gateway's AS endpoints (must include `/oauth-issuer`) |
 | `client_config.clients` | Pre-registered `client_id`/`client_secret` table — `/oauth-issuer/register` returns one of these |
 | `downstream_server` | Credentials and URLs for the gateway to talk to Auth0 during the authorization code flow; `redirect_uri` must match an entry in the Auth0 app's "Allowed Callback URLs" |
+| **`downstream_server.scopes` includes `offline_access`** | Tells Auth0 to also issue a `refresh_token` alongside the access token, so the OAuth flow can be redeemed for a fresh access token later without a repeat browser login (tested in Step 10). Requires "Allow Offline Access" enabled on the Auth0 API — see the Auth0 requirements section. |
 | **`pre_issuance.enabled: true`** | Turns the pre-issuance hook on. When `false` (or absent), the controller skips the gRPC Check entirely. |
 | **`pre_issuance.grpc.target`** | Cluster DNS + port of the gRPC ext_authz Service. This Service is created in Step 7 — until then, the controller's dial attempts will fail. Combined with `failure_policy: closed` below, that means OAuth flows attempted between Step 5 and Step 7 will fail with a 400 — that's expected. |
 | **`pre_issuance.grpc.insecure_disable_tls`** | Talk to the ext_authz Service over plain HTTP/2 (cleartext gRPC). Production deployments should run the ext_authz Service with TLS and remove this flag. |
@@ -665,7 +669,7 @@ stringData:
   client_id: "${AUTH0_CLIENT_ID}"
   client_secret: "${AUTH0_CLIENT_SECRET}"
   mcp_resource: "/mcp"
-  scopes: "openid profile email"
+  scopes: "openid profile email offline_access"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -925,6 +929,68 @@ In the Inspector left panel, click **Tools → List Tools**. You should see tool
 
 Call one tool from each upstream — for example, `everything/echo` with a test string, and any `soloio-docs` search tool — to prove the multiplexed path works post-auth. Both should return a tool result, not a 401.
 
+### Capture and redeem the refresh token
+
+Step 5 already requested the `offline_access` scope, so the token response Inspector just received includes a `refresh_token` alongside the access token. Open the **Auth** tab in Inspector and expand **Access Tokens** to see it:
+
+```json
+{
+  "access_token": "eyJhbGci...",
+  "id_token": "eyJhbGci...",
+  "token_type": "Bearer",
+  "expires_in": 86400,
+  "scope": "openid profile email offline_access",
+  "refresh_token": "6KYKcJur3ufa5jL4o6Xsh0xQL61X7OND5nECMyRH2zkyb"
+}
+```
+
+> If `refresh_token` is missing and `scope` doesn't include `offline_access`, the Auth0 API's "Allow Offline Access" setting is off — see the Auth0 requirements section. This fails silently: no error, Auth0 just omits the scope.
+
+Copy the `refresh_token` value and redeem it directly against the gateway's issuer — the refresh grant added in `v2026.7.0`:
+
+```bash
+curl -sk -X POST "https://${AUTH0_GATEWAY_HOST}/oauth-issuer/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=<paste the refresh_token here>" \
+  -d "client_id=${AUTH0_CLIENT_ID}" \
+  -d "client_secret=${AUTH0_CLIENT_SECRET}" | jq .
+```
+
+Expected output — a fresh `access_token` with the same scope, `HTTP 200`:
+
+```json
+{
+  "access_token": "eyJhbGci...",
+  "id_token": "eyJhbGci...",
+  "expires_in": 86400,
+  "scope": "openid profile email offline_access",
+  "token_type": "Bearer"
+}
+```
+
+Auth0's default configuration does not rotate refresh tokens, so no new `refresh_token` appears in this response — the same one can be redeemed again. If your tenant has Refresh Token Rotation enabled, expect a new `refresh_token` on every redemption and the old one to become invalid.
+
+Confirm the new access token actually works against the multiplexed backend:
+
+```bash
+NEW_TOKEN=$(curl -sk -X POST "https://${AUTH0_GATEWAY_HOST}/oauth-issuer/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token" \
+  -d "refresh_token=<paste the refresh_token here>" \
+  -d "client_id=${AUTH0_CLIENT_ID}" \
+  -d "client_secret=${AUTH0_CLIENT_SECRET}" | jq -r .access_token)
+
+curl -sk -X POST "https://${AUTH0_GATEWAY_HOST}/mcp" \
+  -H "Authorization: Bearer $NEW_TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"refresh-test","version":"1.0"}}}' \
+  -w "\nHTTP_STATUS:%{http_code}\n"
+```
+
+`HTTP_STATUS:200` with a populated `result.serverInfo` confirms the refreshed token authenticates against the gateway exactly like the original access token.
+
 ### What proves what
 
 | Observation in Inspector | What it proves |
@@ -933,6 +999,9 @@ Call one tool from each upstream — for example, `everything/echo` with a test 
 | Login completes and Inspector shows "Connected" | Pre-issuance hook ALLOWED the principal; the pre-registered `client_id`/`client_secret` matched the Auth0 app; fake-DCR worked |
 | Tool list renders without 401 and includes tools from **both** upstreams | Auth0-issued JWT validated against Auth0 JWKS; multiplexed `mcp-backend` is forwarding to both targets |
 | `kubectl logs` shows `ALLOWED` line | Pre-issuance hook fired and returned OK |
+| Access Tokens JSON includes `refresh_token` and `scope` contains `offline_access` | `offline_access` reached Auth0 and the API allows offline access |
+| `curl .../oauth-issuer/token` with `grant_type=refresh_token` returns `200` with a new `access_token` | The eager-OAuth issuer's refresh grant (`v2026.7.0`+) is live and forwarding correctly to Auth0 |
+| Refreshed access token authenticates against `/mcp` with `200` | The refreshed token is a fully valid Auth0-issued JWT, not just an opaque success response |
 
 ---
 
@@ -1026,8 +1095,9 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | `mcp-auth0.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
 | **Every login redirects to `https://example.com/no-access`** (or your custom deny page) | The Auth0 sub of the user you logged in as is not in `ALLOWED_PRINCIPALS`. This is the expected deny-path behavior — but if you meant to be on the allow path, the allowlist needs to be updated. | `kubectl logs -n agentgateway-system deployment/grpc-ext-authz --tail=20` — every Check prints one line including the `source.principal` it saw. Edit `ALLOWED_PRINCIPALS` per Step 7's BYO sub-section. |
 | **Inspector shows "failed to process downstream callback" 400 instead of redirecting** | The ext-authz pod is unreachable or timing out. With `failure_policy: closed`, gRPC dial/timeout errors do NOT trigger the deny redirect — the redirect only fires on an explicit `PERMISSION_DENIED`. | `kubectl get pods -n agentgateway-system -l app=grpc-ext-authz`; `kubectl get svc -n agentgateway-system grpc-ext-authz`; controller logs |
-| **`source.principal=""` in ext-authz logs** | The agentgateway controller is too old to populate `source.principal` on the pre-issuance Check | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].image}'` — verify the image tag is `v2026.5.x` or later |
 | **Inspector connects despite the user being absent from `ALLOWED_PRINCIPALS`** | `pre_issuance.enabled` is not actually true in `KGW_OAUTH_ISSUER_CONFIG` in the running controller | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].env[?(@.name=="KGW_OAUTH_ISSUER_CONFIG")].value}' \| jq .pre_issuance` |
+| **(Step 10) Token response has no `refresh_token`, `scope` omits `offline_access`, no error anywhere** | The Auth0 API behind `AUTH0_AUDIENCE` has "Allow Offline Access" disabled. Auth0 silently drops the scope instead of erroring | Auth0 Dashboard → Applications → APIs → *your API* → Settings → Access Settings → enable "Allow Offline Access"; then **Clear OAuth State** in Inspector and reconnect |
+| **(Step 10) `curl .../oauth-issuer/token` with `grant_type=refresh_token` returns an error** | Controller is older than `v2026.7.0` — the refresh grant (PR #7537) isn't implemented yet | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].image}'` — verify the image tag is `v2026.7.0` or later |
 
 Useful commands:
 

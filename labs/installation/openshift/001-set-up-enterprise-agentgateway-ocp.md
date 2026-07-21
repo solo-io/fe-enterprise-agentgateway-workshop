@@ -49,7 +49,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.6.3
+export ENTERPRISE_AGW_VERSION=v2026.7.0
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -84,7 +84,7 @@ ratelimitconfigs.ratelimit.solo.io
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> The top-level Helm `image.registry` and `image.tag` are the global default for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, and `ext-cache`/`redis`). For a private-registry or air-gapped install, set `image.registry` to your mirror and ensure all images, extensions included, are mirrored there. See the [image list](../image-list.md) for the full set of charts and images to mirror, or the [air-gapped install guide](https://docs.solo.io/agentgateway/latest/install/airgap/) for more detail.
+> The top-level Helm `image.registry` and `image.tag` are the global default for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, and `ext-cache`/`redis`). For a private-registry or air-gapped install, set `image.registry` to your mirror and ensure all images, extensions included, are mirrored there. See the [image list](../image-list.md) for the full set of charts and images to mirror, or the [air-gapped install guide](https://docs.solo.io/agentgateway/latest/install/airgap/) for more detail. As of `v2026.7.0`, the top-level Helm `imagePullSecrets` is likewise the global default and propagates to the proxy and every extension automatically — no per-CR pull-secret overrides are needed unless a specific extension uses a different secret than the rest.
 
 Using Helm:
 ```bash
@@ -101,7 +101,7 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.p
 #image:
 #  registry: us-docker.pkg.dev/solo-public/enterprise-agentgateway
 #  pullPolicy: IfNotPresent
-# Controller-only pull secret (proxy/extensions need it on the CR — see next step):
+# Propagates to the controller, proxy, AND extensions automatically (v2026.7.0+):
 #imagePullSecrets:
 #- name: my-registry-secret
 # Extensions inherit image.registry; their tags are pinned by the chart.
@@ -161,7 +161,7 @@ spec:
           replicas: 1
           template:
             spec:
-              #--- Private registry: pull secret for the ext-auth-service pod ---
+              #--- Only needed to override with a secret different from the global one above ---
               #imagePullSecrets:
               #- name: my-registry-secret
               # Delete pod-level securityContext for OpenShift
@@ -179,7 +179,7 @@ spec:
           replicas: 1
           template:
             spec:
-              #--- Private registry: pull secret for the rate-limiter pod ---
+              #--- Only needed to override with a secret different from the global one above ---
               #imagePullSecrets:
               #- name: my-registry-secret
               # Delete pod-level securityContext for OpenShift
@@ -197,7 +197,7 @@ spec:
           replicas: 1
           template:
             spec:
-              #--- Private registry: pull secret for the ext-cache (redis) pod ---
+              #--- Only needed to override with a secret different from the global one above ---
               #imagePullSecrets:
               #- name: my-registry-secret
               # Delete pod-level securityContext for OpenShift
@@ -216,7 +216,7 @@ The configuration below shows the customizations exposed through `EnterpriseAgen
 
 This is the developer's slice: a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the settings the app team owns — deployment, service, logging, observability, and the proxy's OpenShift `securityContext` deletion — and omits `sharedExtensions`, which the operator set at the GatewayClass level in the previous step. The two resources merge, with this per-Gateway config layering on top of the class default. The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`.
 
-For air-gapped or private-registry installs, set the registry once at the Helm chart level with the global `image.registry` value shown in the controller install step above — as of `v2026.6.1` that value flows through to the proxy and all extension images automatically, so no per-image overrides are needed here. (If a single extension ever needs a different registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` supports a highest-precedence `spec.sharedExtensions.<name>.image` override.)
+For air-gapped or private-registry installs, set the registry once at the Helm chart level with the global `image.registry` value shown in the controller install step above — as of `v2026.6.1` that value flows through to the proxy and all extension images automatically, so no per-image overrides are needed here. As of `v2026.7.0`, the same is true for pull secrets: the top-level Helm `imagePullSecrets` propagates to the proxy and every extension automatically, so the per-CR `imagePullSecrets` overrides above are only needed if an extension uses a different secret than the rest. (If a single extension ever needs a different registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` supports a highest-precedence `spec.sharedExtensions.<name>.image` override.)
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -237,7 +237,7 @@ spec:
         #  labels:
         #    istio.io/dataplane-mode: ambient
         spec:
-          #--- Private registry: pull secret for the agentgateway proxy pod ---
+          #--- Only needed to override with a secret different from the global one above ---
           #imagePullSecrets:
           #- name: my-registry-secret
           # Delete pod-level securityContext

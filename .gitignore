@@ -44,11 +44,17 @@ node_modules/
 tmp/
 temp/
 
+# Playwright MCP session artifacts
+.playwright-mcp/
+
 # Superpowers docs
 docs/
 
 # Migration scripts (one-shot, kept locally)
 scripts/
+
+# Claude Code skills (internal tooling, kept locally)
+.claude/skills/
 
 # Diagram HTML sources (rendered PNGs are committed instead)
 images/platform-engineering/src/

@@ -57,7 +57,7 @@ export KUBECONTEXT_CLUSTER2=cluster2
 export MESH_NAME_CLUSTER1=cluster1
 export MESH_NAME_CLUSTER2=cluster2
 export ISTIO_VERSION=1.30.0
-export ENTERPRISE_AGW_VERSION=v2026.6.3
+export ENTERPRISE_AGW_VERSION=v2026.7.0
 : "${SOLO_TRIAL_LICENSE_KEY:?export your Solo license key first}"
 ```
 
