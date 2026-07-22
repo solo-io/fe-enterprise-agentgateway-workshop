@@ -1,5 +1,13 @@
 # Changelog
 
+0.12.7 - (7-22-26)
+---
+- Merge `labs/routing/routing-header-matching.md`, `routing-path-per-model.md`, and `routing-query-parameter-matching.md` into `labs/routing/routing-match-types.md`
+- Update `README.md` and `tracks/llm-track.md` to point at the consolidated routing-match-types lab
+- Merge `labs/rate-limiting/request-based-rate-limiting.md` into `labs/rate-limiting/global-token-rate-limiting.md` as a REQUEST-vs-TOKEN section, and rename it to `labs/rate-limiting/global-rate-limiting.md`
+- Update `README.md` and `tracks/llm-track.md` to drop the standalone request-based-rate-limiting link and point at the renamed global-rate-limiting lab
+- Merge `labs/installation/airgap/ably7-image-list.md` into `labs/installation/image-list.md` as an "Air-Gap Mirror Reference" section
+
 0.12.6 - (7-22-26)
 ---
 - Merge `labs/mcp/dynamic-mcp.md` into `labs/mcp/in-cluster-mcp.md`

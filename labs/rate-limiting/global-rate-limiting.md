@@ -1,4 +1,4 @@
-# Configure Input Token Based Rate Limiting
+# Configure Global Rate Limiting (Request-Based & Token-Based)
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -6,9 +6,10 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
 - Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Configure a global REQUEST-based rate limit using a simple per-call counter
 - Create an initial RateLimitConfig to implement token-based rate limiting (input tokens) using a shared global counter
 - Use CEL expressions to key rate limits on request headers, JWT claims, client IP, and plan tiers
-- Validate token-based rate limiting and per-user isolation
+- Validate rate limiting and per-user isolation
 
 Create openai api-key secret
 ```bash
@@ -74,6 +75,83 @@ curl -i "$GATEWAY_IP:8080/openai" \
       }
     ]
   }'
+```
+
+## REQUEST vs TOKEN: two rate limit types
+
+`RateLimitConfig.spec.raw.rateLimits[].type` controls what the gateway actually counts against the budget:
+- `type: REQUEST` — a simple per-call counter. Every request costs 1 unit regardless of prompt size — good for a basic call-volume cap (e.g. "5 requests per hour").
+- `type: TOKEN` — the gateway parses the LLM request (and response, where applicable) to count input tokens, so a long prompt consumes more of the budget than a short one — good for cost-based quotas.
+
+Both types share the same `RateLimitConfig`/`EnterpriseAgentgatewayPolicy` shape; only the `type` field (and what gets weighed against the counter) differs. The rest of this lab uses `type: TOKEN`, but REQUEST is worth seeing on its own first since it's the simpler of the two.
+
+### Configure a global REQUEST-based rate limit of 5 requests per hour
+
+Create rate limit config:
+```bash
+kubectl apply -f- <<EOF
+apiVersion: ratelimit.solo.io/v1alpha1
+kind: RateLimitConfig
+metadata:
+  name: global-request-rate-limit
+  namespace: agentgateway-system
+spec:
+  raw:
+    descriptors:
+    - key: generic_key
+      value: counter
+      rateLimit:
+        requestsPerUnit: 5
+        unit: HOUR
+    rateLimits:
+    - actions:
+      - genericKey:
+          descriptorValue: counter
+      type: REQUEST
+EOF
+```
+
+Create an `EnterpriseAgentgatewayPolicy` referencing the rate limit config we just created:
+```bash
+kubectl apply -f- <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: global-request-rate-limit
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - name: agentgateway-proxy
+      group: gateway.networking.k8s.io
+      kind: Gateway
+  traffic:
+    entRateLimit:
+      global:
+        rateLimitConfigRefs:
+        - name: global-request-rate-limit
+EOF
+```
+
+## curl openai
+```bash
+curl -i "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+You should be rate limited on the 6th request to the LLM, regardless of how short or long each prompt was — REQUEST counts calls, not tokens.
+
+Before moving on to the token-based examples below, clean up the REQUEST-based config and policy:
+```bash
+kubectl delete rlc -n agentgateway-system global-request-rate-limit
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system global-request-rate-limit
 ```
 
 ## CEL actions and the descriptor model
