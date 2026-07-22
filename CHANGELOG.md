@@ -5,6 +5,8 @@
 - Merge `labs/mcp/dynamic-mcp.md` into `labs/mcp/in-cluster-mcp.md`
 - Update `README.md`, `tracks/mcp-track.md`, and `labs/mcp/mcp-tool-federation.md` to drop the now-gone standalone Dynamic MCP link
 - Standardize MCP Service `appProtocol` on `agentgateway.dev/mcp` repo-wide
+- Drop remaining SSE references: `remote-mcp.md`, `openapi-to-mcp-external-api.md`, `openapi-to-mcp-in-cluster.md`, `charts/agentgateway-developer/values.yaml`
+- Swap `mcp-byo-grpc-ext-authz.md`'s live `protocol: SSE` backend for `mcp-server-everything` over `StreamableHTTP`
 
 0.12.5 - (7-21-26)
 ---

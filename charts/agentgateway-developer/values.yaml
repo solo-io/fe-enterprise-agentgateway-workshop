@@ -12,4 +12,4 @@ endpoints: []
 #      - name: github
 #        host: github-mcp.team-alpha.svc.cluster.local
 #        port: 8080
-#        protocol: StreamableHTTP   # optional: StreamableHTTP | SSE
+#        protocol: StreamableHTTP

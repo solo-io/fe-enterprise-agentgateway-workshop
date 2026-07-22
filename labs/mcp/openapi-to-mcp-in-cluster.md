@@ -24,12 +24,12 @@ Most enterprises already run dozens of internal REST APIs described by OpenAPI s
 
 ### `entMcp` vs `mcp`
 
-The other MCP labs in this workshop use `spec.mcp`, which only speaks to upstreams that are already MCP servers (`StreamableHTTP` or `SSE`). OpenAPI-to-MCP is an **enterprise** feature, so it lives under `spec.entMcp`, which is a superset that adds the `OpenAPI` protocol:
+The other MCP labs in this workshop use `spec.mcp`, which only speaks to upstreams that are already MCP servers (`StreamableHTTP`). OpenAPI-to-MCP is an **enterprise** feature, so it lives under `spec.entMcp`, which is a superset that adds the `OpenAPI` protocol:
 
 | Backend field | Supported protocols |
 |---|---|
-| `spec.mcp` (OSS) | `StreamableHTTP`, `SSE` |
-| `spec.entMcp` (enterprise) | `StreamableHTTP`, `SSE`, **`OpenAPI`** |
+| `spec.mcp` (OSS) | `StreamableHTTP` |
+| `spec.entMcp` (enterprise) | `StreamableHTTP`, **`OpenAPI`** |
 
 When `protocol: OpenAPI` is set, you must also provide `openAPI.schemaRef`, which points at a ConfigMap containing the OpenAPI 3.0 **JSON** schema under a `data.schema` key.
 
@@ -267,7 +267,7 @@ Review the following table to understand this configuration.
 
 | Setting | Description |
 |---|---|
-| `entMcp` | The enterprise MCP backend type, which supports the `OpenAPI`, `StreamableHTTP`, and `SSE` protocols. |
+| `entMcp` | The enterprise MCP backend type, which supports the `OpenAPI` and `StreamableHTTP` protocols. |
 | `targets[].static.protocol` | Set to `OpenAPI` to expose REST API operations as MCP tools. |
 | `targets[].static.host` / `port` | The in-cluster service, addressed as `<service>.<namespace>.svc.cluster.local` on its plain-HTTP port `12111`. No TLS origination is needed. |
 | `targets[].static.openAPI.schemaRef.name` | The ConfigMap that holds the OpenAPI 3.0 JSON schema. The ConfigMap must have a `data.schema` key. |
