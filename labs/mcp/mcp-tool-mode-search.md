@@ -107,7 +107,7 @@ spec:
     - name: mcp-http
       port: 8080
       targetPort: 3001
-      appProtocol: kgateway.dev/mcp
+      appProtocol: agentgateway.dev/mcp
 EOF
 ```
 
@@ -553,7 +553,7 @@ metadata:
   labels: { app: mcp-stub }
 spec:
   selector: { app: mcp-stub }
-  ports: [{ port: 8080, targetPort: 8000, name: http, appProtocol: kgateway.dev/mcp }]
+  ports: [{ port: 8080, targetPort: 8000, name: http, appProtocol: agentgateway.dev/mcp }]
 EOF
 
 kubectl rollout status deployment/mcp-stub -n mcp --timeout=60s

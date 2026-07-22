@@ -48,9 +48,8 @@ After completing this track you should be able to:
 
 | Lab | What you'll learn |
 |---|---|
-| [In-Cluster MCP](../labs/mcp/in-cluster-mcp.md) | Route agent traffic to an MCP server running inside the Kubernetes cluster |
+| [In-Cluster MCP](../labs/mcp/in-cluster-mcp.md) | Route agent traffic to an MCP server running inside the Kubernetes cluster, from a static backend to label-selector-based dynamic discovery |
 | [Remote MCP](../labs/mcp/remote-mcp.md) | Proxy agent traffic to an MCP server running outside the cluster |
-| [Dynamic MCP](../labs/mcp/dynamic-mcp.md) | Use label selectors to automatically pick up new MCP backend pods — no backend edits needed at scale |
 
 ---
 

@@ -98,7 +98,7 @@ spec:
     - name: mcp-http
       port: 8080
       targetPort: 3001
-      appProtocol: kgateway.dev/mcp
+      appProtocol: agentgateway.dev/mcp
 EOF
 ```
 
