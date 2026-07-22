@@ -28,7 +28,7 @@
                 "name": {"type": "string"},
                 "host": {"type": "string"},
                 "port": {"type": "integer"},
-                "protocol": {"enum": ["StreamableHTTP", "SSE"]}
+                "protocol": {"enum": ["StreamableHTTP"]}
               }
             }
           }

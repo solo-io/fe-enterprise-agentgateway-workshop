@@ -65,12 +65,12 @@ def test_mcp_multiple_targets():
                   "endpoints[0].targets[1].name=github",
                   "endpoints[0].targets[1].host=github-mcp.team-alpha.svc.cluster.local",
                   "endpoints[0].targets[1].port=9090",
-                  "endpoints[0].targets[1].protocol=SSE")
+                  "endpoints[0].targets[1].protocol=StreamableHTTP")
     be = by_kind(docs, "EnterpriseAgentgatewayBackend")[0]
     targets = be["spec"]["entMcp"]["targets"]
     assert len(targets) == 2
     assert targets[0]["name"] == "arxiv"
-    assert targets[1]["name"] == "github" and targets[1]["static"]["protocol"] == "SSE"
+    assert targets[1]["name"] == "github" and targets[1]["static"]["protocol"] == "StreamableHTTP"
 
 def test_no_policy_kind_ever_rendered():
     # This chart no longer owns any traffic/frontend policy, and (post-strip) no

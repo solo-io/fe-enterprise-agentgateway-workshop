@@ -23,7 +23,7 @@ Additional requirements:
 
 ### Why federation?
 
-The MCP labs you've worked through so far ([In-Cluster MCP](in-cluster-mcp.md), [Dynamic MCP](dynamic-mcp.md)) each route to a single backend. In a real platform, you'll have many MCP servers — domain-specific, language-specific, or owned by different teams — and consumers want **one endpoint** that aggregates them all, **one auth policy** that gates them all, and **one observability surface** that attributes traffic across them all.
+The MCP labs you've worked through so far ([In-Cluster MCP](in-cluster-mcp.md)) each route to a single backend. In a real platform, you'll have many MCP servers — domain-specific, language-specific, or owned by different teams — and consumers want **one endpoint** that aggregates them all, **one auth policy** that gates them all, and **one observability surface** that attributes traffic across them all.
 
 A **multiplexed** (a.k.a. "Virtual MCP") backend does exactly that: one `EnterpriseAgentgatewayBackend` with multiple `spec.mcp.targets`. Clients open one MCP connection and see the union of every backend's tools. The gateway prefixes tool names so they don't collide and uses the prefix to route `tools/call` back to the right backend.
 
@@ -99,7 +99,7 @@ kubectl create secret generic bls-api-key --namespace mcp \
 
 ## Step 2: Deploy the four MCP servers
 
-Each Service is labeled `app=mcp-<name>` — that's the label the federated backend will select on. The `appProtocol: kgateway.dev/mcp` tells AgentGateway to speak MCP to the upstream.
+Each Service is labeled `app=mcp-<name>` — that's the label the federated backend will select on. The `appProtocol: agentgateway.dev/mcp` tells AgentGateway to speak MCP to the upstream.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -138,7 +138,7 @@ spec:
   ports:
   - port: 80
     targetPort: 8000
-    appProtocol: kgateway.dev/mcp
+    appProtocol: agentgateway.dev/mcp
 ---
 # ─── fred (Federal Reserve Economic Data, Node) ──────────────────────
 apiVersion: apps/v1
@@ -181,7 +181,7 @@ spec:
   ports:
   - port: 80
     targetPort: 3000
-    appProtocol: kgateway.dev/mcp
+    appProtocol: agentgateway.dev/mcp
 ---
 # ─── sec-edgar (SEC filings + XBRL, Python) ──────────────────────────
 apiVersion: apps/v1
@@ -221,7 +221,7 @@ spec:
   ports:
   - port: 80
     targetPort: 9870
-    appProtocol: kgateway.dev/mcp
+    appProtocol: agentgateway.dev/mcp
 ---
 # ─── bls (U.S. Bureau of Labor Statistics, Node) ─────────────────────
 apiVersion: apps/v1
@@ -265,7 +265,7 @@ spec:
   ports:
   - port: 80
     targetPort: 3000
-    appProtocol: kgateway.dev/mcp
+    appProtocol: agentgateway.dev/mcp
 EOF
 ```
 

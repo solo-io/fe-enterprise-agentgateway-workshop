@@ -100,36 +100,57 @@ kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mcp-website-fetcher
+  name: mcp-server-everything
   namespace: mcp
+  labels:
+    app: mcp-server-everything
 spec:
+  replicas: 1
   selector:
     matchLabels:
-      app: mcp-website-fetcher
+      app: mcp-server-everything
   template:
     metadata:
       labels:
-        app: mcp-website-fetcher
+        app: mcp-server-everything
     spec:
       containers:
-      - name: mcp-website-fetcher
-        image: ghcr.io/peterj/mcp-website-fetcher:main
-        imagePullPolicy: Always
+        - name: mcp-everything
+          image: node:20-alpine
+          command:
+            - sh
+            - -c
+            - |
+              export NODE_OPTIONS="--max-old-space-size=10240 --max-semi-space-size=64"
+              npx -y @modelcontextprotocol/server-everything streamableHttp
+          ports:
+            - name: mcp-http
+              containerPort: 3001
+          env:
+            - name: PORT
+              value: "3001"
+          readinessProbe:
+            tcpSocket:
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mcp-website-fetcher
+  name: mcp-server-everything
   namespace: mcp
   labels:
-    app: mcp-website-fetcher
+    app: mcp-server-everything
 spec:
   selector:
-    app: mcp-website-fetcher
+    app: mcp-server-everything
   ports:
-  - port: 80
-    targetPort: 8000
-    appProtocol: agentgateway.dev/mcp
+    - name: mcp-http
+      port: 8080
+      targetPort: 3001
+      appProtocol: agentgateway.dev/mcp
 EOF
 ```
 
@@ -145,9 +166,9 @@ spec:
     targets:
     - name: mcp-target
       static:
-        host: mcp-website-fetcher.mcp.svc.cluster.local
-        port: 80
-        protocol: SSE
+        host: mcp-server-everything.mcp.svc.cluster.local
+        port: 8080
+        protocol: StreamableHTTP
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -167,7 +188,7 @@ EOF
 
 Wait for the MCP server to be ready
 ```bash
-kubectl rollout status deployment/mcp-website-fetcher -n mcp --timeout=60s
+kubectl rollout status deployment/mcp-server-everything -n mcp --timeout=60s
 ```
 
 ## Verify the MCP route works without ext-authz
@@ -197,7 +218,7 @@ curl -i "$GATEWAY_IP:8080/mcp" \
   }'
 ```
 
-You should get a response from the MCP server (or a valid SSE connection response).
+You should get a response from the MCP server.
 
 ## Create the ext-authz policy
 
@@ -270,6 +291,7 @@ Send the request again with the `x-ext-authz: allow` header.
 ```bash
 curl -i "$GATEWAY_IP:8080/mcp" \
   -H "content-type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "x-ext-authz: allow" \
   -d '{
     "jsonrpc": "2.0",
@@ -309,6 +331,6 @@ kubectl delete deployment -n agentgateway-system grpc-ext-authz
 kubectl delete service -n agentgateway-system grpc-ext-authz
 kubectl delete httproute -n agentgateway-system mcp
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend
-kubectl delete deployment -n mcp mcp-website-fetcher
-kubectl delete service -n mcp mcp-website-fetcher
+kubectl delete deployment -n mcp mcp-server-everything
+kubectl delete service -n mcp mcp-server-everything
 ```

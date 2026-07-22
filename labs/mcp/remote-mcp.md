@@ -73,7 +73,7 @@ EOF
 
 - `host: search.solo.io` - External MCP server hostname
 - `port: 443` - HTTPS port
-- `protocol: StreamableHTTP` - HTTP-based MCP protocol (not SSE)
+- `protocol: StreamableHTTP` - HTTP-based MCP protocol
 - `policies.tls: {}` - Enables TLS to the upstream server
 - `value: /mcp` - Custom path prefix for routing
 

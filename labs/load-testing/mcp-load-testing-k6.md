@@ -136,7 +136,7 @@ spec:
   - name: mcp-http
     port: 3000
     targetPort: 3000
-    appProtocol: kgateway.dev/mcp
+    appProtocol: agentgateway.dev/mcp
   type: ClusterIP
 EOF
 ```

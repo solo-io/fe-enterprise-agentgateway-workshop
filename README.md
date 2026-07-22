@@ -135,7 +135,6 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [In-Cluster MCP](labs/mcp/in-cluster-mcp.md)
 - [Remote MCP](labs/mcp/remote-mcp.md)
-- [Dynamic MCP](labs/mcp/dynamic-mcp.md)
 - [OpenAPI to MCP — External API](labs/mcp/openapi-to-mcp-external-api.md)
 - [OpenAPI to MCP — In-Cluster Deployment](labs/mcp/openapi-to-mcp-in-cluster.md)
 - [MCP Tool Federation](labs/mcp/mcp-tool-federation.md)

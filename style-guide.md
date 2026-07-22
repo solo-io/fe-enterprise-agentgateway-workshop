@@ -172,7 +172,7 @@ Standard verification tools:
   ```
 
   Plain `#` lines for explanatory comments; numbered `# 1.` / `# 2.` comment headers to structure multi-part cleanup blocks.
-- MCP Services: note there is `appProtocol` drift (`kgateway.dev/mcp` in newer labs vs `agentgateway.dev/mcp` in older ones) — match the lab family you're extending and verify against the current release. OpenAPI-protocol MCP backends must use the enterprise `spec.entMcp` (+ `openAPI.schemaRef`); OSS `spec.mcp` only supports `StreamableHTTP`/`SSE`.
+- MCP Services: use `appProtocol: agentgateway.dev/mcp` on the Service port — this is the standardized value across all labs (previously `kgateway.dev/mcp` also appeared; both worked, but the repo has since converged on `agentgateway.dev/mcp`). OpenAPI-protocol MCP backends must use the enterprise `spec.entMcp` (+ `openAPI.schemaRef`); OSS `spec.mcp` only supports `StreamableHTTP`/`SSE`.
 
 ## 9. Callouts, tables, diagrams, images
 
@@ -283,7 +283,7 @@ These exist in the corpus; new labs should follow the **normative** column.
 | `Expected output:` / `Expected Output:` / `Expected response:` | `Expected output:` |
 | `> **Note:**` blockquotes vs `> [!NOTE]` alerts | Bold-lead blockquotes; don't mix styles in one lab |
 | Cleanup with/without `--ignore-not-found` | Always `--ignore-not-found` |
-| `appProtocol: kgateway.dev/mcp` vs `agentgateway.dev/mcp` | Both verified working live on v2026.6.3 — match the lab family you extend. What actually breaks discovery is *omitting* `appProtocol`: a Service port without an MCP appProtocol is never picked up by selector-based backends (`mcp: no backends configured`) |
+| `appProtocol` value for MCP Services | `agentgateway.dev/mcp` (standardized repo-wide; verified working live on v2026.7.0). What actually breaks discovery is *omitting* `appProtocol`: a Service port without an MCP appProtocol is never picked up by selector-based backends (`mcp: no backends configured`) |
 | Three JWT identity systems (lib/jwt helper, static inline tokens, live Keycloak) | Prefer `lib/jwt/generate-jwt.sh` for static-identity labs, live IdP for OAuth labs; don't invent a new one |
 | `grafana/k6:latest` vs pinned | Pin the image version |
 | Lowercase `## curl openai` headings | Established quirk in routing labs; fine to keep within that family |
