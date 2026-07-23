@@ -66,7 +66,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | [Routing to AWS Bedrock via API Keys](../labs/routing/configure-routing-aws-bedrock-apikey.md) | AWS Bedrock |
 | [AWS Bedrock with IRSA](../labs/routing/configure-routing-aws-bedrock-irsa.md) | AWS Bedrock / EKS |
 | [Routing to Anthropic](../labs/routing/configure-routing-anthropic.md) | Anthropic |
-| [Routing to Azure OpenAI](../labs/routing/configure-routing-azure-openai.md) | Azure OpenAI |
+| [Routing to Azure OpenAI and Azure AI Foundry](../labs/routing/configure-routing-azure-openai.md) | Azure OpenAI / Azure AI Foundry |
 | [Routing to Google Vertex AI](../labs/routing/configure-routing-vertexai.md) | Google Vertex AI |
 | [Routing to Google Vertex AI via Service Account](../labs/routing/configure-routing-vertexai-service-account.md) | Google Vertex AI |
 
