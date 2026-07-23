@@ -1,20 +1,35 @@
-# Configure Fixed Path + Header Matching Routing Example
+# Configure Routing by Match Type
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
-- Configure LLM routing example with fixed-path + header match to access endpoint
-- Curl OpenAI endpoints through the agentgateway proxy
+- Configure an `EnterpriseAgentgatewayBackend` per model using the model override parameter
+- Configure LLM routing using three `HTTPRoute` match types: path, header, and query parameter
+- Curl OpenAI endpoints through the agentgateway proxy for each match type
 - Validate path to model mapping
 - Cleanup routes to start fresh for the next lab
 
-Create openai api-key secret if it has not been created already
+## Setup
+
+Create the OpenAI api-key secret if it has not been created already
 ```bash
 kubectl create secret generic openai-secret -n agentgateway-system \
 --from-literal="Authorization=Bearer $OPENAI_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
+
+Our default `EnterpriseAgentgatewayBackend` allows the user to specify any `model` parameter in the request body. To restrict access to specific models, configure a model override in the `EnterpriseAgentgatewayBackend`:
+```
+provider:
+  openai:
+    model: "gpt-4o-mini"
+```
+When a model override is configured, the gateway overrides any user-input `model` parameter in the request body (e.g. if the user supplies `model: gpt-5-2025-08-07`, the gateway overrides it to `gpt-4o-mini`).
+
+Create an `EnterpriseAgentgatewayBackend` per model for finer-grained control over which models clients can access.
+
+**When model overrides are specified, the client does not need to supply a `model` parameter in the request body, since the gateway injects it. A client-supplied model is accepted but overwritten.**
 
 Lets create an OpenAI `EnterpriseAgentgatewayBackend` per specific-model if you haven't already
 ```bash
@@ -70,9 +85,106 @@ spec:
 EOF
 ```
 
-### Configure LLM routing example with fixed path + header matching to access endpoints
+```bash
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+```
 
-Now we can configure a `HTTPRoute` that has a specific path-per-model endpoint using the same backends we used previously
+Each option below configures the same `openai` `HTTPRoute` with a different match type. Applying a later option's `HTTPRoute` replaces the previous one, so you can try them one at a time against the backends created above.
+
+## Option A: Path-per-Model Matching
+
+Configure an `HTTPRoute` that maps a specific path to each model:
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai/gpt-3.5-turbo
+      backendRefs:
+        - name: openai-gpt-3.5-turbo
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai/gpt-4o-mini
+      backendRefs:
+        - name: openai-gpt-4o-mini
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai/gpt-4o
+      backendRefs:
+        - name: openai-gpt-4o
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+EOF
+```
+
+curl each model's path:
+```bash
+curl -i "$GATEWAY_IP:8080/openai/gpt-3.5-turbo" \
+  -H "content-type: application/json" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+The response shows the model used: `gpt-3.5-turbo-0125`
+
+```bash
+curl -i "$GATEWAY_IP:8080/openai/gpt-4o-mini" \
+  -H "content-type: application/json" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+The response shows the model used: `gpt-4o-mini-2024-07-18`
+
+```bash
+curl -i "$GATEWAY_IP:8080/openai/gpt-4o" \
+  -H "content-type: application/json" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+The response shows the model used: `gpt-4o-2024-08-06`
+
+## Option B: Header Matching
+
+Configure an `HTTPRoute` that matches on a fixed path plus a `model` header:
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -130,10 +242,8 @@ spec:
 EOF
 ```
 
-## curl /openai with the "model: gpt-3.5-turbo" header
+curl `/openai` with the `model` header set:
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
-
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "model: gpt-3.5-turbo" \
@@ -146,9 +256,8 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-3.5-turbo-0125`
+The response shows the model used: `gpt-3.5-turbo-0125`
 
-## curl /openai with the "model: gpt-4o-mini" header
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -162,9 +271,8 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-4o-mini-2024-07-18`
+The response shows the model used: `gpt-4o-mini-2024-07-18`
 
-## curl /openai with the "model: gpt-4o" header
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -178,7 +286,110 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-4o-2024-08-06`
+The response shows the model used: `gpt-4o-2024-08-06`
+
+## Option C: Query Parameter Matching
+
+Configure an `HTTPRoute` that matches on a fixed path plus a `model` query parameter:
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: openai
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+          queryParams:
+          - type: Exact
+            name: model
+            value: gpt-3.5-turbo
+      backendRefs:
+        - name: openai-gpt-3.5-turbo
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+          queryParams:
+          - type: Exact
+            name: model
+            value: gpt-4o-mini
+      backendRefs:
+        - name: openai-gpt-4o-mini
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai
+          queryParams:
+          - type: Exact
+            name: model
+            value: gpt-4o
+      backendRefs:
+        - name: openai-gpt-4o
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+      timeouts:
+        request: "120s"
+EOF
+```
+
+curl `/openai` with the `model` query parameter set:
+```bash
+curl -i "$GATEWAY_IP:8080/openai?model=gpt-3.5-turbo" \
+  -H "content-type: application/json" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+The response shows the model used: `gpt-3.5-turbo-0125`
+
+```bash
+curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o-mini" \
+  -H "content-type: application/json" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+The response shows the model used: `gpt-4o-mini-2024-07-18`
+
+```bash
+curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o" \
+  -H "content-type: application/json" \
+  -d '{
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+The response shows the model used: `gpt-4o-2024-08-06`
 
 ## Observability
 

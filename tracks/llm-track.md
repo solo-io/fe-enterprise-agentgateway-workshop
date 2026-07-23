@@ -78,9 +78,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 | Lab | What you'll learn |
 |---|---|
-| [Path-per-Model Routing](../labs/routing/routing-path-per-model.md) | Map URL paths to different models or providers |
-| [Header Matching Routing](../labs/routing/routing-header-matching.md) | Route based on HTTP headers (e.g., `X-Model`) |
-| [Query Parameter Matching Routing](../labs/routing/routing-query-parameter-matching.md) | Route based on URL query params |
+| [Routing by Match Type (Path, Header, Query Parameter)](../labs/routing/routing-match-types.md) | Route the same models via path, header, or query param matching |
 | [Body-Based Routing](../labs/routing/configure-body-based-routing.md) | Route on request body fields (e.g., `model`, `stream`) |
 | [Timeouts and Retries](../labs/routing/timeouts-and-retries.md) | Configure per-route timeouts and retry policies |
 | [LLM Failover](../labs/routing/llm-failover.md) | Priority-group failover between providers |
@@ -110,11 +108,10 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 | Lab | What you'll learn |
 |---|---|
-| [Request-Based Rate Limiting](../labs/rate-limiting/request-based-rate-limiting.md) | Limit requests per second/minute by API key or user |
 | [Local Token-Based Rate Limiting](../labs/rate-limiting/local-token-rate-limiting.md) | Enforce per-instance token quotas without a shared store |
-| [Global Token-Based Rate Limiting](../labs/rate-limiting/global-token-rate-limiting.md) | Enforce cluster-wide token quotas with a Redis backend |
+| [Global Rate Limiting (Request-Based & Token-Based)](../labs/rate-limiting/global-rate-limiting.md) | Enforce cluster-wide request or token quotas with a Redis backend |
 | [Virtual Keys](../labs/security/virtual-keys.md) | Per-key token budgets with budget isolation |
-| [LLM Cost Tracking with Virtual Keys](../labs/observability/llm-cost-tracking-with-virtual-keys.md) | Prometheus metrics + PromQL for per-user chargeback |
+| [LLM Cost Management](../labs/observability/llm-cost-management.md) | Solo UI Cost Management dashboard: per-user/group spend, budgets, model cost catalog |
 
 ---
 

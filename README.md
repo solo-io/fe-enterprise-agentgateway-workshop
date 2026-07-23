@@ -55,9 +55,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [Configure Mock OpenAI Server](labs/routing/configure-mock-openai-server.md) _(OpenAI)_
 - [Basic Routing to OpenAI](labs/routing/configure-routing-openai.md) _(OpenAI)_
-- [Path-per-Model Routing](labs/routing/routing-path-per-model.md) _(OpenAI)_
-- [Header Matching Routing](labs/routing/routing-header-matching.md) _(OpenAI)_
-- [Query Parameter Matching Routing](labs/routing/routing-query-parameter-matching.md) _(OpenAI)_
+- [Routing by Match Type (Path, Header, Query Parameter)](labs/routing/routing-match-types.md) _(OpenAI)_
 - [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
 - [Routing to AWS Bedrock](labs/routing/configure-routing-aws-bedrock.md) _(AWS Bedrock)_
 - [Routing to AWS Bedrock via API Keys](labs/routing/configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
@@ -107,9 +105,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Rate Limiting
 
-- [Request-Based Rate Limiting](labs/rate-limiting/request-based-rate-limiting.md)
 - [Local Token-Based Rate Limiting](labs/rate-limiting/local-token-rate-limiting.md)
-- [Global Token-Based Rate Limiting](labs/rate-limiting/global-token-rate-limiting.md)
+- [Global Rate Limiting (Request-Based & Token-Based)](labs/rate-limiting/global-rate-limiting.md)
 - [Virtual Keys](labs/security/virtual-keys.md) _(see also: Security)_
 - [MCP Tool Rate Limiting](labs/mcp/mcp-tool-rate-limiting.md) _(see also: MCP)_
 
@@ -198,7 +195,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Observability
 
-- [LLM Cost Tracking with Virtual Keys](labs/observability/llm-cost-tracking-with-virtual-keys.md) _(see also: Security, Rate Limiting)_
+- [LLM Cost Management](labs/observability/llm-cost-management.md) _(see also: Security, Rate Limiting)_
 - [Production Observability, Alerting, and Scaling](labs/observability/production-observability-alerting-and-scaling.md)
 
 ---

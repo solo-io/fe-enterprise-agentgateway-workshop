@@ -8,7 +8,7 @@
 | Helm | ≥ 3.12 |
 | Gateway API CRDs | 1.3 – 1.5 |
 | Istio (if using waypoint/ambient features) | 1.26 – 1.29 |
-| Solo UI | 0.5.0 |
+| Solo UI | 0.5.1 |
 
 Source: Version Support Matrix
 

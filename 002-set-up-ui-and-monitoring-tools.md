@@ -18,7 +18,7 @@ The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-teleme
 Export your Solo license key (same key used in lab 001):
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export AGW_UI_VERSION=0.5.0
+export AGW_UI_VERSION=0.5.1
 ```
 
 ### Step 1: Install/upgrade CRDs
