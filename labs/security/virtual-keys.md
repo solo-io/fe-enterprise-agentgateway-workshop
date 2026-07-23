@@ -557,7 +557,7 @@ Expected: `HTTP 200` for tenant-b despite tenant-a being exhausted.
 
 ### Observability
 
-Token usage visibility is covered in the standalone `llm-cost-tracking-with-virtual-keys` lab, which includes access log inspection and Prometheus PromQL queries for per-user consumption and cost.
+Token usage visibility, per-user/per-group cost attribution, and budget tracking through the Solo UI's Cost Management dashboard are covered in the standalone `llm-cost-management` lab.
 
 ## Cleanup
 

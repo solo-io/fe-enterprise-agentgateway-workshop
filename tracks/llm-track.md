@@ -111,7 +111,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | [Local Token-Based Rate Limiting](../labs/rate-limiting/local-token-rate-limiting.md) | Enforce per-instance token quotas without a shared store |
 | [Global Rate Limiting (Request-Based & Token-Based)](../labs/rate-limiting/global-rate-limiting.md) | Enforce cluster-wide request or token quotas with a Redis backend |
 | [Virtual Keys](../labs/security/virtual-keys.md) | Per-key token budgets with budget isolation |
-| [LLM Cost Tracking with Virtual Keys](../labs/observability/llm-cost-tracking-with-virtual-keys.md) | Prometheus metrics + PromQL for per-user chargeback |
+| [LLM Cost Management](../labs/observability/llm-cost-management.md) | Solo UI Cost Management dashboard: per-user/group spend, budgets, model cost catalog |
 
 ---
 

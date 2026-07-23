@@ -7,6 +7,8 @@
 - Merge `labs/rate-limiting/request-based-rate-limiting.md` into `labs/rate-limiting/global-token-rate-limiting.md` as a REQUEST-vs-TOKEN section, and rename it to `labs/rate-limiting/global-rate-limiting.md`
 - Update `README.md` and `tracks/llm-track.md` to drop the standalone request-based-rate-limiting link and point at the renamed global-rate-limiting lab
 - Merge `labs/installation/airgap/ably7-image-list.md` into `labs/installation/image-list.md` as an "Air-Gap Mirror Reference" section
+- Update Solo UI to `0.5.1`
+- Replace `/labs/observability/llm-cost-tracking-with-virtual-keys.md` with the latest Cost Management features. Renamed to `/labs/observability/llm-cost-management.md`
 
 0.12.6 - (7-22-26)
 ---

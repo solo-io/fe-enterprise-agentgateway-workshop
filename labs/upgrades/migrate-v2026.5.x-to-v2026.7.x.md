@@ -74,7 +74,7 @@ imagePullSecrets:
 | Gateway API CRDs | 1.4 – 1.5 | 1.3 – 1.5 |
 | Helm | ≥ 3.12 | ≥ 3.12 |
 | Istio (ambient/waypoint) | 1.26 – 1.29 | 1.26 – 1.29 |
-| Solo UI | 0.3.16 | 0.5.0 |
+| Solo UI | 0.3.16 | 0.5.1 |
 
 The Kubernetes floor moved at v2026.6.0 and hasn't moved again since — the same 1.32–1.36 floor applies at v2026.7.0. Kubernetes must be ≥ 1.32 before upgrading; this is the only prerequisite that blocks the upgrade. Gateway API CRDs at v1.5.0 remain valid.
 

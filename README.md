@@ -195,7 +195,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Observability
 
-- [LLM Cost Tracking with Virtual Keys](labs/observability/llm-cost-tracking-with-virtual-keys.md) _(see also: Security, Rate Limiting)_
+- [LLM Cost Management](labs/observability/llm-cost-management.md) _(see also: Security, Rate Limiting)_
 - [Production Observability, Alerting, and Scaling](labs/observability/production-observability-alerting-and-scaling.md)
 
 ---

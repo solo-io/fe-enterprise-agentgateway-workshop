@@ -19,17 +19,17 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Our default `EnterpriseAgentgatewayBackend` allows the user to specify any `model` parameter in the request body. In order to restrict access to specific models, we can configure a model override in the `EnterpriseAgentgatewayBackend`:
+Our default `EnterpriseAgentgatewayBackend` allows the user to specify any `model` parameter in the request body. To restrict access to specific models, configure a model override in the `EnterpriseAgentgatewayBackend`:
 ```
 provider:
   openai:
     model: "gpt-4o-mini"
 ```
-When a model override is configured, the gateway will override any user-input `model` parameter in the request body (e.g. if the user supplies `model: gpt-5-2025-08-07` it will be overridden to `gpt-4o-mini`).
+When a model override is configured, the gateway overrides any user-input `model` parameter in the request body (e.g. if the user supplies `model: gpt-5-2025-08-07`, the gateway overrides it to `gpt-4o-mini`).
 
-With this option, we can create an `EnterpriseAgentgatewayBackend` per model if we want more granular control of access to models.
+Create an `EnterpriseAgentgatewayBackend` per model for finer-grained control over which models clients can access.
 
-**Additionally, when model overrides are specified, the client does not have to supply a `model` parameter in the request body, since the gateway will inject it. The client can input a model in the request body, but effectively it will just be overwritten.**
+**When model overrides are specified, the client does not need to supply a `model` parameter in the request body, since the gateway injects it. A client-supplied model is accepted but overwritten.**
 
 Lets create an OpenAI `EnterpriseAgentgatewayBackend` per specific-model if you haven't already
 ```bash
@@ -152,7 +152,7 @@ curl -i "$GATEWAY_IP:8080/openai/gpt-3.5-turbo" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-3.5-turbo-0125`
+The response shows the model used: `gpt-3.5-turbo-0125`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai/gpt-4o-mini" \
@@ -166,7 +166,7 @@ curl -i "$GATEWAY_IP:8080/openai/gpt-4o-mini" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-4o-mini-2024-07-18`
+The response shows the model used: `gpt-4o-mini-2024-07-18`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai/gpt-4o" \
@@ -180,7 +180,7 @@ curl -i "$GATEWAY_IP:8080/openai/gpt-4o" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-4o-2024-08-06`
+The response shows the model used: `gpt-4o-2024-08-06`
 
 ## Option B: Header Matching
 
@@ -256,7 +256,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-3.5-turbo-0125`
+The response shows the model used: `gpt-3.5-turbo-0125`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
@@ -271,7 +271,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-4o-mini-2024-07-18`
+The response shows the model used: `gpt-4o-mini-2024-07-18`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
@@ -286,7 +286,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-4o-2024-08-06`
+The response shows the model used: `gpt-4o-2024-08-06`
 
 ## Option C: Query Parameter Matching
 
@@ -361,7 +361,7 @@ curl -i "$GATEWAY_IP:8080/openai?model=gpt-3.5-turbo" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-3.5-turbo-0125`
+The response shows the model used: `gpt-3.5-turbo-0125`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o-mini" \
@@ -375,7 +375,7 @@ curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o-mini" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-4o-mini-2024-07-18`
+The response shows the model used: `gpt-4o-mini-2024-07-18`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o" \
@@ -389,7 +389,7 @@ curl -i "$GATEWAY_IP:8080/openai?model=gpt-4o" \
     ]
   }'
 ```
-We should see that the response shows that the model used was `gpt-4o-2024-08-06`
+The response shows the model used: `gpt-4o-2024-08-06`
 
 ## Observability
 

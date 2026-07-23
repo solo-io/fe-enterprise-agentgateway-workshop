@@ -372,7 +372,7 @@ The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-teleme
 ### Set required variables
 
 ```bash
-export AGW_UI_VERSION=0.5.0
+export AGW_UI_VERSION=0.5.1
 ```
 
 ### Step 1: Install/upgrade CRDs
