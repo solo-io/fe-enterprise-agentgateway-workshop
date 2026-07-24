@@ -62,7 +62,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [AWS Bedrock with IRSA](labs/routing/configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_
 - [AWS Bedrock Titan Embeddings](labs/routing/configure-routing-aws-bedrock-titan-embeddings.md) _(AWS Bedrock)_
 - [Routing to Anthropic](labs/routing/configure-routing-anthropic.md) _(Anthropic)_
-- [Routing to Azure OpenAI](labs/routing/configure-routing-azure-openai.md) _(Azure OpenAI)_
+- [Routing to Azure OpenAI and Azure AI Foundry](labs/routing/configure-routing-azure-openai.md) _(Azure OpenAI / Azure AI Foundry)_
+- [Azure OpenAI with Workload Identity](labs/routing/configure-routing-azure-openai-workload-identity.md) _(Azure OpenAI / AKS)_
 - [Routing to Google Vertex AI](labs/routing/configure-routing-vertexai.md) _(Google Vertex AI)_
 - [Routing to Google Vertex AI via Service Account](labs/routing/configure-routing-vertexai-service-account.md) _(Google Vertex AI)_
 - [OpenAI Embeddings](labs/routing/configure-openai-embeddings.md) _(OpenAI)_
@@ -228,7 +229,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
         - OpenAI
         - AWS Bedrock (IAM credentials, API keys, and EKS IRSA)
         - Anthropic (Claude)
-        - Azure OpenAI
+        - Azure OpenAI (API key and AKS Workload Identity)
         - Google Vertex AI (user auth and GCP service account)
     - OpenAI Embeddings support
     - AWS Bedrock Titan embeddings support

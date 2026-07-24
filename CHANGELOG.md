@@ -1,5 +1,11 @@
 # Changelog
 
+0.12.8 - (7-23-26)
+---
+- Update `labs/routing/configure-routing-azure-openai.md` to include examples for Azure Foundry endpoints
+- Add new lab `labs/routing/configure-routing-azure-openai-workload-identity.md` to configure UMI workload identity with Azure
+- Update `README.md`
+
 0.12.7 - (7-22-26)
 ---
 - Merge `labs/routing/routing-header-matching.md`, `routing-path-per-model.md`, and `routing-query-parameter-matching.md` into `labs/routing/routing-match-types.md`
