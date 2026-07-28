@@ -30,18 +30,19 @@ kubectl api-resources --api-group=gateway.networking.k8s.io
 Expected Output:
 
 ```bash
-NAME                 SHORTNAMES   APIVERSION                           NAMESPACED   KIND
-backendtlspolicies   btlspolicy   gateway.networking.k8s.io/v1         true         BackendTLSPolicy
-gatewayclasses       gc           gateway.networking.k8s.io/v1         false        GatewayClass
-gateways             gtw          gateway.networking.k8s.io/v1         true         Gateway
-grpcroutes                        gateway.networking.k8s.io/v1         true         GRPCRoute
-httproutes                        gateway.networking.k8s.io/v1         true         HTTPRoute
-listenersets         lset         gateway.networking.k8s.io/v1         true         ListenerSet
-referencegrants      refgrant     gateway.networking.k8s.io/v1         true         ReferenceGrant
-tcproutes                         gateway.networking.k8s.io/v1alpha2   true         TCPRoute
-tlsroutes                         gateway.networking.k8s.io/v1         true         TLSRoute
-udproutes                         gateway.networking.k8s.io/v1alpha2   true         UDPRoute
+NAME                 SHORTNAMES   APIVERSION                     NAMESPACED   KIND
+backendtlspolicies   btlspolicy   gateway.networking.k8s.io/v1   true         BackendTLSPolicy
+gatewayclasses       gc           gateway.networking.k8s.io/v1   false        GatewayClass
+gateways             gtw          gateway.networking.k8s.io/v1   true         Gateway
+grpcroutes                        gateway.networking.k8s.io/v1   true         GRPCRoute
+httproutes                        gateway.networking.k8s.io/v1   true         HTTPRoute
+listenersets         lset         gateway.networking.k8s.io/v1   true         ListenerSet
+referencegrants      refgrant     gateway.networking.k8s.io/v1   true         ReferenceGrant
+tlsroutes                         gateway.networking.k8s.io/v1   true         TLSRoute
 ```
+
+> [!NOTE]
+> The command above installs the **standard** channel. If you also need `TCPRoute` or `UDPRoute` (`gateway.networking.k8s.io/v1alpha2`), install the **experimental** channel instead — swap `standard-install.yaml` for `experimental-install.yaml`. No lab in this workshop requires them.
 
 ## Install Enterprise Agentgateway
 
@@ -72,20 +73,25 @@ kubectl api-resources | awk 'NR==1 || /enterpriseagentgateway\.solo\.io|agentgat
 Expected output
 
 ```bash
-NAME                                SHORTNAMES        APIVERSION                                NAMESPACED   KIND
-enterpriseagentgatewaybackends                agbe              agentgateway.dev/v1alpha1                 true         EnterpriseAgentgatewayBackend
-agentgatewayparameters              agpar             agentgateway.dev/v1alpha1                 true         AgentgatewayParameters
-agentgatewaypolicies                agpol             agentgateway.dev/v1alpha1                 true         AgentgatewayPolicy
-enterpriseagentgatewayparameters    eagpar            enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
-enterpriseagentgatewaypolicies      eagpol            enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
-authconfigs                         ac                extauth.solo.io/v1                        true         AuthConfig
-ratelimitconfigs                    rlc               ratelimit.solo.io/v1alpha1                true         RateLimitConfig
+NAME                                    SHORTNAMES   APIVERSION                                NAMESPACED   KIND
+agentgatewaybackends                    agbe         agentgateway.dev/v1alpha1                 true         AgentgatewayBackend
+agentgatewayparameters                  agpar        agentgateway.dev/v1alpha1                 true         AgentgatewayParameters
+agentgatewaypolicies                    agpol        agentgateway.dev/v1alpha1                 true         AgentgatewayPolicy
+enterpriseagentgatewaybackends          eagbe        enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayBackend
+enterpriseagentgatewaybudgets           eagbud       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayBudget
+enterpriseagentgatewayexternalsecrets   eages        enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayExternalSecret
+enterpriseagentgatewayparameters        eagpar       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
+enterpriseagentgatewaypolicies          eagpol       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
+authconfigs                             ac           extauth.solo.io/v1                        true         AuthConfig
+ratelimitconfigs                        rlc          ratelimit.solo.io/v1alpha1                true         RateLimitConfig
 ```
+
+The OSS `agentgateway.dev` CRDs and the Enterprise `enterpriseagentgateway.solo.io` CRDs are distinct resources — the Enterprise kinds wrap their OSS counterparts. This workshop uses the Enterprise kinds (`eagbe`, `eagpar`, `eagpol`) throughout.
 
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> **Air-gapped or private-registry install?** This lab pulls images from the public registry. For the full set of charts and images to mirror, see the [image list](image-list.md). To mirror all chart-managed images into a private registry, follow the dedicated [air-gap install lab](airgap/001-airgap.md) instead.
+> **Air-gapped or private-registry install?** This lab pulls images from the public registry. For the full set of charts and images to mirror, see the [image list](labs/installation/image-list.md). To mirror all chart-managed images into a private registry, follow the dedicated [air-gap install lab](labs/installation/airgap/001-airgap.md) instead.
 
 Using Helm:
 ```bash
@@ -204,6 +210,7 @@ enterprise-agentgateway-5f9c5b95b4-gjblt                    1/1     Running   0 
 ext-auth-service-enterprise-agentgateway-6fcc5bc989-22wgd   1/1     Running   0          11m
 ext-cache-enterprise-agentgateway-6bfcb8c87d-vjzxn          1/1     Running   0          11m
 rate-limiter-enterprise-agentgateway-589f66bb88-xz7nm       1/1     Running   0          11m
+waf-server-enterprise-agentgateway-6fc78487cc-vbqd8         1/1     Running   0          11m
 ```
 
 ## Configure access logs (optional)
