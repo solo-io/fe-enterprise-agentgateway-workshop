@@ -329,16 +329,22 @@ The dashboard provides real-time visualization of:
 - MCP metrics (tool calls, server requests)
 - Connection and runtime metrics
 
-### View Traces in Grafana
+### View Traces in the Solo UI
 
 To view distributed traces with LLM-specific spans:
 
-1. In Grafana, navigate to **Home > Explore**
-2. Select **Tempo** from the data source dropdown
-3. Click **Search** to see all traces
-4. Filter traces by service, operation, or trace ID to find AgentGateway requests
+1. Port-forward to the Solo UI:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
 
-Traces include LLM-specific spans with information like `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more.
+2. Open http://localhost:4000 in your browser
+
+3. Click **Tracing** in the left navigation
+
+4. Use the **Search spans** box or the time-range buttons to find your requests, then click a row to open its span details
+
+Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`.
 
 ### View Access Logs
 
@@ -348,7 +354,7 @@ AgentGateway automatically logs detailed information about LLM requests to stdou
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output includes the model name, token usage, and trace ID for correlating with distributed traces in Grafana.
+Example output includes the model name, token usage, and trace ID for correlating with distributed traces in the Solo UI.
 
 ## Cleanup
 ```bash

@@ -95,7 +95,7 @@ spec:
   ai:
     provider:
       openai:
-        model: gpt-4o-mini
+        model: gpt-5.4-nano
   policies:
     auth:
       secretRef:
@@ -130,7 +130,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -253,7 +253,7 @@ No `backendRef` is needed -- it defaults to the provisioned ext-auth service.
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -279,7 +279,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "api-key: authorized-user-key" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",

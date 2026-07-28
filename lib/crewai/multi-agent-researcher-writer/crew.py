@@ -18,7 +18,7 @@ def main():
     agentgateway_proxy = LLM(
         provider="openai",
         base_url=base_url,
-        model="gpt-4o-mini",
+        model="gpt-5.4-nano",
         api_key="agentgateway-handles-auth",  # agentgateway injects the real key
     )
 
@@ -76,6 +76,9 @@ def main():
         tasks=[research_task, writing_task],
         verbose=True,
         process=Process.sequential,
+        # Keep prompts and completions local — CrewAI otherwise uploads a trace
+        # of the first run in a project directory to app.crewai.com
+        tracing=False,
     )
 
     result = crew.kickoff()

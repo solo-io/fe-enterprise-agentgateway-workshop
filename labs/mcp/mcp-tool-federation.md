@@ -469,7 +469,7 @@ EOF
 In MCP Inspector, click **Disconnect** then **Connect**. You should see:
 
 ```
-MCP error -32001: Error POSTing to endpoint (HTTP 401): authentication failure: no bearer token found
+MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: authentication failure: no bearer token found
 ```
 
 ### Mint an admin token and reconnect
@@ -607,16 +607,16 @@ Every request through the federated backend is annotated with `mcp.target` ident
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Look for MCP-specific fields: `mcp.method`, `mcp.resource`, `mcp.resource.name`, `mcp.target`, and `http.status`.
+Look for MCP-specific fields: `mcp.method.name`, `mcp.resource.type`, `mcp.target`, `mcp.session.id`, and `http.status`.
 
 ### View MCP metrics
 
 ```bash
 kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics | grep mcp && kill $!
+sleep 3 && curl -s http://localhost:15020/metrics | grep -E 'agentgateway_mcp_requests_total|protocol="mcp"' && kill $!
 ```
 
-You should see counters such as `agentgateway_mcp_tool_calls_total`, `agentgateway_mcp_server_requests_total`, and `agentgateway_mcp_request_duration_seconds` — broken down by `mcp.target` so you can see which backend is hot.
+You should see the `agentgateway_mcp_requests_total` counter broken down by the `server` label — the MCP target that served each call — so you can see which backend is hot, plus the `resource` label for the tool name. HTTP-level volume and latency for MCP traffic come from `agentgateway_requests_total{protocol="mcp"}` and `agentgateway_request_duration_seconds{protocol="mcp"}`.
 
 ### View in Grafana
 

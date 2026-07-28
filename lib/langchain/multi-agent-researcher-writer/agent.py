@@ -20,7 +20,7 @@ def main():
 
     # agentgateway proxies to OpenAI; use a placeholder key — agentgateway handles real auth
     llm = ChatOpenAI(
-        model="gpt-4o-mini",
+        model="gpt-5.4-nano",
         base_url=base_url,
         api_key="agentgateway-handles-auth",
     )

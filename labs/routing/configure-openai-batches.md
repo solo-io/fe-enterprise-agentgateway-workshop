@@ -101,9 +101,9 @@ Create a JSONL file containing batch requests. Each line must be a valid JSON ob
 
 ```bash
 cat > batch_requests.jsonl <<'EOF'
-{"custom_id": "request-1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "What is the capital of France?"}], "max_tokens": 100}}
-{"custom_id": "request-2", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "What is 2+2?"}], "max_tokens": 100}}
-{"custom_id": "request-3", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Name a color."}], "max_tokens": 100}}
+{"custom_id": "request-1", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "What is the capital of France?"}], "max_tokens": 100}}
+{"custom_id": "request-2", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "What is 2+2?"}], "max_tokens": 100}}
+{"custom_id": "request-3", "method": "POST", "url": "/v1/chat/completions", "body": {"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Name a color."}], "max_tokens": 100}}
 EOF
 ```
 
@@ -250,9 +250,9 @@ cat batch_results.jsonl
 
 Example output (each line is a separate JSON response):
 ```json
-{"id": "batch_req_abc123", "custom_id": "request-1", "response": {"status_code": 200, "request_id": "req_123", "body": {"id": "chatcmpl-123", "object": "chat.completion", "created": 1234567890, "model": "gpt-4o-mini", "choices": [{"index": 0, "message": {"role": "assistant", "content": "The capital of France is Paris."}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18}}}, "error": null}
-{"id": "batch_req_def456", "custom_id": "request-2", "response": {"status_code": 200, "request_id": "req_456", "body": {"id": "chatcmpl-456", "object": "chat.completion", "created": 1234567891, "model": "gpt-4o-mini", "choices": [{"index": 0, "message": {"role": "assistant", "content": "2+2 equals 4."}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 8, "completion_tokens": 6, "total_tokens": 14}}}, "error": null}
-{"id": "batch_req_ghi789", "custom_id": "request-3", "response": {"status_code": 200, "request_id": "req_789", "body": {"id": "chatcmpl-789", "object": "chat.completion", "created": 1234567892, "model": "gpt-4o-mini", "choices": [{"index": 0, "message": {"role": "assistant", "content": "Blue."}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 7, "completion_tokens": 2, "total_tokens": 9}}}, "error": null}
+{"id": "batch_req_abc123", "custom_id": "request-1", "response": {"status_code": 200, "request_id": "req_123", "body": {"id": "chatcmpl-123", "object": "chat.completion", "created": 1234567890, "model": "gpt-5.4-nano", "choices": [{"index": 0, "message": {"role": "assistant", "content": "The capital of France is Paris."}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 10, "completion_tokens": 8, "total_tokens": 18}}}, "error": null}
+{"id": "batch_req_def456", "custom_id": "request-2", "response": {"status_code": 200, "request_id": "req_456", "body": {"id": "chatcmpl-456", "object": "chat.completion", "created": 1234567891, "model": "gpt-5.4-nano", "choices": [{"index": 0, "message": {"role": "assistant", "content": "2+2 equals 4."}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 8, "completion_tokens": 6, "total_tokens": 14}}}, "error": null}
+{"id": "batch_req_ghi789", "custom_id": "request-3", "response": {"status_code": 200, "request_id": "req_789", "body": {"id": "chatcmpl-789", "object": "chat.completion", "created": 1234567892, "model": "gpt-5.4-nano", "choices": [{"index": 0, "message": {"role": "assistant", "content": "Blue."}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 7, "completion_tokens": 2, "total_tokens": 9}}}, "error": null}
 ```
 
 ## Additional Batch Operations
@@ -355,7 +355,7 @@ The Batches API is ideal for:
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about batch API requests including file uploads, batch creation, and status checks. All requests include trace IDs for correlation with distributed traces in Grafana.
+AgentGateway automatically logs detailed information about batch API requests including file uploads, batch creation, and status checks. All requests include trace IDs for correlation with distributed traces in the Solo UI.
 
 Check the logs:
 ```bash

@@ -1,5 +1,16 @@
 # Changelog
 
+0.13.1 - (7-28-26)
+---
+- Refresh model names repo-wide: `gpt-4o-mini` → `gpt-5.4-nano`, `gpt-4o` → `gpt-5.6-terra`, `gpt-3.5-turbo` → `gpt-5.4-mini`, and Claude 3.5 → Claude 5
+- Replace the "View Traces in Grafana/Tempo" block with the Solo UI **Tracing** view (`kubectl port-forward svc/solo-enterprise-ui 4000:80`) in every lab that had one and fix prompt and completion references
+- Correct MCP telemetry in `style-guide.md` and the MCP labs: `agentgateway_mcp_requests_total` is the only `agentgateway_mcp_*` series, with volume and latency from `agentgateway_requests_total{protocol="mcp"}` and `agentgateway_request_duration_seconds{protocol="mcp"}`
+- Correct the MCP log and span fields to `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`
+- Minor improvements in `labs/mcp/remote-mcp.md`
+- Update `labs/observability/llm-cost-management.md`
+- Update the Grafana dashboard model catalog and cost tables
+- Minor updates to the built-in guardrails lab
+
 0.13.0 - (7-28-26)
 ---
 - Update `agentgateway-architecture.gif` in readme

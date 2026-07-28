@@ -39,7 +39,7 @@ spec:
   ai:
     provider:
       anthropic:
-        model: "claude-3-5-haiku-latest"
+        model: "claude-sonnet-5"
   policies:
     auth:
       secretRef:
@@ -88,7 +88,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -i "$GATEWAY_IP:8080/anthropic" \
   -H "content-type: application/json" \
   -d '{
-    "model": "claude-3-5-haiku-latest",
+    "model": "claude-sonnet-5",
     "messages": [
       {
         "role": "system",

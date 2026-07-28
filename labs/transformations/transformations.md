@@ -66,7 +66,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -105,7 +105,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "x-user-id: bob" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -154,7 +154,7 @@ Now that we’ve validated a basic header transformation, let’s enrich the res
 Here is the expected behavior of the transformation policy below
 - add `x-user-id` to capture the user identifier (defaulting to `anonymous` if missing)
 - add `x-llm-request-model` to capture what model the client requested (read from the request body)
-- add `x-llm-response-model` to capture the exact model version the backend used (read from the response body — this may differ from the requested model, e.g. `gpt-4o-mini` → `gpt-4o-mini-2024-07-18`)
+- add `x-llm-response-model` to capture the exact model version the backend used (read from the response body — this may differ from the requested model, e.g. `gpt-5.4-nano` → `gpt-5.4-nano`)
 - add `x-request-method` for API behavior analysis
 - add `x-request-path` to help distinguish which route processed the call
 
@@ -192,7 +192,7 @@ Make a curl request again
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -205,8 +205,8 @@ curl -i "$GATEWAY_IP:8080/openai" \
 We should see the response headers we applied in the transformation policy
 ```
 x-user-id: anonymous
-x-llm-request-model: gpt-4o-mini
-x-llm-response-model: gpt-4o-mini-2024-07-18
+x-llm-request-model: gpt-5.4-nano
+x-llm-response-model: gpt-5.4-nano
 x-request-method: POST
 x-request-path: /openai
 ```

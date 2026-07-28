@@ -126,7 +126,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -ik "http://$GATEWAY_IP/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -150,7 +150,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -ik "https://$GATEWAY_IP/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -171,7 +171,7 @@ content-type: application/json
   "id": "chatcmpl-...",
   "object": "chat.completion",
   "created": 1736736000,
-  "model": "gpt-4o-mini-2024-07-18",
+  "model": "gpt-5.4-nano",
   "choices": [
     {
       "index": 0,

@@ -584,7 +584,9 @@ Then access at: http://localhost:3000
 - Username: `admin`
 - Password: `prom-operator`
 
-Navigate to: **Dashboards > AgentGateway Overview**
+Navigate to: **Dashboards > AgentGateway Dashboard**
+
+While the load tests run, the request rate, token throughput, and latency panels track both mock backends, and the **Token Usage by Model** table breaks the traffic out by `mock-gpt-4o` and `mock-gpt-5.2`.
 
 ### Access Prometheus Metrics
 
@@ -596,17 +598,31 @@ kubectl port-forward svc/grafana-prometheus-kube-pr-prometheus -n monitoring 909
 
 Then access at: http://localhost:9090
 
-Useful metrics to query:
-- `agentgateway_gen_ai_client_token_usage`
-- `agentgateway_gen_ai_server_request_duration`
-- `agentgateway_requests_total`
-- `agentgateway_request_duration_seconds`
+Useful queries to run:
+
+```promql
+# Request rate per backend
+sum by (backend) (rate(agentgateway_requests_total[1m]))
+
+# Request count per route and response status
+sum by (route, status) (agentgateway_requests_total)
+
+# Tokens consumed per model, split by input and output
+sum by (gen_ai_request_model, gen_ai_token_type) (agentgateway_gen_ai_client_token_usage_sum)
+
+# p95 LLM request latency
+histogram_quantile(0.95, sum by (le) (rate(agentgateway_gen_ai_server_request_duration_bucket[1m])))
+```
+
+Token usage and latency are exposed as histograms, so query the `_sum`, `_count`, or `_bucket` series rather than the bare metric name.
 
 ### View AgentGateway Logs
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
+
+If you lowered the log level to `warn` above, per-request access logs are suppressed and this command returns nothing while the test is healthy. Set the level back to `info` if you want to inspect individual requests.
 
 ## Understanding the Load Patterns
 
@@ -621,12 +637,22 @@ This lab deploys two different load generators with distinct patterns so you can
 
 ### mock-gpt-5.2 Load Pattern
 - **Base RPS**: 35 requests per second
-- **Min RPS**: 17.5 RPS (50% of base, configured by `RAMP_MIN_MULTIPLIER: 0.5`)
-- **Max RPS**: 52.5 RPS (150% of base, configured by `RAMP_MAX_MULTIPLIER: 1.5`)
+- **Min RPS**: 17 RPS (50% of base, configured by `RAMP_MIN_MULTIPLIER: 0.5`)
+- **Max RPS**: 52 RPS (150% of base, configured by `RAMP_MAX_MULTIPLIER: 1.5`)
 - **Stage Duration**: 45 seconds per ramp up/down
-- **Pattern**: Faster, more dramatic oscillations between 17.5 RPS and 52.5 RPS every 45 seconds
+- **Pattern**: Faster, more dramatic oscillations between 17 RPS and 52 RPS every 45 seconds
 
 The different patterns create distinct lines in your Grafana dashboard, making it easy to distinguish between the two backends and observe how the system handles varying load profiles.
+
+### How Long a Ramping Test Runs
+
+In ramping mode, `DURATION` is not the wall-clock runtime. It sets how many up/down cycles the script generates, and the actual runtime is the sum of the ramp stages:
+
+- Cycles = `floor((DURATION / RAMP_STAGE_DURATION - 1) / 2)`
+- Stages = 2 per cycle, plus one final stage that settles at the base RPS
+- Runtime = stages x `RAMP_STAGE_DURATION`
+
+So the mock-gpt-4o job (`DURATION: 5m`, `RAMP_STAGE_DURATION: 1m`) runs 2 cycles across 5 stages for a total of 5 minutes, while the mock-gpt-5.2 job (`DURATION: 5m`, `RAMP_STAGE_DURATION: 45s`) also runs 5 stages but finishes in 3m45s. Set `RAMP_CYCLES` if you want to control the cycle count directly.
 
 ## Advanced Configuration
 
@@ -635,7 +661,7 @@ You can customize the k6s load test by modifying these environment variables:
 **Load Pattern Options:**
 - `LOAD_PATTERN`: "constant" or "ramping"
 - `RPS`: Base requests per second
-- `DURATION`: Test duration (e.g., "5m", "1h", "12h")
+- `DURATION`: Test duration for constant load; in ramping mode it determines the number of ramp cycles (e.g., "5m", "1h", "12h")
 
 **Ramping Pattern Options:**
 - `RAMP_MIN_MULTIPLIER`: Minimum RPS as multiplier of base RPS (default: 0.5)

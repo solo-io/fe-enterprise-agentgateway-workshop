@@ -170,14 +170,20 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 
 4. Navigate to **Dashboards > AgentGateway Dashboard** to view metrics
 
-### View Traces in Grafana
+### View Traces in the Solo UI
 
 To view distributed traces:
 
-1. In Grafana, navigate to **Home > Explore**
-2. Select **Tempo** from the data source dropdown
-3. Click **Search** to see all traces
-4. Filter by service or operation to find AgentGateway requests for this embedding call
+1. Port-forward to the Solo UI:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
+
+2. Open http://localhost:4000 in your browser
+
+3. Click **Tracing** in the left navigation
+
+4. Click the row for this embedding call to open its span details
 
 ## Cleanup
 ```bash

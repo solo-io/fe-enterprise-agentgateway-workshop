@@ -67,7 +67,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -137,7 +137,7 @@ EOF
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -228,7 +228,7 @@ Note that the following user prompt "Whats your favorite poem" contains 5 tokens
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -299,7 +299,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "X-User-ID: user-123" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -316,7 +316,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "X-User-ID: user-456" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -392,7 +392,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "X-User-ID: user-123" \
   -H "X-Tenant-ID: tenant-A" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -409,7 +409,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "X-User-ID: user-123" \
   -H "X-Tenant-ID: tenant-B" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -531,7 +531,7 @@ Requests without a valid JWT are now rejected before they ever reach the rate li
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -548,7 +548,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $USER_A_TOKEN" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -567,7 +567,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $USER_B_TOKEN" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -587,7 +587,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "Authorization: Bearer $USER_A_TOKEN" \
   -H "X-User-ID: someone-else" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -740,7 +740,7 @@ for i in $(seq 1 25); do
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer $STANDARD_TOKEN" \
-    -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}' \
+    -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}' \
     "$GATEWAY_IP:8080/openai")
   echo "Request $i: HTTP $STATUS"
 done
@@ -753,7 +753,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $PREMIUM_TOKEN" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -827,7 +827,7 @@ Send requests without any `Authorization` header. The IP rate limiter fires on u
 for i in $(seq 1 25); do
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "content-type: application/json" \
-    -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}' \
+    -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}' \
     "$GATEWAY_IP:8080/openai")
   echo "Request $i: HTTP $STATUS"
 done
@@ -943,7 +943,7 @@ for i in $(seq 1 25); do
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer $USER_TOKEN" \
-    -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}' \
+    -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}' \
     "$GATEWAY_IP:8080/openai")
   echo "Request $i: HTTP $STATUS"
 done
@@ -961,7 +961,7 @@ for i in $(seq 1 10); do
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer $USER_TOKEN" \
-    -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}' \
+    -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}' \
     "$GATEWAY_IP:8080/openai")
   echo "Request $i: HTTP $STATUS"
 done

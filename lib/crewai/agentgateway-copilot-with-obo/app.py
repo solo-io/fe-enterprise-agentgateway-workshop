@@ -132,7 +132,7 @@ with st.sidebar:
         gateway_ip_sidebar = os.environ.get("GATEWAY_IP", "")
         if st.button("Probe gateway with both tokens") and gateway_ip_sidebar:
             probe_url = f"http://{gateway_ip_sidebar}:8080/openai"
-            probe_body = {"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hi"}]}
+            probe_body = {"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "hi"}]}
             col1, col2 = st.columns(2)
             with col1:
                 st.caption("User JWT (Keycloak)")
@@ -198,7 +198,7 @@ if submitted:
                 probe = requests.post(
                     f"http://{gateway_ip}:8080/openai",
                     headers={"Content-Type": "application/json"},
-                    json={"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "hello"}]},
+                    json={"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "hello"}]},
                     timeout=5,
                 )
                 st.error(f"Agentgateway rejected the request: **HTTP {probe.status_code}**")
@@ -281,7 +281,7 @@ if submitted:
             llm = LLM(
                 provider="openai",
                 base_url=f"http://{gateway_ip}:8080/openai",
-                model="gpt-4o-mini",
+                model="gpt-5.4-nano",
                 api_key=obo_jwt,
             )
 

@@ -319,7 +319,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 
 The dashboard provides real-time visualization of:
 - Core GenAI metrics (request rates, token usage by model)
-- Claude Code specific metrics showing `claude-3-5-sonnet` or `claude-3-5-haiku` model usage
+- Claude Code specific metrics showing `claude-sonnet-5` or `claude-opus-5` model usage
 - Streaming metrics (TTFT, TPOT)
 - Connection and runtime metrics
 
@@ -373,7 +373,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ```
 
 Example output shows comprehensive request details including:
-- Model information (e.g., `claude-3-5-sonnet-20241022`)
+- Model information (e.g., `claude-sonnet-5`)
 - Token usage (input and output tokens)
 - Request duration
 - Trace IDs for correlation with Solo UI traces

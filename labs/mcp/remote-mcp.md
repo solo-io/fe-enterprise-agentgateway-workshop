@@ -10,6 +10,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - Integrate with Claude Code
 - Secure MCP server with JWT auth
 - Authorize access based on JWT claims
+- Limit access to tools
 
 ## Overview
 
@@ -103,9 +104,10 @@ In the MCP Inspector menu, connect to your AgentGateway:
 
 ### Search Solo.io Documentation
 
-The Solo.io docs MCP server provides two tools:
+The Solo.io docs MCP server provides three tools:
 - **search**: Search Solo.io product documentation
 - **get_chunks**: Retrieve sequential segments of a document
+- **get_full_page**: Retrieve a full documentation page
 
 Let's test the search tool:
 
@@ -174,13 +176,13 @@ AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. Y
 
 ```bash
 kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics | grep mcp && kill $!
+sleep 3 && curl -s http://localhost:15020/metrics | grep -E 'agentgateway_mcp_requests_total|protocol="mcp"' && kill $!
 ```
 
 You should see MCP-specific metrics like:
-- `agentgateway_mcp_tool_calls_total`
-- `agentgateway_mcp_server_requests_total`
-- `agentgateway_mcp_request_duration_seconds`
+- `agentgateway_mcp_requests_total` — per-call MCP counter, labeled by `method` (`initialize`, `tools/call`, …), `resource_type`, `server` (the MCP target), and `resource` (the tool name)
+- `agentgateway_requests_total{protocol="mcp"}` — HTTP-level request counter for MCP traffic, labeled by `backend`, `route`, and `status`
+- `agentgateway_request_duration_seconds{protocol="mcp"}` — request latency histogram for MCP traffic
 
 ### View Metrics and Traces in Grafana
 
@@ -205,16 +207,22 @@ The dashboard provides real-time visualization of:
 - **MCP metrics** (tool calls, server requests)
 - Connection and runtime metrics
 
-### View Traces in Grafana
+### View Traces in the Solo UI
 
 To view distributed traces with MCP-specific spans:
 
-1. In Grafana, navigate to **Home > Explore**
-2. Select **Tempo** from the data source dropdown
-3. Click **Search** to see all traces
-4. Filter traces by service, operation, or trace ID to find AgentGateway requests
+1. Port-forward to the Solo UI:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
 
-Traces include MCP-specific spans with information like `mcp.method`, `mcp.resource`, `mcp.resource.name`, `mcp.target`, and more.
+2. Open http://localhost:4000 in your browser
+
+3. Click **Tracing** in the left navigation
+
+4. Use the **Search spans** box or the time-range buttons to find your requests, then click a row to open its span details
+
+Traces include MCP-specific spans with information like `mcp.method.name`, `mcp.resource.type`, `mcp.target`, `mcp.session.id`, and more.
 
 ### View Access Logs
 
@@ -225,11 +233,13 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ```
 
 Example output shows comprehensive request details including MCP-specific information like:
-- `mcp.method: tools/call`
-- `mcp.resource: search`
+- `mcp.method.name: tools/call`
 - `mcp.target: soloio-docs-mcp-target`
+- `mcp.resource.type: tool`
+- `gen_ai.tool.name: search`
+- `mcp.session.id: <session id>`
 - `http.status: 200`
-- Trace IDs for correlation with distributed traces in Grafana
+- Trace IDs for correlation with distributed traces in the Solo UI
 
 ## Secure Access to MCP Server
 
@@ -274,10 +284,10 @@ EOF
 From the MCP Inspector, verify that the connection fails with an error message similar to the following, because no valid JWT was provided from the MCP inspector tool (MCP client) to the AgentGateway proxy:
 
 ```
-MCP error -32001: Error POSTing to endpoint (HTTP 403): authentication failure: no bearer token found
+MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: authentication failure: no bearer token found
 ```
 
-We should also be able to see this error in the access logs `authentication failure: no bearer token found` with an `http.status: 403`:
+We should also be able to see this error in the access logs `authentication failure: no bearer token found` with an `http.status=401` and `reason=JwtAuth`:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
@@ -285,10 +295,11 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 
 ### Provide a Valid JWT
 
-Go back to the MCP Inspector tool and expand the **Authentication** section. Enter the following details in the **API Token Authentication** card:
+Go back to the MCP Inspector tool and expand the **Authentication** section. In the **Custom Headers** card, add a header with the following details:
 
 - **Header Name**: Enter `Authorization`
-- **Bearer Token**: Enter `Bearer ` followed by the JWT token below. The MCP Inspector sends this value as-is in the Authorization header, so the `Bearer ` prefix is required.
+- **Header Value**: Enter `Bearer ` followed by the JWT token below. The MCP Inspector sends this value as-is in the Authorization header, so the `Bearer ` prefix is required.
+- **Toggle the header on** using the switch to the left of the row. Headers are disabled by default and are only sent when enabled — if you skip this, the connection still fails with `no bearer token found`.
 
 ```
 eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw
@@ -302,29 +313,39 @@ Now, if you try to run the `search` tool again it should result in **Tool Result
 
 You can limit access to the MCP server based on specific JWT claims with CEL-based RBAC rules.
 
-Update the EnterpriseAgentgatewayPolicy to add your RBAC rules. In the following example, you use a CEL expression to only allow access to the MCP server if the JWT has the `org=admin` claim:
+Create an EnterpriseAgentgatewayPolicy that attaches to the **Backend** and evaluates your rules under `backend.mcp.authorization`. Attaching at the Backend rather than the Gateway makes the rules MCP-aware, so the same CEL expression can reason about JWT claims now and individual tools later in this lab.
+
+In the following example, you use a CEL expression to only allow access to the MCP server if the JWT has the `org=admin` claim:
 
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
-  name: jwt-rbac
+  name: mcp-rbac
   namespace: agentgateway-system
 spec:
   targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: agentgateway-proxy
-  traffic:
-    authorization:
-      policy:
-        matchExpressions:
-          - 'jwt.org == "admin"'
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: soloio-docs-mcp-backend
+  backend:
+    mcp:
+      authorization:
+        action: Allow
+        policy:
+          matchExpressions:
+            - 'jwt.org == "admin"'
 EOF
 ```
 
-Now, if you try to run the `search` tool again it should fail because our user is not allowed to access this endpoint anymore.
+Our token carries `org=solo.io`, not `org=admin`, so access is now denied. In the MCP Inspector, click **Reconnect**, then from the **Tools** tab click **Clear** and **List Tools** — the list comes back empty.
+
+Unauthorized tools are filtered out of the catalog rather than merely blocked on call, so a denied caller sees an MCP server with no tools at all. Attempting a call anyway is rejected as an unknown tool:
+
+```
+{"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"Unknown tool: search"}}
+```
 
 ### Inspect the JWT
 
@@ -349,34 +370,83 @@ Notice the `org` field is `solo.io`, not `admin`.
 
 ## Allow Access for solo.io Organization
 
-We can update our CEL expression to allow anyone who is a part of the `solo.io` org to use the search tool:
+Correct the expression to match the `org` claim our token actually carries, so that anyone in the `solo.io` org is allowed through:
 
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
-  name: jwt-rbac
+  name: mcp-rbac
   namespace: agentgateway-system
 spec:
   targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: agentgateway-proxy
-  traffic:
-    authorization:
-      policy:
-        matchExpressions:
-          - 'jwt.org == "solo.io"'
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: soloio-docs-mcp-backend
+  backend:
+    mcp:
+      authorization:
+        action: Allow
+        policy:
+          matchExpressions:
+            - 'jwt.org == "solo.io"'
 EOF
 ```
 
-Now, if you try to run the `search` tool again it should result in **Tool Result: Success**
+Reconnect and list tools again. All three tools are back, and running `search` returns **Tool Result: Success** — the expression authorizes the caller but says nothing about *which* tools they may use, so it grants the full catalog.
 
 You can create complex authorization rules based on any JWT claim:
 - `jwt.org == "admin"` - Require specific organization
 - `jwt.team == "ai-team"` - Require specific team
 - `jwt.llms.openai.exists(m, m == "gpt-4o")` - Check for model access
+
+## Limit Tool Access
+
+The expression above is still all-or-nothing: any caller in the `solo.io` org can reach *every* tool on the remote server. Because the policy is attached to the Backend, it is MCP-aware, so you can extend the same CEL expression with `mcp.tool.name` to authorize individual tools.
+
+This is especially useful for remote MCP servers, where you don't control which tools the upstream exposes. As the vendor adds tools, an allowlist keyed on `mcp.tool.name` keeps your callers scoped to the ones you have reviewed.
+
+In the following example, callers in the `solo.io` org may use only the `search` tool:
+
+```bash
+kubectl apply -f- <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mcp-rbac
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: soloio-docs-mcp-backend
+  backend:
+    mcp:
+      authorization:
+        action: Allow
+        policy:
+          matchExpressions:
+            - 'jwt.org == "solo.io" && mcp.tool.name == "search"'
+EOF
+```
+
+**Key configuration details:**
+
+- `targetRefs` points at the `EnterpriseAgentgatewayBackend`, not the Gateway — tool authorization is evaluated by the MCP backend, so a Gateway-scoped `traffic.authorization` policy can gate the server as a whole but cannot filter individual tools
+- `matchExpressions` entries are OR'd together; use `&&` within a single expression to require both a claim and a tool name
+- Omitting a `mcp.tool.name` condition grants access to all tools, which is why the previous step returned the full catalog
+- An invalid CEL expression fails closed. If the catalog comes back empty unexpectedly, check the policy status: `kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-rbac -o jsonpath='{.status.ancestors[*].conditions[*].message}'`
+
+Verify the restriction in the MCP Inspector:
+
+1. Click **Reconnect**, then from the **Tools** tab click **Clear** and **List Tools**. Only **search** is listed — `get_chunks` and `get_full_page` are filtered out.
+2. Run **search** again. It still returns **Tool Result: Success**.
+3. Because the other tools are no longer advertised, a call to `get_chunks` is rejected as an unknown tool:
+
+```
+{"jsonrpc":"2.0","id":4,"error":{"code":-32602,"message":"Unknown tool: get_chunks"}}
+```
 
 ## Cleanup
 
@@ -384,7 +454,7 @@ Remove Kubernetes resources:
 
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt-rbac
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mcp-rbac
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system soloio-docs-mcp-backend
 kubectl delete httproute -n agentgateway-system soloio-docs-mcp
 ```

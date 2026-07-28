@@ -158,7 +158,7 @@ spec:
       - providers:
           - name: openai-provider
             openai:
-              model: "gpt-4o-mini"
+              model: "gpt-5.4-nano"
 ---
 # Per-provider auth: passthrough for the mock (no upstream API key needed),
 # OpenAI secretRef for the failover provider. Each policy uses
@@ -336,13 +336,19 @@ In the access logs (entries with `"scope": "request"`), you can observe:
 
 The change in `endpoint` field between requests clearly shows the failover from the mock server to OpenAI.
 
-### View Traces in Grafana
+### View Traces in the Solo UI
 
 To view distributed traces and see failover behavior across requests:
 
-1. In Grafana, navigate to **Home > Explore**
-2. Select **Tempo** from the data source dropdown
-3. Click **Search** to see all traces
+1. Port-forward to the Solo UI:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
+
+2. Open http://localhost:4000 in your browser
+
+3. Click **Tracing** in the left navigation
+
 4. Compare traces from your two requests:
    - **First trace**: Shows attempt to mock-gpt-4o with 429 error span
    - **Second trace**: Shows successful routing to OpenAI backend with 200 response

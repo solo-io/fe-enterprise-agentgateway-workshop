@@ -89,7 +89,7 @@ curl "$GATEWAY_IP:8080/openai" \
   -H "Content-Type: application/json" \
   -d '{
     "stream": true,
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "system",
@@ -108,17 +108,17 @@ curl "$GATEWAY_IP:8080/openai" \
 You'll see Server-Sent Events (SSE) format with incremental chunks:
 
 ```
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-4o-mini-2024-07-18","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-4o-mini-2024-07-18","choices":[{"index":0,"delta":{"content":"Streaming"},"finish_reason":null}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{"content":"Streaming"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-4o-mini-2024-07-18","choices":[{"index":0,"delta":{"content":" responses"},"finish_reason":null}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{"content":" responses"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-4o-mini-2024-07-18","choices":[{"index":0,"delta":{"content":" allow"},"finish_reason":null}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{"content":" allow"},"finish_reason":null}]}
 
 ...
 
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-4o-mini-2024-07-18","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
 
 data: [DONE]
 ```
@@ -160,19 +160,25 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 
 For streaming requests, you'll see:
 - `"gen_ai.operation.name": "chat"`
-- `"gen_ai.request.model": "gpt-4o-mini"`
+- `"gen_ai.request.model": "gpt-5.4-nano"`
 - `"gen_ai.usage.input_tokens"` and `"gen_ai.usage.output_tokens"`
 - Streaming-specific timing metrics
 
 **Note**: Unlike non-streaming responses, streaming responses don't include the `usage` object in the SSE stream. Token usage is tracked in AgentGateway's access logs and metrics.
 
-### View Traces
+### View Traces in the Solo UI
 
 Streaming requests generate the same distributed traces as non-streaming:
 
-1. In Grafana, navigate to **Home > Explore**
-2. Select **Tempo** from the data source dropdown
-3. Search for recent traces
+1. Port-forward to the Solo UI:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
+
+2. Open http://localhost:4000 in your browser
+
+3. Click **Tracing** in the left navigation
+
 4. Compare trace durations between streaming and non-streaming requests
 
 Streaming traces show timing for:

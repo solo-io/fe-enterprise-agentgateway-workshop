@@ -222,7 +222,7 @@ Most labs end feature work with a near-verbatim `## Observability` block — cop
 - Sub-headings: `### View Metrics Endpoint`, `### View Metrics and Traces in Grafana`, `### View Access Logs`, `### (Optional) View Traces in Jaeger`.
 - Grafana access: `kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000`, login `admin` / `prom-operator`.
 - Metrics endpoint: port-forward `15020` and curl `/metrics`.
-- Canonical MCP metric names: `agentgateway_mcp_tool_calls_total`, `agentgateway_mcp_server_requests_total`, `agentgateway_mcp_request_duration_seconds`; access-log fields `mcp.method`, `mcp.resource`, `mcp.target`, `http.status`.
+- Canonical MCP metric names: `agentgateway_mcp_requests_total` (labels `method`, `resource_type`, `server`, `resource`) is the only `agentgateway_mcp_*` series the proxy emits; MCP HTTP-level volume and latency come from `agentgateway_requests_total{protocol="mcp"}` and `agentgateway_request_duration_seconds{protocol="mcp"}`. Access-log/span fields are `mcp.method.name`, `mcp.resource.type`, `mcp.target`, `mcp.session.id`, `gen_ai.tool.name`, `http.status`.
 - PromQL goes in ```` ```promql ```` fences. Sum input/output token types separately to avoid label conflicts; note that `increase()` extrapolation can produce fractional tokens.
 - Don't re-document the monitoring stack — point at `002`.
 

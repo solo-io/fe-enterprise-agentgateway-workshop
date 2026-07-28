@@ -73,7 +73,7 @@ spec:
 EOF
 ```
 
-The `EnterpriseAgentgatewayBackend` matches requests on the `/openai` path prefix, rewrites the path to `/v1/chat/completions`, and forwards the request to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret.
+The `HTTPRoute` matches requests on the `/openai` path prefix. The `EnterpriseAgentgatewayBackend` then forwards them to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret, normalizing the path to the provider's `/v1/chat/completions` endpoint. Because the backend handles that normalization, any sub-path under the prefix works — so CrewAI's `base_url` can point at `/openai` directly.
 
 ## Get the Gateway IP
 
@@ -93,7 +93,7 @@ Before running the crew, confirm the gateway is routing to OpenAI correctly:
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -126,7 +126,6 @@ Run the crew with your chosen topic:
 ```bash
 GATEWAY_IP="$GATEWAY_IP" \
 CREW_TOPIC="AI Gateway key patterns and concepts" \
-CREWAI_TRACING_ENABLED=false \
 lib/crewai/multi-agent-researcher-writer/.venv/bin/python3 lib/crewai/multi-agent-researcher-writer/crew.py
 ```
 
@@ -136,7 +135,6 @@ Try a different topic:
 ```bash
 GATEWAY_IP="$GATEWAY_IP" \
 CREW_TOPIC="Service Mesh key patterns and concepts" \
-CREWAI_TRACING_ENABLED=false \
 lib/crewai/multi-agent-researcher-writer/.venv/bin/python3 lib/crewai/multi-agent-researcher-writer/crew.py
 ```
 
@@ -171,15 +169,20 @@ The dashboard shows real-time data from the crew run, including:
 - Per-model request latency
 - Total proxied request counts
 
-### View Traces in Grafana
+### View Traces in the Solo UI
 
 To see distributed traces for individual agent LLM calls:
 
-1. In Grafana, navigate to **Home > Explore**
-2. Select **Tempo** from the data source dropdown
-3. Click **Search** to see all traces
+1. Port-forward to the Solo UI:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
 
-Each agent invocation produces a trace with LLM-specific spans containing `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, and token counts.
+2. Open http://localhost:4000 in your browser
+
+3. Click **Tracing** in the left navigation
+
+Each agent invocation produces a trace listed as `POST /openai/*` against the `agentgateway-system/openai` route, with its duration and input/output token counts. Click a row to open its span details, which carry `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`.
 
 ### View the Prometheus metrics endpoint
 
@@ -190,6 +193,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 Useful metrics:
 - `agentgateway_gen_ai_client_token_usage` — token usage per agent call
+- `agentgateway_gen_ai_client_cost_usd_total` — estimated cost per agent call
 - `agentgateway_gen_ai_server_request_duration` — latency per request
 - `agentgateway_requests_total` — total proxied requests
 

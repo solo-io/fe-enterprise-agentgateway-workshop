@@ -434,7 +434,7 @@ Confirm the route rejects requests that carry no OBO token:
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 Expected Output:
