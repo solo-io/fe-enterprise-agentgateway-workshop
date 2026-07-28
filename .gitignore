@@ -58,3 +58,4 @@ scripts/
 
 # Diagram HTML sources (rendered PNGs are committed instead)
 images/platform-engineering/src/
+images/src/

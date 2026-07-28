@@ -1,5 +1,9 @@
 # Changelog
 
+0.13.0 - (7-28-26)
+---
+- Update `agentgateway-architecture.gif` in readme
+
 0.12.9 - (7-28-26)
 ---
 - Fix broken relative links in `001-install-enterprise-agentgateway.md`: `image-list.md` and `airgap/001-airgap.md` now point at `labs/installation/`
