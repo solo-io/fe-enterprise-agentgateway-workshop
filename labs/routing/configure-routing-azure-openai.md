@@ -1,43 +1,40 @@
-# Configure Basic Routing to Azure OpenAI
+# Configure Routing to Azure OpenAI and Azure AI Foundry
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
-- Create a Kubernetes secret that contains our Azure OpenAI api-key credentials
-- Create a route to Azure OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
-- Curl Azure OpenAI through the agentgateway proxy
+- Create a Kubernetes secret that contains our Azure api-key credentials
+- Create a route to Azure OpenAI or Azure AI Foundry as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Curl your provider through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
 ### Configure Required Variables
 
-Set the following environment variables to match your Azure OpenAI deployment.
-For reference, an endpoint typically follows this format:
-`https://${ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-01`
+Set the following environment variables to match your Azure resource.
 
 **Note:** The ENDPOINT should be just the hostname without the `https://` scheme (e.g., `my-endpoint.openai.azure.com`)
 
 ```bash
 export AZURE_OPENAI_API_KEY="<API-KEY>"
-export ENDPOINT="<AZURE-OPENAI-ENDPOINT>"  # Just the hostname, no https://
-export DEPLOYMENT_NAME="<DEPLOYMENT-NAME>"
+export ENDPOINT="<AZURE-ENDPOINT>"  # Just the hostname, no https://
 ```
 
-Create azure openai api-key secret
+Create azure api-key secret
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
   name: azureopenai-secret
-  namespace: agentgateway-system # Putting in same ns where the redis, ext auth is getting deployed
+  namespace: agentgateway-system
 type: Opaque
 stringData:
   Authorization: "Bearer ${AZURE_OPENAI_API_KEY}"
 EOF
 ```
 
-Create azure openai route and backend
+Create the route to the backend (shared by both options below):
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -60,7 +57,64 @@ spec:
           kind: EnterpriseAgentgatewayBackend
       timeouts:
         request: "120s"
----
+EOF
+```
+
+Then create the backend using whichever option matches your Azure resource.
+
+## Option A: Azure AI Foundry (v1 API)
+
+Use this option if your resource is an Azure AI Foundry resource, or any resource exposing Azure's unified `v1` inference API, with no deployments to reference. `apiVersion` defaults to `v1`, which routes to `/openai/v1/chat/completions` and reads the model directly from the request body.
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: azure-openai
+  namespace: agentgateway-system
+spec:
+  ai:
+    provider:
+      azureopenai:
+        endpoint: "${ENDPOINT}"
+  policies:
+    auth:
+      secretRef:
+        name: azureopenai-secret
+EOF
+```
+
+curl azure ai foundry
+```bash
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+
+curl -i "$GATEWAY_IP:8080/azure" \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "<YOUR-FOUNDRY-MODEL-NAME>",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+```
+
+Skip ahead to [Observability](#observability).
+
+## Option B: Classic Deployment-Based Azure OpenAI
+
+Use this option if your resource uses named deployments and a dated `api-version`. For reference, an endpoint typically follows this format:
+`https://${ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-01`
+
+```bash
+export DEPLOYMENT_NAME="<DEPLOYMENT-NAME>"
+```
+
+```bash
+kubectl apply -f - <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayBackend
 metadata:
@@ -79,7 +133,7 @@ spec:
 EOF
 ```
 
-## curl azure openai
+curl azure openai
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 

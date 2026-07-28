@@ -1,11 +1,17 @@
 # Changelog
 
-0.12.8 - (7-28-26)
+0.12.9 - (7-28-26)
 ---
 - Fix broken relative links in `001-install-enterprise-agentgateway.md`: `image-list.md` and `airgap/001-airgap.md` now point at `labs/installation/`
 - Correct the Enterprise Agentgateway CRD expected output in `001`: split the conflated `agentgatewaybackends` (OSS, `agbe`) and `enterpriseagentgatewaybackends` (Enterprise, `eagbe`) rows, and add the missing `enterpriseagentgatewaybudgets` and `enterpriseagentgatewayexternalsecrets` CRDs
 - Correct the Gateway API expected output in `001`: drop `tcproutes` and `udproutes`, which ship in the experimental channel and not in the `standard-install.yaml` the lab applies
 - Add the missing `waf-server-enterprise-agentgateway` pod to the expected controller output in `001`
+
+0.12.8 - (7-23-26)
+---
+- Update `labs/routing/configure-routing-azure-openai.md` to include examples for Azure Foundry endpoints
+- Add new lab `labs/routing/configure-routing-azure-openai-workload-identity.md` to configure UMI workload identity with Azure
+- Update `README.md`
 
 0.12.7 - (7-22-26)
 ---
