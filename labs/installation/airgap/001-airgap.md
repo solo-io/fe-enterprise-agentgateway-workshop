@@ -31,7 +31,7 @@ kubectl api-resources --api-group=gateway.networking.k8s.io
 
 Expected Output:
 
-```bash
+```
 NAME                 SHORTNAMES   APIVERSION                           NAMESPACED   KIND
 backendtlspolicies   btlspolicy   gateway.networking.k8s.io/v1         true         BackendTLSPolicy
 gatewayclasses       gc           gateway.networking.k8s.io/v1         false        GatewayClass
@@ -73,7 +73,7 @@ kubectl api-resources | awk 'NR==1 || /enterpriseagentgateway\.solo\.io|agentgat
 
 Expected output
 
-```bash
+```
 NAME                                SHORTNAMES        APIVERSION                                NAMESPACED   KIND
 agentgatewaybackends                agbe              agentgateway.dev/v1alpha1                 true         AgentgatewayBackend
 agentgatewayparameters              agpar             agentgateway.dev/v1alpha1                 true         AgentgatewayParameters
@@ -139,7 +139,7 @@ kubectl get pods -n agentgateway-system -l app.kubernetes.io/name=enterprise-age
 
 Expected Output:
 
-```bash
+```
 NAME                                       READY   STATUS    RESTARTS   AGE
 enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 ```
@@ -264,7 +264,7 @@ kubectl get pods -n agentgateway-system
 
 Expected Output:
 
-```bash
+```
 NAME                                                        READY   STATUS    RESTARTS   AGE
 agentgateway-proxy-7d4c8c4d4b-lvdsq                         1/1     Running   0          11m
 agentgateway-proxy-9f8e7d6c5b-xkpqr                         1/1     Running   0          11m

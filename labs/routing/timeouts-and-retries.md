@@ -245,14 +245,10 @@ date: Wed, 07 Jan 2026 22:47:38 GMT
 request timeout
 ```
 
-Check the agentgateway logs, you should see that the request was retried a few times before the timeout
-```json
-{
-  "retry": 3,
-  "status": 504,
-  "duration": "103ms",
-  "error": "request timeout"
-}
+Check the agentgateway logs, you should see that the request was retried a few times before the timeout. The access log is a single logfmt line — these are the relevant fields from it:
+
+```
+http.status=504 retry.attempt=3 error="request timeout" reason=Timeout duration=102ms
 ```
 
 ### What Happened?
@@ -321,13 +317,9 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ```
 
 You should see output similar to:
-```json
-{
-  "retry": 7,
-  "status": 504,
-  "duration": "2001ms",
-  "error": "request timeout"
-}
+
+```
+http.status=504 retry.attempt=7 error="request timeout" reason=Timeout duration=2003ms
 ```
 
 ### Observing Backoff Behavior

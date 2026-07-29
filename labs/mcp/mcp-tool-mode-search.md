@@ -251,7 +251,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/search" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | sed 's/^data: //' | python3 -m json.tool
 ```
 
 ### Look up a tool
@@ -261,7 +261,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/search" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_tool","arguments":{"name":"get-sum"}}}' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_tool","arguments":{"name":"get-sum"}}}' | sed 's/^data: //' | python3 -m json.tool
 ```
 
 The `structuredContent.results` array has one entry with the tool's `name`, `tool_description`, and JSON-Schema `args`. The `name` argument is an exact-name lookup; pass the literal upstream tool name (e.g., `get-sum`, not `sum`).
@@ -273,7 +273,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/search" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"invoke_tool","arguments":{"name":"get-sum","arguments":{"a":2,"b":3}}}}' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"invoke_tool","arguments":{"name":"get-sum","arguments":{"a":2,"b":3}}}}' | sed 's/^data: //' | python3 -m json.tool
 ```
 
 The final response's `result.content[0].text` is `"The sum of 2 and 3 is 5."` — `invoke_tool` returns the upstream tool's reply verbatim, so the envelope shape (`content`, `structuredContent`, both, or neither) follows the upstream. Note the double-nested `arguments`: `invoke_tool` takes an `arguments` field whose value is itself the upstream tool's `arguments` payload.
@@ -425,7 +425,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/search" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_tool","arguments":{"name":"env"}}}' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_tool","arguments":{"name":"env"}}}' | sed 's/^data: //' | python3 -m json.tool
 ```
 
 Expected: `get_tool` with `{"name": "env"}` returns `status: "no_match"` and the `available_tools` array does not contain `get-env`. The CEL expression for tool name `get-env` evaluates as `mcp.tool.name != "get-env" || (has(jwt.roles) && jwt.roles.exists(r, r == "engineering"))` → `false || (false && ...)` → `false` — the tool is filtered. The same call without the policy would return the tool's metadata.
@@ -666,8 +666,16 @@ The structured log's `gen_ai.tool.name` field shows the *meta-tool* name (`get_t
 ### View MCP metrics
 
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 3 && curl -s http://localhost:15020/metrics | grep agentgateway_mcp_requests_total && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 3
+  curl -s http://localhost:15020/metrics | grep agentgateway_mcp_requests_total
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 `agentgateway_mcp_requests_total` increments with `resource="get_tool"` and `resource="invoke_tool"`, *not* `echo`/`get-sum`/etc. If you want per-upstream-tool metrics, you need Standard mode or to inspect traces.

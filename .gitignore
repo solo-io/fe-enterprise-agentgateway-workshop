@@ -56,6 +56,9 @@ scripts/
 # Claude Code skills (internal tooling, kept locally)
 .claude/skills/
 
+# E2E lab test suite (kept locally until it ships — remove this line to release it)
+e2e/
+
 # Diagram HTML sources (rendered PNGs are committed instead)
 images/platform-engineering/src/
 images/src/

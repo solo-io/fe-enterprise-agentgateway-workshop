@@ -78,7 +78,7 @@ This naming becomes important in [Step 7](#step-7-persona-based-tool-filtering) 
 ## Step 1: Namespace and API key secrets
 
 ```bash
-kubectl create namespace mcp
+kubectl create namespace mcp --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 Create the FRED API key secret (required):
@@ -458,7 +458,7 @@ spec:
         - issuer: workshop.solo.io
           jwks:
             inline: |
-                $(sed 's/^/                /' lib/jwt/jwks.json)
+$(sed 's/^/              /' lib/jwt/jwks.json)
 EOF
 ```
 
@@ -612,8 +612,16 @@ Look for MCP-specific fields: `mcp.method.name`, `mcp.resource.type`, `mcp.targe
 ### View MCP metrics
 
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 3 && curl -s http://localhost:15020/metrics | grep -E 'agentgateway_mcp_requests_total|protocol="mcp"' && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 3
+  curl -s http://localhost:15020/metrics | grep -E 'agentgateway_mcp_requests_total|protocol="mcp"'
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 You should see the `agentgateway_mcp_requests_total` counter broken down by the `server` label — the MCP target that served each call — so you can see which backend is hot, plus the `resource` label for the tool name. HTTP-level volume and latency for MCP traffic come from `agentgateway_requests_total{protocol="mcp"}` and `agentgateway_request_duration_seconds{protocol="mcp"}`.

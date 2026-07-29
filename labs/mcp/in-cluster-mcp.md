@@ -55,7 +55,7 @@ The `mcp-server-everything` image runs via `npx`, so no custom container image i
 - `app: mcp-server-everything` label on both the Deployment and Service — this is the label the dynamic backend will select later
 
 ```bash
-kubectl create namespace mcp
+kubectl create namespace mcp --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 ```bash
@@ -283,8 +283,16 @@ No Backend or HTTPRoute change was required at any point.
 AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
 
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 3 && curl -s http://localhost:15020/metrics | grep -E 'agentgateway_mcp_requests_total|protocol="mcp"' && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 3
+  curl -s http://localhost:15020/metrics | grep -E 'agentgateway_mcp_requests_total|protocol="mcp"'
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 You should see MCP-specific metrics such as:

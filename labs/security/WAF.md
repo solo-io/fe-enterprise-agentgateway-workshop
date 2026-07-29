@@ -58,7 +58,7 @@ kubectl get deploy -n agentgateway-system -l app=waf-server
 
 Expected output:
 
-```bash
+```
 NAME                      CREATED AT
 wafpolicies.waf.solo.io   2026-...
 

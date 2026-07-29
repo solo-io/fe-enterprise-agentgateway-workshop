@@ -313,8 +313,16 @@ Look for MCP-specific fields in the structured log output. A `tools/call` agains
 
 ### View MCP metrics
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 2 && curl -s http://localhost:15020/metrics | grep -iE "open-meteo|protocol=\"mcp\"" && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 2
+  curl -s http://localhost:15020/metrics | grep -iE "open-meteo|protocol=\"mcp\""
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 > The grep is scoped to `open-meteo` and `protocol="mcp"` on purpose. A plain `grep -iE "mcp"` returns every MCP route on the gateway (federation, other labs, etc.), which is a lot of noise on a shared cluster.
