@@ -389,17 +389,17 @@ Cross-reference the **Trace ID** with the access logs (next section) to jump fro
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about LLM requests to stdout. You can tail the logs to see Claude Desktop traffic flowing through:
+The gateway logs every LLM request to stdout. Tail the logs to watch Claude Desktop traffic:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output shows comprehensive request details including:
+The log line carries:
 - Model information (e.g., `claude-haiku-4-5-20251001`)
 - Token usage (input and output tokens)
 - Request duration
-- Trace IDs for correlation with Solo UI traces
+- A `trace.id` you can search for in the Solo UI's **Tracing** view
 - Full request and response bodies
 
 ### View Metrics Endpoint

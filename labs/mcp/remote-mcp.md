@@ -222,24 +222,24 @@ kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
 
 4. Use the **Search spans** box or the time-range buttons to find your requests, then click a row to open its span details
 
-Traces include MCP-specific spans with information like `mcp.method.name`, `mcp.resource.type`, `mcp.target`, `mcp.session.id`, and more.
+Each span carries the MCP fields `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`.
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about MCP requests to stdout:
+The gateway logs every MCP request to stdout:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output shows comprehensive request details including MCP-specific information like:
+The log line carries these MCP fields:
 - `mcp.method.name: tools/call`
 - `mcp.target: soloio-docs-mcp-target`
 - `mcp.resource.type: tool`
 - `gen_ai.tool.name: search`
 - `mcp.session.id: <session id>`
 - `http.status: 200`
-- Trace IDs for correlation with distributed traces in the Solo UI
+- A `trace.id` you can search for in the Solo UI's **Tracing** view
 
 ## Secure Access to MCP Server
 
@@ -287,7 +287,7 @@ From the MCP Inspector, verify that the connection fails with an error message s
 MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: authentication failure: no bearer token found
 ```
 
-We should also be able to see this error in the access logs `authentication failure: no bearer token found` with an `http.status=401` and `reason=JwtAuth`:
+This error also appears in the access logs as `authentication failure: no bearer token found` with an `http.status=401` and `reason=JwtAuth`:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
@@ -370,7 +370,7 @@ Notice the `org` field is `solo.io`, not `admin`.
 
 ## Allow Access for solo.io Organization
 
-Correct the expression to match the `org` claim our token actually carries, so that anyone in the `solo.io` org is allowed through:
+Correct the expression to match the `org` claim our token carries, so that anyone in the `solo.io` org is allowed through:
 
 ```bash
 kubectl apply -f- <<EOF

@@ -380,7 +380,7 @@ Example log output:
 INFO:     10.244.2.7:57232 - "POST /request HTTP/1.1" 200 OK
 ```
 
-Note that no `/response` webhook call follows — the request never reached OpenAI.
+No `/response` webhook call follows — the request never reached OpenAI.
 
 ---
 
@@ -759,13 +759,13 @@ Guardrail rejections carry `reason="Guardrail"` on the `agentgateway_requests_to
 sum(rate(agentgateway_requests_total{reason="Guardrail"}[5m])) by (status)
 ```
 
-Masked prompts and completions are not on the dashboard — they are text, not metrics. Read them from the access logs as shown below.
+Masked prompts and completions are text rather than metrics, so no dashboard panel shows them. Read them from the access logs as shown below.
 
 ### View traces
 
 Port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80`, open http://localhost:4000, and click **Tracing** in the left navigation. Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, and `gen_ai.usage.output_tokens`, plus per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`.
 
-Guardrail-rejected requests are traced too, which makes them easy to pick out. Their spans carry `http.status=403`, `reason=Guardrail`, and `error="request rejected by webhook guardrail"` — and because the request never reached the provider, they have no `gen_ai.*` or `agw.ai.usage.cost` attributes at all.
+Rejected requests produce spans too, and they stand out: each carries `http.status=403`, `reason=Guardrail`, and `error="request rejected by webhook guardrail"`. Because the request never reached the provider, the span has no `gen_ai.*` or `agw.ai.usage.cost` attributes.
 
 ### View AgentGateway access logs
 
@@ -779,7 +779,7 @@ A rejected request logs the guardrail as the reason it never reached the provide
 http.path=/openai http.status=403 protocol=llm error="request rejected by webhook guardrail" reason=Guardrail duration=1389ms
 ```
 
-The access log is also where you can confirm what the provider actually returned after masking, via the `llm.completion` attribute:
+The access log also shows what the provider returned after masking, via the `llm.completion` attribute:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --tail 50 \

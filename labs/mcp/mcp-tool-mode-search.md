@@ -661,7 +661,7 @@ EOF
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Note that the structured log's `gen_ai.tool.name` field shows the *meta-tool* name (`get_tool`, `invoke_tool`) — not the upstream tool — because that's what the client called. The gateway's call to the upstream is a separate trace span.
+The structured log's `gen_ai.tool.name` field shows the *meta-tool* name (`get_tool`, `invoke_tool`) — not the upstream tool — because that's what the client called. The gateway's call to the upstream is a separate trace span.
 
 ### View MCP metrics
 

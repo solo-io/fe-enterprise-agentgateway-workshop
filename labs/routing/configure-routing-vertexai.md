@@ -145,13 +145,13 @@ Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.respo
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about LLM requests to stdout:
+The gateway logs every LLM request to stdout:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in the Solo UI.
+The log line carries the model and token counts, plus a `trace.id` you can search for in the Solo UI's **Tracing** view.
 
 ### (Optional) View Traces in Jaeger
 

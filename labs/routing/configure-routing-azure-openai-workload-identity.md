@@ -348,7 +348,7 @@ Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.respo
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about LLM requests to stdout:
+The gateway logs every LLM request to stdout:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20

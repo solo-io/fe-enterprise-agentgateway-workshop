@@ -640,7 +640,7 @@ This lab deploys two different load generators with distinct patterns so you can
 - **Min RPS**: 17 RPS (50% of base, configured by `RAMP_MIN_MULTIPLIER: 0.5`)
 - **Max RPS**: 52 RPS (150% of base, configured by `RAMP_MAX_MULTIPLIER: 1.5`)
 - **Stage Duration**: 45 seconds per ramp up/down
-- **Pattern**: Faster, more dramatic oscillations between 17 RPS and 52 RPS every 45 seconds
+- **Pattern**: Faster, sharper oscillations between 17 RPS and 52 RPS every 45 seconds
 
 The different patterns create distinct lines in your Grafana dashboard, making it easy to distinguish between the two backends and observe how the system handles varying load profiles.
 

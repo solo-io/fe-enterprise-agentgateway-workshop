@@ -336,17 +336,17 @@ kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
 
 4. Use the **Search spans** box or the time-range buttons to find your requests, then click a row to open its span details
 
-Traces include MCP-specific spans with information like `mcp.method.name`, `mcp.resource.type`, `mcp.target`, `mcp.session.id`, and more.
+Each span carries the MCP fields `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`.
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about MCP requests to stdout:
+The gateway logs every MCP request to stdout:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output shows comprehensive request details including MCP-specific information like `mcp.method.name`, `mcp.resource.type`, `mcp.target`, `mcp.session.id`, and trace IDs for correlation with distributed traces in the Solo UI.
+The log line carries the MCP fields `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`, plus a `trace.id` you can search for in the Solo UI's **Tracing** view.
 
 ### (Optional) View Traces in Jaeger
 
@@ -356,7 +356,7 @@ If you installed Jaeger in the [002 — Set Up Monitoring Tools (OCP)](../instal
 kubectl port-forward svc/jaeger -n observability 16686:16686
 ```
 
-Navigate to http://localhost:16686 in your browser to see traces with MCP-specific spans including `mcp.method.name`, `mcp.resource.type`, `mcp.target`, `mcp.session.id`, and more
+Navigate to http://localhost:16686 in your browser to see the traces. Each span carries the MCP fields `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`.
 
 ## Secure access to MCP Server
 
@@ -400,7 +400,7 @@ From the MCP Inspector, click **Reconnect** and verify that the connection fails
 MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: authentication failure: no bearer token found
 ```
 
-We should also be able to see this error in the access logs `authentication failure: no bearer token found` with an `http.status=401` and `reason=JwtAuth`
+This error also appears in the access logs as `authentication failure: no bearer token found` with an `http.status=401` and `reason=JwtAuth`
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
@@ -476,7 +476,7 @@ If you navigate to jwt.io and input the tokens used we should see the claims tha
 
 ### Restore access
 
-Correct the expression to match the `org` claim our token actually carries, so that anyone in the `solo.io` org is allowed through:
+Correct the expression to match the `org` claim our token carries, so that anyone in the `solo.io` org is allowed through:
 
 ```bash
 kubectl apply -f- <<EOF

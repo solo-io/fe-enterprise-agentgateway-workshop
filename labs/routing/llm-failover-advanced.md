@@ -253,7 +253,7 @@ This pattern demonstrates a real-world graceful degradation setup:
 **Priority Group 2 (Degraded Mode):**
 1. OpenAI gpt-5.4-nano (less capable but faster/cheaper fallback)
 
-The key insight: Priority Group 2 uses a less proficient model (gpt-5.4-nano) to ensure users get *some* response even if it's lower quality. However, since Priority Group 1 has a healthy backend (gpt-5.6-terra), Priority Group 2 should NOT be reached in this test.
+Priority Group 2 uses a less proficient model (gpt-5.4-nano) to ensure users get *some* response even if it's lower quality. However, since Priority Group 1 has a healthy backend (gpt-5.6-terra), Priority Group 2 should NOT be reached in this test.
 
 ### Update Configuration
 
@@ -432,12 +432,12 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 
 This pattern demonstrates that:
 1. **Intra-pool failover**: Failover works correctly between backends within the same priority group
-2. **Backend ejection**: Unhealthy backends are ejected and not used in subsequent requests
+2. **Backend ejection**: The gateway ejects an unhealthy backend and skips it on subsequent requests
 3. **Priority group preference**: The gateway stays within the current priority group as long as ANY backend is healthy
-4. **Graceful degradation**: Lower priority groups with less capable models (gpt-5.4-nano) are only used when ALL backends in higher priority groups fail
-5. **Quality preservation**: Users get responses from the more capable model (gpt-5.6-terra) when available, ensuring the best possible user experience
+4. **Graceful degradation**: The gateway drops to a lower priority group, and its less capable models (gpt-5.4-nano), only when every backend in the higher groups has failed
+5. **Quality preservation**: Users get responses from the more capable model (gpt-5.6-terra) when available
 
-This pattern is crucial for building resilient AI gateway architectures that balance quality, cost, and availability. You can configure preferred high-quality models in Priority Group 1, while ensuring users still get *some* response (even if lower quality) from Priority Group 2 when the preferred tier is completely unavailable.
+The result trades answer quality for availability only when it has to: Priority Group 1 carries the models you prefer, and Priority Group 2 still returns an answer, at lower quality, once every backend in the preferred tier is down.
 
 ---
 

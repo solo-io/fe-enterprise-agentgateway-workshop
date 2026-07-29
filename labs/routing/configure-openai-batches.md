@@ -355,7 +355,7 @@ The Batches API is ideal for:
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about batch API requests including file uploads, batch creation, and status checks. All requests include trace IDs for correlation with distributed traces in the Solo UI.
+The gateway logs each step of the batch flow: the file upload, the batch creation, and the status checks. Every line carries a `trace.id` you can search for in the Solo UI's **Tracing** view.
 
 Check the logs:
 ```bash
