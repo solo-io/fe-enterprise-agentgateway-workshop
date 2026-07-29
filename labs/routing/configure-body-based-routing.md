@@ -271,7 +271,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-The response `model` field should show `gpt-5.4-nano` (the OpenAI resolved version).
+The response `model` field should show `gpt-5.4-nano-2026-03-17` (the OpenAI resolved version).
 
 ### Route to Mock LLM
 

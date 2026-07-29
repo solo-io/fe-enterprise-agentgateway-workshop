@@ -171,7 +171,7 @@ content-type: application/json
   "id": "chatcmpl-...",
   "object": "chat.completion",
   "created": 1736736000,
-  "model": "gpt-5.4-nano",
+  "model": "gpt-5.4-nano-2026-03-17",
   "choices": [
     {
       "index": 0,

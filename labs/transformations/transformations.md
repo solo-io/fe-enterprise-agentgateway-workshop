@@ -206,7 +206,7 @@ We should see the response headers we applied in the transformation policy
 ```
 x-user-id: anonymous
 x-llm-request-model: gpt-5.4-nano
-x-llm-response-model: gpt-5.4-nano
+x-llm-response-model: gpt-5.4-nano-2026-03-17
 x-request-method: POST
 x-request-path: /openai
 ```

@@ -152,7 +152,7 @@ curl -i "$GATEWAY_IP:8080/openai/gpt-5.4-mini" \
     ]
   }'
 ```
-The response shows the model used: `gpt-5.4-mini`
+The response shows the model used: `gpt-5.4-mini-2026-03-17`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai/gpt-5.4-nano" \
@@ -166,7 +166,7 @@ curl -i "$GATEWAY_IP:8080/openai/gpt-5.4-nano" \
     ]
   }'
 ```
-The response shows the model used: `gpt-5.4-nano`
+The response shows the model used: `gpt-5.4-nano-2026-03-17`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai/gpt-5.6-terra" \
@@ -256,7 +256,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-The response shows the model used: `gpt-5.4-mini`
+The response shows the model used: `gpt-5.4-mini-2026-03-17`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
@@ -271,7 +271,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-The response shows the model used: `gpt-5.4-nano`
+The response shows the model used: `gpt-5.4-nano-2026-03-17`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
@@ -361,7 +361,7 @@ curl -i "$GATEWAY_IP:8080/openai?model=gpt-5.4-mini" \
     ]
   }'
 ```
-The response shows the model used: `gpt-5.4-mini`
+The response shows the model used: `gpt-5.4-mini-2026-03-17`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai?model=gpt-5.4-nano" \
@@ -375,7 +375,7 @@ curl -i "$GATEWAY_IP:8080/openai?model=gpt-5.4-nano" \
     ]
   }'
 ```
-The response shows the model used: `gpt-5.4-nano`
+The response shows the model used: `gpt-5.4-nano-2026-03-17`
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai?model=gpt-5.6-terra" \

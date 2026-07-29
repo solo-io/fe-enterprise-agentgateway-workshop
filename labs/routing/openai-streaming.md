@@ -108,17 +108,17 @@ curl "$GATEWAY_IP:8080/openai" \
 You'll see Server-Sent Events (SSE) format with incremental chunks:
 
 ```
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano-2026-03-17","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{"content":"Streaming"},"finish_reason":null}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano-2026-03-17","choices":[{"index":0,"delta":{"content":"Streaming"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{"content":" responses"},"finish_reason":null}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano-2026-03-17","choices":[{"index":0,"delta":{"content":" responses"},"finish_reason":null}]}
 
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{"content":" allow"},"finish_reason":null}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano-2026-03-17","choices":[{"index":0,"delta":{"content":" allow"},"finish_reason":null}]}
 
 ...
 
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano-2026-03-17","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
 
 data: [DONE]
 ```

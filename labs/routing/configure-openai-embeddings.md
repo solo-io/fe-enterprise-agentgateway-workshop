@@ -206,7 +206,7 @@ Example output for chat completions:
             }
         ],
         "system_fingerprint": "fp_29330a9688",
-        "model": "gpt-5.4-nano",
+        "model": "gpt-5.4-nano-2026-03-17",
         "service_tier": "default"
     },
     "rq.headers.user-agent": "curl/8.7.1",

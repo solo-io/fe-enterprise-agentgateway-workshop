@@ -744,7 +744,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agw-llm-ops --pref
 Each LLM request shows its route, status, token usage, and whether the response streamed, for example:
 
 ```
-...gateway=agentgateway-system/agw-llm-ops route=agentgateway-system/llm-chat-real ... http.status=200 protocol=llm gen_ai.request.model=gpt-5.4-nano gen_ai.response.model=gpt-5.4-nano gen_ai.usage.input_tokens=13 gen_ai.usage.output_tokens=19 llm.streaming=false
+...gateway=agentgateway-system/agw-llm-ops route=agentgateway-system/llm-chat-real ... http.status=200 protocol=llm gen_ai.request.model=gpt-5.4-nano gen_ai.response.model=gpt-5.4-nano-2026-03-17 gen_ai.usage.input_tokens=13 gen_ai.usage.output_tokens=19 llm.streaming=false
 ...gateway=agentgateway-system/agw-llm-ops route=agentgateway-system/llm-chat-mock ... http.status=200 protocol=llm gen_ai.request.model=mock-model gen_ai.response.model=mock-model gen_ai.usage.input_tokens=10 gen_ai.usage.output_tokens=54 llm.streaming=false
 ...gateway=agentgateway-system/agw-llm-ops route=agentgateway-system/llm-chat-mock ... http.status=429 protocol=llm reason=DirectResponse
 ```

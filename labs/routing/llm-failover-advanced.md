@@ -857,11 +857,11 @@ HTTP=503  error.type=InternalServerError  error.code=503
 === Request 2 ===
 HTTP=429  error.type=RateLimitError       error.code=429
 === Request 3 ===
-HTTP=200  model=gpt-5.4-nano
+HTTP=200  model=gpt-5.4-nano-2026-03-17
 === Request 4 ===
-HTTP=200  model=gpt-5.4-nano
+HTTP=200  model=gpt-5.4-nano-2026-03-17
 === Request 5 ===
-HTTP=200  model=gpt-5.4-nano
+HTTP=200  model=gpt-5.4-nano-2026-03-17
 ```
 
 The exact provider P2C picks first (mock-429 or mock-503) may vary, but the overall sequence will always be: one failure from the first picked provider, one failure from the second, then group 2 takes over.
