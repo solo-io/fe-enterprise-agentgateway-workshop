@@ -62,7 +62,7 @@ modelCatalog: []
 #    apiPath: /v1/chat/completions
 #  - alias: chat-real          # real completions; provider is a platform decision
 #    provider: openai
-#    model: gpt-4o-mini
+#    model: gpt-5.4-nano
 #    auth:
 #      secretRef: openai-secret   # platform-held provider credential (pre-created Secret)
 

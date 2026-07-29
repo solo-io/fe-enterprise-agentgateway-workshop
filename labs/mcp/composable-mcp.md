@@ -1085,11 +1085,11 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ... protocol=mcp mcp.method.name=tools/call mcp.target=account-brief mcp.resource.type=tool gen_ai.tool.name=account-brief mcp.session.id=... duration=2ms
 ```
 
-`protocol=mcp` and `mcp.target=account-brief` identify this as the composite tool call, but the log line doesn't break out the `account`/`orders` steps individually — same as the meta-tool logging in [MCP Tool Mode — Search](mcp-tool-mode-search.md), where the structured log shows the tool the client called, and "the gateway's call to the upstream is a separate trace span." Traces are where the per-step fan-out becomes visible: if you installed Tempo in `002`, the `trace.id` on the log line above has one parent span for the `tools/call` against `account-brief` and a child span per step — one for the MCP call into `accounts-mcp`, one for the HTTP call into `orders-api`.
+`protocol=mcp` and `mcp.target=account-brief` identify this as the composite tool call, but the log line doesn't break out the `account`/`orders` steps individually — same as the meta-tool logging in [MCP Tool Mode — Search](mcp-tool-mode-search.md), where the structured log shows the tool the client called, and "the gateway's call to the upstream is a separate trace span." Traces are where the per-step fan-out becomes visible: in the Solo UI's **Tracing** view, the `trace.id` on the log line above has one parent span for the `tools/call` against `account-brief` and a child span per step — one for the MCP call into `accounts-mcp`, one for the HTTP call into `orders-api`.
 
-1. Port-forward Grafana: `kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000`
-2. Open http://localhost:3000 (username: `admin`, password: `prom-operator`)
-3. **Home > Explore**, select **Tempo**, and search for a trace on route `composable-mcp/composable-mcp`
+1. Port-forward the Solo UI: `kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80`
+2. Open http://localhost:4000 and click **Tracing** in the left navigation
+3. Find a trace on route `composable-mcp/composable-mcp` and click the row
 4. Expand the trace — the two child spans are the two upstream calls this one `tools/call` fanned out to
 
 ---

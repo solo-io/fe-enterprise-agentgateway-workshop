@@ -65,7 +65,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -108,7 +108,7 @@ Make a curl request to the OpenAI endpoint again, this time it should fail
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -124,7 +124,7 @@ Try a different one
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",

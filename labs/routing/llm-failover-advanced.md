@@ -166,7 +166,7 @@ spec:
       - providers:
           - name: openai-provider
             openai:
-              model: "gpt-4o-mini"
+              model: "gpt-5.4-nano"
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
@@ -248,12 +248,12 @@ This pattern demonstrates a real-world graceful degradation setup:
 
 **Priority Group 1 (Preferred):**
 1. Mock server (fails with 429)
-2. OpenAI gpt-4o (healthy, more capable model)
+2. OpenAI gpt-5.6-terra (healthy, more capable model)
 
 **Priority Group 2 (Degraded Mode):**
-1. OpenAI gpt-4o-mini (less capable but faster/cheaper fallback)
+1. OpenAI gpt-5.4-nano (less capable but faster/cheaper fallback)
 
-The key insight: Priority Group 2 uses a less proficient model (gpt-4o-mini) to ensure users get *some* response even if it's lower quality. However, since Priority Group 1 has a healthy backend (gpt-4o), Priority Group 2 should NOT be reached in this test.
+Priority Group 2 uses a less proficient model (gpt-5.4-nano) to ensure users get *some* response even if it's lower quality. However, since Priority Group 1 has a healthy backend (gpt-5.6-terra), Priority Group 2 should NOT be reached in this test.
 
 ### Update Configuration
 
@@ -309,12 +309,12 @@ spec:
           # OpenAI (should failover to this within the same priority group)
           - name: openai-provider-primary
             openai:
-              model: "gpt-4o"
+              model: "gpt-5.6-terra"
       # Priority Group 2: OpenAI fallback (should NOT be reached)
       - providers:
           - name: openai-provider-fallback
             openai:
-              model: "gpt-4o-mini"
+              model: "gpt-5.4-nano"
 ---
 # Re-apply the per-provider auth policies for the new provider names. The
 # passthrough EAGP from Base Setup still matches; the OpenAI EAGP now needs
@@ -357,10 +357,10 @@ EOF
 ```
 
 **Key differences from the Base Setup backend:**
-- Priority Group 1 now has TWO providers: mock-ratelimit-provider and openai-provider-primary (gpt-4o)
-- Priority Group 2 uses a less capable model (gpt-4o-mini) as a "degraded mode" fallback
+- Priority Group 1 now has TWO providers: mock-ratelimit-provider and openai-provider-primary (gpt-5.6-terra)
+- Priority Group 2 uses a less capable model (gpt-5.4-nano) as a "degraded mode" fallback
 - This demonstrates graceful degradation: prefer the more capable model, but ensure users get *some* response (even if lower quality) if all preferred backends fail
-- In this test, Priority Group 2 should never be reached because Priority Group 1 has a healthy gpt-4o backend
+- In this test, Priority Group 2 should never be reached because Priority Group 1 has a healthy gpt-5.6-terra backend
 
 ### Test Intra-Priority-Group Failover
 
@@ -383,13 +383,13 @@ HTTP Status: 429
 
 Request 2:
 ```json
-{"model":"gpt-4o-2024-08-06","choices":[{"message":{"content":"Four.",...}],...}
+{"model":"gpt-5.6-terra","choices":[{"message":{"content":"Four.",...}],...}
 HTTP Status: 200
 ```
 
 Request 3:
 ```json
-{"model":"gpt-4o-2024-08-06","choices":[{"message":{"content":"Four.",...}],...}
+{"model":"gpt-5.6-terra","choices":[{"message":{"content":"Four.",...}],...}
 HTTP Status: 200
 ```
 
@@ -423,21 +423,21 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 
 **Key observations:**
 - Request 1: Routed to `mock-gpt-4o-svc` → returned 429 → backend ejected
-- Requests 2-3: Routed to `api.openai.com` (Priority Group 1's healthy gpt-4o backend) → returned 200
+- Requests 2-3: Routed to `api.openai.com` (Priority Group 1's healthy gpt-5.6-terra backend) → returned 200
 - The endpoint does NOT switch back to the mock server
-- Priority Group 2 (with gpt-4o-mini) is never reached because Priority Group 1 has a healthy backend
-- Users get responses from the more capable gpt-4o model, not the degraded gpt-4o-mini fallback
+- Priority Group 2 (with gpt-5.4-nano) is never reached because Priority Group 1 has a healthy backend
+- Users get responses from the more capable gpt-5.6-terra model, not the degraded gpt-5.4-nano fallback
 
 ### What This Proves
 
 This pattern demonstrates that:
 1. **Intra-pool failover**: Failover works correctly between backends within the same priority group
-2. **Backend ejection**: Unhealthy backends are ejected and not used in subsequent requests
+2. **Backend ejection**: The gateway ejects an unhealthy backend and skips it on subsequent requests
 3. **Priority group preference**: The gateway stays within the current priority group as long as ANY backend is healthy
-4. **Graceful degradation**: Lower priority groups with less capable models (gpt-4o-mini) are only used when ALL backends in higher priority groups fail
-5. **Quality preservation**: Users get responses from the more capable model (gpt-4o) when available, ensuring the best possible user experience
+4. **Graceful degradation**: The gateway drops to a lower priority group, and its less capable models (gpt-5.4-nano), only when every backend in the higher groups has failed
+5. **Quality preservation**: Users get responses from the more capable model (gpt-5.6-terra) when available
 
-This pattern is crucial for building resilient AI gateway architectures that balance quality, cost, and availability. You can configure preferred high-quality models in Priority Group 1, while ensuring users still get *some* response (even if lower quality) from Priority Group 2 when the preferred tier is completely unavailable.
+The result trades answer quality for availability only when it has to: Priority Group 1 carries the models you prefer, and Priority Group 2 still returns an answer, at lower quality, once every backend in the preferred tier is down.
 
 ---
 
@@ -575,7 +575,7 @@ spec:
       - providers:
           - name: openai-provider
             openai:
-              model: "gpt-4o-mini"
+              model: "gpt-5.4-nano"
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
@@ -771,7 +771,7 @@ spec:
       - providers:
           - name: openai-fallback
             openai:
-              model: "gpt-4o-mini"
+              model: "gpt-5.4-nano"
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
@@ -857,11 +857,11 @@ HTTP=503  error.type=InternalServerError  error.code=503
 === Request 2 ===
 HTTP=429  error.type=RateLimitError       error.code=429
 === Request 3 ===
-HTTP=200  model=gpt-4o-mini-2024-07-18
+HTTP=200  model=gpt-5.4-nano-2026-03-17
 === Request 4 ===
-HTTP=200  model=gpt-4o-mini-2024-07-18
+HTTP=200  model=gpt-5.4-nano-2026-03-17
 === Request 5 ===
-HTTP=200  model=gpt-4o-mini-2024-07-18
+HTTP=200  model=gpt-5.4-nano-2026-03-17
 ```
 
 The exact provider P2C picks first (mock-429 or mock-503) may vary, but the overall sequence will always be: one failure from the first picked provider, one failure from the second, then group 2 takes over.

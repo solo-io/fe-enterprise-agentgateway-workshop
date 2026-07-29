@@ -86,7 +86,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -i "$GATEWAY_IP:8080/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -165,7 +165,7 @@ Example output for chat completions:
     "protocol": "llm",
     "duration": "3323ms",
     "request.body": {
-        "model": "gpt-4o-mini",
+        "model": "gpt-5.4-nano",
         "messages": [
             {
                 "role": "user",
@@ -206,7 +206,7 @@ Example output for chat completions:
             }
         ],
         "system_fingerprint": "fp_29330a9688",
-        "model": "gpt-4o-mini-2024-07-18",
+        "model": "gpt-5.4-nano-2026-03-17",
         "service_tier": "default"
     },
     "rq.headers.user-agent": "curl/8.7.1",
@@ -287,13 +287,13 @@ Notice the `gen_ai.operation.name` field changes based on the endpoint:
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about LLM requests to stdout:
+The gateway logs every LLM request to stdout:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
+The log line carries the model and token counts, plus a `trace.id` you can search for in the Solo UI's **Tracing** view.
 
 ## Advanced: Using Path Rewrites
 
@@ -382,7 +382,7 @@ Test chat completions using `/openai/chat`:
 curl -i "$GATEWAY_IP:8080/openai/chat" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -415,7 +415,7 @@ You can also still use the standard OpenAI paths directly thanks to the default 
 curl -i "$GATEWAY_IP:8080/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```

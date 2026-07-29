@@ -83,8 +83,8 @@ These follow the [OpenTelemetry GenAI semantic conventions](https://opentelemetr
 | `gen_ai_token_type` | `input`, `output` | Whether this observation counts prompt tokens or completion tokens. Only on `token_usage`. |
 | `gen_ai_operation_name` | `chat`, `embeddings` | The type of LLM operation. |
 | `gen_ai_system` | `openai`, `anthropic`, `bedrock`, `vertexai`, `azureopenai`, etc. | The LLM provider type configured in the backend. |
-| `gen_ai_request_model` | e.g. `gpt-4o`, `claude-sonnet-4-20250514` | The model name sent in the request. |
-| `gen_ai_response_model` | e.g. `gpt-4o-2024-08-06` | The model name returned in the response (may differ from request). |
+| `gen_ai_request_model` | e.g. `gpt-5.6-terra`, `claude-sonnet-4-20250514` | The model name sent in the request. |
+| `gen_ai_response_model` | e.g. `gpt-5.4-nano-2026-03-17` | The model name returned in the response (may differ from request). |
 
 #### MCP (Model Context Protocol) Metrics
 

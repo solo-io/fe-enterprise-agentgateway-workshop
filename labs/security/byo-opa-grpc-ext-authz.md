@@ -246,7 +246,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {"role": "user", "content": "Whats your favorite poem?"}
     ]
@@ -289,7 +289,7 @@ EOF
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {"role": "user", "content": "Whats your favorite poem?"}
     ]
@@ -315,7 +315,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "x-ext-authz: allow" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {"role": "user", "content": "Whats your favorite poem?"}
     ]
@@ -833,13 +833,13 @@ Re-run the deny/allow tests from Part 1 — they should behave identically, beca
 # Should be 403
 curl -sS -o /dev/null -w "no header: %{http_code}\n" "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}'
+  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}'
 
 # Should be 200
 curl -sS -o /dev/null -w "with header: %{http_code}\n" "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "x-ext-authz: allow" \
-  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hi"}]}'
+  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}'
 ```
 
 To prove the policy came from the bundle, check the decision log — each entry now includes a `bundles` field naming the active bundle:

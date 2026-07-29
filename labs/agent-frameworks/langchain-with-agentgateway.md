@@ -73,7 +73,7 @@ spec:
 EOF
 ```
 
-The `EnterpriseAgentgatewayBackend` matches requests on the `/openai` path prefix and forwards them to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret. LangChain's `ChatOpenAI` appends `/chat/completions` automatically, so the `base_url` is set to `http://$GATEWAY_IP:8080/openai/v1`.
+The `HTTPRoute` matches requests on the `/openai` path prefix. The `EnterpriseAgentgatewayBackend` then forwards them to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret, normalizing the path to the provider's `/v1/chat/completions` endpoint. LangChain's `ChatOpenAI` appends `/chat/completions` to whatever `base_url` you give it, so this lab uses `http://$GATEWAY_IP:8080/openai/v1`.
 
 ## Get the Gateway IP
 
@@ -93,7 +93,7 @@ Before running the pipeline, confirm the gateway is routing to OpenAI correctly:
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -162,15 +162,20 @@ The dashboard shows real-time data from the pipeline run, including:
 - Per-model request latency
 - Total proxied request counts
 
-### View Traces in Grafana
+### View Traces in the Solo UI
 
 To see distributed traces for individual agent LLM calls:
 
-1. In Grafana, navigate to **Home > Explore**
-2. Select **Tempo** from the data source dropdown
-3. Click **Search** to see all traces
+1. Port-forward to the Solo UI:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
 
-Each chain invocation produces a trace with LLM-specific spans containing `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, and token counts.
+2. Open http://localhost:4000 in your browser
+
+3. Click **Tracing** in the left navigation
+
+Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`.
 
 ### View the Prometheus metrics endpoint
 
@@ -181,6 +186,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 Useful metrics:
 - `agentgateway_gen_ai_client_token_usage` — token usage per agent call
+- `agentgateway_gen_ai_client_cost_usd_total` — estimated cost per agent call
 - `agentgateway_gen_ai_server_request_duration` — latency per request
 - `agentgateway_requests_total` — total proxied requests
 

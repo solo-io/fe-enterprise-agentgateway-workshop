@@ -28,7 +28,7 @@ In Standard mode, every upstream tool call is its own round trip: the model issu
 - **Intermediate results are large.** Example: an image pipeline that fetches a base64-encoded image (KB–MB per payload), passes it through OCR, and returns extracted text. Standard mode would land every intermediate base64 payload in the model's context; Code mode only emits the final text. Step 4 Part B below demonstrates this with `get-tiny-image`.
 - **The model needs to loop over tool calls rather than round-tripping each iteration.** Example: "for each of these 50 customer IDs, look up the open invoice total and sum them" — one `run_code` invocation vs. 50 sequential round trips. (Still bounded by the 20-tool-call ceiling — see Runtime limits above.)
 
-**Stay with Standard mode when** workflows are one-shot and intermediate results are tiny (e.g., a calculator's `add(a,b)`, or a feature-flag service where each call is a self-contained lookup). Code mode buys you nothing if there's no chaining and no large intermediates to elide, and the sandbox indirection adds latency. You also need Standard mode if you want per-upstream-tool counters on `agentgateway_mcp_tool_calls_total`; Code mode aggregates everything under `run_code`.
+**Stay with Standard mode when** workflows are one-shot and intermediate results are tiny (e.g., a calculator's `add(a,b)`, or a feature-flag service where each call is a self-contained lookup). Code mode buys you nothing if there's no chaining and no large intermediates to elide, and the sandbox indirection adds latency. You also need Standard mode if you want per-upstream-tool counters on `agentgateway_mcp_requests_total`; Code mode aggregates everything under `run_code`.
 
 **Reach for [Search mode](mcp-tool-mode-search.md) instead** when the catalog is large but calls don't depend on each other. Example: an aggregator MCP server with 200 tools where the model picks the right one per turn but rarely chains more than one — Search mode's `get_tool` is the lighter abstraction and you skip the sandbox altogether. The two modes solve different problems — Search compresses the *catalog*, Code compresses the *results*.
 
@@ -698,16 +698,16 @@ EOF
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-The `mcp.method` field shows `run_code` — each script execution is one MCP call to the gateway, regardless of how many upstream tool calls happen inside the sandbox.
+The `gen_ai.tool.name` field shows `run_code` (with `mcp.method.name=tools/call`) — each script execution is one MCP call to the gateway, regardless of how many upstream tool calls happen inside the sandbox.
 
 ### View MCP metrics
 
 ```bash
 kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics | grep mcp_tool_calls && kill $!
+sleep 3 && curl -s http://localhost:15020/metrics | grep agentgateway_mcp_requests_total && kill $!
 ```
 
-`agentgateway_mcp_tool_calls_total` increments by one per `run_code` invocation. For per-upstream-tool visibility, inspect traces.
+`agentgateway_mcp_requests_total{method="tools/call"}` increments by one per `run_code` invocation, with `resource="run_code"`. For per-upstream-tool visibility, inspect traces.
 
 ### View in Grafana
 

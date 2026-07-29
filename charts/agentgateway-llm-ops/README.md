@@ -101,7 +101,7 @@ gateway:
 modelCatalog:
   - alias: chat-real
     provider: openai
-    model: gpt-4o
+    model: gpt-5.6-terra
     auth:
       secretRef: openai-secret
 grants:

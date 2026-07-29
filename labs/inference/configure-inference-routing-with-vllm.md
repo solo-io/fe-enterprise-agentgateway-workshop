@@ -291,9 +291,9 @@ Look for `gRPC server listening` on port `9002` — this is the ext-proc endpoin
 
 > **Note on EPP metrics:** the EPP exposes Prometheus metrics on container port `9090`, but the endpoint is gated by Kubernetes TokenReview authentication by default and returns `401 Unauthorized` without a valid ServiceAccount token. To scrape it, configure Prometheus with the appropriate token or run a custom scraper inside the cluster. Out of scope for this lab.
 
-### View Metrics and Traces in Grafana
+### View Metrics and Traces
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use Tempo through the Grafana **Explore** view.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the **Tracing** view in the Solo UI.
 
 1. Port-forward to the Grafana service:
    ```bash
@@ -304,7 +304,7 @@ For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring to
    - Username: `admin`
    - Password: Value of `$GRAFANA_ADMIN_PASSWORD` (default: `prom-operator`)
 4. Navigate to **Dashboards > AgentGateway Dashboard** to view metrics.
-5. In **Home > Explore**, select **Tempo** and search for recent traces to find spans that include the InferencePool backend selection.
+5. For traces, port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80`, open <http://localhost:4000>, and click **Tracing** in the left navigation to find spans that include the InferencePool backend selection.
 
 ## Cleanup
 

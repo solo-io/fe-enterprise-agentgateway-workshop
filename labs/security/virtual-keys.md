@@ -170,7 +170,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-alice-abc123def456" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
@@ -182,7 +182,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-bob-xyz789uvw012" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [{"role": "user", "content": "Hello!"}]
   }'
 ```
@@ -193,7 +193,7 @@ Both should return `HTTP 200`. Verify that an unknown key is rejected:
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-invalid-key" \
-  -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello!"}]}'
+  -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Hello!"}]}'
 ```
 
 Expected: `HTTP 401`.
@@ -278,7 +278,7 @@ for i in {1..20}; do
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-alice-abc123def456" \
     -d '{
-      "model": "gpt-4o-mini",
+      "model": "gpt-5.4-nano",
       "messages": [{"role": "user", "content": "What is 1+1?"}]
     }'
 done
@@ -293,7 +293,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-bob-xyz789uvw012" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [{"role": "user", "content": "What is 2+2?"}]
   }'
 ```
@@ -440,7 +440,7 @@ for i in {1..15}; do
   curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-charlie-ghi345jkl678" \
-    -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "What is 1+1?"}]}'
+    -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "What is 1+1?"}]}'
 done
 ```
 
@@ -450,7 +450,7 @@ Charlie hits `429` after her free-tier budget is exhausted. Verify alice's premi
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-alice-abc123def456" \
-  -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Still working?"}]}'
+  -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Still working?"}]}'
 ```
 
 Expected: `HTTP 200`.
@@ -543,14 +543,14 @@ for i in {1..20}; do
   curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-alice-abc123def456" \
-    -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "What is 1+1?"}]}'
+    -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "What is 1+1?"}]}'
 done
 
 # Alice in tenant-b still has her full budget
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-alice-tenant-b-000111" \
-  -d '{"model": "gpt-4o-mini", "messages": [{"role": "user", "content": "Hello from tenant-b!"}]}'
+  -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Hello from tenant-b!"}]}'
 ```
 
 Expected: `HTTP 200` for tenant-b despite tenant-a being exhausted.

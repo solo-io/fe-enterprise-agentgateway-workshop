@@ -87,7 +87,7 @@ modelCatalog:
     apiPath: /v1/chat/completions
   - alias: chat-real
     provider: openai
-    model: gpt-4o-mini
+    model: gpt-5.4-nano
     auth:
       secretRef: openai-secret
 """
@@ -103,7 +103,7 @@ def test_catalog_backends():
     assert mock["ai"]["provider"]["path"] == "/v1/chat/completions"
     assert mock["policies"]["auth"] == {"passthrough": {}}
     real = bes["llm-chat-real"]["spec"]
-    assert real["ai"]["provider"]["openai"]["model"] == "gpt-4o-mini"
+    assert real["ai"]["provider"]["openai"]["model"] == "gpt-5.4-nano"
     assert "host" not in real["ai"]["provider"]
     assert real["policies"]["auth"] == {"secretRef": {"name": "openai-secret"}}
 
@@ -466,7 +466,7 @@ gateway: null
 modelCatalog:
   - alias: chat-real
     provider: openai
-    model: gpt-4o-mini
+    model: gpt-5.4-nano
     auth:
       secretRef: openai-secret
 

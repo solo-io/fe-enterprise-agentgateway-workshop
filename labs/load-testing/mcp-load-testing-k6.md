@@ -420,7 +420,7 @@ While the test runs, open Grafana to watch live metrics:
 kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 ```
 
-Access at http://localhost:3000 (admin / prom-operator). Navigate to **Dashboards > AgentGateway Overview**.
+Access at http://localhost:3000 (admin / prom-operator). Navigate to **Dashboards > AgentGateway Dashboard**.
 
 Key panels to watch:
 - **Request Rate** — total requests/sec through AgentGateway on the `/mcp` route
@@ -606,7 +606,7 @@ kubectl get job k6-mcp-rps -n loadgenerator
 kubectl logs -f job/k6-mcp-rps -n loadgenerator
 ```
 
-Watch Grafana (**Dashboards > AgentGateway Overview**) for:
+Watch Grafana (**Dashboards > AgentGateway Dashboard**) for:
 - **Request Rate** — should step from ~25 req/s to ~50 req/s matching the stage transitions
 - **Request Duration** — watch for p95 latency increase at 50 req/s
 - **`dropped_iterations`** in the k6 summary — if this exceeds 10, AgentGateway is at capacity

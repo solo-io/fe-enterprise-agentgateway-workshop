@@ -267,7 +267,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -296,7 +296,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $VALID_TOKEN" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",

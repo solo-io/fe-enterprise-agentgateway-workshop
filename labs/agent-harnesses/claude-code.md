@@ -319,7 +319,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 
 The dashboard provides real-time visualization of:
 - Core GenAI metrics (request rates, token usage by model)
-- Claude Code specific metrics showing `claude-3-5-sonnet` or `claude-3-5-haiku` model usage
+- Claude Code specific metrics showing `claude-sonnet-5` or `claude-opus-5` model usage
 - Streaming metrics (TTFT, TPOT)
 - Connection and runtime metrics
 
@@ -366,17 +366,17 @@ Cross-reference the **Trace ID** with the access logs (next section) to jump fro
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about LLM requests to stdout. You can tail the logs to see Claude Code traffic flowing through:
+The gateway logs every LLM request to stdout. Tail the logs to watch Claude Code traffic:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output shows comprehensive request details including:
-- Model information (e.g., `claude-3-5-sonnet-20241022`)
+The log line carries:
+- Model information (e.g., `claude-sonnet-5`)
 - Token usage (input and output tokens)
 - Request duration
-- Trace IDs for correlation with Solo UI traces
+- A `trace.id` you can search for in the Solo UI's **Tracing** view
 - Full request and response bodies
 
 ### View Metrics Endpoint

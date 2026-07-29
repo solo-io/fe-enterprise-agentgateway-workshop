@@ -32,7 +32,7 @@ The client only sees these two tools. The model searches the catalog at runtime 
 - **The catalog is dynamic.** Example: a tenant-scoped server where each customer gets a different tool set (per-integration connectors). The same client connection works across tenants because discovery happens at runtime — clients don't need to reconnect to refresh.
 - **RBAC heavily filters per user.** Example: an internal "kitchen-sink" server where the average user is authorized to use ~10 of 200 tools. `get_tool` never surfaces the rest and the model never sees them. (Step 5 below demonstrates this with a single tool, but the pattern scales.)
 
-**Stay with Standard mode when** the catalog is small and stable (e.g., a website-fetcher with one `fetch_url` tool, or a calculator with `add`/`multiply`) — there's not enough catalog to compress and the meta-tool indirection adds latency for no benefit. You also need Standard mode if you want per-upstream-tool counters on `agentgateway_mcp_tool_calls_total` without consulting traces; Search mode aggregates everything under the meta-tools.
+**Stay with Standard mode when** the catalog is small and stable (e.g., a website-fetcher with one `fetch_url` tool, or a calculator with `add`/`multiply`) — there's not enough catalog to compress and the meta-tool indirection adds latency for no benefit. You also need Standard mode if you want per-upstream-tool counters on `agentgateway_mcp_requests_total` without consulting traces; Search mode aggregates everything under the meta-tools.
 
 **Reach for [Code mode](mcp-tool-mode-code.md) instead** when a workflow needs to chain tool calls or filter large intermediate results. Example: "find every open incident from `pagerduty.list_incidents`, fetch each one's logs via `loki.query_range`, return a 200-word summary." Search mode would round-trip each call and ferry every log blob through the model's context; Code mode keeps the intermediates inside the sandbox and returns only the summary. The two modes solve different problems — Search compresses the *catalog*, Code compresses the *results*.
 
@@ -661,16 +661,16 @@ EOF
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Note that the structured log's `mcp.method` field shows the *meta-tool* name (`get_tool`, `invoke_tool`) — not the upstream tool — because that's what the client called. The gateway's call to the upstream is a separate trace span.
+The structured log's `gen_ai.tool.name` field shows the *meta-tool* name (`get_tool`, `invoke_tool`) — not the upstream tool — because that's what the client called. The gateway's call to the upstream is a separate trace span.
 
 ### View MCP metrics
 
 ```bash
 kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics | grep mcp_tool_calls && kill $!
+sleep 3 && curl -s http://localhost:15020/metrics | grep agentgateway_mcp_requests_total && kill $!
 ```
 
-`agentgateway_mcp_tool_calls_total` increments for `get_tool` and `invoke_tool`, *not* `echo`/`get-sum`/etc. If you want per-upstream-tool metrics, you need Standard mode or to inspect traces.
+`agentgateway_mcp_requests_total` increments with `resource="get_tool"` and `resource="invoke_tool"`, *not* `echo`/`get-sum`/etc. If you want per-upstream-tool metrics, you need Standard mode or to inspect traces.
 
 ### View in Grafana
 

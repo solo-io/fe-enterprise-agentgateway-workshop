@@ -190,11 +190,13 @@ In the MCP Inspector menu, connect to your agentgateway
 - Click Connect.
 
 ### Run a tool
-- From the menu bar, click the Tools tab. Then from the Tools pane, click List Tools and select the echo tool.
+- From the menu bar, click the Tools tab. Then from the Tools pane, click List Tools and select the echo tool, listed as **Echo Tool**.
 - In the message field, enter `Hello from AgentGateway!` and click Run Tool.
-- Verify the response echoes your message back.
+- Verify that the result reads `Tool Result: Success` and echoes your message back as `"Echo: Hello from AgentGateway!"`.
 
-Try the **get-sum** tool as well — enter two numbers and confirm the result is returned.
+Try the **get-sum** tool as well, listed as **Get Sum Tool** — enter two numbers and confirm the result is returned.
+
+The Inspector lists each tool by its display title rather than its protocol name, so `get-env` appears as **Print Environment Tool** and `trigger-long-running-operation` as **Trigger Long Running Operation Tool**.
 
 ---
 
@@ -241,7 +243,7 @@ This step demonstrates the core value of dynamic backends: updating the MCP serv
 
 ### Scale the deployment
 
-Add a second replica. The Service automatically routes across both pods via kube-proxy — and since the dynamic Backend discovers the Service (not individual pods), no gateway configuration changes at all:
+Add a second replica. AgentGateway discovers the Service, resolves its pod endpoints, and load-balances across them itself — so the new pod is picked up with no gateway configuration change at all:
 
 ```bash
 kubectl scale deployment mcp-server-everything -n mcp --replicas=2
@@ -264,7 +266,9 @@ The `--prefix` flag prepends the pod name to each log line so you can tell them 
 
 ### Observe session stickiness
 
-In MCP Inspector, connect and run **echo** or **get-env** several times. Watch the logs — all requests from your current session land on the same pod. AgentGateway encodes the backend endpoint into the session token at connection time, so a client stays pinned to one pod for the lifetime of that session.
+In MCP Inspector, connect and run **echo** or **get-env** several times. Watch the logs — all requests from your current session land on the same pod. AgentGateway assigns the session to a backend pod at connection time and returns a self-describing session token in the `mcp-session-id` header, so a client stays pinned to one pod for the lifetime of that session, and any agentgateway proxy replica can serve it.
+
+This is the default behavior, `sessionRouting: Stateful` on the Backend, and it depends on the `selector`-based target you configured in Step 3 — a `static` target gives no such affinity guarantee. Set `sessionRouting: Stateless` instead and the gateway stops issuing a session ID entirely, which only works if the upstream MCP server holds no session state of its own. `mcp-server-everything` does hold session state, so it requires the stateful default.
 
 ### Observe load balancing on reconnect
 
@@ -280,13 +284,19 @@ AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. Y
 
 ```bash
 kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics && kill $!
+sleep 3 && curl -s http://localhost:15020/metrics | grep -E 'agentgateway_mcp_requests_total|protocol="mcp"' && kill $!
 ```
 
 You should see MCP-specific metrics such as:
-- `agentgateway_mcp_tool_calls_total`
-- `agentgateway_mcp_server_requests_total`
-- `agentgateway_mcp_request_duration_seconds`
+- `agentgateway_mcp_requests_total` — per-call MCP counter, labeled by `method` (`initialize`, `tools/call`, …), `resource_type`, `server` (the MCP target), and `resource` (the tool name)
+- `agentgateway_requests_total{protocol="mcp"}` — HTTP-level request counter for MCP traffic, labeled by `backend`, `route`, and `status`
+- `agentgateway_request_duration_seconds{protocol="mcp"}` — request latency histogram for MCP traffic
+
+For example, a `tools/call` for `echo` against the dynamic backend appears as:
+
+```
+agentgateway_mcp_requests_total{method="tools/call",resource_type="tool",server="mcp-server-everything-mcp-http",resource="echo",...} 2
+```
 
 ### View Metrics and Traces in Grafana
 
@@ -311,36 +321,42 @@ The dashboard provides real-time visualization of:
 - MCP metrics (tool calls, server requests)
 - Connection and runtime metrics
 
-### View Traces in Grafana
+### View Traces in the Solo UI
 
 To view distributed traces with MCP-specific spans:
 
-1. In Grafana, navigate to **Home > Explore**
-2. Select **Tempo** from the data source dropdown
-3. Click **Search** to see all traces
-4. Filter traces by service, operation, or trace ID to find AgentGateway requests
+1. Port-forward to the Solo UI:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
 
-Traces include MCP-specific spans with information like `mcp.method`, `mcp.resource`, `mcp.resource.name`, `mcp.target`, and more.
+2. Open http://localhost:4000 in your browser
+
+3. Click **Tracing** in the left navigation
+
+4. Use the **Search spans** box or the time-range buttons to find your requests, then click a row to open its span details
+
+Each span carries the MCP fields `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`.
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about MCP requests to stdout:
+The gateway logs every MCP request to stdout:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output shows comprehensive request details including MCP-specific information like `mcp.method`, `mcp.resource`, `mcp.resource.name`, `mcp.target`, and trace IDs for correlation with distributed traces in Grafana.
+The log line carries the MCP fields `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`, plus a `trace.id` you can search for in the Solo UI's **Tracing** view.
 
 ### (Optional) View Traces in Jaeger
 
-If you installed Jaeger in the [002 — Set Up Monitoring Tools (OCP)](../installation/openshift/002-set-up-monitoring-tools-ocp.md) lab instead of Tempo, you can view traces in the UI:
+If you installed Jaeger in the [002 — Set Up Monitoring Tools (OCP)](../installation/openshift/002-set-up-monitoring-tools-ocp.md) lab instead of the Solo UI, you can view traces in the Jaeger UI:
 
 ```bash
 kubectl port-forward svc/jaeger -n observability 16686:16686
 ```
 
-Navigate to http://localhost:16686 in your browser to see traces with MCP-specific spans including `mcp.method`, `mcp.resource`, `mcp.resource.name`, `mcp.target`, and more
+Navigate to http://localhost:16686 in your browser to see the traces. Each span carries the MCP fields `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`.
 
 ## Secure access to MCP Server
 
@@ -379,21 +395,22 @@ spec:
 EOF
 ```
 
-From the MCP Inspector, verify that the connection fails with an error message similar to the following, because no valid JWT was provided from the MCP inspector tool (MCP client) to the agentgateway proxy.
+From the MCP Inspector, click **Reconnect** and verify that the connection fails with an error message similar to the following, because no valid JWT was provided from the MCP inspector tool (MCP client) to the agentgateway proxy.
 ```
-MCP error -32001: Error POSTing to endpoint (HTTP 403): authentication failure: no bearer token found
+MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: authentication failure: no bearer token found
 ```
 
-We should also be able to see this error in the access logs `authentication failure: no bearer token found` with an `http.status: 403`
+This error also appears in the access logs as `authentication failure: no bearer token found` with an `http.status=401` and `reason=JwtAuth`
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
 ### Provide a valid JWT
-Go back to the MCP Inspector tool and expand the Authentication section. Enter the following details in the API Token Authentication card
+Go back to the MCP Inspector tool and expand the **Authentication** section. In the **Custom Headers** card, add a header with the following details:
 
-- Header Name: Enter `Authorization`
-- Bearer Token: Enter `Bearer ` followed by the JWT token below. The MCP Inspector sends this value as-is in the Authorization header, so the `Bearer ` prefix is required.
+- **Header Name**: Enter `Authorization`
+- **Header Value**: Enter `Bearer ` followed by the JWT token below. The MCP Inspector sends this value as-is in the Authorization header, so the `Bearer ` prefix is required.
+- **Toggle the header on** using the switch to the left of the row. Headers are disabled by default and are only sent when enabled — if you skip this, the connection still fails with `no bearer token found`.
 ```
 eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw
 ```
@@ -405,29 +422,39 @@ Now, if you try to run the `echo` tool again it should result in `Tool Result: S
 ### Authorize based on JWT Claims
 You can limit access to the MCP server based on specific JWT claims with CEL-based RBAC rules.
 
-Update the EnterpriseAgentgatewayPolicy to add your RBAC rules. In the following example, you use a CEL expression to only allow access to the MCP server if the JWT has the org=ai-admins claim
+Create an EnterpriseAgentgatewayPolicy that attaches to the **Backend** and evaluates your rules under `backend.mcp.authorization`. Attaching at the Backend rather than the Gateway makes the rules MCP-aware, so the same CEL expression can reason about JWT claims now and individual tools later in this lab.
+
+In the following example, you use a CEL expression to only allow access to the MCP server if the JWT has the `org=admin` claim:
 
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
-  name: jwt-rbac
+  name: mcp-rbac
   namespace: agentgateway-system
 spec:
   targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: agentgateway-proxy
-  traffic:
-    authorization:
-      policy:
-        matchExpressions:
-          - 'jwt.org == "admin"'
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: mcp-backend
+  backend:
+    mcp:
+      authorization:
+        action: Allow
+        policy:
+          matchExpressions:
+            - 'jwt.org == "admin"'
 EOF
 ```
 
-Now, if you try to run the `echo` tool again it should fail because our user is not allowed to access this endpoint anymore
+Our token carries `org=solo.io`, not `org=admin`, so access is now denied. In the MCP Inspector, click **Reconnect**, then from the **Tools** tab click **Clear** and **List Tools** — the list comes back empty.
+
+Unauthorized tools are filtered out of the catalog rather than merely blocked on call, so a denied caller sees an MCP server with no tools at all. Attempting a call anyway is rejected as an unknown tool:
+
+```
+{"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"Unknown tool: echo"}}
+```
 
 ### Inspect the JWT
 If you navigate to jwt.io and input the tokens used we should see the claims that we can create CEL RBAC rules on
@@ -447,34 +474,105 @@ If you navigate to jwt.io and input the tokens used we should see the claims tha
 }
 ```
 
-## Limit tool access
-We can also extend our CEL expression to limit tool access so that anyone who is a part of the `solo.io` org can use the echo tool
+### Restore access
+
+Correct the expression to match the `org` claim our token carries, so that anyone in the `solo.io` org is allowed through:
+
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
-  name: jwt-rbac
+  name: mcp-rbac
   namespace: agentgateway-system
 spec:
   targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: Gateway
-      name: agentgateway-proxy
-  traffic:
-    authorization:
-      policy:
-        matchExpressions:
-          - 'jwt.org == "solo.io"'
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: mcp-backend
+  backend:
+    mcp:
+      authorization:
+        action: Allow
+        policy:
+          matchExpressions:
+            - 'jwt.org == "solo.io"'
 EOF
 ```
-Now, if you try to run the `echo` tool again it should result in `Tool Result: Success`
 
+Reconnect and list tools again. All twelve tools are back, and running `echo` returns `Tool Result: Success` — the expression authorizes the caller but says nothing about *which* tools they may use, so it grants the full catalog.
+
+## Limit tool access
+
+The expression above is still all-or-nothing: any caller in the `solo.io` org can reach *every* tool. Because the policy is attached to the Backend, it is MCP-aware, so you can extend the same CEL expression with `mcp.tool.name` to authorize individual tools.
+
+In the following example, callers in the `solo.io` org may use only the `echo` tool:
+
+```bash
+kubectl apply -f- <<EOF
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: mcp-rbac
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayBackend
+      name: mcp-backend
+  backend:
+    mcp:
+      authorization:
+        action: Allow
+        policy:
+          matchExpressions:
+            - 'jwt.org == "solo.io" && mcp.tool.name == "echo"'
+EOF
+```
+
+**Key configuration details:**
+
+- `targetRefs` points at the `EnterpriseAgentgatewayBackend`, not the Gateway — tool authorization is evaluated by the MCP backend, so a Gateway-scoped `traffic.authorization` policy can gate the server as a whole but cannot filter individual tools
+- `matchExpressions` entries are OR'd together; use `&&` within a single expression to require both a claim and a tool name
+- Omitting a `mcp.tool.name` condition grants access to all tools, which is why the previous step returned the full catalog
+
+Verify the restriction in the MCP Inspector:
+
+1. Click **Reconnect**, then from the **Tools** tab click **Clear** and **List Tools**. Only **Echo Tool** is listed — unauthorized tools are filtered out of `tools/list` rather than merely blocked on call.
+2. Run **echo**. It still returns `Tool Result: Success`.
+3. Because `get-sum` is no longer advertised, the Inspector can't offer it. Confirm it is rejected at the gateway by calling it directly:
+
+```bash
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+
+export JWT_TOKEN=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw
+
+MCP_SESSION_ID=$(curl -s -D - -o /dev/null -X POST "http://$GATEWAY_IP:8080/mcp" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}' \
+  | grep -i '^mcp-session-id' | tr -d '\r' | awk '{print $2}')
+
+curl -s -X POST "http://$GATEWAY_IP:8080/mcp" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "mcp-session-id: $MCP_SESSION_ID" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get-sum","arguments":{"a":21,"b":21}}}'
+```
+
+Example output:
+```
+{"jsonrpc":"2.0","id":2,"error":{"code":-32602,"message":"Unknown tool: get-sum"}}
+```
+
+Because the tool was filtered out of the catalog, the gateway rejects the call as an unknown tool rather than as an authorization failure. Note this response arrives as plain JSON with a `400 Bad Request` status, whereas successful tool calls stream back as `text/event-stream` with a `data:` prefix.
 
 ## Cleanup
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jwt-rbac
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mcp-rbac
 kubectl delete httproute -n agentgateway-system mcp
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend
 kubectl delete deployment -n mcp mcp-server-everything

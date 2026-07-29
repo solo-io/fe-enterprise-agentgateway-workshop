@@ -16,14 +16,14 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ```
 Client Request
-    │  body: { "model": "gpt-4o-mini" | "mock-gpt-4o" | <missing> }
+    │  body: { "model": "gpt-5.4-nano" | "mock-gpt-4o" | <missing> }
     ▼
 AgentgatewayPolicy (phase: PreRouting, Request Transformation)
     │  X-Gateway-Model-Name   = json(request.body).model
     │  X-Gateway-Model-Status = "specified" | "unspecified"
     ▼
 HTTPRoute (header match)
-    ├─ X-Gateway-Model-Name: gpt-4o-mini    →  OpenAI (gpt-4o-mini)
+    ├─ X-Gateway-Model-Name: gpt-5.4-nano    →  OpenAI (gpt-5.4-nano)
     ├─ X-Gateway-Model-Name: mock-gpt-4o    →  Mock LLM Server
     └─ X-Gateway-Model-Status: unspecified  →  Mock LLM Server (fallback)
 ```
@@ -109,7 +109,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 
 ## Create EnterpriseAgentgatewayBackend Resources
 
-Create one backend for each routing target: OpenAI (`gpt-4o-mini`) and the mock LLM server.
+Create one backend for each routing target: OpenAI (`gpt-5.4-nano`) and the mock LLM server.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -117,13 +117,13 @@ kubectl apply -f - <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayBackend
 metadata:
-  name: openai-gpt-4o-mini
+  name: openai-gpt-5.4-nano
   namespace: agentgateway-system
 spec:
   ai:
     provider:
       openai:
-        model: "gpt-4o-mini"
+        model: "gpt-5.4-nano"
   policies:
     auth:
       secretRef:
@@ -184,7 +184,7 @@ EOF
 ### Step 2: Route on the Extracted Headers
 
 Create the `HTTPRoute` with three rules:
-1. Known model `gpt-4o-mini` → OpenAI
+1. Known model `gpt-5.4-nano` → OpenAI
 2. Known model `mock-gpt-4o` → Mock LLM
 3. `x-gateway-model-status: unspecified` → Mock LLM (fallback for requests with no `model` field)
 
@@ -207,9 +207,9 @@ spec:
           headers:
             - type: Exact
               name: x-gateway-model-name
-              value: gpt-4o-mini
+              value: gpt-5.4-nano
       backendRefs:
-        - name: openai-gpt-4o-mini
+        - name: openai-gpt-5.4-nano
           group: enterpriseagentgateway.solo.io
           kind: EnterpriseAgentgatewayBackend
       timeouts:
@@ -255,13 +255,13 @@ echo "Gateway IP: $GATEWAY_IP"
 
 ### Route to OpenAI
 
-Send a request with `"model": "gpt-4o-mini"` — the gateway extracts this value from the body and routes to the OpenAI backend.
+Send a request with `"model": "gpt-5.4-nano"` — the gateway extracts this value from the body and routes to the OpenAI backend.
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -271,7 +271,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-The response `model` field should show `gpt-4o-mini-2024-07-18` (the OpenAI resolved version).
+The response `model` field should show `gpt-5.4-nano-2026-03-17` (the OpenAI resolved version).
 
 ### Route to Mock LLM
 
@@ -346,42 +346,48 @@ The dashboard provides real-time visualization of:
 - MCP metrics (tool calls, server requests)
 - Connection and runtime metrics
 
-### View Traces in Grafana
+### View Traces in the Solo UI
 
 To view distributed traces with LLM-specific spans:
 
-1. In Grafana, navigate to **Home > Explore**
-2. Select **Tempo** from the data source dropdown
-3. Click **Search** to see all traces
-4. Filter traces by service, operation, or trace ID to find AgentGateway requests
+1. Port-forward to the Solo UI:
+```bash
+kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+```
 
-Traces include LLM-specific spans with information like `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more.
+2. Open http://localhost:4000 in your browser
+
+3. Click **Tracing** in the left navigation
+
+4. Use the **Search spans** box or the time-range buttons to find your requests, then click a row to open its span details
+
+Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`.
 
 ### View Access Logs
 
-AgentGateway automatically logs detailed information about LLM requests to stdout:
+The gateway logs every LLM request to stdout:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output shows comprehensive request details including model information, token usage, and trace IDs for correlation with distributed traces in Grafana.
+The log line carries the model and token counts, plus a `trace.id` you can search for in the Solo UI's **Tracing** view.
 
 ### (Optional) View Traces in Jaeger
 
-If you installed Jaeger in the [002 — Set Up Monitoring Tools (OCP)](../installation/openshift/002-set-up-monitoring-tools-ocp.md) lab instead of Tempo, you can view traces in the UI:
+If you installed Jaeger in the [002 — Set Up Monitoring Tools (OCP)](../installation/openshift/002-set-up-monitoring-tools-ocp.md) lab instead of the Solo UI, you can view traces in the Jaeger UI:
 
 ```bash
 kubectl port-forward svc/jaeger -n observability 16686:16686
 ```
 
-Navigate to http://localhost:16686 in your browser to see traces with LLM-specific spans including `gen_ai.completion`, `gen_ai.prompt`, `llm.request.model`, `llm.request.tokens`, and more
+Navigate to http://localhost:16686 in your browser to see the traces. Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, and `gen_ai.usage.output_tokens`, plus per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`
 
 ## Cleanup
 ```bash
 kubectl delete agentgatewaypolicy -n agentgateway-system extract-model-from-body
 kubectl delete httproute -n agentgateway-system body-based-routing
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-4o-mini
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-5.4-nano
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-gpt-4o
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete svc -n agentgateway-system mock-gpt-4o-svc
