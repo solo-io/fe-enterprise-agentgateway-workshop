@@ -154,7 +154,7 @@ Now that we’ve validated a basic header transformation, let’s enrich the res
 Here is the expected behavior of the transformation policy below
 - add `x-user-id` to capture the user identifier (defaulting to `anonymous` if missing)
 - add `x-llm-request-model` to capture what model the client requested (read from the request body)
-- add `x-llm-response-model` to capture the exact model version the backend used (read from the response body — this may differ from the requested model, e.g. `gpt-5.4-nano` → `gpt-5.4-nano`)
+- add `x-llm-response-model` to capture the exact model version the backend used (read from the response body — this may differ from the requested model, e.g. `gpt-5.4-nano` → `gpt-5.4-nano-2026-03-17`)
 - add `x-request-method` for API behavior analysis
 - add `x-request-path` to help distinguish which route processed the call
 

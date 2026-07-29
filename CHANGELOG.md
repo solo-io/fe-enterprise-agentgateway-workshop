@@ -2,7 +2,8 @@
 
 0.13.2 - (7-29-26)
 ---
-- Minor fixes and improvements caught in testing
+- Fixes and improvements caught in testing, optimizations for agent use
+- Updates to Agentgateway dashboard - additional model pricing
 
 0.13.1 - (7-28-26)
 ---
