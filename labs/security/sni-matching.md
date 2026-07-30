@@ -388,23 +388,5 @@ kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```
 
-Deploy the default `Gateway` from lab `001`
-```bash
-kubectl apply -f - <<EOF
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: agentgateway-proxy
-  namespace: agentgateway-system
-spec:
-  gatewayClassName: enterprise-agentgateway
-  listeners:
-    - name: http
-      port: 8080
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-EOF
-```
+The `agentgateway-proxy` Gateway from `001` is untouched by this lab, so nothing
+needs to be restored.
