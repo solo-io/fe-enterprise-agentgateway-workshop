@@ -34,31 +34,47 @@ kubectl create secret tls -n agentgateway-system https \
 
 ## Configure the gateway to terminate TLS
 
-Configure the gateway with HTTPS listener to terminate TLS connections.
+Add an HTTPS listener to the `agentgateway-proxy` Gateway from `001` so it terminates TLS on port 443 alongside the plaintext listener it already serves on 8080. This is how you would roll TLS out in front of an existing gateway.
+
+Append the listener with a **JSON patch** rather than `kubectl apply`. A full `apply` replaces the whole object, so it would drop any field `001` set that this manifest does not restate — including `infrastructure.parametersRef`, which supplies the proxy's replica count, logging, and model catalog. The patch below adds one list entry and touches nothing else.
 
 ```bash
-kubectl apply -f - <<EOF
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: agentgateway-proxy
-  namespace: agentgateway-system
-spec:
-  gatewayClassName: enterprise-agentgateway
-  listeners:
-    - protocol: HTTPS
-      port: 443
-      name: https
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - name: https
-            kind: Secret
-      allowedRoutes:
-        namespaces:
-          from: All
-EOF
+kubectl patch gateway agentgateway-proxy -n agentgateway-system --type=json -p '[
+  {
+    "op": "add",
+    "path": "/spec/listeners/-",
+    "value": {
+      "name": "https",
+      "port": 443,
+      "protocol": "HTTPS",
+      "tls": {
+        "mode": "Terminate",
+        "certificateRefs": [
+          {
+            "name": "https",
+            "kind": "Secret"
+          }
+        ]
+      },
+      "allowedRoutes": {
+        "namespaces": {
+          "from": "All"
+        }
+      }
+    }
+  }
+]'
+```
+
+Confirm both listeners are present and the parameters reference survived:
+```bash
+kubectl get gateway agentgateway-proxy -n agentgateway-system \
+  -o jsonpath='listeners={.spec.listeners[*].port} params={.spec.infrastructure.parametersRef.name}{"\n"}'
+```
+
+Expected output:
+```
+listeners=8080 443 params=agentgateway-config
 ```
 
 ## Configure OpenAI Route
@@ -118,7 +134,7 @@ EOF
 
 ## Validate HTTP traffic is blocked
 
-Try to access the gateway over HTTP without TLS. This should fail because the gateway only accepts HTTPS connections on port 443.
+Try to access the route over plaintext HTTP on port 80. This fails because the gateway has no listener there — TLS traffic is served on 443, and the plaintext listener from `001` is on 8080.
 
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
@@ -219,23 +235,18 @@ kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-m
 kubectl delete secret -n agentgateway-system openai-secret https
 ```
 
-Restore the default Gateway from lab `001`
+Remove the HTTPS listener, leaving the rest of the Gateway from `001` as it was:
 ```bash
-kubectl apply -f - <<EOF
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: agentgateway-proxy
-  namespace: agentgateway-system
-spec:
-  gatewayClassName: enterprise-agentgateway
-  listeners:
-    - name: http
-      port: 8080
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-EOF
+kubectl patch gateway agentgateway-proxy -n agentgateway-system --type=json -p '[
+  {
+    "op": "remove",
+    "path": "/spec/listeners/1"
+  }
+]'
+```
+
+Verify the baseline is back to a single plaintext listener with its parameters still attached:
+```bash
+kubectl get gateway agentgateway-proxy -n agentgateway-system \
+  -o jsonpath='listeners={.spec.listeners[*].port} params={.spec.infrastructure.parametersRef.name}{"\n"}'
 ```

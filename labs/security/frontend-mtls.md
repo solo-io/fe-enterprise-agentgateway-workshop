@@ -46,40 +46,67 @@ openssl x509 -req -sha256 -days 365 -CA example_certs/glootest.com.crt -CAkey ex
 
 ## Configure the gateway to terminate mTLS
 
-Configure the gateway with frontend TLS validation to require client certificates. The `spec.tls.frontend.default.validation` section enables mTLS by referencing the CA certificate ConfigMap.
+Configure the `agentgateway-proxy` Gateway from `001` with frontend TLS validation to require client certificates. The `spec.tls.frontend.default.validation` section enables mTLS by referencing the CA certificate ConfigMap, and an HTTPS listener terminates TLS on port 443 alongside the plaintext listener already on 8080.
+
+Both changes go in with a **JSON patch** rather than `kubectl apply`. A full `apply` replaces the whole object, so it would drop any field `001` set that the manifest does not restate — including `infrastructure.parametersRef`, which supplies the proxy's replica count, logging, and model catalog. The patch below adds the two fields and touches nothing else.
 
 ```bash
-kubectl apply -f - <<EOF
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: agentgateway-proxy
-  namespace: agentgateway-system
-spec:
-  gatewayClassName: enterprise-agentgateway
-  tls:
-    frontend:
-      default:
-        validation:
-          mode: AllowValidOnly
-          caCertificateRefs:
-            - name: ca-cert
-              kind: ConfigMap
-              group: ""
-  listeners:
-    - protocol: HTTPS
-      port: 443
-      name: https
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - name: https
-            kind: Secret
-      allowedRoutes:
-        namespaces:
-          from: All
-EOF
+kubectl patch gateway agentgateway-proxy -n agentgateway-system --type=json -p '[
+  {
+    "op": "add",
+    "path": "/spec/tls",
+    "value": {
+      "frontend": {
+        "default": {
+          "validation": {
+            "mode": "AllowValidOnly",
+            "caCertificateRefs": [
+              {
+                "name": "ca-cert",
+                "kind": "ConfigMap",
+                "group": ""
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  {
+    "op": "add",
+    "path": "/spec/listeners/-",
+    "value": {
+      "name": "https",
+      "port": 443,
+      "protocol": "HTTPS",
+      "tls": {
+        "mode": "Terminate",
+        "certificateRefs": [
+          {
+            "name": "https",
+            "kind": "Secret"
+          }
+        ]
+      },
+      "allowedRoutes": {
+        "namespaces": {
+          "from": "All"
+        }
+      }
+    }
+  }
+]'
+```
+
+Confirm the mTLS validation and both listeners are in place, with the parameters reference intact:
+```bash
+kubectl get gateway agentgateway-proxy -n agentgateway-system \
+  -o jsonpath='listeners={.spec.listeners[*].port} mtls={.spec.tls.frontend.default.validation.mode} params={.spec.infrastructure.parametersRef.name}{"\n"}'
+```
+
+Expected output:
+```
+listeners=8080 443 mtls=AllowValidOnly params=agentgateway-config
 ```
 
 ## Configure OpenAI Route
@@ -255,23 +282,22 @@ kubectl delete secret -n agentgateway-system openai-secret https
 kubectl delete configmap -n agentgateway-system ca-cert
 ```
 
-Restore the default Gateway from lab `001`
+Remove the mTLS validation and the HTTPS listener, leaving the rest of the Gateway from `001` as it was:
 ```bash
-kubectl apply -f - <<EOF
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: agentgateway-proxy
-  namespace: agentgateway-system
-spec:
-  gatewayClassName: enterprise-agentgateway
-  listeners:
-    - name: http
-      port: 8080
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-EOF
+kubectl patch gateway agentgateway-proxy -n agentgateway-system --type=json -p '[
+  {
+    "op": "remove",
+    "path": "/spec/listeners/1"
+  },
+  {
+    "op": "remove",
+    "path": "/spec/tls"
+  }
+]'
+```
+
+Verify the baseline is back to a single plaintext listener with its parameters still attached:
+```bash
+kubectl get gateway agentgateway-proxy -n agentgateway-system \
+  -o jsonpath='listeners={.spec.listeners[*].port} params={.spec.infrastructure.parametersRef.name}{"\n"}'
 ```

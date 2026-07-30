@@ -306,7 +306,7 @@ Check OPA's decision log to see the rejection:
 kubectl logs -n agentgateway-system -l app=opa-ext-authz --tail=20
 ```
 
-You should see a decision-log entry with `"result": false` and the request attributes OPA evaluated.
+You should see a decision-log entry with `"result":false` and the request attributes OPA evaluated.
 
 ### Step 5: Test — request allowed with required header
 
@@ -322,7 +322,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-You should get a 200 response with a completion from OpenAI. The OPA decision log will now show `"result": true`.
+You should get a 200 response with a completion from OpenAI. The OPA decision log will now show `"result":true`.
 
 ---
 
@@ -637,7 +637,7 @@ curl -i "$GATEWAY_IP:8080/mcp" \
   }'
 ```
 
-Expected: `HTTP/1.1 403 Forbidden`. The OPA decision log will show `"result": false` and the full JSON-RPC payload in `input.attributes.request.http.body` — proof the decision was made off the body, not the header.
+Expected: `HTTP/1.1 403 Forbidden`. The OPA decision log will show `"result":false` and the full JSON-RPC payload in `input.attributes.request.http.body` — proof the decision was made off the body, not the header.
 
 ### Caveats
 

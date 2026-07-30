@@ -70,7 +70,6 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [OpenAI Batch API](labs/routing/configure-openai-batches.md) _(OpenAI)_
 - [OpenAI Streaming](labs/routing/openai-streaming.md) _(OpenAI)_
 - [OpenAI Audio (TTS & STT)](labs/routing/openai-audio.md) _(OpenAI)_
-- [OpenAI Video Generation (Sora)](labs/routing/openai-video.md) _(OpenAI)_
 - [Direct Response](labs/routing/direct-response.md)
 - [Timeouts and Retries](labs/routing/timeouts-and-retries.md)
 - [LLM Failover](labs/routing/llm-failover.md)
