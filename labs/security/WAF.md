@@ -395,7 +395,7 @@ Expected behavior:
 WAF is a cheap, deterministic first pass; it catches *literal* injection strings but is easily bypassed by paraphrasing. `promptGuard` understands intent and catches what the WAF misses. Run both on the same route: the WAF drops obvious signatures before any model cost, and the semantic guard catches the rest.
 
 ```bash
-kubectl apply -f - <<EOF
+kubectl apply -f - <<'EOF'
 apiVersion: waf.solo.io/v1alpha1
 kind: WAFPolicy
 metadata:

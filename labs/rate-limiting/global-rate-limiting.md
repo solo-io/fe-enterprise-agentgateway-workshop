@@ -60,7 +60,7 @@ spec:
 EOF
 ```
 
-## curl openai
+## Get the gateway address and curl openai
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
@@ -132,21 +132,25 @@ spec:
 EOF
 ```
 
-## curl openai
+## curl openai until the request limit trips
+The limit is 5 requests per hour, so send six:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
-  -H "content-type: application/json" \
-  -d '{
-    "model": "gpt-5.4-nano",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Whats your favorite poem?"
-      }
-    ]
-  }'
+for i in $(seq 1 6); do
+  echo -n "request $i: "
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+    -H "content-type: application/json" \
+    -d '{
+      "model": "gpt-5.4-nano",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Whats your favorite poem?"
+        }
+      ]
+    }'
+done
 ```
-You should be rate limited on the 6th request to the LLM, regardless of how short or long each prompt was — REQUEST counts calls, not tokens.
+The 6th request returns `HTTP 429`, regardless of how short or long each prompt was — REQUEST counts calls, not tokens.
 
 Before moving on to the token-based examples below, clean up the REQUEST-based config and policy:
 ```bash
@@ -222,22 +226,25 @@ spec:
 EOF
 ```
 
-## curl openai
-Note that the following user prompt "Whats your favorite poem" contains 5 tokens based on the [OpenAI tokenizer](https://platform.openai.com/tokenizer)
+## curl openai until the token limit trips
+Note that the following user prompt "Whats your favorite poem" contains 5 tokens based on the [OpenAI tokenizer](https://platform.openai.com/tokenizer), so the 10-token hourly budget covers about two requests:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
-  -H "content-type: application/json" \
-  -d '{
-    "model": "gpt-5.4-nano",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Whats your favorite poem?"
-      }
-    ]
-  }'
+for i in $(seq 1 4); do
+  echo -n "request $i: "
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+    -H "content-type: application/json" \
+    -d '{
+      "model": "gpt-5.4-nano",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Whats your favorite poem?"
+        }
+      ]
+    }'
+done
 ```
-You should be rate limited after several requests to the LLM because we will have hit our token-based rate limit of 10 input tokens per hour
+Once the 10 input tokens are spent, further requests in the same hour return `HTTP 429`.
 
 ## Configure header-based token rate limiting
 Now let's configure a rate limit based on a custom header (`X-User-ID`) instead of a generic counter. The `cel` action evaluates `request.headers["X-User-ID"]` per request — each distinct header value becomes its own counter bucket, giving each user their own quota.
@@ -542,22 +549,25 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 The request fails with `authentication failure: no bearer token found`.
 
-Now send requests as **User A**. The prompt `"Whats your favorite poem?"` is 5 input tokens, so against the 10-input-tokens-per-minute budget you'll be rate limited after a couple of requests:
+Now send requests as **User A**. The prompt `"Whats your favorite poem?"` is 5 input tokens, so against the 10-input-tokens-per-minute budget the quota is spent after a couple of requests:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
-  -H "content-type: application/json" \
-  -H "Authorization: Bearer $USER_A_TOKEN" \
-  -d '{
-    "model": "gpt-5.4-nano",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Whats your favorite poem?"
-      }
-    ]
-  }'
+for i in $(seq 1 4); do
+  echo -n "User A request $i: "
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+    -H "content-type: application/json" \
+    -H "Authorization: Bearer $USER_A_TOKEN" \
+    -d '{
+      "model": "gpt-5.4-nano",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Whats your favorite poem?"
+        }
+      ]
+    }'
+done
 ```
-Repeat until you receive a `429 Too Many Requests` — User A (`sub=analyst-user`) has exhausted their quota.
+The later requests return `HTTP 429` — User A (`sub=analyst-user`) has exhausted their quota.
 
 ### Verify independent per-user counters
 
