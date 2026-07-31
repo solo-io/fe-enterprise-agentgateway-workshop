@@ -138,150 +138,28 @@ curl -i "$GATEWAY_IP:8080/v1/models" \
   -H "content-type: application/json"
 ```
 
-## View access logs
+## Compare access logs across endpoints
 Agentgateway enterprise automatically logs information about the LLM request to stdout
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output for chat completions:
+Example output for chat completions, which the backend maps to `Completions`:
 ```
-{
-    "level": "info",
-    "time": "2025-12-29T19:19:05.858661Z",
-    "scope": "request",
-    "gateway": "agentgateway-system/agentgateway-proxy",
-    "listener": "http",
-    "route": "agentgateway-system/openai",
-    "endpoint": "api.openai.com:443",
-    "src.addr": "10.42.0.1:37349",
-    "http.method": "POST",
-    "http.host": "192.168.107.2",
-    "http.path": "/v1/chat/completions",
-    "http.version": "HTTP/1.1",
-    "http.status": 200,
-    "trace.id": "8d57dc753938207f00f6aa72c75ad010",
-    "span.id": "8e33ce4fb0ee0f5b",
-    "protocol": "llm",
-    "duration": "3323ms",
-    "request.body": {
-        "model": "gpt-5.4-nano",
-        "messages": [
-            {
-                "role": "user",
-                "content": "Whats your favorite poem?"
-            }
-        ]
-    },
-    "response.body": {
-        "object": "chat.completion",
-        "usage": {
-            "completion_tokens": 50,
-            "prompt_tokens": 12,
-            "prompt_tokens_details": {
-                "cached_tokens": 0,
-                "audio_tokens": 0
-            },
-            "completion_tokens_details": {
-                "rejected_prediction_tokens": 0,
-                "reasoning_tokens": 0,
-                "accepted_prediction_tokens": 0,
-                "audio_tokens": 0
-            },
-            "total_tokens": 62
-        },
-        "created": 1767035943,
-        "id": "chatcmpl-CsD3f0Dp1jpYBOFmxJVBccFZkq0IQ",
-        "choices": [
-            {
-                "logprobs": null,
-                "message": {
-                    "annotations": [],
-                    "refusal": null,
-                    "content": "I don’t have personal preferences, but one timeless poem that many people appreciate is \"The Road Not Taken\" by Robert Frost. Its exploration of choices and their impact on life resonates with many readers. Would you like a summary or analysis of it?",
-                    "role": "assistant"
-                },
-                "index": 0,
-                "finish_reason": "stop"
-            }
-        ],
-        "system_fingerprint": "fp_29330a9688",
-        "model": "gpt-5.4-nano-2026-03-17",
-        "service_tier": "default"
-    },
-    "rq.headers.user-agent": "curl/8.7.1",
-    "rq.headers.content-type": "application/json",
-    "rq.headers.content-length": "144",
-    "rq.headers.accept": "*/*",
-    "rq.headers.all": {
-        "user-agent": "curl/8.7.1",
-        "content-type": "application/json",
-        "content-length": "144",
-        "accept": "*/*"
-    }
-}
+2026-07-29T22:48:02.532619Z	info	request gateway=agentgateway-system/agentgateway-proxy listener=http route=agentgateway-system/openai endpoint=api.openai.com:443 src.addr=10.244.0.0:1599 http.method=POST http.host=172.18.255.254 http.path=/v1/chat/completions http.version=HTTP/1.1 http.status=200 trace.id=789dc792d6aa18f780f31bb03f4be6c4 span.id=1379e8fbe67f388a protocol=llm gen_ai.operation.name=chat gen_ai.provider.name=openai gen_ai.request.model=gpt-5.4-nano gen_ai.response.model=gpt-5.4-nano-2026-03-17 gen_ai.usage.input_tokens=11 gen_ai.usage.cache_read.input_tokens=0 gen_ai.usage.output_tokens=82 agw.ai.usage.cost.total=0.0001047 gen_ai.usage.output_audio_tokens=0 duration=1128ms llm.streaming=false llm.cached_tokens=0 llm.reasoning_tokens=0 llm.prompt=[{"role": "user", "content": "Whats your favorite poem?"}] llm.completion="..."
 ```
 
-Example output for embeddings:
+Example output for embeddings, which the backend maps to `Passthrough`:
 ```
-{
-    "level": "info",
-    "time": "2025-12-29T19:19:07.905670Z",
-    "scope": "request",
-    "gateway": "agentgateway-system/agentgateway-proxy",
-    "listener": "http",
-    "route": "agentgateway-system/openai",
-    "endpoint": "api.openai.com:443",
-    "src.addr": "10.42.0.1:18322",
-    "http.method": "POST",
-    "http.host": "192.168.107.2",
-    "http.path": "/v1/embeddings",
-    "http.version": "HTTP/1.1",
-    "http.status": 200,
-    "trace.id": "0e6269f279c4bc3065e53f5ade553ca7",
-    "span.id": "e4f4ccfce8a2cc4b",
-    "protocol": "llm",
-    "duration": "1013ms",
-    "request.body": {
-        "input": "The quick brown fox jumped over the lazy dog.",
-        "model": "text-embedding-3-small"
-    },
-    "response.body": {
-        "object": "list",
-        "usage": {
-            "prompt_tokens": 10,
-            "total_tokens": 10
-        },
-        "data": [
-            {
-                "embedding": [
-                    -0.012501234,
-                    -0.0137081165,
-                    <...omitted...>,
-                    0.018354936
-                ],
-                "index": 0,
-                "object": "embedding"
-            }
-        ],
-        "model": "text-embedding-3-small"
-    },
-    "rq.headers.accept": "*/*",
-    "rq.headers.user-agent": "curl/8.7.1",
-    "rq.headers.content-type": "application/json",
-    "rq.headers.content-length": "105",
-    "rq.headers.all": {
-        "accept": "*/*",
-        "user-agent": "curl/8.7.1",
-        "content-type": "application/json",
-        "content-length": "105"
-    }
-}
+2026-07-29T22:48:03.41909Z	info	request gateway=agentgateway-system/agentgateway-proxy listener=http route=agentgateway-system/openai endpoint=api.openai.com:443 src.addr=10.244.1.1:61033 http.method=POST http.host=172.18.255.254 http.path=/v1/embeddings http.version=HTTP/1.1 http.status=200 trace.id=8540d5f05bd8bc668d3d39007058ae88 span.id=96a543cf0942ec24 protocol=llm duration=463ms
 ```
 
-Notice the `gen_ai.operation.name` field changes based on the endpoint:
-- `chat` for `/v1/chat/completions`
-- `embeddings` for `/v1/embeddings`
+The route type you assign in `policies.ai.routes` decides how much the gateway records:
+
+- `Completions` routes are parsed as LLM traffic, so the log line carries `gen_ai.operation.name=chat`, the requested and served models, input and output token counts, per-request cost under `agw.ai.usage.cost.total`, and the prompt and completion text as `llm.prompt` and `llm.completion`.
+- `Passthrough` routes are proxied without LLM parsing, so their log lines carry only the HTTP fields — method, path, status, and duration. Token usage for embeddings is still returned to the client in the response body's `usage` object, but the gateway does not extract it.
+
+Use `Passthrough` when you want the gateway to front an endpoint for auth, routing, and TLS, and `Completions` when you also want token accounting, cost attribution, and guardrails.
 
 ## Observability
 

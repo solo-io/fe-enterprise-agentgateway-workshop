@@ -204,7 +204,7 @@ kubectl get pods -n monitoring
 
 Expected Output:
 
-```bash
+```
 NAME                                                     READY   STATUS    RESTARTS   AGE
 grafana-prometheus-fbdf9c69f-p9qq5                       3/3     Running   0          2m54s
 grafana-prometheus-kube-pr-operator-857d774dbf-djxch     1/1     Running   0          2m54s

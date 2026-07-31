@@ -32,7 +32,7 @@ To target a specific tool, use a CEL descriptor to inspect the JSON-RPC request 
 Create the `mcp` namespace and deploy the `mcp-server-everything` reference MCP server:
 
 ```bash
-kubectl create namespace mcp
+kubectl create namespace mcp --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 ```bash
@@ -258,7 +258,7 @@ MCP error -32001: Streamable HTTP error: Error POSTing to endpoint:
 
 ### Verify independent counters with a standard tool
 
-Even though `get-env` has hit its 3/min limit, `echo` has its own independent counter (10/min) and should still succeed:
+Even though `get-env` has hit its 3/min limit, `echo` is unaffected and should still succeed. The CEL expression resolves `echo` to `tool_name=echo`, which matches no descriptor in the `RateLimitConfig`, so it is never counted:
 
 1. From the **Tools** tab, select the `echo` tool
 2. Enter any message (e.g. `Hello World!`) and click **Run Tool**

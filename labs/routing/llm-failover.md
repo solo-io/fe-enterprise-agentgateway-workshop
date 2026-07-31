@@ -257,15 +257,18 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 
 ### Testing Failover Behavior
 
-Send multiple requests to observe the failover pattern:
+Send three requests to observe the failover pattern:
 
 ```bash
-curl -v "$GATEWAY_IP:8080/openai" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "",
-    "messages": [{"role": "user", "content": "What is 2+2?"}]
-  }'
+for i in 1 2 3; do
+  echo "--- Request $i ---"
+  curl -s -w "\nHTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "model": "",
+      "messages": [{"role": "user", "content": "What is 2+2?"}]
+    }'
+done
 ```
 
 Note that the default response from the mock openai server will always be
@@ -409,4 +412,12 @@ Restore the AgentGateway to the 2 replicas we originally set up:
 kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":2}}}}'
 
 kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
+
+kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
+```
+
+Confirm both replicas are back before moving on to another lab:
+```bash
+kubectl get deploy agentgateway-proxy -n agentgateway-system \
+  -o jsonpath='replicas={.status.readyReplicas}{"\n"}'
 ```

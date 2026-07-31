@@ -364,31 +364,28 @@ EOF
 
 ### Test Intra-Priority-Group Failover
 
-Send multiple requests to observe the failover pattern within Priority Group 1:
+Send three requests to observe the failover pattern within Priority Group 1:
 
 ```bash
-curl -s -w "\nHTTP Status: %{http_code}\n" \
-  "$GATEWAY_IP:8080/openai" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "", "messages": [{"role": "user", "content": "What is 2+2?"}]}'
+for i in 1 2 3; do
+  echo "=== Request $i ==="
+  curl -s -w "\nHTTP Status: %{http_code}\n" \
+    "$GATEWAY_IP:8080/openai" \
+    -H "Content-Type: application/json" \
+    -d '{"model": "", "messages": [{"role": "user", "content": "What is 2+2?"}]}'
+done
 ```
 
 **Expected output pattern:**
 
-Request 1:
-```json
+```
+=== Request 1 ===
 {"error":{"message":"Rate limit reached for mock-gpt-4o...","type":"RateLimitError","code":429}}
 HTTP Status: 429
-```
-
-Request 2:
-```json
+=== Request 2 ===
 {"model":"gpt-5.6-terra","choices":[{"message":{"content":"Four.",...}],...}
 HTTP Status: 200
-```
-
-Request 3:
-```json
+=== Request 3 ===
 {"model":"gpt-5.6-terra","choices":[{"message":{"content":"Four.",...}],...}
 HTTP Status: 200
 ```
@@ -401,24 +398,12 @@ Check the AgentGateway logs to confirm which backends handled each request:
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-**Expected log output:**
+**Expected log output** (trimmed to the fields that matter):
 
-```json
-{
-  "status": 429,
-  "endpoint": "mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000",
-  "duration": "2ms"
-}
-{
-  "status": 200,
-  "endpoint": "api.openai.com:443",
-  "duration": "861ms"
-}
-{
-  "status": 200,
-  "endpoint": "api.openai.com:443",
-  "duration": "491ms"
-}
+```
+endpoint=mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000 http.path=/openai http.status=429 duration=2ms
+endpoint=api.openai.com:443 http.path=/openai http.status=200 duration=861ms
+endpoint=api.openai.com:443 http.path=/openai http.status=200 duration=491ms
 ```
 
 **Key observations:**
@@ -641,13 +626,16 @@ kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
 kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
 ```
 
-Send requests to observe the 5XX failover pattern:
+Send three requests to observe the 5XX failover pattern:
 
 ```bash
-curl -s -w "\nHTTP Status: %{http_code}\n" \
-  "$GATEWAY_IP:8080/openai-5xx" \
-  -H "Content-Type: application/json" \
-  -d '{"model": "", "messages": [{"role": "user", "content": "What is 2+2?"}]}'
+for i in 1 2 3; do
+  echo "=== Request $i ==="
+  curl -s -w "\nHTTP Status: %{http_code}\n" \
+    "$GATEWAY_IP:8080/openai-5xx" \
+    -H "Content-Type: application/json" \
+    -d '{"model": "", "messages": [{"role": "user", "content": "What is 2+2?"}]}'
+done
 ```
 
 **Expected response pattern:**
@@ -670,19 +658,11 @@ Check the AgentGateway logs to confirm the failover behavior:
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-**Expected log output:**
+**Expected log output** (trimmed to the fields that matter):
 
-```json
-{
-  "status": 503,
-  "endpoint": "mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local:8000",
-  "duration": "2ms"
-}
-{
-  "status": 200,
-  "endpoint": "api.openai.com:443",
-  "duration": "861ms"
-}
+```
+endpoint=mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local:8000 http.path=/openai-5xx http.status=503 duration=2ms
+endpoint=api.openai.com:443 http.path=/openai-5xx http.status=200 duration=861ms
 ```
 
 **Key observations:**
@@ -929,4 +909,12 @@ Restore the AgentGateway to the 2 replicas we originally set up:
 kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --type=merge -p '{"spec":{"deployment":{"spec":{"replicas":2}}}}'
 
 kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
+
+kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
+```
+
+Confirm both replicas are back before moving on to another lab:
+```bash
+kubectl get deploy agentgateway-proxy -n agentgateway-system \
+  -o jsonpath='replicas={.status.readyReplicas}{"\n"}'
 ```

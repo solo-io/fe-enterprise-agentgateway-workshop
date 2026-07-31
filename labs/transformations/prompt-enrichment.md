@@ -98,7 +98,7 @@ spec:
 EOF
 ```
 
-## curl openai
+## curl openai with enrichment applied
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -113,7 +113,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-We should see that the response was returned in JSON format
+The request body is unchanged from the first call, but the gateway prepends the system message before forwarding it, so the response comes back in JSON format
 ```
 {"id":"chatcmpl-CJ1ZTRQCOuIwe8yiaRnpLPDyvE4QX","choices":[{"index":0,"message":{"content":"```json\n{\n  \"favorite_poem\": {\n    \"title\": \"The Road Not Taken\",\n    \"author\": \"Robert Frost\",\n    \"summary\": \"The poem explores the theme of choices and their consequences, using the metaphor of a fork in the road to illustrate the decisions we face in life.\"\n  }\n}\n```","role":"assistant"},"finish_reason":"stop"}],"created":1758650307,"model":"gpt-5.4-nano-2026-03-17","service_tier":"default","system_fingerprint":"fp_560af6e559","object":"chat.completion","usage":{"prompt_tokens":22,"completion_tokens":67,"total_tokens":89,"prompt_tokens_details":{"audio_tokens":0,"cached_tokens":0},"completion_tokens_details":{"accepted_prediction_tokens":0,"audio_tokens":0,"reasoning_tokens":0,"rejected_prediction_tokens":0}}}
 ```

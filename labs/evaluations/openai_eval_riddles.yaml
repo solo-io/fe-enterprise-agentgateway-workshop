@@ -19,7 +19,10 @@ providers:
     config: { temperature: 0, max_tokens: 1024 }
   - id: openai:gpt-5.4-nano
     config: { temperature: 0, max_tokens: 1024 }
-  - id: openai:gpt-5.6-terra
+  # Pinned to :chat: so promptfoo uses the Chat Completions API. Without it,
+  # promptfoo routes this model to the Responses API, which the gateway's
+  # Completions route rejects with "missing field `messages`".
+  - id: openai:chat:gpt-5.6-terra
     # gpt-5.6-terra supports only its default temperature, so this entry omits it
     config: { max_tokens: 1024 }
   - id: openai:chat:gpt-5-nano-2025-08-07

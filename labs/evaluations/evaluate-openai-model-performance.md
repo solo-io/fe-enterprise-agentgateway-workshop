@@ -97,18 +97,18 @@ export OPENAI_BASE_URL="http://$GATEWAY_IP:8080/openai"
 
 Run a model eval for coding tasks using llm-as-a-judge and confidence scoring assertions
 ```bash
-promptfoo eval --no-cache -c evaluations/openai_eval_coding.yaml
+promptfoo eval --no-cache -c labs/evaluations/openai_eval_coding.yaml
 ```
 You should see results for the various tests in the Promptfoo UI as well as in the terminal output
 
 Run a model eval for messaging tasks using llm-as-a-judge, confidence, regex, and icontains assertions
 ```bash
-promptfoo eval --no-cache -c evaluations/openai_eval_messaging.yaml
+promptfoo eval --no-cache -c labs/evaluations/openai_eval_messaging.yaml
 ```
 You should see results for the various tests in the Promptfoo UI as well as in the terminal output
 
 ## Additional Evaluations
-Feel free to review or test out the other evaluation examples in `/evaluations`
+Feel free to review or test out the other evaluation examples in `labs/evaluations/`
 
 ## Cleanup
 ```bash

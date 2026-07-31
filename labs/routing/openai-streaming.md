@@ -118,7 +118,9 @@ data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752
 
 ...
 
-data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano-2026-03-17","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano-2026-03-17","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":null}
+
+data: {"id":"chatcmpl-...","object":"chat.completion.chunk","created":1744306752,"model":"gpt-5.4-nano-2026-03-17","choices":[],"usage":{"prompt_tokens":37,"completion_tokens":59,"total_tokens":96}}
 
 data: [DONE]
 ```
@@ -126,7 +128,9 @@ data: [DONE]
 **Key observations:**
 - Each `data:` line contains a JSON chunk with incremental content
 - The `delta.content` field contains the new tokens
-- The final chunk has `"finish_reason":"stop"`
+- The content chunks carry `"usage":null`
+- The chunk that closes the message has `"finish_reason":"stop"`
+- A final chunk with an empty `choices` array carries the token `usage`
 - The stream ends with `data: [DONE]`
 
 ## Observability
@@ -164,7 +168,7 @@ For streaming requests, you'll see:
 - `"gen_ai.usage.input_tokens"` and `"gen_ai.usage.output_tokens"`
 - Streaming-specific timing metrics
 
-**Note**: Unlike non-streaming responses, streaming responses don't include the `usage` object in the SSE stream. Token usage is tracked in AgentGateway's access logs and metrics.
+**Note**: OpenAI omits token usage from a stream unless the client asks for it with `stream_options.include_usage`. AgentGateway sets that option on your behalf so it can record token metrics, so you get the usage chunk shown above without changing your request — and the same figures appear in the access logs and metrics.
 
 ### View Traces in the Solo UI
 

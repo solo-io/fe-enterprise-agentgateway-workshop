@@ -236,7 +236,13 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-You should see a 200 response with a completion from OpenAI, along with the `x-ext-authz-check-result: allowed` header injected by the ext-authz server.
+You should see a 200 response with a completion from OpenAI.
+
+Note that `x-ext-authz-check-result` appears only on *denied* responses. On a deny the ext-authz server generates the whole response, headers included; on an allow it returns a decision and the gateway forwards your original request upstream, so there is no such header in what the client receives. Confirm the allow decision in the server's log instead:
+
+```bash
+kubectl logs -n agentgateway-system -l app=grpc-ext-authz --tail=10
+```
 
 ## View Access Logs
 

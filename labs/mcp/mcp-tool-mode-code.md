@@ -263,7 +263,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | sed 's/^data: //' | python3 -m json.tool
 ```
 
 Exactly one tool: `run_code`. Its `description` field contains the typed API.
@@ -275,7 +275,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_code","arguments":{"code":"const greeting = await echo({message: \"hello\"}); const total = await get_sum({a: 2, b: 3}); ({greeting, total})"}}}' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_code","arguments":{"code":"const greeting = await echo({message: \"hello\"}); const total = await get_sum({a: 2, b: 3}); ({greeting, total})"}}}' | sed 's/^data: //' | python3 -m json.tool
 ```
 
 The `result.structuredContent.success` field has the combined object; intermediate results are not in the response.
@@ -450,7 +450,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | python3 -m json.tool | grep -E "function|get_env|getEnv|get-env"
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | sed 's/^data: //' | python3 -m json.tool | grep -E "function|get_env|getEnv|get-env"
 ```
 
 Expected: in Code mode, the `run_code` tool's description (returned by `tools/list`) no longer lists `get_env` (or whichever identifier shape your cluster emits) in the typed API. The CEL expression for tool name `get-env` evaluates as `mcp.tool.name != "get-env" || (has(jwt.roles) && jwt.roles.exists(r, r == "engineering"))` → `false || (false && ...)` → `false` — the function is filtered from the typed API.
@@ -463,7 +463,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_code","arguments":{"code":"const env = await get_env({}); env"}}}' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_code","arguments":{"code":"const env = await get_env({}); env"}}}' | sed 's/^data: //' | python3 -m json.tool
 ```
 
 Expected: an error indicating `get_env` is not defined in the sandbox — the typed API didn't include it for this caller, so the function is not defined and the script fails compilation before it runs.
@@ -703,8 +703,16 @@ The `gen_ai.tool.name` field shows `run_code` (with `mcp.method.name=tools/call`
 ### View MCP metrics
 
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 3 && curl -s http://localhost:15020/metrics | grep agentgateway_mcp_requests_total && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 3
+  curl -s http://localhost:15020/metrics | grep agentgateway_mcp_requests_total
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 `agentgateway_mcp_requests_total{method="tools/call"}` increments by one per `run_code` invocation, with `resource="run_code"`. For per-upstream-tool visibility, inspect traces.

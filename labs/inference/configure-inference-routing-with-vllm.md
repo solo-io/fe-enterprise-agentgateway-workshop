@@ -272,9 +272,17 @@ The `inferencepool.selected_endpoint` value matches a vLLM pod IP, confirming th
 AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. Inference-routed requests show up with a `backend` label ending in `.inference.cluster.local`:
 
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 >/dev/null 2>&1 & \
-PF=$!; sleep 2 && curl -s http://localhost:15020/metrics \
-  | grep 'agentgateway_requests_total.*inference.cluster.local' ; kill $PF
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 2
+  curl -s http://localhost:15020/metrics \
+    | grep 'agentgateway_requests_total.*inference.cluster.local'
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 If this returns empty, retry — the agentgateway proxy runs with multiple replicas and `port-forward` connects to one of them. Send another inference request and rerun.

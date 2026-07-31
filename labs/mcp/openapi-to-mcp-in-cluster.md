@@ -384,8 +384,16 @@ A `tools/call` against this backend logs `protocol=mcp`, `mcp.method.name=tools/
 
 ### View MCP metrics
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 2 && curl -s http://localhost:15020/metrics | grep -iE "mcp" && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 2
+  curl -s http://localhost:15020/metrics | grep -iE "mcp"
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 You should see MCP request counters, including:

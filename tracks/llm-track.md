@@ -131,7 +131,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 ### Use Case 7 — Embeddings, Batches & Multimodal
 
-**Value:** Extend the gateway beyond chat completions to cover the full API surface — embeddings, async batch processing, audio, and video — without provider-specific client changes.
+**Value:** Extend the gateway beyond chat completions to cover the full API surface — embeddings, async batch processing, and audio — without provider-specific client changes.
 
 | Lab | What you'll learn |
 |---|---|
@@ -140,7 +140,6 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | [OpenAI Batch API](../labs/routing/configure-openai-batches.md) | Submit and retrieve async batch jobs |
 | [OpenAI Streaming](../labs/routing/openai-streaming.md) | Stream responses for real-time token generation |
 | [OpenAI Audio (TTS & STT)](../labs/routing/openai-audio.md) | Route Text-to-Speech and Speech-to-Text requests |
-| [OpenAI Video Generation (Sora)](../labs/routing/openai-video.md) | Route Sora video generation requests |
 
 ---
 

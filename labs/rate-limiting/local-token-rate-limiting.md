@@ -98,22 +98,29 @@ spec:
 EOF
 ```
 
-## curl openai
-Note that the following user prompt "Whats your favorite poem" contains 5 tokens based on the [OpenAI tokenizer](https://platform.openai.com/tokenizer)
+## curl openai until the limit trips
+Note that the following user prompt "Whats your favorite poem" contains 5 tokens based on the [OpenAI tokenizer](https://platform.openai.com/tokenizer), so a single request consumes the whole minute's budget.
+
+Local limits are enforced per proxy replica, and `001` deploys two, so each replica carries its own 5-token budget. Send a short burst so every replica is hit:
+
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
-  -H "content-type: application/json" \
-  -d '{
-    "model": "gpt-5.4-nano",
-    "messages": [
-      {
-        "role": "user",
-        "content": "Whats your favorite poem?"
-      }
-    ]
-  }'
+for i in {1..6}; do
+  echo -n "request $i: "
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+    -H "content-type: application/json" \
+    -d '{
+      "model": "gpt-5.4-nano",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Whats your favorite poem?"
+        }
+      ]
+    }'
+done
 ```
-You should be rate limited on the second request to LLM because we will have hit our token-based rate limit of 5 input tokens per minute (first request consumes 5 tokens)
+
+The first request to each replica returns `HTTP 200` and consumes its 5-token budget; every later request in the same minute returns `HTTP 429`.
 
 ## Local vs. Global Rate Limiting
 Local rate limiting shown in this lab is enforced directly on each proxy, with every replica maintaining its own independent counter. This makes it useful as a coarse-grained, first line of defense to shed excess traffic before it reaches backend services or global rate limit servers.

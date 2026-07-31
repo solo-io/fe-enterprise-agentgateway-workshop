@@ -142,14 +142,23 @@ kubectl create -n agentgateway-system secret tls bar \
 
 ## Set up SNI Routing
 
-Set up an SNI Gateway that serves multiple hosts on the same port
+Set up an SNI Gateway that serves multiple hosts on the same port.
+
+> [!NOTE]
+> This creates a **separate** `agentgateway-sni` Gateway rather than editing the
+> `agentgateway-proxy` Gateway from `001`. Applying a full Gateway manifest over
+> the shared one would replace its listener list — dropping the HTTP `8080`
+> listener the other labs route through — and detach its
+> `infrastructure.parametersRef`. A dedicated Gateway also gets its own
+> LoadBalancer address, which is what the SNI checks below resolve against.
+
 ```bash
 kubectl apply -f - <<EOF
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway-proxy
+  name: agentgateway-sni
   namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
@@ -197,7 +206,7 @@ spec:
   hostnames:
   - "mock-openai-foo.glootest.com"
   parentRefs:
-    - name: agentgateway-proxy
+    - name: agentgateway-sni
       namespace: agentgateway-system
   rules:
     - matches:
@@ -220,7 +229,7 @@ spec:
   hostnames:
   - "mock-openai-bar.glootest.com"
   parentRefs:
-    - name: agentgateway-proxy
+    - name: agentgateway-sni
       namespace: agentgateway-system
   rules:
     - matches:
@@ -243,7 +252,7 @@ spec:
   hostnames:
   - "mock-openai-baz.glootest.com"
   parentRefs:
-    - name: agentgateway-proxy
+    - name: agentgateway-sni
       namespace: agentgateway-system
   rules:
     - matches:
@@ -263,7 +272,7 @@ EOF
 
 curl mock-openai-foo over https:
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-sni -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 curl -ikv --resolve "mock-openai-foo.glootest.com:443:${GATEWAY_IP}" https://mock-openai-foo.glootest.com:443/ \
   -H "content-type: application/json" \
@@ -368,7 +377,7 @@ curl: (35) LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to mock-openai-
 Clean up objects created in this lab
 ```bash
 rm -rf example_certs
-kubectl delete gateway -n agentgateway-system agentgateway
+kubectl delete gateway -n agentgateway-system agentgateway-sni
 kubectl delete httproute -n agentgateway-system mock-openai-bar-route
 kubectl delete httproute -n agentgateway-system mock-openai-baz-route
 kubectl delete httproute -n agentgateway-system mock-openai-foo-route
@@ -379,23 +388,5 @@ kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```
 
-Deploy the default `Gateway` from lab `001`
-```bash
-kubectl apply -f - <<EOF
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: agentgateway-proxy
-  namespace: agentgateway-system
-spec:
-  gatewayClassName: enterprise-agentgateway
-  listeners:
-    - name: http
-      port: 8080
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-EOF
-```
+The `agentgateway-proxy` Gateway from `001` is untouched by this lab, so nothing
+needs to be restored.

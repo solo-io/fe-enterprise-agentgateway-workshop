@@ -55,7 +55,7 @@ kubectl get pods -n observability
 
 Expected Output:
 
-```bash
+```
 NAME                      READY   STATUS    RESTARTS   AGE
 jaeger-54b6c8b5d5-8s74n   1/1     Running   0          18m
 ```

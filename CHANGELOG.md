@@ -1,5 +1,10 @@
 # Changelog
 
+0.13.2 - (7-31-26)
+---
+- Fixes and improvements caught in testing, optimizations for agent use
+- Updates to Agentgateway dashboard - additional model pricing
+
 0.13.1 - (7-28-26)
 ---
 - Refresh model names repo-wide: `gpt-4o-mini` → `gpt-5.4-nano`, `gpt-4o` → `gpt-5.6-terra`, `gpt-3.5-turbo` → `gpt-5.4-mini`, and Claude 3.5 → Claude 5
