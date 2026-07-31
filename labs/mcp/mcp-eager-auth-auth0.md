@@ -369,12 +369,6 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway \
   --version $ENTERPRISE_AGW_VERSION \
   --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
   -f -<<EOF
-gatewayClassParametersRefs:
-  enterprise-agentgateway:
-    group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-config
-    namespace: agentgateway-system
 
 tokenExchange:
   enabled: true
@@ -942,15 +936,7 @@ export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n age
 helm upgrade -i -n agentgateway-system enterprise-agentgateway \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --version $ENTERPRISE_AGW_VERSION \
-  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
-  -f -<<EOF
-gatewayClassParametersRefs:
-  enterprise-agentgateway:
-    group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-config
-    namespace: agentgateway-system
-EOF
+  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
 
 kubectl rollout status -n agentgateway-system deployment/enterprise-agentgateway --timeout=180s
 

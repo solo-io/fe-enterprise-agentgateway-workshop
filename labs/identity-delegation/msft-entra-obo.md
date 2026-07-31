@@ -82,7 +82,7 @@ export ENTRA_DOWNSTREAM_SCOPE="$ENTRA_DOWNSTREAM_SCOPE"  # e.g. "api://ffffffff-
 export ENTRA_OBO_CLIENT_SECRET="$ENTRA_OBO_CLIENT_SECRET"
 
 # Controller version and license (set these to match your environment)
-export ENTERPRISE_AGW_VERSION=v2026.5.2
+export ENTERPRISE_AGW_VERSION=v2026.7.1-patch.0
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
 ```
 
@@ -107,12 +107,6 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.p
 --version $ENTERPRISE_AGW_VERSION \
 --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
 -f -<<EOF
-gatewayClassParametersRefs:
-  enterprise-agentgateway:
-    group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-config
-    namespace: agentgateway-system
 tokenExchange:
   enabled: true
   issuer: "enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777"
@@ -575,13 +569,5 @@ kubectl delete secret -n agentgateway-system entra-obo-client-secret
 helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $ENTERPRISE_AGW_VERSION \
---set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
--f -<<EOF
-gatewayClassParametersRefs:
-  enterprise-agentgateway:
-    group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-config
-    namespace: agentgateway-system
-EOF
+--set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
 ```

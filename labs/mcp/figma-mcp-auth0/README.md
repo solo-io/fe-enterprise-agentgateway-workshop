@@ -23,11 +23,11 @@ no Figma-side allowlisting of the gateway.
        └────────▶ 4. validated ──────▶└──────────────┘
 ```
 
-- **Layer A** — Claude Code authenticates to the gateway. The gateway is the OAuth
+- **Layer A**: Claude Code authenticates to the gateway. The gateway is the OAuth
   Authorization Server the client sees (`/oauth-issuer/...`); it brokers the code flow to
   Auth0 and validates the resulting Auth0 JWT at the MCP backend. This follows
   [`../mcp-eager-auth-auth0.md`](../mcp-eager-auth-auth0.md).
-- **Layer B** — when Claude calls a Figma tool, the gateway has no Figma token for you, so it
+- **Layer B**: when Claude calls a Figma tool, the gateway has no Figma token for you, so it
   elicits a Figma OAuth login (browser), stores the token bound to your identity, and injects
   it into `api.figma.com` calls.
 
@@ -38,7 +38,7 @@ Files in this folder:
 | File | Purpose |
 |---|---|
 | `README.md` | This runbook |
-| `figma-mcp.yaml` | Figma-specific CRs (backend, route, CORS, elicitation policy+secret, auth0-jwks) — `envsubst`-templated |
+| `figma-mcp.yaml` | Figma-specific CRs (backend, route, CORS, elicitation policy+secret, auth0-jwks): `envsubst`-templated |
 | `figma-openapi.json` | Full Figma REST OpenAPI spec (v0.40.0, 42 paths) → loaded into a ConfigMap |
 
 ---
@@ -48,10 +48,10 @@ Files in this folder:
 - Lab `001` baseline running (agentgateway-proxy Gateway with an HTTP listener on 8080). This
   runbook was validated against controller **v2026.6.1** on a local KinD cluster.
 - `kubectl`, `helm`, `openssl`, `jq`, `envsubst` (gettext), Node 18+ (for Claude Code).
-- A way to resolve `mcp-auth0.glootest.com` to the gateway LoadBalancer — a local
+- A way to resolve `mcp-auth0.glootest.com` to the gateway LoadBalancer: a local
   `/etc/hosts` entry (this runbook; needs sudo).
 
-### Auth0 (Layer A) — you create these in the Auth0 dashboard
+### Auth0 (Layer A): you create these in the Auth0 dashboard
 
 1. **Application** → *Regular Web Application*, grant type **Authorization Code**.
 2. **API** (an "audience") under Auth0 → APIs.
@@ -63,7 +63,7 @@ Files in this folder:
    The eager-OAuth issuer runs a dual flow; registering only one yields
    `invalid_request: callback url not allowed` after login.
 
-### Figma (Layer B) — you create these in the Figma dashboard
+### Figma (Layer B): you create these in the Figma dashboard
 
 1. Go to **figma.com → your avatar → Settings → Developers**, or directly
    [figma.com/developers/apps](https://www.figma.com/developers/apps) → **Create a new app**.
@@ -88,9 +88,9 @@ Files in this folder:
 
 ---
 
-## Step 1 — Environment variables + DNS
+## Step 1: Environment variables + DNS
 
-Run every command in this runbook from **this lab folder** — Step 6 reads `figma-openapi.json`
+Run every command in this runbook from **this lab folder**. Step 6 reads `figma-openapi.json`
 by relative path, and the certs land in `./example_certs`:
 
 ```bash
@@ -134,7 +134,7 @@ echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" | sudo tee -a /etc/hosts
 
 ---
 
-## Step 2 — Self-signed TLS cert + HTTPS listener
+## Step 2: Self-signed TLS cert + HTTPS listener
 
 OAuth requires HTTPS for anything that isn't `localhost`. Create a self-signed cert for
 `mcp-auth0.glootest.com` and add a port-443 HTTPS listener alongside the existing HTTP:8080.
@@ -200,17 +200,17 @@ kubectl get gateway -n agentgateway-system agentgateway-proxy \
 ```
 
 > **State store:** this runbook uses **SQLite in-memory** (no Postgres). OAuth/elicitation
-> state is lost on a controller pod restart — fine for a personal setup. For durable state,
+> state is lost on a controller pod restart, which is fine for a personal setup. For durable state,
 > deploy Postgres per `../mcp-eager-auth-auth0.md` Step 3 and add the `database:` block in Step 4.
 
 ---
 
-## Step 3 — STS env on the proxy params
+## Step 3: STS env on the proxy params
 
 The proxy needs to know where the in-cluster STS lives. Patch the `EnterpriseAgentgatewayParameters`
 that your `agentgateway-proxy` Gateway references (check with
 `kubectl get gateway agentgateway-proxy -n agentgateway-system -o jsonpath='{.spec.infrastructure.parametersRef.name}'`
-— on this workshop it is `agentgateway-config`). A `merge` patch preserves all other settings.
+, which on this workshop is `agentgateway-config`). A `merge` patch preserves all other settings.
 
 ```bash
 kubectl patch enterpriseagentgatewayparameters agentgateway-config \
@@ -228,12 +228,11 @@ kubectl get enterpriseagentgatewayparameters agentgateway-config \
 
 ---
 
-## Step 4 — Helm upgrade: enable eager-OAuth pointed at Auth0
+## Step 4: Helm upgrade to enable eager-OAuth pointed at Auth0
 
-> **`--reuse-values` is required here.** It preserves your existing install values (license key,
-> `gatewayClassParametersRefs`, and any shared-extension wiring) and only adds the eager-OAuth
-> config below. A full `-f values.yaml` upgrade without `--reuse-values` can silently drop those
-> settings.
+> **`--reuse-values` is required here.** It keeps the values already on the release, such as your
+> license key, and adds only the eager-OAuth config below. A full `-f values.yaml` upgrade without
+> it resets the release to chart defaults and drops your license key.
 
 ```bash
 helm upgrade enterprise-agentgateway \
@@ -288,7 +287,7 @@ kubectl rollout status -n agentgateway-system deployment/agentgateway-proxy --ti
 
 ---
 
-## Step 5 — Route the eager-OAuth issuer endpoints
+## Step 5: Route the eager-OAuth issuer endpoints
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -322,9 +321,9 @@ kubectl get httproute -n agentgateway-system oauth-issuer \
 
 ---
 
-## Step 6 — Deploy the Figma backend
+## Step 6: Deploy the Figma backend
 
-> **`figma-openapi.json` in this folder is already down-converted** — you can skip straight to
+> **`figma-openapi.json` in this folder is already down-converted**, so you can skip straight to
 > the ConfigMap command. The detail below is only needed if you refresh the spec from upstream.
 >
 > <details><summary>Why the spec is pre-processed (OpenAPI 3.1 → 3.0)</summary>
@@ -346,7 +345,7 @@ Load the full (down-converted) Figma OpenAPI spec into a ConfigMap (`--server-si
 last-applied annotation, which would double the ~477 KB object past etcd's 1 MiB limit):
 
 ```bash
-# Must be run from this lab folder (see Step 1) — the --from-file path is relative.
+# Must be run from this lab folder (see Step 1): the --from-file path is relative.
 kubectl create configmap figma-openapi-schema -n agentgateway-system \
   --from-file=schema=figma-openapi.json \
   --dry-run=client -o yaml | kubectl apply --server-side -f -
@@ -371,7 +370,7 @@ curl -sk "https://${AUTH0_GATEWAY_HOST}/.well-known/oauth-authorization-server/f
 
 ---
 
-## Step 7 — Connect Claude Code
+## Step 7: Connect Claude Code
 
 ```bash
 claude mcp add figma-mcp-auth0 --transport http https://mcp-auth0.glootest.com/figma/openapi/mcp
@@ -379,7 +378,7 @@ claude mcp list   # expect: figma-mcp-auth0: https://mcp-auth0.glootest.com/figm
 ```
 
 Launch Claude Code with Node TLS verification disabled (self-signed gateway cert). Do **not**
-put this in your shell rc — it disables TLS for all Node processes in the shell.
+put this in your shell rc. It disables TLS for all Node processes in the shell.
 
 ```bash
 NODE_TLS_REJECT_UNAUTHORIZED=0 claude
@@ -395,7 +394,7 @@ What happens the first time:
 
 0. **Self-signed cert warning (up front).** The browser's very first hop is the gateway's own
    `…/oauth-issuer/authorize` on `mcp-auth0.glootest.com`, so the "Your connection is not
-   private" warning appears **before** Auth0 — click **Advanced → Proceed**. Accepting it once
+   private" warning appears **before** Auth0. Click **Advanced → Proceed**. Accepting it once
    covers the return `…/callback/upstream` hop too (same host), so you won't be prompted again.
 
 1. **Auth0 login (Layer A).** Claude Code discovers the gateway AS, registers, and opens a
@@ -409,21 +408,21 @@ What happens the first time:
    > go straight to the Figma consent below.
 
 2. **Figma login (Layer B).** The browser continues to **Figma's OAuth consent** listing the
-   five read scopes — click **Allow access**. (Figma re-shows this consent on every fresh login;
+   five read scopes. Click **Allow access**. (Figma re-shows this consent on every fresh login;
    it does not remember a prior grant.)
 
    ![Figma consent screen](images/02-figma-consent.png)
 
 3. Figma redirects through `…/oauth-issuer/callback/upstream` and the browser returns to
-   **Claude Code's own success page** ("you can close this window" — image below). Depending on
+   **Claude Code's own success page** ("you can close this window", image below). Depending on
    timing you may briefly see the gateway's **"Authorization complete."** page first.
 
    ![Callback received](images/05-callback-received.png)
 
-4. Claude Code retries; the gateway injects your Figma token and the call returns real data — no 401. Subsequent runs reuse both tokens.
+4. Claude Code retries; the gateway injects your Figma token and the call returns real data, no 401. Subsequent runs reuse both tokens.
 
 > **Note on token binding:** the Figma token is stored bound to the **Auth0 identity** (`sub`) that
-> made the call. Each distinct user identity gets its own Figma elicitation the first time — this
+> made the call. Each distinct user identity gets its own Figma elicitation the first time. This
 > is the intended per-user credential-forwarding behavior.
 
 ---
@@ -451,20 +450,20 @@ curl -sk "https://mcp-auth0.glootest.com/.well-known/oauth-authorization-server/
 
 ---
 
-## Step 8 — Read a Figma design as codegen context
+## Step 8: Read a Figma design as codegen context
 
 `getMe` only proves the plumbing. The backend exposes 49 Figma tools (`getFile`, `getFileNodes`,
 `getImages`, `getFileStyles`, `getComments`, `getFileVersions`, …), all guarded by the same two
 OAuth layers, so Claude can read an actual design file.
 
-Open any Figma design file in your browser and copy its key from the URL —
-`figma.com/design/`**`<FILE_KEY>`**`/<name>` — then ask Claude Code:
+Open any Figma design file in your browser and copy its key from the URL:
+`figma.com/design/`**`<FILE_KEY>`**`/<name>`. Then ask Claude Code:
 
 ```
 Using figma-mcp-auth0, read Figma file <FILE_KEY>:
-1. getFileMeta — name + who last touched it
-2. getFile with depth=2 — list the pages and the top-level frames on each
-3. getImages — render the "Thumbnail" frame to a PNG
+1. getFileMeta: name + who last touched it
+2. getFile with depth=2: list the pages and the top-level frames on each
+3. getImages: render the "Thumbnail" frame to a PNG
 Then summarize the design and outline how you'd rebuild the "Product page" frame in React.
 ```
 
@@ -480,18 +479,18 @@ getImages    → https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/…  
 
 > ⚠️ **Tool arguments are nested, not flat.** Because the backend is `protocol: OpenAPI`,
 > agentgateway groups each operation's parameters under `path`/`query` objects. `getFile`
-> takes `{"path":{"file_key":"…"},"query":{"depth":2}}` — **not** a top-level `file_key`.
+> takes `{"path":{"file_key":"…"},"query":{"depth":2}}`, **not** a top-level `file_key`.
 > Claude infers this from each tool's input schema, but if you call the tool by hand with a
 > flat `file_key` the path param is left empty and Figma answers `{"status":403,"err":
-> "Permission denied"}` (a misleading 403 — it means "malformed request", not "no access").
+> "Permission denied"}` (a misleading 403: it means "malformed request", not "no access").
 
 ---
 
-## Alternative client — drive the backend with MCP Inspector
+## Alternative client: drive the backend with MCP Inspector
 
 Claude Code is one MCP client; the [MCP Inspector](https://github.com/modelcontextprotocol/inspector)
-is a visual one. Its Guided OAuth Flow steps through the same Layer-A handshake this lab builds —
-protected-resource discovery → AS-metadata discovery → dynamic client registration → token exchange —
+is a visual one. Its Guided OAuth Flow steps through the same Layer-A handshake this lab builds:
+protected-resource discovery → AS-metadata discovery → dynamic client registration → token exchange,
 with an expandable panel at each step, which makes it useful for inspecting where OAuth discovery
 points (gateway vs. Auth0) and the nested `path`/`query` shape of the OpenAPI tool args.
 
@@ -502,7 +501,7 @@ self-signed-cert escape hatch as Step 7. Run it from `npx` (no clone, no config 
 NODE_TLS_REJECT_UNAUTHORIZED=0 npx @modelcontextprotocol/inspector
 ```
 
-It prints a **proxy session token** and auto-opens the UI with the token pre-filled —
+It prints a **proxy session token** and auto-opens the UI with the token pre-filled:
 `http://localhost:6274/?MCP_PROXY_AUTH_TOKEN=…` (UI on **6274**, proxy on **6277**). If you open
 `localhost:6274` by hand instead, paste that token into **Configuration → Proxy Session Token** or it
 returns 403.
@@ -517,12 +516,12 @@ returns 403.
 **Authenticate (Layer A + B, same dual flow as Claude Code):**
 
 4. Under *"Need to configure authentication?"* click **Open Auth Settings**, then **Guided OAuth Flow**
-   (recommended for debugging) — or **Quick OAuth Flow** for a one-click redirect.
+   (recommended for debugging), or **Quick OAuth Flow** for a one-click redirect.
 5. The Inspector discovers the gateway's AS metadata and **dynamically registers itself** at
    `…/oauth-issuer/register` (DCR), then opens the browser. Just like Step 7: accept the self-signed
    cert warning on `mcp-auth0.glootest.com` → log in at **Auth0** → **Allow access** at **Figma** →
    the browser returns to the Inspector's `http://localhost:6274/oauth/callback`.
-   > You don't register the Inspector's callback anywhere — DCR registers `localhost:6274/oauth/callback`
+   > You don't register the Inspector's callback anywhere. DCR registers `localhost:6274/oauth/callback`
    > on the fly. The Auth0/Figma callbacks from the pre-reqs are the *gateway's* upstream/downstream
    > (`…/oauth-issuer/callback/{upstream,downstream}`), not the client's.
 6. In the Guided flow, expand each step to check the layer: the **client registration** step should
@@ -531,10 +530,10 @@ returns 403.
 
 **Use it:**
 
-7. Click **Connect**, then **Tools → List Tools** — you'll see the 49 Figma operations.
+7. Click **Connect**, then **Tools → List Tools**: you'll see the 49 Figma operations.
 8. Pick **getMe → Run Tool** → your real Figma profile JSON (the same payload as the Verify section).
 9. Try **getFile**: the Inspector renders the form from the OpenAPI schema, so it already groups the
-   inputs — fill `path.file_key` and `query.depth`, not a flat `file_key`. This is the Step 8 nesting
+   inputs: fill `path.file_key` and `query.depth`, not a flat `file_key`. This is the Step 8 nesting
    gotcha made visible; a flat field leaves the path param empty → Figma's misleading
    `403 Permission denied`.
 
@@ -544,7 +543,7 @@ returns 403.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `GET /figma/openapi/mcp` returns **406** (not 401), well-known returns 404 | MCP auth policy `PartiallyValid` — controller couldn't fetch JWKS. Almost always a **leading slash** on `jwksPath` | `jwksPath: .well-known/jwks.json` (no leading slash). Check `kubectl logs -n agentgateway-system deploy/enterprise-agentgateway | grep -i jwks` |
+| `GET /figma/openapi/mcp` returns **406** (not 401), well-known returns 404 | MCP auth policy `PartiallyValid`: controller couldn't fetch JWKS. Almost always a **leading slash** on `jwksPath` | `jwksPath: .well-known/jwks.json` (no leading slash). Check `kubectl logs -n agentgateway-system deploy/enterprise-agentgateway | grep -i jwks` |
 | `registration_endpoint` in AS metadata points at **Auth0**, not the gateway | `agentgateway.dev/issuer-proxy` missing, or `oauth-issuer` route not Accepted | Confirm `issuer-proxy` in the backend; `kubectl get httproute -n agentgateway-system oauth-issuer` |
 | `/oauth-issuer/register` 404/501 | Step 4 didn't enable `tokenExchange`, or Step 5 route missing | Re-check Step 4 values landed and the route is Accepted |
 | Auth0 `callback url not allowed` after login | Only one of the two Auth0 callbacks registered | Register **both** `/oauth-issuer/callback/downstream` and `.../callback/upstream` |
@@ -560,7 +559,7 @@ returns 403.
 | **Inspector**: OAuth stalls / TLS error reaching the gateway | Launched without the self-signed escape hatch | Relaunch with `NODE_TLS_REJECT_UNAUTHORIZED=0 npx @modelcontextprotocol/inspector` |
 | **Inspector**: OAuth aborts before the browser returns | Default 10 s request timeout too short for two logins | **Configuration → Request Timeout** → `120000` ms |
 | **Inspector**: Quick OAuth Flow shows a "paste the code" box | Quick flow uses the debug callback (`/oauth/callback/debug`), a manual copy-paste path | Use **Guided OAuth Flow** for the automatic `/oauth/callback`, or paste the `code` from the browser URL back into the box |
-| **Inspector**: proxy logs show repeated `GET /figma/openapi/mcp` → **404 `mcp: session not found`** | Benign — the `OpenAPI` MCP backend is **stateless** (no server-side GET/SSE stream), so the Inspector's optional stream GET 404s while the tool-call POSTs succeed | Ignore it; confirm the JWT still validates in the same log line and that `served elicitation token` fires on tool calls |
+| **Inspector**: proxy logs show repeated `GET /figma/openapi/mcp` → **404 `mcp: session not found`** | Benign: the `OpenAPI` MCP backend is **stateless** (no server-side GET/SSE stream), so the Inspector's optional stream GET 404s while the tool-call POSTs succeed | Ignore it; confirm the JWT still validates in the same log line and that `served elicitation token` fires on tool calls |
 
 Useful commands:
 
@@ -608,7 +607,7 @@ spec:
         namespaces: { from: All }
 EOF
 
-# Disable eager-OAuth (reuse-values keeps gatewayClassParametersRefs + license)
+# Disable eager-OAuth (reuse-values keeps the license key)
 helm upgrade enterprise-agentgateway \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --version $ENTERPRISE_AGW_VERSION -n agentgateway-system \

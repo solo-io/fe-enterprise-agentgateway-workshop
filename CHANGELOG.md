@@ -1,5 +1,12 @@
 # Changelog
 
+0.13.3 - (7-31-26)
+---
+- Update Enterprise Agentgateway to `v2026.7.1-patch.0`
+- Present top-level helm image overrides as the default path in the install labs, now that v2026.7.x is the LTS baseline
+- Fix the SSE parsing in `labs/mcp/mcp-tool-mode-code.md` and `labs/mcp/mcp-tool-mode-search.md`
+- Fix three labs still pinning `ENTERPRISE_AGW_VERSION=v2026.5.2` in their controller-upgrade steps
+
 0.13.2 - (7-31-26)
 ---
 - Fixes and improvements caught in testing, optimizations for agent use

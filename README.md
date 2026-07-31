@@ -320,7 +320,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway v2026.7.0
+- Enterprise Agentgateway v2026.7.1-patch.0
 
 
 ## User Stories / Acceptance Criteria
