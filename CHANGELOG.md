@@ -1,6 +1,6 @@
 # Changelog
 
-0.13.2 - (7-29-26)
+0.13.2 - (7-31-26)
 ---
 - Fixes and improvements caught in testing, optimizations for agent use
 - Updates to Agentgateway dashboard - additional model pricing
