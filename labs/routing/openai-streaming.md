@@ -85,7 +85,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 Send a request with `"stream": true` to enable streaming:
 
 ```bash
-curl "$GATEWAY_IP:8080/openai" \
+curl --no-progress-meter "$GATEWAY_IP:8080/openai" \
   -H "Content-Type: application/json" \
   -d '{
     "stream": true,
