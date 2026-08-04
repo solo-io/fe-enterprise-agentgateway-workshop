@@ -263,7 +263,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | sed 's/^data: //' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | sed -n 's/^data: //p' | python3 -m json.tool
 ```
 
 Exactly one tool: `run_code`. Its `description` field contains the typed API.
@@ -275,7 +275,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_code","arguments":{"code":"const greeting = await echo({message: \"hello\"}); const total = await get_sum({a: 2, b: 3}); ({greeting, total})"}}}' | sed 's/^data: //' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_code","arguments":{"code":"const greeting = await echo({message: \"hello\"}); const total = await get_sum({a: 2, b: 3}); ({greeting, total})"}}}' | sed -n 's/^data: //p' | python3 -m json.tool
 ```
 
 The `result.structuredContent.success` field has the combined object; intermediate results are not in the response.
@@ -450,7 +450,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | sed 's/^data: //' | python3 -m json.tool | grep -E "function|get_env|getEnv|get-env"
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | sed -n 's/^data: //p' | python3 -m json.tool | grep -E "function|get_env|getEnv|get-env"
 ```
 
 Expected: in Code mode, the `run_code` tool's description (returned by `tools/list`) no longer lists `get_env` (or whichever identifier shape your cluster emits) in the typed API. The CEL expression for tool name `get-env` evaluates as `mcp.tool.name != "get-env" || (has(jwt.roles) && jwt.roles.exists(r, r == "engineering"))` → `false || (false && ...)` → `false` — the function is filtered from the typed API.
@@ -463,7 +463,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -H "Mcp-Session-Id: $SID" \
   -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_code","arguments":{"code":"const env = await get_env({}); env"}}}' | sed 's/^data: //' | python3 -m json.tool
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_code","arguments":{"code":"const env = await get_env({}); env"}}}' | sed -n 's/^data: //p' | python3 -m json.tool
 ```
 
 Expected: an error indicating `get_env` is not defined in the sandbox — the typed API didn't include it for this caller, so the function is not defined and the script fails compilation before it runs.

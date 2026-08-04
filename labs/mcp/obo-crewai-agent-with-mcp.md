@@ -163,7 +163,7 @@ Upgrade the controller helm release, adding the `tokenExchange` block pointing t
 
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.5.2
+export ENTERPRISE_AGW_VERSION=v2026.7.1-patch.0
 ```
 
 ```bash
@@ -172,12 +172,6 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.p
 --version $ENTERPRISE_AGW_VERSION \
 --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
 -f -<<EOF
-gatewayClassParametersRefs:
-  enterprise-agentgateway:
-    group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-config
-    namespace: agentgateway-system
 tokenExchange:
   enabled: true
   issuer: "enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777"
@@ -582,13 +576,5 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --create-namespace \
   --version $ENTERPRISE_AGW_VERSION \
-  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
-  -f -<<EOF
-gatewayClassParametersRefs:
-  enterprise-agentgateway:
-    group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-config
-    namespace: agentgateway-system
-EOF
+  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
 ```

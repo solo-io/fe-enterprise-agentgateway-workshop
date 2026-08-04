@@ -159,6 +159,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 ## Agent Harnesses
 
 - [Claude Code](labs/agent-harnesses/claude-code.md)
+- [Keep Claude Code Authenticated with Per-User Auth0 Tokens](labs/agent-harnesses/claude-code-auth0-pkce.md) _(Auth0 / Anthropic)_ — per-user PKCE token renewed automatically via `apiKeyHelper`
 - [Claude Desktop](labs/agent-harnesses/claude-desktop.md)
 - [Claude Code as MCP Client with Eager OAuth (Auth0)](labs/mcp/mcp-eager-auth-auth0.md#step-10--test-with-claude-code)
 - [Claude Code as MCP Client with Eager OAuth (Okta)](labs/mcp/mcp-eager-auth-okta.md#step-10--test-with-claude-code)
@@ -256,6 +257,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - Control access with org-specific API-key
     - Control access with JWT authentication
     - JWT-based RBAC (Role-Based Access Control)
+    - Keep an agent harness authenticated with Authorization Code + PKCE from a public client (no client secret) — Claude Code's `apiKeyHelper` renews a per-user Auth0 token silently, so the provider key never leaves the cluster and offboarding is an IdP action
     - Frontend TLS termination
     - Frontend mTLS with client certificate validation
     - SNI (Server Name Indication) matching for multi-domain HTTPS
@@ -320,7 +322,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway v2026.7.0
+- Enterprise Agentgateway v2026.7.1-patch.0
 
 
 ## User Stories / Acceptance Criteria

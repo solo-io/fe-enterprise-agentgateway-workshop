@@ -2,7 +2,7 @@
 
 In this workshop, you'll deploy Enterprise Agentgateway and complete hands-on labs that showcase routing, security, observability, and agentic capabilities.
 
-> **Air-gap note:** This lab uses `docker.io/ably7`, a public Docker Hub repo that stands in for the private registry you'd mirror to in a real air-gapped environment. Every chart-managed image is pulled from this single registry — swap `docker.io/ably7` for your own private registry to reproduce a true air-gap install with no access to `us-docker.pkg.dev`, `gcr.io`, or upstream public images at runtime.
+> **Air-gap note:** This lab uses `docker.io/ably7`, a public Docker Hub repo that stands in for the private registry you'd mirror to in a real air-gapped environment. Every chart-managed image comes from this single registry. Swap `docker.io/ably7` for your own private registry to reproduce a true air-gap install with no access to `us-docker.pkg.dev`, `gcr.io`, or upstream public images at runtime.
 
 ## Pre-requisites
 - Kubernetes > 1.31
@@ -51,7 +51,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.7.0
+export ENTERPRISE_AGW_VERSION=v2026.7.1-patch.0
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -87,7 +87,7 @@ ratelimitconfigs                    rlc               ratelimit.solo.io/v1alpha1
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> The top-level Helm `image.registry` is the global default registry for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.7.0`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.4-alpine`). Mirror each image at the tag shown in the [Air-Gap Mirror Reference](../image-list.md#air-gap-mirror-reference-dockerioably7). As of `v2026.7.0`, the top-level Helm `imagePullSecrets` is likewise the global default and propagates to the proxy and every extension automatically — no per-CR pull-secret overrides are needed unless a specific extension uses a different secret than the rest.
+> The top-level Helm `image.registry` is the global default registry for every chart-managed image: the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.7.1-patch.0`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.4-alpine`). Mirror each image at the tag shown in the [Air-Gap Mirror Reference](../image-list.md#air-gap-mirror-reference-dockerioably7). The top-level Helm `imagePullSecrets` is the global default too, and it reaches the proxy and every extension. Add a per-CR pull-secret override only when one extension uses a different secret than the rest.
 
 Using Helm:
 ```bash
@@ -104,7 +104,7 @@ helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.p
 image:
   registry: docker.io/ably7
   pullPolicy: IfNotPresent
-# Propagates to the controller, proxy, AND extensions automatically (v2026.7.0+):
+# Propagates to the controller, proxy, AND extensions automatically:
 #imagePullSecrets:
 #- name: my-registry-secret
 # Extensions inherit image.registry; their tags are pinned by the chart.
@@ -118,16 +118,6 @@ rateLimiter:
 extCache:
   image:
     repository: redis
-# Register the operator's GatewayClass-wide parameters default.
-# Shared extensions apply at the GatewayClass level, so they live in
-# 'agentgateway-shared-extensions' (applied in the next step). If the referenced
-# parameters are not found, the controller falls back to its defaults.
-gatewayClassParametersRefs:
-  enterprise-agentgateway:
-    group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayParameters
-    name: agentgateway-shared-extensions
-    namespace: agentgateway-system
 EOF
 ```
 
@@ -144,42 +134,11 @@ NAME                                       READY   STATUS    RESTARTS   AGE
 enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 ```
 
-### Shared extensions (operator)
-
-Apply the GatewayClass-wide parameters the controller install referenced above. This is the operator's slice — it enables the shared extensions and sets their replica counts. It is attached at the GatewayClass level, so every Gateway of the `enterprise-agentgateway` class inherits it.
-
-```bash
-kubectl apply -f- <<'EOF'
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayParameters
-metadata:
-  name: agentgateway-shared-extensions
-  namespace: agentgateway-system
-spec:
-  sharedExtensions:
-    extauth:
-      enabled: true
-      deployment:
-        spec:
-          replicas: 1
-    ratelimiter:
-      enabled: true
-      deployment:
-        spec:
-          replicas: 1
-    extCache:
-      enabled: true
-      deployment:
-        spec:
-          replicas: 1
-EOF
-```
-
 ## Deploy Agentgateway with customizations
 
-This is the developer's slice: a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the settings the app team owns — deployment, service, logging, and observability — and omits `sharedExtensions`, which the operator set at the GatewayClass level in the previous step. The two resources merge, with this per-Gateway config layering on top of the class default. The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`.
+This is the developer's slice: a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) plus the `Gateway` that consumes it. It carries the settings the app team owns: deployment, service, logging, and observability. You do not configure the shared extensions here. The controller enables ext-auth, rate-limiter, and ext-cache on its own at one replica each. These parameters attach to the `Gateway` through `spec.infrastructure.parametersRef`.
 
-(If a single extension ever needs a different registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` supports a highest-precedence `spec.sharedExtensions.<name>.image` override.)
+If one extension needs a different registry, repository, or tag than the global default, set `spec.sharedExtensions.<name>.image` on `EnterpriseAgentgatewayParameters`. That override takes highest precedence.
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -276,7 +235,7 @@ rate-limiter-enterprise-agentgateway-589f66bb88-xz7nm       1/1     Running   0 
 
 ## Configure access logs (optional)
 
-Agentgateway emits access logs by default. This step is optional — the enrichment fields below are not required by any later lab, but are useful for debugging and observability. Apply an `EnterpriseAgentgatewayPolicy` to enrich the default access logs with additional metadata extracted from the request and response:
+Agentgateway emits access logs by default. This step is optional: no later lab needs the enrichment fields below, though they help with debugging and observability. Apply an `EnterpriseAgentgatewayPolicy` to enrich the default access logs with additional metadata extracted from the request and response:
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -297,13 +256,13 @@ spec:
         # --- Capture all JWT claims (use to discover available fields, then narrow down)
         - name: jwt.all
           expression: jwt
-        # Streaming vs buffered — useful for debugging latency differences
+        # Streaming vs buffered: useful for debugging latency differences
         - name: llm.streaming
           expression: llm.streaming
-        # Cache efficiency — shows cost savings from prompt caching
+        # Cache efficiency: shows cost savings from prompt caching
         - name: llm.cached_tokens
           expression: llm.cachedInputTokens
-        # Reasoning tokens — relevant for o1/o3 models
+        # Reasoning tokens: relevant for o1/o3 models
         - name: llm.reasoning_tokens
           expression: llm.reasoningTokens
         # Full prompt conversation (has perf impact for large prompts)
@@ -461,7 +420,7 @@ To tear everything down, work in reverse order. Delete the `Gateway` first so th
 ```bash
 kubectl delete enterpriseagentgatewaypolicy access-logs tracing -n agentgateway-system --ignore-not-found
 kubectl delete gateway agentgateway-proxy -n agentgateway-system --ignore-not-found
-kubectl delete enterpriseagentgatewayparameters agentgateway-config agentgateway-shared-extensions -n agentgateway-system --ignore-not-found
+kubectl delete enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --ignore-not-found
 helm uninstall management -n agentgateway-system
 helm uninstall management-crds -n agentgateway-system
 helm uninstall enterprise-agentgateway -n agentgateway-system

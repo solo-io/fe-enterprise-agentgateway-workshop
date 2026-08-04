@@ -6,7 +6,7 @@ Turn the Figma REST API into an MCP server behind Enterprise Agentgateway, guard
 two OAuth logins (Entra, then Figma) and no Figma-side allowlisting of the gateway.
 
 > **This is the Entra variant of [`../figma-mcp-auth0/`](../figma-mcp-auth0/README.md).** Only
-> **Layer A** (the inbound MCP auth) changed — Auth0 → Entra. **Layer B (the Figma elicitation)
+> **Layer A** (the inbound MCP auth) changed: Auth0 → Entra. **Layer B (the Figma elicitation)
 > is unchanged.** If you've done the Auth0 lab, the only new material here is the Entra app
 > registration and the Entra-flavored Helm values in Steps 1 and 4.
 
@@ -14,15 +14,15 @@ two OAuth logins (Entra, then Figma) and no Figma-side allowlisting of the gatew
 
 The two OAuth layers use two *different* gateway mechanisms, and they don't overlap:
 
-- **Layer A — inbound MCP auth (Entra).** The gateway is the OAuth Authorization Server the
+- **Layer A: inbound MCP auth (Entra).** The gateway is the OAuth Authorization Server the
   client sees (`/oauth-issuer/...`); its eager-OAuth issuer brokers the code flow to Entra and
   validates the resulting Entra JWT at the MCP backend.
-- **Layer B — downstream Figma OAuth (elicitation).** When Claude calls a Figma tool, the
+- **Layer B: downstream Figma OAuth (elicitation).** When Claude calls a Figma tool, the
   gateway has no Figma token for you, so it **elicits** a Figma OAuth login (browser), stores the
   token bound to your Entra identity, and injects it into `api.figma.com` calls.
 
 > **Why not Entra OBO for Layer B?** OBO ([`../../identity-delegation/msft-entra-obo.md`](../../identity-delegation/msft-entra-obo.md))
-> exchanges *the same* Entra token for a downstream token — it only works when the downstream API
+> exchanges *the same* Entra token for a downstream token. It only works when the downstream API
 > lives in the *same* Entra tenant (e.g. Microsoft Graph). Figma is a **foreign IdP**; Entra
 > cannot mint a Figma token, so Layer B must be elicitation. (Entra OBO also *disables*
 > elicitation, so the two are mutually exclusive by design. This lab uses elicitation only.)
@@ -47,7 +47,7 @@ Files in this folder:
 | File | Purpose |
 |---|---|
 | `README.md` | This runbook |
-| `figma-mcp.yaml` | Figma-specific CRs (backend, route, CORS, elicitation policy+secret, entra-jwks) — `envsubst`-templated |
+| `figma-mcp.yaml` | Figma-specific CRs (backend, route, CORS, elicitation policy+secret, entra-jwks): `envsubst`-templated |
 | `figma-openapi.json` | Full Figma REST OpenAPI spec (v0.40.0, 42 paths, down-converted 3.1→3.0) → loaded into a ConfigMap |
 | `images/` | Screenshots referenced by this runbook (Entra + Figma config, runtime OAuth) |
 | `.figma-creds.env.example` | Template for a gitignored `.figma-creds.env` holding your Entra/Figma credentials (see Step 1) |
@@ -59,17 +59,17 @@ Files in this folder:
 - Lab `001` baseline running (agentgateway-proxy Gateway with an HTTP listener on 8080). This
   runbook mirrors the Auth0 lab, validated against controller **v2026.6.1**+ on a local KinD cluster.
 - `kubectl`, `helm`, `openssl`, `jq`, `envsubst` (gettext), Node 18+ (for Claude Code).
-- A way to resolve `mcp-entra.glootest.com` to the gateway LoadBalancer — a local
+- A way to resolve `mcp-entra.glootest.com` to the gateway LoadBalancer: a local
   `/etc/hosts` entry (this runbook; needs sudo).
 
-### Entra ID (Layer A) — you create this in the Azure portal
+### Entra ID (Layer A): you create this in the Azure portal
 
 You can **reuse the middle-tier app registration from the [Entra OBO lab](../../identity-delegation/msft-entra-obo.md)**
-— you just add the gateway callbacks and expose a scope (the OBO lab didn't need either, because
+You just add the gateway callbacks and expose a scope (the OBO lab didn't need either, because
 it fetched tokens with `az` instead of an interactive browser login).
 
 1. **App registration** (reuse `ENTRA_MIDDLETIER_CLIENT_ID` or create a new one). Note the
-   **tenant ID** and **client ID**, and create a **client secret** — the eager-OAuth issuer is a
+   **tenant ID** and **client ID**, and create a **client secret**. The eager-OAuth issuer is a
    confidential client and exchanges the auth code with this secret.
 2. **Authentication → Add a platform → Web.** Register **both** eager-OAuth callbacks:
    ```
@@ -83,10 +83,10 @@ it fetched tokens with `az` instead of an interactive browser login).
 3. **Expose an API.** Under **Expose an API**, set the Application ID URI to `api://<client-id>`
    (the default) and **Add a scope** named `agentgateway` (admin+user consent, enabled). The
    inbound token must carry `aud: api://<client-id>`, which happens only when the login requests
-   a scope *belonging to this API* — a bare `openid profile email` login returns a Graph/userinfo
+   a scope *belonging to this API*. A bare `openid profile email` login returns a Graph/userinfo
    token with the wrong audience and the MCP policy 401s.
 
-   ![Entra Expose an API — agentgateway scope](images/03-entra-expose-api-scope.png)
+   ![Entra Expose an API: agentgateway scope](images/03-entra-expose-api-scope.png)
 4. **API permissions.** Ensure the app has (and has consented to) the delegated OIDC scopes
    `openid`, `profile`, `email`. Grant admin consent if your tenant requires it.
 5. **Access token version (important).** Under **Manifest**, note `accessTokenAcceptedVersion`:
@@ -95,7 +95,7 @@ it fetched tokens with `az` instead of an interactive browser login).
    - `2` → tokens have `iss = https://login.microsoftonline.com/<tenant>/v2.0`. If you set this,
      change the `issuer:` in `figma-mcp.yaml` to match.
 
-### Figma (Layer B) — you create this in the Figma dashboard
+### Figma (Layer B): you create this in the Figma dashboard
 
 Identical to the Auth0 lab. Go to [figma.com/developers/apps](https://www.figma.com/developers/apps)
 → **Create a new app**:
@@ -112,7 +112,7 @@ Identical to the Auth0 lab. Go to [figma.com/developers/apps](https://www.figma.
    `{"error":true,"status":400,"message":"Invalid scopes for app"}`). In the **OAuth scopes** tab,
    enable: `current_user:read`, `file_content:read`, `file_metadata:read`, `file_comments:read`,
    `file_versions:read`.
-   > ⚠️ `files:read` is retired for *new* OAuth apps — use the granular `file_content:read` /
+   > ⚠️ `files:read` is retired for *new* OAuth apps, so use the granular `file_content:read` /
    > `file_metadata:read` / `file_versions:read`. The scope string in the elicitation Secret
    > (`figma-mcp.yaml`) must be a subset of what's enabled here.
 
@@ -121,11 +121,11 @@ Identical to the Auth0 lab. Go to [figma.com/developers/apps](https://www.figma.
 
 ---
 
-## Step 1 — Environment variables + DNS
+## Step 1: Environment variables + DNS
 
-> **Tip — reusable credentials file:** copy `.figma-creds.env.example` to `.figma-creds.env` (gitignored), fill in the values from your Entra and Figma app registrations, and `source .figma-creds.env` instead of re-exporting everything each session. Never commit a populated copy.
+> **Reusable credentials file:** copy `.figma-creds.env.example` to `.figma-creds.env` (gitignored), fill in the values from your Entra and Figma app registrations, and `source .figma-creds.env` instead of re-exporting everything each session. Never commit a populated copy.
 
-Run every command in this runbook from **this lab folder** — Step 6 reads `figma-openapi.json`
+Run every command in this runbook from **this lab folder**. Step 6 reads `figma-openapi.json`
 by relative path, and the certs land in `./example_certs`:
 
 ```bash
@@ -171,7 +171,7 @@ echo "$GATEWAY_IP $ENTRA_GATEWAY_HOST" | sudo tee -a /etc/hosts
 
 ---
 
-## Step 2 — Self-signed TLS cert + HTTPS listener
+## Step 2: Self-signed TLS cert + HTTPS listener
 
 OAuth requires HTTPS for anything that isn't `localhost`. Create a self-signed cert for
 `mcp-entra.glootest.com` and add a port-443 HTTPS listener alongside the existing HTTP:8080.
@@ -237,15 +237,15 @@ kubectl get gateway -n agentgateway-system agentgateway-proxy \
 ```
 
 > **State store:** this runbook uses **SQLite in-memory** (no Postgres). OAuth/elicitation
-> state is lost on a controller pod restart — fine for a personal setup. For durable state,
+> state is lost on a controller pod restart, which is fine for a personal setup. For durable state,
 > deploy Postgres per `../mcp-eager-auth-auth0.md` Step 3 and add the `database:` block in Step 4.
 
 ---
 
-## Step 3 — STS env on the proxy params
+## Step 3: STS env on the proxy params
 
 The proxy needs to know where the in-cluster STS lives. This lab uses the **elicitation** STS
-path (`/elicitations/oauth2/token`), *not* the RFC 8693 / Entra-OBO path (`/oauth2/token`) — Layer
+path (`/elicitations/oauth2/token`), *not* the RFC 8693 / Entra-OBO path (`/oauth2/token`). Layer
 B is elicitation. Patch the `EnterpriseAgentgatewayParameters` your `agentgateway-proxy` Gateway
 references (`agentgateway-config` on this workshop). A `merge` patch preserves other settings.
 
@@ -265,12 +265,11 @@ kubectl get enterpriseagentgatewayparameters agentgateway-config \
 
 ---
 
-## Step 4 — Helm upgrade: enable eager-OAuth pointed at Entra
+## Step 4: Helm upgrade to enable eager-OAuth pointed at Entra
 
-> **`--reuse-values` is required here.** It preserves your existing install values (license key,
-> `gatewayClassParametersRefs`, and any shared-extension wiring) and only adds the eager-OAuth
-> config below. A full `-f values.yaml` upgrade without `--reuse-values` can silently drop those
-> settings.
+> **`--reuse-values` is required here.** It keeps the values already on the release, such as your
+> license key, and adds only the eager-OAuth config below. A full `-f values.yaml` upgrade without
+> it resets the release to chart defaults and drops your license key.
 
 The only difference from the Auth0 lab is the IdP: the `subject/api` JWKS validators and the
 issuer's `downstream_server` now point at Entra.
@@ -325,7 +324,7 @@ kubectl rollout status -n agentgateway-system deployment/agentgateway-proxy --ti
 
 > **Why the API scope is in `scopes`.** Including `${ENTRA_API_SCOPE}` (e.g.
 > `api://<client-id>/agentgateway`) is what makes Entra mint an access token with
-> `aud: api://<client-id>` — the audience the MCP auth policy validates. The reserved OIDC scopes
+> `aud: api://<client-id>`, the audience the MCP auth policy validates. The reserved OIDC scopes
 > (`openid`/`profile`/`email`) can be combined with a single resource's scope in one request.
 >
 > **Entra authorize URL has no query string**, so the eager-OAuth issuer's URL builder appends
@@ -337,7 +336,7 @@ kubectl rollout status -n agentgateway-system deployment/agentgateway-proxy --ti
 
 ---
 
-## Step 5 — Route the eager-OAuth issuer endpoints
+## Step 5: Route the eager-OAuth issuer endpoints
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -371,9 +370,9 @@ kubectl get httproute -n agentgateway-system oauth-issuer \
 
 ---
 
-## Step 6 — Deploy the Figma backend
+## Step 6: Deploy the Figma backend
 
-> **`figma-openapi.json` in this folder is already down-converted** (OpenAPI 3.1 → 3.0) — skip
+> **`figma-openapi.json` in this folder is already down-converted** (OpenAPI 3.1 → 3.0), so skip
 > straight to the ConfigMap command. agentgateway's OpenAPI→MCP parser rejects 3.1's nullable
 > `"type": ["string","null"]` syntax; the file here is pre-processed. To refresh from upstream see
 > the collapsible note in [`../figma-mcp-auth0/README.md`](../figma-mcp-auth0/README.md) Step 6.
@@ -382,7 +381,7 @@ Load the full (down-converted) Figma OpenAPI spec into a ConfigMap (`--server-si
 last-applied annotation, which would double the ~477 KB object past etcd's 1 MiB limit):
 
 ```bash
-# Must be run from this lab folder (see Step 1) — the --from-file path is relative.
+# Must be run from this lab folder (see Step 1): the --from-file path is relative.
 kubectl create configmap figma-openapi-schema -n agentgateway-system \
   --from-file=schema=figma-openapi.json \
   --dry-run=client -o yaml | kubectl apply --server-side -f -
@@ -407,7 +406,7 @@ curl -sk "https://${ENTRA_GATEWAY_HOST}/.well-known/oauth-authorization-server/f
 
 ---
 
-## Step 7 — Connect Claude Code
+## Step 7: Connect Claude Code
 
 ```bash
 claude mcp add figma-mcp-entra --transport http https://mcp-entra.glootest.com/figma/openapi/mcp
@@ -415,7 +414,7 @@ claude mcp list   # expect: figma-mcp-entra: https://mcp-entra.glootest.com/figm
 ```
 
 Launch Claude Code with Node TLS verification disabled (self-signed gateway cert). Do **not**
-put this in your shell rc — it disables TLS for all Node processes in the shell.
+put this in your shell rc. It disables TLS for all Node processes in the shell.
 
 ```bash
 NODE_TLS_REJECT_UNAUTHORIZED=0 claude
@@ -431,7 +430,7 @@ What happens the first time:
 
 0. **Self-signed cert warning (up front).** The browser's first hop is the gateway's own
    `…/oauth-issuer/authorize` on `mcp-entra.glootest.com`, so the "Your connection is not private"
-   warning appears **before** the Microsoft login — click **Advanced → Proceed**. Accepting it once
+   warning appears **before** the Microsoft login. Click **Advanced → Proceed**. Accepting it once
    covers the return `…/callback/upstream` hop too (same host).
 
 1. **Microsoft login (Layer A).** Claude Code discovers the gateway AS, registers, and opens a
@@ -444,7 +443,7 @@ What happens the first time:
    > the Figma consent.
 
 2. **Figma login (Layer B).** The browser continues to **Figma's OAuth consent** listing the read
-   scopes — click **Allow access**. (Figma re-shows this consent on every fresh login.)
+   scopes. Click **Allow access**. (Figma re-shows this consent on every fresh login.)
 
    ![Figma consent screen](images/04-figma-consent.png)
 
@@ -452,10 +451,10 @@ What happens the first time:
    **Claude Code's own success page** ("you can close this window"). You may briefly see the
    gateway's **"Authorization complete."** page first.
 
-4. Claude Code retries; the gateway injects your Figma token and the call returns real data — no 401. Subsequent runs reuse both tokens.
+4. Claude Code retries; the gateway injects your Figma token and the call returns real data, no 401. Subsequent runs reuse both tokens.
 
 > **Token binding:** the Figma token is stored bound to the **Entra identity** (`sub`) that made
-> the call. Each distinct user identity gets its own Figma elicitation the first time — the intended
+> the call. Each distinct user identity gets its own Figma elicitation the first time, which is the intended
 > per-user credential-forwarding behavior.
 
 ---
@@ -470,7 +469,7 @@ A successful `getMe` returns your real Figma profile:
 ```
 
 > **Validated live** (controller v2026.6.1): the inbound Microsoft login SSO'd through an existing
-> Entra session, chained to the Figma consent, and `getMe` returned the real profile — both OAuth
+> Entra session, chained to the Figma consent, and `getMe` returned the real profile. Both OAuth
 > layers end-to-end. If you have no active Entra session, you'll see the `login.microsoftonline.com`
 > sign-in before the Figma consent.
 
@@ -496,33 +495,33 @@ kubectl logs -n agentgateway-system deploy/enterprise-agentgateway --tail=100 | 
 
 ---
 
-## Step 8 — Read a Figma design as codegen context
+## Step 8: Read a Figma design as codegen context
 
 `getMe` only proves the plumbing. The backend exposes 49 Figma tools (`getFile`, `getFileNodes`,
 `getImages`, `getFileStyles`, `getComments`, `getFileVersions`, …), all guarded by the same two
 OAuth layers, so Claude can read an actual design file.
 
-Open any Figma design file in your browser and copy its key from the URL —
-`figma.com/design/`**`<FILE_KEY>`**`/<name>` — then ask Claude Code:
+Open any Figma design file in your browser and copy its key from the URL:
+`figma.com/design/`**`<FILE_KEY>`**`/<name>`. Then ask Claude Code:
 
 ```
 Using figma-mcp-entra, read Figma file <FILE_KEY>:
-1. getFileMeta — name + who last touched it
-2. getFile with depth=2 — list the pages and the top-level frames on each
-3. getImages — render the "Thumbnail" frame to a PNG
+1. getFileMeta: name + who last touched it
+2. getFile with depth=2: list the pages and the top-level frames on each
+3. getImages: render the "Thumbnail" frame to a PNG
 Then summarize the design and outline how you'd rebuild the "Product page" frame in React.
 ```
 
 > ⚠️ **Tool arguments are nested, not flat.** Because the backend is `protocol: OpenAPI`,
 > agentgateway groups each operation's parameters under `path`/`query` objects. `getFile`
-> takes `{"path":{"file_key":"…"},"query":{"depth":2}}` — **not** a top-level `file_key`.
+> takes `{"path":{"file_key":"…"},"query":{"depth":2}}`, **not** a top-level `file_key`.
 > Claude infers this from each tool's input schema, but a flat `file_key` leaves the path param
-> empty and Figma answers `{"status":403,"err":"Permission denied"}` (a misleading 403 — it means
+> empty and Figma answers `{"status":403,"err":"Permission denied"}` (a misleading 403: it means
 > "malformed request", not "no access").
 
 ---
 
-## Alternative client — drive the backend with MCP Inspector
+## Alternative client: drive the backend with MCP Inspector
 
 The [MCP Inspector](https://github.com/modelcontextprotocol/inspector) steps through the same
 Layer-A handshake with an expandable panel at each step (protected-resource discovery → AS-metadata
@@ -560,7 +559,7 @@ not a flat `file_key`.
 
 > **Validated live** here on controller v2026.6.1 via this exact Guided flow: Microsoft login SSO'd
 > through an existing Entra session, chained to the Figma consent, and `getMe` returned the real
-> profile — confirming both OAuth layers end-to-end.
+> profile, confirming both OAuth layers end-to-end.
 
 ---
 
@@ -568,13 +567,13 @@ not a flat `file_key`.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `GET /figma/openapi/mcp` returns **406** (not 401), well-known returns 404 | MCP auth policy `PartiallyValid` — controller couldn't fetch JWKS. Almost always a **leading slash** on `jwksPath` | `jwksPath: ${ENTRA_TENANT_ID}/discovery/v2.0/keys` (no leading slash). Check `kubectl logs -n agentgateway-system deploy/enterprise-agentgateway \| grep -i jwks` |
+| `GET /figma/openapi/mcp` returns **406** (not 401), well-known returns 404 | MCP auth policy `PartiallyValid`: controller couldn't fetch JWKS. Almost always a **leading slash** on `jwksPath` | `jwksPath: ${ENTRA_TENANT_ID}/discovery/v2.0/keys` (no leading slash). Check `kubectl logs -n agentgateway-system deploy/enterprise-agentgateway \| grep -i jwks` |
 | `registration_endpoint` in AS metadata points at **Entra**, not the gateway | `agentgateway.dev/issuer-proxy` missing, or `oauth-issuer` route not Accepted | Confirm `issuer-proxy` in the backend; `kubectl get httproute -n agentgateway-system oauth-issuer` |
 | `/oauth-issuer/register` 404/501 | Step 4 didn't enable `tokenExchange`, or Step 5 route missing | Re-check Step 4 values landed and the route is Accepted |
 | **Entra** `AADSTS50011: redirect URI ... does not match` after login | Only one (or neither) of the two gateway callbacks registered on the Entra app | Register **both** `/oauth-issuer/callback/downstream` and `.../callback/upstream` as **Web** redirect URIs |
 | **Entra** `AADSTS65001` (consent not granted) | User/admin hasn't consented to the app's scopes | Complete interactive consent, or have an admin grant consent for the app in the Azure portal |
-| 401 after Microsoft login with a valid-looking JWT — `JWT audience mismatch` | Token `aud` isn't `api://<client-id>` — the login didn't request the API scope | Confirm `${ENTRA_API_SCOPE}` is in the Step 4 `downstream_server.scopes` **and** exposed on the app (Pre-reqs step 3) |
-| 401 after login — `JWT issuer not recognized` | Token `iss` (v1 `sts.windows.net` vs v2 `login.microsoftonline.com/.../v2.0`) doesn't match `issuer:` in `figma-mcp.yaml` | Decode the token at jwt.io; set `issuer:` to match, governed by the app's `accessTokenAcceptedVersion` (Pre-reqs step 5) |
+| 401 after Microsoft login with a valid-looking JWT: `JWT audience mismatch` | Token `aud` isn't `api://<client-id>`: the login didn't request the API scope | Confirm `${ENTRA_API_SCOPE}` is in the Step 4 `downstream_server.scopes` **and** exposed on the app (Pre-reqs step 3) |
+| 401 after login: `JWT issuer not recognized` | Token `iss` (v1 `sts.windows.net` vs v2 `login.microsoftonline.com/.../v2.0`) doesn't match `issuer:` in `figma-mcp.yaml` | Decode the token at jwt.io; set `issuer:` to match, governed by the app's `accessTokenAcceptedVersion` (Pre-reqs step 5) |
 | Controller `CrashLoopBackOff`: `unsupported validator type:` | Missing a validator in Step 4 | Include all three (`subject`/`api`/`actor`) |
 | **Figma** error page after consent (`invalid redirect_uri`) | Figma app callback missing/wrong | Register `https://mcp-entra.glootest.com/oauth-issuer/callback/upstream` in the Figma app |
 | Figma call **401/403** *after* the Figma consent completes (token not injected) | Elicitation stored the token but didn't inject it | On `ent-figma-openapi-exchange`, set `spec.backend.tokenExchange.mode: ElicitationOnly` and re-apply |
@@ -629,7 +628,7 @@ spec:
         namespaces: { from: All }
 EOF
 
-# Disable eager-OAuth (reuse-values keeps gatewayClassParametersRefs + license)
+# Disable eager-OAuth (reuse-values keeps the license key)
 helm upgrade enterprise-agentgateway \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --version $ENTERPRISE_AGW_VERSION -n agentgateway-system \
