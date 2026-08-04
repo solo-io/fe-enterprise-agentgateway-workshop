@@ -14,7 +14,7 @@ After completing this track you should be able to:
 
 - **Unify LLM access** — route traffic to multiple providers from a single gateway endpoint without changing client code
 - **Enforce routing policies** — route by path, header, query parameter, or request body to control which model handles which request
-- **Secure the gateway** — apply virtual keys (with upstream credential masking), JWT-based RBAC, TLS/mTLS, OPA, and BYO external authorization
+- **Secure the gateway** — apply virtual keys (with upstream credential masking), JWT-based RBAC, per-user OAuth tokens for developer tooling, TLS/mTLS, OPA, and BYO external authorization
 - **Control costs with rate limits** — enforce per-request, per-user, and global token quotas; reset them on a schedule
 - **Apply content guardrails** — block prompt injection, PII, and harmful content before requests reach the model
 - **Enrich and transform** — inject system prompts, rewrite headers, and shape request/response payloads
@@ -94,6 +94,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 |---|---|
 | [Virtual Keys](../labs/security/virtual-keys.md) | Issue per-user keys with independent token budgets; upstream provider key is masked from all callers |
 | [JWT Auth with RBAC](../labs/security/jwt-auth-with-rbac.md) | Validate JWTs and enforce role-based access |
+| [Keep Claude Code Authenticated with Per-User Auth0 Tokens](../labs/agent-harnesses/claude-code-auth0-pkce.md) | Replace a shared provider key with per-user Auth0 JWTs minted by a public client via PKCE; renew them silently so developers never hold the Anthropic key |
 | [TLS Termination](../labs/security/tls-termination.md) | Terminate HTTPS at the gateway |
 | [Frontend mTLS](../labs/security/frontend-mtls.md) | Require and validate client certificates |
 | [SNI Matching](../labs/security/sni-matching.md) | Route HTTPS traffic by hostname without decryption |

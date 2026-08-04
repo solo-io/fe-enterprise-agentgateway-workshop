@@ -7,6 +7,8 @@
 - Fix the SSE parsing in `labs/mcp/mcp-tool-mode-code.md` and `labs/mcp/mcp-tool-mode-search.md`
 - Minor update in `openai-streaming.md` lab
 - Fix three labs still pinning `ENTERPRISE_AGW_VERSION=v2026.5.2` in their controller-upgrade steps
+- Add `labs/agent-harnesses/claude-code-auth0-pkce.md`: route Claude Code through Agentgateway to Anthropic with a per-user Auth0 JWT instead of a shared/virtual API key
+- Add `lib/oauth-pkce/`: IdP-agnostic Authorization Code + PKCE helpers — `pkce-login.py` (interactive, caches tokens `0600`) and `pkce-token.py` (non-interactive credential helper: stdout-only token, silent refresh, fails closed)
 
 0.13.2 - (7-31-26)
 ---

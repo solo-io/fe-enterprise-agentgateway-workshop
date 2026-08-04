@@ -31,8 +31,10 @@ Thumbs.db
 *.swo
 *~
 
-# Python virtual environments
+# Python virtual environments and bytecode caches
 **/.venv/
+__pycache__/
+*.py[cod]
 
 # Node modules (if any)
 node_modules/
