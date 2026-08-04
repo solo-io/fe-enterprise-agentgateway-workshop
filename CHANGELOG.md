@@ -1,5 +1,9 @@
 # Changelog
 
+0.13.4 - (8-4-26)
+---
+- Add Step 8 to `labs/agent-harnesses/claude-code-auth0-pkce.md`: mint per-user `x-org`/`x-user` claims with an Auth0 Post-Login Action sourced from `app_metadata`, then authorize on them with `authorization.policy.matchExpressions`
+
 0.13.3 - (8-3-26)
 ---
 - Update Enterprise Agentgateway to `v2026.7.1-patch.0`

@@ -47,6 +47,7 @@ Configure three settings:
 - Validate per-user Auth0 JWTs on that route with `jwtAuthentication` and a remote JWKS backend
 - Obtain a user token with the Authorization Code flow + PKCE, with no client secret on the laptop
 - Wire the token into Claude Code's `apiKeyHelper` for one session, leaving your own configuration untouched, so it renews from the refresh token
+- Add per-user team claims with an Auth0 Post-Login Action and authorize on them with a CEL rule
 - Verify that the Anthropic key stays in the cluster and that revoking access at Auth0 cuts off one developer
 
 ---
@@ -466,18 +467,163 @@ Expected output:
 
 That subject is the Auth0 identity of the person who logged in during Step 5. A shared provider key produces no `jwt.sub` at all, so per-user tokens in front of the provider credential are what let you tie a request back to a person.
 
-### Going back to normal
-
-| Goal | How |
-|---|---|
-| Stop using the helper | Nothing to undo on the `--bare --settings` path: omit the flags and your usual login applies. If you took the optional permanent step in Step 6, remove the `apiKeyHelper` key from `~/.claude/settings.json` with the script in [Cleanup](#cleanup), which preserves your other settings |
-| Stop routing through the gateway | `unset ANTHROPIC_BASE_URL`, after which Claude Code talks to Anthropic directly with your normal credentials |
-| Force a fresh login next time | `rm ~/.agentgateway/pkce-token.json` |
-| Revoke one developer entirely | Revoke the grant in Auth0 (next section) |
+Going back to normal takes nothing on the `--bare --settings` path: drop the flags and your usual login applies again. [Cleanup](#cleanup) handles the rest — the cached credential, the shell variables, and the `apiKeyHelper` key if you took the optional step in Step 6 — and cutting off one developer for good is the next section.
 
 ---
 
-## Step 8 — Prove Renewal and Revocation
+## Step 8 — Authorize by Team Claim
+
+A policy written against `jwt.sub` needs an edit every time someone joins or leaves. Put the team in a claim instead and the policy stays fixed: you grant access to a team once, and membership changes stay in Auth0.
+
+### Put the team on the user record
+
+Store the team and the developer's handle on the user (User Management → Users → your user → Metadata → **App Metadata**). Use *App Metadata* rather than User Metadata, which the user can edit themselves — a value your policy trusts has to be admin-controlled.
+
+```json
+{
+  "org": "GTM",
+  "user": "ably77"
+}
+```
+
+![App metadata on the user record](../../images/auth0-pkce/05-user-app-metadata.png)
+
+Give a second user a different team, `{"org": "engineering", "user": "jdoe"}`, so you have something to deny later.
+
+### Add the claims with a Post-Login Action
+
+Auth0 mints claims through an **Action**: Actions → Library → **Create Action** → **Build from scratch**, named `add-org-user-claims`, trigger **Login / Post Login**.
+
+![Create a Post Login action](../../images/auth0-pkce/04-create-post-login-action.png)
+
+Replace the body with this, then click **Deploy**:
+
+```js
+exports.onExecutePostLogin = async (event, api) => {
+  const meta = event.user.app_metadata || {};
+
+  const claims = {
+    'x-org': meta.org,
+    'x-user': meta.user || event.user.nickname,
+  };
+
+  for (const [name, value] of Object.entries(claims)) {
+    if (value) api.accessToken.setCustomClaim(name, value);
+  }
+};
+```
+
+![The deployed action](../../images/auth0-pkce/06-action-code.png)
+
+The `if (value)` guard means a user with no `app_metadata.org` gets no `x-org` claim at all rather than an empty one, and a rule referencing a missing claim denies the request.
+
+Attach it to the flow: Actions → **Triggers** → **post-login**, drag it between **Start** and **Complete**, then **Apply**.
+
+![The action in the post-login flow](../../images/auth0-pkce/07-add-action-to-post-login-flow.png)
+
+> **Deploying is not enabling.** A deployed Action outside the flow never runs, and the flow discards your change if you navigate away before clicking **Apply**. The banner should read *All changes are live*.
+
+### Mint a token that carries the claims
+
+Actions run on interactive login, so the token in your cache predates this one:
+
+```bash
+rm -f ~/.agentgateway/pkce-token.json
+./lib/oauth-pkce/pkce-login.py
+```
+
+Decode it with the snippet from Step 5, widened to print every claim:
+
+```bash
+python3 -c "
+import base64, json, pathlib
+d = json.loads(pathlib.Path.home().joinpath('.agentgateway/pkce-token.json').read_text())
+p = d['access_token'].split('.')[1]; p += '=' * (-len(p) % 4)
+print(json.dumps(json.loads(base64.urlsafe_b64decode(p)), indent=2))
+"
+```
+
+Expected output, with the two new claims alongside the standard ones:
+
+```json
+{
+  "x-org": "GTM",
+  "x-user": "ably77",
+  "iss": "https://your-tenant.us.auth0.com/",
+  "sub": "google-oauth2|113881425988484374005",
+  ...
+}
+```
+
+The claims also have to survive the silent renewal, or a Claude Code session breaks an hour in when the helper swaps in a refreshed token. Force one:
+
+```bash
+python3 -c "
+import json, pathlib
+p = pathlib.Path.home() / '.agentgateway/pkce-token.json'
+d = json.loads(p.read_text()); d['expires_at'] = 0
+p.write_text(json.dumps(d, indent=2))
+"
+./lib/oauth-pkce/pkce-token.py > /dev/null
+```
+
+Decode again: `x-org` and `x-user` are still there, with a newer `iat`.
+
+### Enforce the claim on the route
+
+Add an `authorization` block to the policy from Step 3, leaving the rest of it untouched:
+
+```bash
+kubectl patch enterpriseagentgatewaypolicy -n agentgateway-system claude-auth0-jwt \
+  --type merge -p '{"spec":{"traffic":{"authorization":{"policy":{"matchExpressions":["jwt[\"x-org\"] == \"GTM\""]}}}}}'
+```
+
+Authentication runs first, then authorization: no token still returns `401`, while a valid token from the wrong team now returns `403`. Your token carries `x-org: GTM`, so the request from Step 5 still returns a completion.
+
+### Watch it deny
+
+Point the rule at a team your token doesn't carry:
+
+```bash
+kubectl patch enterpriseagentgatewaypolicy -n agentgateway-system claude-auth0-jwt \
+  --type merge -p '{"spec":{"traffic":{"authorization":{"policy":{"matchExpressions":["jwt[\"x-org\"] == \"engineering\""]}}}}}'
+```
+
+Wait a few seconds for the change to reach the proxy, then repeat the request:
+
+```
+authorization failed
+```
+
+The access log separates this from an authentication failure:
+
+```
+http.path=/claude/v1/messages http.status=403 jwt.sub=google-oauth2|113881425988484374005 protocol=http error="authorization failed" reason=Authorization
+```
+
+`reason=Authorization` with a `jwt.sub` present means the token was good and the rule rejected it, where Step 4's rejection carried `reason=JwtAuth` and no subject at all. Neither reaches Anthropic, so a denial costs nothing. Put the working rule back:
+
+```bash
+kubectl patch enterpriseagentgatewaypolicy -n agentgateway-system claude-auth0-jwt \
+  --type merge -p '{"spec":{"traffic":{"authorization":{"policy":{"matchExpressions":["jwt[\"x-org\"] == \"GTM\""]}}}}}'
+```
+
+### Rules worth trying
+
+Each expression goes in `matchExpressions` in place of the one above.
+
+| Expression | Grants access to |
+|---|---|
+| `jwt["x-org"] == "GTM"` | One team |
+| `jwt["x-org"] in ["GTM", "engineering"]` | Several teams, without repeating the claim |
+| `jwt["x-org"] == "GTM" && jwt["x-user"] == "ably77"` | A named person on a named team |
+| `"x-org" in jwt && jwt["x-org"] == "GTM"` | The same as the first rule, with the presence check spelled out |
+
+> **Index hyphenated claims with brackets.** `jwt["x-org"]` works; `jwt.x-org` does not, because CEL reads the hyphen as subtraction. It fails quietly: the policy still reports `Policy accepted Attached to all targets` while **every** request returns `403`, exactly as it does for a rule naming a claim the token doesn't carry. Both fail closed, which is the right direction to fail but easy to misread as a broken gateway. Claim names without hyphens (`org`, `team`) can use dot access, as in `jwt.org == "GTM"`.
+
+---
+
+## Step 9 — Prove Renewal and Revocation
 
 ### Silent renewal
 
@@ -526,6 +672,7 @@ Claude Code then has no credential and the gateway rejects it. That cuts off one
 | `sub` is a user, and `jwt.sub` appears in every access log line | Requests are attributable to a person and revocable individually |
 | Anthropic replied without the caller holding a key | The provider key stayed in `claude-secret` and was injected after validation |
 | The helper refreshed without a browser | Expiry is invisible to the developer |
+| A valid token from the wrong team returned `403` | Team membership gates the route, and moving someone between teams is an IdP change rather than a policy edit |
 | Revoking at Auth0 breaks renewal | Offboarding is an IdP action, not a key rotation |
 
 ---
@@ -548,7 +695,22 @@ http.path=/claude/v1/messages http.status=200 endpoint=api.anthropic.com:443 jwt
 
 The rejection carries `reason=JwtAuth` and stops there: no `endpoint=api.anthropic.com:443`, no `protocol=llm`, no token counts. Unauthenticated traffic stops at the gateway, so you pay nothing for it.
 
-**The authenticated line carries `jwt.sub`**, the Auth0 subject of the developer who made the request. Spend and prompts tie back to a person, which a shared provider key can't do. The gateway also logs the full claim set as `jwt.all`, so you can attribute by any claim (email, team, tenant) without changing the policy:
+**The authenticated line carries `jwt.sub`**, the Auth0 subject of the developer who made the request. Spend and prompts tie back to a person, which a shared provider key can't do. The gateway also logs the full claim set as `jwt.all`, so once Step 8 adds team claims you can attribute by any of them without changing the policy:
+
+```bash
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --tail 50 \
+  | grep /claude | sort | tail -1 | grep -o 'jwt.all={[^}]*}'
+```
+
+Expected output, once Step 8 is in place:
+
+```
+jwt.all={"x-org": "GTM", "x-user": "ably77", "sub": "google-oauth2|113881425988484374005", "iss": "https://your-tenant.us.auth0.com/", ...}
+```
+
+The `sort` matters when the proxy runs more than one replica. `kubectl logs -l` returns each pod's tail one after another rather than merging them by time, so a bare `tail -1` can hand you an older request from whichever pod happens to come last. Log lines start with an RFC 3339 timestamp, so sorting them lexicographically puts them in chronological order.
+
+Attribute by subject instead:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --tail 50 \
@@ -592,6 +754,11 @@ Open http://localhost:4000 and click **Tracing** in the left navigation.
 | Anthropic returns `authentication_error: invalid x-api-key` | The **upstream** is rejecting `claude-secret` | Recreate the secret with a valid `$ANTHROPIC_API_KEY` |
 | `pkce-token.py` exits `no cached credentials` | Never logged in, or the cache was deleted | Run `pkce-login.py` |
 | Port `8910` is in use | Another login is still listening | `pkill -f pkce-login.py`. To use another port set `OIDC_PORT` **and** register the matching callback URL |
+| The token carries no `x-org` or `x-user` after Step 8 | The Action is deployed but not in the post-login flow, or the flow was never applied | Actions → Triggers → post-login. The Action must sit between Start and Complete and the banner must read *All changes are live* |
+| Claims still missing after fixing the flow | The cached token predates the Action, which runs only on interactive login | `rm ~/.agentgateway/pkce-token.json` and run `pkce-login.py` again |
+| Every request `403`s with `reason=Authorization`, including your own | A hyphenated claim referenced with dot access (`jwt.x-org`), or a rule naming a claim the token lacks. Both fail closed while the policy still reports `Accepted` | Use bracket indexing, `jwt["x-org"]`, and confirm the claim exists by decoding the token per Step 8 |
+| One user is denied while another is allowed | That user's `app_metadata` has no `org`, so the Action omits the claim | Add `app_metadata` for them, then have them log in again |
+| Access log shows an older request, or claims look missing | The proxy runs multiple replicas and `kubectl logs -l` concatenates each pod's tail instead of merging by time | Add `sort` before `tail`, as in the [Observability](#view-access-logs) commands |
 
 ---
 
@@ -630,3 +797,11 @@ PY
 ```
 
 In Auth0, remove `http://localhost:8910/callback` from the Native application's Allowed Callback URLs, and delete the application if you created it only for this lab.
+
+If you completed Step 8, undo the claim configuration separately. Deleting the application does not remove it: the Action is bound to the **tenant's** login flow and `app_metadata` lives on the **user**, so both outlive the application and keep applying to every other application in the tenant.
+
+1. Actions → **Triggers** → **post-login**, remove `add-org-user-claims` from the flow, then **Apply**
+2. Actions → **Library**, delete `add-org-user-claims`
+3. User Management → Users → each user → Metadata → clear **App Metadata** back to `{}`
+
+Step 1 on its own is enough if you'd rather keep the Action for later. Out of the flow it stops running, and nothing reads the claims once the gateway policy is gone.
