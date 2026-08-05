@@ -37,17 +37,17 @@ When `protocol: OpenAPI` is set, you must also provide `openAPI.schemaRef`, whic
 
 ## Step 1: Deploy the Stripe mock server
 
-Deploy `stripe-mock` into a dedicated `stripe-mock` namespace. It serves HTTP on port `12111`.
+Deploy `stripe-mock` into a dedicated `stripe-mcp` namespace. It serves HTTP on port `12111`.
 
 ```bash
-kubectl create namespace stripe-mock --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace stripe-mcp --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: stripe-mock
-  namespace: stripe-mock
+  namespace: stripe-mcp
 spec:
   replicas: 1
   selector:
@@ -69,7 +69,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: stripe-mock
-  namespace: stripe-mock
+  namespace: stripe-mcp
 spec:
   selector:
     app: stripe-mock
@@ -82,7 +82,7 @@ EOF
 
 Verify that the pod is ready:
 ```bash
-kubectl wait --for=condition=available deployment/stripe-mock -n stripe-mock --timeout=60s
+kubectl wait --for=condition=available deployment/stripe-mock -n stripe-mcp --timeout=60s
 ```
 
 > `stripe-mock` is **stateless**: it validates requests against the embedded Stripe OpenAPI spec and returns hardcoded sample objects. It does not persist anything you send, and it does not validate the *value* of your API key — but it does require an `Authorization` header to be present (see Step 3).
@@ -232,7 +232,7 @@ spec:
     targets:
       - name: stripe-mock
         static:
-          host: stripe-mock.stripe-mock.svc.cluster.local
+          host: stripe-mock.stripe-mcp.svc.cluster.local
           port: 12111
           protocol: OpenAPI
           openAPI:
@@ -429,5 +429,5 @@ kubectl delete httproute -n agentgateway-system openapi-mcp-stripe
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system stripe-mock-openapi
 kubectl delete secret -n agentgateway-system stripe-mock-token
 kubectl delete configmap -n agentgateway-system stripe-mock-schema
-kubectl delete namespace stripe-mock
+kubectl delete namespace stripe-mcp
 ```
