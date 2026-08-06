@@ -4,6 +4,7 @@
 ---
 - Rename the dedicated `stripe-mock` namespace to `stripe-mcp` in `labs/mcp/openapi-to-mcp-in-cluster.md`
 - Add new lab: `labs/platform-engineering/kyverno-admission-control.md`
+- Enrich the access-log and tracing examples in `001-install-enterprise-agentgateway.md`: latency breakdown (`proxy.*Duration`), provider/model/token/cost fields, `default()`-guarded `llm.*`/`jwt.*` attributes, and OTel-style span attributes (`enduser.id`, `llm.usage.*`, `llm.prompt.user`)
 
 0.13.4 - (8-4-26)
 ---

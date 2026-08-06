@@ -215,7 +215,7 @@ waf-server-enterprise-agentgateway-6fc78487cc-vbqd8         1/1     Running   0 
 
 ## Configure access logs (optional)
 
-Agentgateway emits access logs by default. This step is optional — the enrichment fields below are not required by any later lab, but are useful for debugging and observability. Apply an `EnterpriseAgentgatewayPolicy` to enrich the default access logs with additional metadata extracted from the request and response:
+Agentgateway emits access logs by default. This step is optional — the enrichment fields below are not required by any later lab, but are useful for debugging and observability. Apply an `EnterpriseAgentgatewayPolicy` to enrich the default access logs with additional metadata extracted from the request and response. Each attribute is a [CEL expression](https://docs.solo.io/agentgateway/latest/reference/cel/); wrap fields that are absent on some requests (for example `llm.*` on non-LLM routes, or `jwt.*` before a JWT policy is attached) in `default()` so the log field is always present:
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -233,36 +233,57 @@ spec:
     accessLog:
       attributes:
         add:
-        # --- Capture all JWT claims (use to discover available fields, then narrow down)
-        - name: jwt.all
-          expression: jwt
+        # --- Request context
+        - name: request_path
+          expression: request.path
+        - name: status_code
+          expression: string(response.code)
+        # --- Latency breakdown: time spent in the upstream (LLM) vs the gateway itself
+        - name: llm_duration
+          expression: proxy.upstreamDuration
+        - name: request_proc_duration
+          expression: proxy.requestProcessingDuration
+        - name: response_proc_duration
+          expression: proxy.responseProcessingDuration
+        # --- LLM telemetry
+        - name: provider
+          expression: default(llm.provider, "none")
+        - name: model
+          expression: default(llm.responseModel, "none")
+        - name: prompt_tokens
+          expression: string(default(llm.inputTokens, 0))
+        - name: completion_tokens
+          expression: string(default(llm.outputTokens, 0))
+        - name: total_cost_usd
+          expression: string(default(llm.cost.total, 0.0))
         # Streaming vs buffered — useful for debugging latency differences
-        - name: llm.streaming
-          expression: llm.streaming
+        - name: llm_streaming
+          expression: default(llm.streaming, false)
         # Cache efficiency — shows cost savings from prompt caching
-        - name: llm.cached_tokens
-          expression: llm.cachedInputTokens
-        # Reasoning tokens — relevant for o1/o3 models
-        - name: llm.reasoning_tokens
-          expression: llm.reasoningTokens
-        # Full prompt conversation (has perf impact for large prompts)
-        - name: llm.prompt
-          expression: llm.prompt
-        # LLM response content
-        - name: llm.completion
-          expression: 'llm.completion[0]'
+        - name: llm_cached_tokens
+          expression: string(default(llm.cachedInputTokens, 0))
+        # Reasoning tokens — relevant for reasoning models
+        - name: llm_reasoning_tokens
+          expression: string(default(llm.reasoningTokens, 0))
+        # --- Identity
+        - name: client_ip
+          expression: source.address
+        - name: user_id
+          expression: default(jwt.sub, "anonymous")
+        # All claims from a verified JWT (use to discover available fields, then narrow down)
+        - name: jwt_all
+          expression: default(jwt, {})
+        # --- Content capture (debug only — perf impact for large prompts/responses)
+        #- name: llm_prompt
+        #  expression: llm.prompt
+        #- name: llm_completion
+        #  expression: 'default(llm.completion[0], "")'
         # --- Capture a single request header by name (example: x-foo)
-        #- name: x-foo
-        #  expression: 'request.headers["x-foo"]'
-        # --- Capture entire request body and parse it as JSON
-        #- name: request.body
-        #  expression: json(request.body)
-        # --- Capture entire response body and parse it as JSON
-        #- name: response.body
-        #  expression: json(response.body)
-        # --- Capture a field in the request body
-        #- name: request.body.modelId
-        #  expression: json(request.body).modelId
+        #- name: x_foo
+        #  expression: 'default(request.headers["x-foo"], "")'
+        # --- Capture a field from the JSON request body
+        #- name: request_model
+        #  expression: 'default(json(request.body).model, "")'
 EOF
 ```
 
@@ -292,21 +313,28 @@ spec:
       randomSampling: "true"
       attributes:
         add:
-        # --- Capture the claims from a verified JWT token if JWT policy is enabled
-        - name: jwt
-          expression: jwt
-        # --- Capture the LLM prompt (warning: performance impact for large prompts)
-        #- name: llm.prompt
-        #  expression: llm.prompt
-        # --- Capture the LLM completion (warning: performance impact for large responses)
-        #- name: llm.completion
-        #  expression: llm.completion
-        # --- Capture entire response body and parse it as JSON
-        #- name: response.body
-        #  expression: json(response.body)
+        # --- Identity: subject of the verified JWT if a JWT policy is enabled
+        - name: enduser.id
+          expression: 'default(jwt.sub, "anonymous")'
+        # --- LLM telemetry
+        - name: llm.is_streaming
+          expression: 'default(llm.streaming, false)'
+        - name: llm.usage.cached_tokens
+          expression: 'default(llm.cachedInputTokens, 0)'
+        - name: llm.usage.reasoning_tokens
+          expression: 'default(llm.reasoningTokens, 0)'
+        # First user message in the prompt (perf impact for large prompts)
+        - name: llm.prompt.user
+          expression: 'default(llm.prompt.filter(m, m.role == "user")[0].content, "")'
+        # LLM response content (perf impact for large responses)
+        - name: llm.completion.output
+          expression: 'default(llm.completion[0], "")'
+        # --- Capture all claims from a verified JWT token
+        #- name: jwt
+        #  expression: jwt
         # --- Capture a single request header by name (example: x-foo)
-        #- name: x-foo
-        #  expression: 'request.headers["x-foo"]'
+        #- name: http.request.header.x_foo
+        #  expression: 'default(request.headers["x-foo"], "")'
 EOF
 ```
 
