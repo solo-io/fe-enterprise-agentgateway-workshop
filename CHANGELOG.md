@@ -3,6 +3,7 @@
 0.13.5 - (8-5-26)
 ---
 - Rename the dedicated `stripe-mock` namespace to `stripe-mcp` in `labs/mcp/openapi-to-mcp-in-cluster.md`
+- Add new lab: `labs/platform-engineering/kyverno-admission-control.md`
 
 0.13.4 - (8-4-26)
 ---
