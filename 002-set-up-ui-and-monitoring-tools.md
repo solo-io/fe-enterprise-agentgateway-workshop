@@ -261,23 +261,22 @@ The AgentGateway dashboard provides comprehensive observability into your AI gat
 The dashboard is organized into several key metric categories:
 
 **Overview**
-- Total Requests, Input/Output Token counts
-- P50, P90, P95 latency
-- Request rate, token throughput (input/output tokens per second)
-- Error rates (4xx, 429, 5xx)
-- Average token usage per request and average GenAI response size
-- Connection Rate, Active Tasks, MCP Tool Calls
-- Token Usage breakdown by Model
+- Total Requests, Request Rate, Input/Output Token counts, MCP Requests, and average tokens per request
+- Error rates (4xx, 429, 5xx) with absolute counts, plus gateway overhead (P95/P99 request-path overhead and overhead as a share of total latency)
+- Request volume by status class and P95 latency trends (LLM end-to-end, LLM time-to-first-token, MCP) over time
+- Token usage and token throughput by model, including each model's share of total requests
 
 ![overview-v2-1.png](images/grafana-dashboard/overview-v2-1.png)
 
 **Cost Tracking**
-- Total Cost (5h, 24h, 7d windows) and Projected Monthly Cost
-- Average cost per request and token spend (input, output, cache read, cache write)
-- Cost Rate ($/hour) over time
-- Cost breakdown by Model, Organization, Team, Route, and Provider
-- Per-model pricing reference tables (OpenAI, Anthropic/Claude, API Gateway)
-- Token throughput consumption by model
+- Total Cost (1h and 24h windows) plus a coverage-aware Projected 30d run-rate that scales honestly on freshly-started clusters
+- Untracked Cost, flagging spend from unrecognized models with a live tok/s and estimated $/hour
+- Spend & Savings by token type (input, output, cache read, cache write) plus a saved-by-caching figure, and Average Cost per Request
+- Cost Rate ($/hour) over time by model
+- A Cost by Model table with cost, % of spend, request counts, and cost per request
+- A Cost by Organization ($/hour) trend, plus cost breakdown tables by Organization, User, Route, and Provider
+- Per-model pricing reference tables (OpenAI, Anthropic/Claude, AWS Bedrock)
+- Cache spend and untracked token throughput by model
 
 ![llm-cost-tracking-v2-1.png](images/grafana-dashboard/llm-cost-tracking-v2-1.png)
 ![llm-cost-tracking-v2-2.png](images/grafana-dashboard/llm-cost-tracking-v2-2.png)
