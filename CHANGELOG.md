@@ -1,5 +1,9 @@
 # Changelog
 
+0.13.6 - (8-10-26)
+---
+- Updated agentgateway dashboard at `/lib/observability/agentgateway-grafana-dashboard-v1.json`: Added gpt-5.5 model to cost tracking
+
 0.13.5 - (8-6-26)
 ---
 - Rename the dedicated `stripe-mock` namespace to `stripe-mcp` in `labs/mcp/openapi-to-mcp-in-cluster.md`
