@@ -2,6 +2,7 @@
 
 0.13.6 - (8-14-26)
 ---
+- Add `labs/routing/configure-routing-groq.md`: route to Groq with the `openai` provider
 - Updated agentgateway dashboard at `/lib/observability/agentgateway-grafana-dashboard-v1.json`: Added gpt-5.4 model to cost tracking, Proxy resource panels now also match waypoint pods, other minor updates
 
 0.13.5 - (8-6-26)
