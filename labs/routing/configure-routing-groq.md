@@ -1,6 +1,6 @@
-# Configure Basic Routing to Groq
+# Configure Routing to Groq
 
-In this lab, you'll route to [Groq](https://console.groq.com/) — an OpenAI-compatible inference provider — using the `openai` provider with a host override.
+In this lab, you'll route to [Groq](https://console.groq.com/), an OpenAI-compatible inference provider, using the `openai` provider with a host override.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -15,13 +15,13 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Why the `openai` Provider?
 
-Groq serves the OpenAI Chat Completions API at `https://api.groq.com/openai/v1/chat/completions`. There is no dedicated `groq` provider, and there doesn't need to be one: because the wire format is identical to OpenAI's, you use `provider.openai` and redirect it at Groq's endpoint. The gateway still parses the request and response as OpenAI traffic, so token counts, model names, streaming metrics, and prompt/completion logging all work exactly as they do in the [OpenAI lab](configure-routing-openai.md).
+Groq serves the OpenAI Chat Completions API at `https://api.groq.com/openai/v1/chat/completions`. There is no dedicated `groq` provider. Because the wire format is identical to OpenAI's, you use `provider.openai` and redirect it at Groq's endpoint. The gateway still parses the request and response as OpenAI traffic, so token counts, model names, streaming metrics, and prompt/completion logging work as they do in the [OpenAI lab](configure-routing-openai.md).
 
-Three provider fields do the redirection:
+These provider fields redirect the traffic:
 
 | Setting | Value | Description |
 |---|---|---|
-| `host` / `port` | `api.groq.com` / `443` | The upstream endpoint. Both must be set together — setting only one is rejected by the CRD. |
+| `host` / `port` | `api.groq.com` / `443` | The upstream endpoint. Both must be set together; the CRD rejects one without the other. |
 | `pathPrefix` | `/openai/v1` | Replaces the `openai` provider's built-in `/v1` prefix. The gateway appends the operation suffix (`/chat/completions`), producing `/openai/v1/chat/completions`. |
 | `policies.tls.sni` | `api.groq.com` | Originates TLS to the upstream and sets the SNI server name. Validates against the system trust store, which is correct for a public CA like Groq's. |
 
@@ -128,11 +128,11 @@ x-ratelimit-remaining-tokens: 7921
 {"model":"openai/gpt-oss-20b","service_tier":"on_demand","usage":{"prompt_tokens":78,"completion_tokens":143,...},"choices":[{"message":{"content":"Quantum computing uses qubits that can exist in multiple states simultaneously...","role":"assistant"}...
 ```
 
-Note that the client never sends an `Authorization` header — the gateway attaches the key from `groq-secret`, so callers reach Groq without ever holding a Groq credential.
+The client sends no `Authorization` header. The gateway attaches the key from `groq-secret`, so callers reach Groq while the credential stays in the cluster.
 
 The backend routes every model Groq serves. Swap the `model` field to reach another one, for example `llama-3.3-70b-versatile`, or pin the backend to a single model by uncommenting `provider.openai.model`, which overrides whatever the client sends.
 
-Streaming works over the same route — add `"stream": true` to the body and the gateway relays Groq's SSE chunks while recording TTFT and TPOT metrics.
+Streaming works over the same route: add `"stream": true` to the body and the gateway relays Groq's SSE chunks while recording TTFT and TPOT metrics.
 
 ## Observability
 
@@ -168,7 +168,7 @@ The dashboard provides real-time visualization of:
 - MCP metrics (tool calls, server requests)
 - Connection and runtime metrics
 
-> **Note — Groq traffic is labeled as OpenAI.** Because the backend uses the `openai` provider, metrics carry `gen_ai_system="openai"` and access logs and spans carry `gen_ai.provider.name=openai`, both alongside `gen_ai.request.model=openai/gpt-oss-20b`. Filter dashboards and queries by model or by `route="agentgateway-system/groq"`, not by provider, to isolate Groq traffic. Cost is also reported as `total_cost_usd="0"`: the base model catalog prices OpenAI, Anthropic, and Gemini models, and Groq's model IDs aren't in it. Add them yourself with a custom catalog — see the [LLM Cost Management lab](../observability/llm-cost-management.md).
+> **Note: Groq traffic is labeled as OpenAI.** Because the backend uses the `openai` provider, metrics carry `gen_ai_system="openai"` and access logs and spans carry `gen_ai.provider.name=openai`, both alongside `gen_ai.request.model=openai/gpt-oss-20b`. To isolate Groq traffic, filter dashboards and queries by model or by `route="agentgateway-system/groq"` rather than by provider. Cost is also reported as `total_cost_usd="0"`: the base model catalog prices OpenAI, Anthropic, and Gemini models, and Groq's model IDs aren't in it. Add them yourself with a custom catalog, as covered in the [LLM Cost Management lab](../observability/llm-cost-management.md).
 
 ### View Traces in the Solo UI
 
@@ -185,7 +185,7 @@ kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
 
 4. Use the **Search spans** box or the time-range buttons to find your requests, then click a row to open its span details
 
-Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`.
+Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Prompt and completion text stays out of spans; the access logs carry it as `llm.prompt` and `llm.completion`.
 
 ### View Access Logs
 
@@ -196,16 +196,6 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ```
 
 The log line carries the upstream endpoint (`endpoint=api.groq.com:443`), the model and token counts, and a `trace.id` you can search for in the Solo UI's **Tracing** view. Reasoning models like `openai/gpt-oss-20b` also report `llm_reasoning_tokens`, which is included in `completion_tokens`.
-
-### (Optional) View Traces in Jaeger
-
-If you installed Jaeger in the [002 — Set Up Monitoring Tools (OCP)](../installation/openshift/002-set-up-monitoring-tools-ocp.md) lab instead of the Solo UI, you can view traces in the Jaeger UI:
-
-```bash
-kubectl port-forward svc/jaeger -n observability 16686:16686
-```
-
-Navigate to http://localhost:16686 in your browser to see the traces. Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, and `gen_ai.usage.output_tokens`, plus per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`
 
 ## Cleanup
 ```bash
