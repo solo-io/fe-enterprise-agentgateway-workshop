@@ -96,7 +96,7 @@ EOF
 A few notes on this config:
 
 - We raise `shutdown.min`/`shutdown.max` above their defaults (10s/60s) so long-lived streams have room to finish draining before the deadline.
-- `kubectl apply` merges into the existing object. Fields not listed here (logging, rawConfig, service, resource requests) are preserved; only `deployment.spec.replicas`, `podDisruptionBudget.spec.minAvailable`, and `shutdown` are added or changed.
+- `kubectl apply` merges into the existing object. Fields not listed here (logging, service, resource requests) are preserved; only `deployment.spec.replicas`, `podDisruptionBudget.spec.minAvailable`, and `shutdown` are added or changed.
 - On v2026.6.1, the operator sets `terminationGracePeriodSeconds` equal to `shutdown.max` (both 110 s), satisfying the `>= shutdown.max` requirement from the draining section above. SIGKILL arrives at the hard-deadline boundary, so active drains have up to `shutdown.max` seconds to complete before the backstop fires.
 
 Confirm two healthy proxy pods and the PDB:

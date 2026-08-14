@@ -205,7 +205,7 @@ EOF
 ## Deploy Agentgateway with customizations
 The configuration below shows the customizations exposed through `EnterpriseAgentgatewayParameters`, such as adding annotations or labels, modifying deployment and service settings, extending observability capabilities, and configuration for deploying on OpenShift.
 
-This is the developer's slice: a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the settings the app team owns — deployment, service, logging, observability, and the proxy's OpenShift `securityContext` deletion — and omits `sharedExtensions`, which the operator set at the GatewayClass level in the previous step. The two resources merge, with this per-Gateway config layering on top of the class default. The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`.
+This is the developer's slice: a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the infrastructure settings the app team owns: deployment, service, logging, and the proxy's OpenShift `securityContext` deletion. It omits `sharedExtensions`, which the operator set at the GatewayClass level in the previous step. You configure metric labels, access logs, and tracing separately, with the `EnterpriseAgentgatewayPolicy` resources in the sections below. The two resources merge, with this per-Gateway config layering on top of the class default. The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`.
 
 For air-gapped or private-registry installs, set the registry once at the Helm chart level with the global `image.registry` value shown in the controller install step above — that value flows through to the proxy and all extension images automatically, so no per-image overrides are needed here. The same is true for pull secrets: the top-level Helm `imagePullSecrets` propagates to the proxy and every extension automatically, so nothing is needed here. (If a single component ever needs a different secret, registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` takes a per-component `imagePullSecrets` under `deployment.spec.template.spec` and a highest-precedence `spec.sharedExtensions.<name>.image` override.)
 
@@ -248,25 +248,6 @@ spec:
         service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     spec:
       type: LoadBalancer
-  #--- Use rawConfig to inline custom configuration from ConfigMap ---
-  rawConfig:
-    config:
-      # --- Label all metrics using a value extracted from the request body
-      metrics:
-        fields:
-          add:
-            # --- Label all metrics with a value extracted from a verified JWT token if present,
-            #     falling back to the `x-org` request header (e.g. ANTHROPIC_CUSTOM_HEADERS from Claude Code)
-            user_org: default(jwt.org, default(request.headers["x-org"], "public-tier"))
-            user_team: default(jwt.team, "public-tier")
-            user_tier: default(jwt.tier, "public-tier")
-            user_name: default(jwt.preferred_username, default(request.headers["x-user"], "public-tier"))
-            # --- Label all metrics with the virtual-key user_id extracted from the validated
-            #     API key credential (empty when no API key is presented). The `llm-cost-tracking`
-            #     lab relies on this label for per-user token/cost queries.
-            user_id: default(apiKey.user_id, "")
-            # --- Label all metrics using a value extracted from the request body
-            #modelId: json(request.body).modelId
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -306,6 +287,49 @@ enterprise-agentgateway-5f9c5b95b4-gjblt                    1/1     Running   0 
 ext-auth-service-enterprise-agentgateway-6fcc5bc989-22wgd   1/1     Running   0          11m
 ext-cache-enterprise-agentgateway-6bfcb8c87d-vjzxn          1/1     Running   0          11m
 rate-limiter-enterprise-agentgateway-589f66bb88-xz7nm       1/1     Running   0          11m
+```
+
+## Configure metric labels
+
+Apply an `EnterpriseAgentgatewayPolicy` to add custom labels to every Prometheus metric the gateway exposes. Each label value is a [CEL expression](https://docs.solo.io/agentgateway/latest/reference/cel/) evaluated per request, so you can slice token usage and cost by organization, team, tier, or user. Wrap fields that are absent on some requests (for example `jwt.*` before a JWT policy is attached) in `default()`, otherwise the label value falls back to `unknown`.
+
+Every distinct label value creates a new Prometheus time series, so keep the list short and low-cardinality. The policy accepts at most 16 labels.
+
+```bash
+kubectl apply -f- <<'EOF'
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: metrics
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: Gateway
+    name: agentgateway-proxy
+  frontend:
+    metrics:
+      attributes:
+        add:
+        # --- Values extracted from a verified JWT token if present, falling back to the
+        #     `x-org` / `x-user` request headers (e.g. ANTHROPIC_CUSTOM_HEADERS from Claude Code)
+        - name: user_org
+          expression: 'default(jwt.org, default(request.headers["x-org"], "public-tier"))'
+        - name: user_team
+          expression: 'default(jwt.team, "public-tier")'
+        - name: user_tier
+          expression: 'default(jwt.tier, "public-tier")'
+        - name: user_name
+          expression: 'default(jwt.preferred_username, default(request.headers["x-user"], "public-tier"))'
+        # --- The virtual-key user_id extracted from the validated API key credential
+        #     (empty when no API key is presented). The `llm-cost-tracking` lab relies
+        #     on this label for per-user token/cost queries.
+        - name: user_id
+          expression: 'default(apiKey.user_id, "")'
+        # --- Label all metrics with a value extracted from the JSON request body
+        #- name: modelId
+        #  expression: 'default(json(request.body).modelId, "")'
+EOF
 ```
 
 ## Configure access logs (optional)
@@ -441,7 +465,7 @@ EOF
 To tear everything down, work in reverse order. Delete the `Gateway` first so the controller can clean up the proxy deployment and service before you remove the controller itself.
 
 ```bash
-kubectl delete enterpriseagentgatewaypolicy access-logs tracing -n agentgateway-system --ignore-not-found
+kubectl delete enterpriseagentgatewaypolicy metrics access-logs tracing -n agentgateway-system --ignore-not-found
 kubectl delete gateway agentgateway-proxy -n agentgateway-system --ignore-not-found
 kubectl delete enterpriseagentgatewayparameters agentgateway-config agentgateway-shared-extensions -n agentgateway-system --ignore-not-found
 helm uninstall enterprise-agentgateway -n agentgateway-system
