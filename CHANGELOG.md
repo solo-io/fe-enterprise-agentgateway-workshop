@@ -1,8 +1,8 @@
 # Changelog
 
-0.13.6 - (8-10-26)
+0.13.6 - (8-14-26)
 ---
-- Updated agentgateway dashboard at `/lib/observability/agentgateway-grafana-dashboard-v1.json`: Added gpt-5.4 model to cost tracking
+- Updated agentgateway dashboard at `/lib/observability/agentgateway-grafana-dashboard-v1.json`: Added gpt-5.4 model to cost tracking, Proxy resource panels now also match waypoint pods, other minor updates
 
 0.13.5 - (8-6-26)
 ---

@@ -1113,7 +1113,7 @@
           "refId": "C"
         }
       ],
-      "title": "LLM Latency Percentiles (p95)",
+      "title": "Latency Percentiles (p95)",
       "type": "timeseries"
     },
     {
@@ -5582,7 +5582,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", cpu=\"total\"}[$__rate_interval])) by (pod)\n/\nsum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"cpu\"}) by (pod)\n* 100",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*|.*-waypoint.*\", cpu=\"total\"}[$__rate_interval])) by (pod)\n/\nsum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*|.*-waypoint.*\", resource=\"cpu\"}) by (pod)\n* 100",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
@@ -5688,7 +5688,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"}) by (pod)\n/\nsum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", resource=\"memory\"}) by (pod)\n* 100",
+          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-.*|.*-waypoint.*\"}) by (pod)\n/\nsum(kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"agentgateway-.*|.*-waypoint.*\", resource=\"memory\"}) by (pod)\n* 100",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
@@ -5891,7 +5891,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"})",
+          "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*|.*-waypoint.*\"})",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -5989,7 +5989,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*\", cpu=\"total\"}[$__rate_interval])) by (pod)",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"agentgateway-.*|.*-waypoint.*\", cpu=\"total\"}[$__rate_interval])) by (pod)",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
@@ -6087,7 +6087,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-.*\"}) by (pod)",
+          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"agentgateway-.*|.*-waypoint.*\"}) by (pod)",
           "legendFormat": "{{pod}}",
           "range": true,
           "refId": "A"
