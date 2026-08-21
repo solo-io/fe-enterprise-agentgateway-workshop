@@ -62,6 +62,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [AWS Bedrock with IRSA](labs/routing/configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_
 - [AWS Bedrock Titan Embeddings](labs/routing/configure-routing-aws-bedrock-titan-embeddings.md) _(AWS Bedrock)_
 - [Routing to Anthropic](labs/routing/configure-routing-anthropic.md) _(Anthropic)_
+- [Routing to Groq](labs/routing/configure-routing-groq.md) _(Groq)_ — OpenAI-compatible provider via `host` / `pathPrefix` override
 - [Routing to Azure OpenAI and Azure AI Foundry](labs/routing/configure-routing-azure-openai.md) _(Azure OpenAI / Azure AI Foundry)_
 - [Azure OpenAI with Workload Identity](labs/routing/configure-routing-azure-openai-workload-identity.md) _(Azure OpenAI / AKS)_
 - [Routing to Google Vertex AI](labs/routing/configure-routing-vertexai.md) _(Google Vertex AI)_
@@ -232,6 +233,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
         - Anthropic (Claude)
         - Azure OpenAI (API key and AKS Workload Identity)
         - Google Vertex AI (user auth and GCP service account)
+        - Groq (and any other OpenAI-compatible provider, via a `host` / `pathPrefix` override)
     - OpenAI Embeddings support
     - AWS Bedrock Titan embeddings support
     - OpenAI Batches API support (asynchronous batch processing)
