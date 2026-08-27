@@ -1,5 +1,11 @@
 # Changelog
 
+0.13.7 - (8-27-26)
+---
+- Update Solo UI to `0.5.5` 
+- Updates to `labs/observability/llm-cost-management.md`
+- Update image list
+
 0.13.6 - (8-21-26)
 ---
 - Add `labs/routing/configure-routing-groq.md`: route to Groq with the `openai` provider

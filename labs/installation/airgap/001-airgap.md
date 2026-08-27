@@ -389,7 +389,7 @@ The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-teleme
 ### Set required variables
 
 ```bash
-export AGW_UI_VERSION=0.5.1
+export AGW_UI_VERSION=0.5.5
 ```
 
 ### Step 1: Install/upgrade CRDs
@@ -450,7 +450,7 @@ clickhouse:
   enabled: true
   image:
     repository: docker.io/ably7/clickhouse-server
-    tag: "26.1.11.9-alpine"
+    tag: "26.3.17-alpine"
 tracing:
   verbose: true
 EOF

@@ -7,14 +7,25 @@ Complete the setup in `001` and `002` first. Cost Management runs on the Solo UI
 ## Lab Objectives
 - Issue per-user API keys (virtual keys) and route them to OpenAI through an `EnterpriseAgentgatewayBackend`
 - Enable the Cost Management section of the Solo UI
+- Review the dimensions that map each request to a user and group
 - Layer your own model cost catalog over the gateway's base catalog to control per-request USD pricing
-- Attribute spend to users and groups via virtual key metadata
-- Enforce per-user and per-group spend/token budgets with `EnterpriseAgentgatewayBudget`
+- Enforce layered per-user and per-group spend/token budgets with `EnterpriseAgentgatewayBudget`
 - View spend, budgets, and the model cost catalog in the Cost Management dashboard
 
 ## About Cost Management
 
-Lab `002` gives you raw token-usage metrics in Grafana and access logs. Cost Management reads the gateway's tracing spans and reports spend by provider, model, group, user, or virtual key, alongside budget usage against your configured limits and the model cost catalog itself. You filter any view and export it as CSV. Answering "what are we spending on LLMs, and who is spending it" no longer means hand-writing PromQL.
+Lab `002` gives you raw token-usage metrics in Grafana and access logs. Cost Management turns them into spend. Total spend, input versus output tokens, and request counts sit at the top of the dashboard; below them, every panel pivots between provider, model, group, user, and virtual key, and any view exports to CSV. Answering "what are we spending on LLMs, and who is spending it" no longer means hand-writing PromQL.
+
+This lab configures each piece behind that dashboard:
+
+| Piece | Question it answers |
+| --- | --- |
+| Virtual keys | Who is calling? |
+| Dimensions | Where do they sit in the org? |
+| Model cost catalog | What does a token cost? |
+| Budgets | What happens when they spend too much? |
+
+The gateway computes spend from its OpenTelemetry spans, and the dimensions, catalog, and budgets are ConfigMaps and CRDs. You manage them through GitOps and export the underlying spans to your own observability stack.
 
 ## Set up the OpenAI backend
 
@@ -81,7 +92,9 @@ The backend shows `ACCEPTED   True`, and the route prints `Accepted=True` and `R
 
 Create one Secret per user, each labeled `app: llm-virtual-keys`. The auth policy in the next section discovers keys by that label instead of by a single Secret name, so you onboard a new user by adding another labeled Secret, with no edit to a central Secret or the policy.
 
-Each entry stores the API key plus the metadata both Cost Management and rate limiting read: `user_id` for token-budget CEL expressions (the client doesn't supply it), and `user`/`group` for Cost Management's spend attribution. Cost Management resolves `user` from `apiKey.user`, then `jwt.sub`, then `jwt.email`; it resolves `group` from `jwt.group`, then `apiKey.group`.
+Callers authenticate to the gateway with a virtual key that you revoke or re-scope per user, and the gateway attaches the upstream OpenAI credential on the way out, so the real provider key stays with the platform team. Each request then arrives with an identity that spend can be attributed to.
+
+Each entry stores the API key plus the metadata both Cost Management and rate limiting read: `user_id` for token-budget CEL expressions (the client doesn't supply it), and `id`/`user`/`group`, which the next section maps to the `virtualKey`, `user`, and `group` dimensions.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -98,6 +111,7 @@ stringData:
     {
       "key": "sk-alice-abc123def456",
       "metadata": {
+        "id": "vk-alice-001",
         "user_id": "alice",
         "user": "alice",
         "group": "research"
@@ -117,6 +131,7 @@ stringData:
     {
       "key": "sk-bob-xyz789uvw012",
       "metadata": {
+        "id": "vk-bob-001",
         "user_id": "bob",
         "user": "bob",
         "group": "engineering"
@@ -125,9 +140,42 @@ stringData:
 EOF
 ```
 
-> **Note:** The `user`/`group` resolution order lives in the `agentgateway-enterprise-budget-dimensions` ConfigMap in the control-plane namespace, and you can customize it. If spend shows up as **Unattributed** in the dashboard, compare the field names on your key metadata against that ConfigMap's hierarchy before assuming the request itself is misconfigured.
-
 > **Tip:** For tiered budgets, multi-tenant `(tenant_id, user_id)` scoping, or a deeper walkthrough of virtual-key mechanics, see the [virtual-keys lab](../security/virtual-keys.md). This lab sets up only the minimum Cost Management needs.
+
+## Review the attribution dimensions
+
+A dimension maps request context to a name your organization already uses, such as a group or a user. Each one is a CEL expression that the proxy evaluates on every request, and they live in the `agentgateway-enterprise-budget-dimensions` ConfigMap that the install creates.
+
+```bash
+kubectl get configmap agentgateway-enterprise-budget-dimensions -n agentgateway-system \
+  -o jsonpath='{.data.dimensions\.yaml}'
+```
+
+Output:
+
+```yaml
+attributes:
+- displayName: Virtual Key
+  expression: apiKey.id
+  id: virtualKey
+hierarchy:
+- displayName: Group
+  expression: coalesce(jwt.group, apiKey.group)
+  id: group
+- displayName: User
+  expression: coalesce(apiKey.user, apiKey.name, apiKey.owner, jwt.sub, jwt.email,
+    basicAuth.username, source.identity.namespace + "/" + source.identity.serviceAccount,
+    source.subjectCn)
+  id: user
+```
+
+- **`hierarchy`** holds ordered scopes, here `group` above `user`. The order sets the roll-up in the dashboard: spend per group, drilled into per user.
+- **`attributes`** holds flat, unordered tags such as `virtualKey`. The proxy also provides `model` and `provider`, which are built in and can't be redefined.
+- Each `coalesce` tells the gateway where to look on the request, JWT claim first and virtual key metadata second. The gateway resolves these values per request and keeps no table of groups or cost centers, so a new group flows through as soon as it appears in a claim or in key metadata. You edit a dimension when the value moves to a different claim or header.
+
+Once you enable Cost Management below, the Solo UI renders this same ConfigMap under **Dimensions** as **Scopes & Attributes**, where you reorder scopes and add attributes. To define your own dimension, such as a `costCenter` resolved from `coalesce(jwt.costCenter, request.headers["x-cost-center"])`, add it to `budgetDimensions.config.attributes` in your Helm values. See the [budget dimensions docs](https://docs.solo.io/agentgateway/latest/llm/cost-controls/budget-limits/#custom-dimensions).
+
+> **Note:** A dimension that resolves to an empty string is unset for that request. Budgets that name it don't match, and the dashboard groups that spend under **Unattributed**. `virtualKey` resolves from `apiKey.id` alone, with no fallback, so set `id` on every key.
 
 ## Configure API key authentication
 
@@ -162,17 +210,17 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 curl -s -o /dev/null -w "alice: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-alice-abc123def456" \
-  -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Hello!"}]}'
+  -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Hello!"}]}'
 
 curl -s -o /dev/null -w "bob: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-bob-xyz789uvw012" \
-  -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Hello!"}]}'
+  -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Hello!"}]}'
 
 curl -s -o /dev/null -w "invalid: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-invalid-key" \
-  -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Hello!"}]}'
+  -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Hello!"}]}'
 ```
 
 Expected output: alice and bob both `HTTP 200`, the invalid key `HTTP 401`.
@@ -182,7 +230,7 @@ Expected output: alice and bob both `HTTP 200`, the invalid key `HTTP 401`.
 Layer the `cost-management` feature flag onto the existing `management` release from `002` with `--reuse-values`, rather than re-specifying every value from that install:
 
 ```bash
-export AGW_UI_VERSION=0.5.1
+export AGW_UI_VERSION=0.5.5
 
 helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
 --namespace agentgateway-system \
@@ -201,9 +249,12 @@ kubectl rollout status deploy/solo-enterprise-ui -n agentgateway-system
 
 ## Configure a model cost catalog
 
-The gateway ships a base catalog: the controller creates an `agentgateway-proxy-model-catalog` ConfigMap alongside each Gateway, covering current OpenAI, Anthropic, and Gemini models. The gateway prices those models with no configuration from you. A model the base catalog doesn't know, such as a mock or self-hosted model, still contributes token and request volume but `$0.00` of spend.
+The gateway ships a base catalog: the controller creates an `agentgateway-proxy-model-catalog` ConfigMap alongside each Gateway, covering OpenAI, Anthropic, and Gemini models known at release time. The gateway prices those models with no configuration from you. A model the base catalog doesn't know, whether a mock, a self-hosted model, or one released after the gateway, still contributes token and request volume but `$0.00` of spend.
 
-You layer your own catalog on top of that base as an overlay, to correct a rate or to price a model the base doesn't cover. Create one that pins `gpt-5.4-nano` to the pricing used elsewhere in this workshop ($0.20 per 1M input tokens, $1.25 per 1M output tokens):
+You layer your own catalog on top of that base as an overlay. An overlay does two jobs, and the one below does both:
+
+- **Add a model the base catalog doesn't price.** This release's base catalog stops short of the `gpt-5.6` family, so `gpt-5.6-luna` traffic prices at `$0.00` until you supply rates for it.
+- **Override a model it does price.** Public list prices are the wrong number for an organization on a negotiated contract. The base prices `gpt-5.5` at list, `$5.00` input and `$30.00` output per 1M tokens; the overlay restates it at a contracted 50% of list.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -218,8 +269,23 @@ data:
       "providers": {
         "openai": {
           "models": {
-            "gpt-5.4-nano": {
-              "rates": { "input": "0.20", "output": "1.25" }
+            "gpt-5.6-luna": {
+              "rates": { "input": "0.20", "output": "1.20", "cacheRead": "0.02", "cacheWrite": "0.25" }
+            },
+            "gpt-5.6-terra": {
+              "rates": { "input": "2.00", "output": "12.00", "cacheRead": "0.20", "cacheWrite": "2.50" }
+            },
+            "gpt-5.6-sol": {
+              "rates": { "input": "5.00", "output": "30.00", "cacheRead": "0.50", "cacheWrite": "6.25" }
+            },
+            "gpt-5.5": {
+              "rates": { "input": "2.50", "output": "15.00", "cacheRead": "0.25" },
+              "tiers": [
+                {
+                  "contextOver": 272000,
+                  "rates": { "input": "5.00", "output": "22.50", "cacheRead": "0.50" }
+                }
+              ]
             }
           }
         }
@@ -228,9 +294,7 @@ data:
 EOF
 ```
 
-> **Note:** An overlay entry replaces the base entry for that model outright rather than merging into it. The base `gpt-5.4-nano` entry also carries a cache-read rate, which the overlay above drops because it sets only `input` and `output`. When you override a model that has cache pricing, restate its `cacheRead`/`cacheWrite` rates too.
-
-> **Tip:** For a broader catalog covering many providers/models at once, generate one with the `agctl` CLI instead of hand-writing it: `agctl costs import --pretty --providers openai,anthropic --out ./catalog.json`, then `kubectl create configmap llm-model-costs --from-file=catalog.json=./catalog.json -n agentgateway-system --dry-run=client -o yaml | kubectl apply -f -`.
+> **Note:** An overlay entry **replaces** the base entry for that model outright rather than merging into it, so an override has to restate every field it wants to keep. The base `gpt-5.5` entry carries a `cacheRead` rate and a `tiers` block that reprices requests over a 272,000-token context. An override setting only `input` and `output` would silently drop both, leaving cached reads and long-context requests billed at the plain rates. The entry above restates them at the same 50% discount. The three `gpt-5.6` entries have no base entry to replace, so they only need their own rates.
 
 `001` created the `agentgateway-config` `EnterpriseAgentgatewayParameters` and attached it to the Gateway via `spec.infrastructure.parametersRef`. Point the Gateway at your catalog by adding `modelCatalog` there with a **merge patch** rather than `kubectl apply`: a full `apply` without the fields `001` set (like `logging`) would strip them, because `kubectl apply` computes a three-way diff against the last-applied config.
 
@@ -247,11 +311,11 @@ kubectl get enterpriseagentgatewayparameters agentgateway-config -n agentgateway
 
 Allow up to two minutes before checking rates. The catalog reaches the gateway as a mounted ConfigMap, so edits to `llm-model-costs` take effect on that delay, and the gateway prices requests you send in the meantime at the previous rates.
 
-## Enforce per-user and per-group budgets
+## Enforce layered budgets
 
-Declare spend/token limits with the `EnterpriseAgentgatewayBudget` CRD. It sits a level above a hand-authored `RateLimitConfig`, purpose-built for USD/token budgets, and the Cost Management dashboard's **Budgets** tab reads it. The controller compiles each entry into a controller-managed `RateLimitConfig` for you, named `agw-budget-<budget-name>-<hash>`.
+The dashboard reports spend after the fact. To cap it, declare spend and token limits with the `EnterpriseAgentgatewayBudget` CRD. It sits a level above a hand-authored `RateLimitConfig`, purpose-built for USD/token budgets, and the Cost Management dashboard's **Budgets** tab reads it. The controller compiles each entry into a controller-managed `RateLimitConfig` for you, named `agw-budget-<budget-name>-<hash>`.
 
-Each budget entry's `subject` scopes it to one or more resolved dimensions: `model`, `provider`, `virtualKey`, `user`, and `group` are available by default, the same dimensions Cost Management attributes spend by. Give alice a token budget and bob a USD budget to see both limit types:
+Each entry's `subject` scopes it to resolved dimensions: `model`, `provider`, `virtualKey`, `user`, and `group` by default, the same dimensions Cost Management attributes spend by. Entries at different levels compose. The budget below combines a group-wide guardrail that logs overages with a per-user default that blocks them.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -262,28 +326,41 @@ metadata:
   namespace: agentgateway-system
 spec:
   budgets:
-  - name: alice-daily-tokens
+  - name: engineering-monthly-usd
     subject:
-      user: alice
+      group: engineering
+    limit:
+      unit: USD
+      amount: 50
+    window:
+      unit: Month
+    onBudgetExceeded: Audit
+  - name: any-user-daily-tokens
+    subject:
+      user: "*"
     limit:
       unit: Tokens
       amount: 100000
     window:
       unit: Day
     onBudgetExceeded: Block
-  - name: bob-daily-usd
+  - name: alice-daily-tokens
     subject:
-      user: bob
+      user: alice
     limit:
-      unit: USD
-      amount: 5
+      unit: Tokens
+      amount: 500000
     window:
       unit: Day
-    onBudgetExceeded: Audit
+    onBudgetExceeded: Block
 EOF
 ```
 
-`onBudgetExceeded` controls the gateway's response once a caller reaches a limit. Alice's budget uses `Block`, so the gateway rejects further requests with `429`. Bob's uses `Audit`: the gateway records the overage and forwards the request anyway. Pick `Audit` for a team you want to monitor without cutting off.
+- **`onBudgetExceeded`** decides what happens at the limit. `Block` rejects further requests with `429`, and `Audit` records the overage and forwards the request. Auditing the group budget while blocking individuals caps one runaway caller and leaves the rest of the group serving traffic.
+- **A `"*"` subject value creates a separate allowance per value.** `user: "*"` gives each distinct user their own 100,000 tokens per day, so a new user gets the default the first time they call.
+- **An exact entry takes precedence over the wildcard** on the same dimension. `alice-daily-tokens` raises alice to 500,000 tokens and suppresses the default for her alone. Entries on other dimensions still stack, so bob's requests debit both the per-user default and the engineering group budget.
+
+Windows roll rather than align to the calendar: `Day` covers a rolling 24 hours and `Month` a rolling 30 days.
 
 Add `entBudgetEnforcement` to the existing `api-key-auth` policy with a merge patch, so the gateway discovers and enforces `EnterpriseAgentgatewayBudget` resources in the same namespace:
 
@@ -311,18 +388,18 @@ for i in {1..5}; do
   curl -s -o /dev/null -w "alice request $i: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-alice-abc123def456" \
-    -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Whats your favorite poem?"}]}'
+    -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Whats your favorite poem?"}]}'
 done
 
 for i in {1..3}; do
   curl -s -o /dev/null -w "bob request $i: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-bob-xyz789uvw012" \
-    -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Whats your favorite poem?"}]}'
+    -d '{"model": "gpt-5.6-terra", "messages": [{"role": "user", "content": "Whats your favorite poem?"}]}'
 done
 ```
 
-Expected output: all 8 requests `HTTP 200`. The budgets above are generous enough that this traffic won't exhaust either one.
+Expected output: all 8 requests `HTTP 200`. Alice's requests run on `gpt-5.6-luna` and bob's on the pricier `gpt-5.6-terra`, so the dashboard's model pivot has two models to separate. The budgets above are generous enough that this traffic won't exhaust any of them.
 
 ## View the Cost Management dashboard
 
@@ -334,9 +411,16 @@ kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
 
 Open [http://localhost:4000/age/](http://localhost:4000/age/) and select **Cost Management** from the menu.
 
-- **Spend**: time-series spend, filterable and groupable by provider, model, group, user, or virtual key. Alice and bob's requests appear broken out both by `user` and by `group`. Model breakdowns list the dated model ID that OpenAI returns, `gpt-5.4-nano-2026-03-17`, rather than the `gpt-5.4-nano` alias you priced; the gateway resolves the dated ID back to your catalog entry. Export the current view as CSV.
-- **Model Cost Catalog**: confirm `gpt-5.4-nano` shows the `$0.20`/`$1.25` per-1M-token rates from the ConfigMap you created above, with source `Override`, meaning your overlay took precedence over the base catalog entry. The other rows show source `Base`.
-- **Budgets**: the `team-budgets` `EnterpriseAgentgatewayBudget` from above. Click the row to open its detail drawer, where each entry shows live usage against its limit (e.g. `506 tokens of 100,000 tokens · On track` for alice, `$0.00 of $5.00 · On track` for bob).
+- **Dashboard**: a summary row of total spend, input versus output tokens, and request count with an average cost per request, followed by paired **Spend by** and **Spend Over Time by** panels. Each panel carries its own pivot. Switch one from **Provider** to **Group** to **User**, and the same traffic re-slices as `research` against `engineering`, then as alice against bob. The **Filters** row narrows every panel at once by scope, provider, model, or virtual key, and **Export CSV** downloads the current view.
+  - Every request attributes to a user, group, and virtual key, because each key sets `id`, `user`, and `group`. Requests where a dimension resolves to nothing appear under **Unattributed**.
+  - Model breakdowns list the model ID the provider returns on the response. The `gpt-5.6` family returns the same undated ID you priced, so `gpt-5.6-luna` and `gpt-5.6-terra` appear verbatim. Models that answer with a dated snapshot ID, such as `gpt-5.4-nano-2026-03-17`, show that snapshot instead, and the gateway resolves it back to the alias in your catalog.
+- **Model Cost Catalog**: the header names the base catalog, lists your overlay under **Overlay catalogs are applied in this order**, and reports `1 model entry is overridden by overlay sources`. Search the table to see both halves of the overlay:
+  - `gpt-5.6` returns the three added models with the input, output, cache-read, and cache-write rates you supplied. Before the overlay they had no row at all.
+  - `gpt-5.5` shows `$2.50` input, `$15.00` output, and `$0.25` cache read instead of the list `$5.00`/`$30.00`/`$0.50`, tagged source `Override`.
+- **Budgets**: the `team-budgets` `EnterpriseAgentgatewayBudget` from above, listed with `3` entries. Click the row to open its detail drawer, where each entry shows its subject, window, and usage against its limit. With the traffic you just sent, all three read `On track`:
+  - `alice-daily-tokens`, subject `user alice`, e.g. `1,041 tokens of 500,000 tokens`
+  - `any-user-daily-tokens`, subject `user *`, e.g. `42 tokens of 100,000 tokens`
+  - `engineering-monthly-usd`, subject `group engineering`, `$0.00 of $50.00`
 
 Treat spend as an estimate. The gateway multiplies token counts by the per-token prices in your catalog, so the totals won't reconcile line-for-line against your LLM provider's invoice.
 
