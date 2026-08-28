@@ -3,6 +3,7 @@
 0.13.8 - (8-27-26)
 ---
 - Enable the Solo UI `cost-management` feature flag by default
+- Updates to `labs/observability/llm-cost-management.md`
 
 
 0.13.7 - (8-27-26)
