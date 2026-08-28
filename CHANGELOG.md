@@ -1,5 +1,12 @@
 # Changelog
 
+0.13.8 - (8-28-26)
+---
+- Enable the Solo UI `cost-management` feature flag by default
+- Updates to `labs/observability/llm-cost-management.md`
+- Add `lib/observability/seed-cost-data.sh`: backfills ClickHouse with synthetic LLM spend so the Cost Management dashboard renders a full history — four providers (OpenAI, Anthropic, Gemini, Bedrock), five teams of 1-3 users
+- Add `lib/observability/README.md` documenting the observability shared assets
+
 0.13.7 - (8-27-26)
 ---
 - Update Solo UI to `0.5.5` 

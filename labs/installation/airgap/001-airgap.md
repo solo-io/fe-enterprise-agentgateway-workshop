@@ -431,6 +431,11 @@ products:
   agentgateway:
     enabled: true
     namespace: agentgateway-system
+    features:
+      #--- Cost Management dashboard (budgets, spend by model/team) ---
+      cost-management: true
+      #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
+      cost-management-writes: true
   mesh:
     enabled: false
   agentregistry:
