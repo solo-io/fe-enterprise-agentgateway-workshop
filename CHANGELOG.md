@@ -1,5 +1,10 @@
 # Changelog
 
+0.13.8 - (8-27-26)
+---
+- Enable the Solo UI `cost-management` feature flag by default
+
+
 0.13.7 - (8-27-26)
 ---
 - Update Solo UI to `0.5.5` 

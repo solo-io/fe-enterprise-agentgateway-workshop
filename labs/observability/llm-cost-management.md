@@ -225,27 +225,7 @@ curl -s -o /dev/null -w "invalid: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai"
 
 Expected output: alice and bob both `HTTP 200`, the invalid key `HTTP 401`.
 
-## Enable Cost Management in the Solo UI
-
-Layer the `cost-management` feature flag onto the existing `management` release from `002` with `--reuse-values`, rather than re-specifying every value from that install:
-
-```bash
-export AGW_UI_VERSION=0.5.5
-
-helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
---namespace agentgateway-system \
---version "$AGW_UI_VERSION" \
---reuse-values \
---set products.agentgateway.features.cost-management=true
-```
-
-To also make the dashboard read-only (no budget/dimension edits from the UI), add `--set products.agentgateway.features.cost-management-writes=false` to the command above.
-
-Check that the UI rolled out:
-
-```bash
-kubectl rollout status deploy/solo-enterprise-ui -n agentgateway-system
-```
+The Cost Management dashboard in the Solo UI is enabled by the `products.agentgateway.features.cost-management` flag, which `002` already sets. Set `cost-management-writes: false` there if you want the dashboard read-only, with no budget or dimension edits from the UI.
 
 ## Configure a model cost catalog
 
