@@ -182,7 +182,7 @@ kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
 
 3. Click **Tracing** in the left navigation
 
-Each agent invocation produces a trace listed as `POST /openai/*` against the `agentgateway-system/openai` route, with its duration and input/output token counts. Click a row to open its span details, which carry `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`.
+Each agent invocation produces a trace listed as `POST /openai/*` against the `agentgateway-system/openai` route, with its duration and input/output token counts. Click a row to open its span details, which carry `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Spans also carry message content: the first user message as `llm.prompt.user` and the response text as `llm.completion.output`. The access logs record tokens and cost but no message text, because `001` ships the `llm_prompt` and `llm_completion` log attributes commented out.
 
 ### View the Prometheus metrics endpoint
 

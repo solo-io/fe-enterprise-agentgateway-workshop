@@ -597,11 +597,9 @@ Treat spend as an estimate. The gateway multiplies token counts by the per-token
 
 ## Cleanup
 
-```bash
-# Synthetic spend, if you ran the optional seeding step
-# (also clears the real traffic and traces recorded during this lab)
-TRUNCATE=true ROWS=0 ./lib/observability/seed-cost-data.sh
+Remove the lab's resources:
 
+```bash
 # Budgets, and the delegated team namespace
 kubectl delete enterpriseagentgatewaybudget -n agentgateway-system \
   finance-guardrails platform-defaults user-exceptions --ignore-not-found
@@ -620,6 +618,14 @@ kubectl delete secret -n agentgateway-system -l app=llm-virtual-keys --ignore-no
 kubectl delete httproute -n agentgateway-system openai --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
+```
+
+Clear the synthetic spend only if you ran the optional seeding step. This also
+drops the real traffic and traces recorded during this lab, along with anything
+other labs have written to the same table:
+
+```bash
+TRUNCATE=true ROWS=0 ./lib/observability/seed-cost-data.sh
 ```
 
 To disable the Cost Management feature:
