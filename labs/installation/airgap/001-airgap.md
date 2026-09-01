@@ -51,7 +51,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.7.1-patch.0
+export ENTERPRISE_AGW_VERSION=v2026.8.2
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -87,7 +87,7 @@ ratelimitconfigs                    rlc               ratelimit.solo.io/v1alpha1
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> The top-level Helm `image.registry` is the global default registry for every chart-managed image: the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.7.1-patch.0`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.4-alpine`). Mirror each image at the tag shown in the [Air-Gap Mirror Reference](../image-list.md#air-gap-mirror-reference-dockerioably7). The top-level Helm `imagePullSecrets` is the global default too, and it reaches the proxy and every extension. Add a per-CR pull-secret override only when one extension uses a different secret than the rest.
+> The top-level Helm `image.registry` is the global default registry for every chart-managed image: the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.8.2`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.6-alpine`). Mirror each image at the tag shown in the [Air-Gap Mirror Reference](../image-list.md#air-gap-mirror-reference-dockerioably7). The top-level Helm `imagePullSecrets` is the global default too, and it reaches the proxy and every extension. Add a per-CR pull-secret override only when one extension uses a different secret than the rest.
 
 Using Helm:
 ```bash

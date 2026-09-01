@@ -82,7 +82,7 @@ export ENTRA_DOWNSTREAM_SCOPE="$ENTRA_DOWNSTREAM_SCOPE"  # e.g. "api://ffffffff-
 export ENTRA_OBO_CLIENT_SECRET="$ENTRA_OBO_CLIENT_SECRET"
 
 # Controller version and license (set these to match your environment)
-export ENTERPRISE_AGW_VERSION=v2026.7.1-patch.0
+export ENTERPRISE_AGW_VERSION=v2026.8.2
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
 ```
 

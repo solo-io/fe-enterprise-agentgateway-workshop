@@ -22,6 +22,11 @@ automatically. A team cannot express a traffic policy here even if it tries.
   proxying the endpoint's `targets`
 - No `HTTPRoute` ever sets `parentRefs` — routes attach to the gateway only
   through the platform's delegation, never directly
+- One `ReferenceGrant` authorizing the platform namespace
+  (`platformNamespace`, default `agentgateway-system`) to delegate into this
+  team's namespace. From v2026.8.2 the controller requires this grant for
+  cross-namespace route delegation: without it the parent route selects no
+  child and every request under the team's prefix returns `404`
 
 ## The contract with agentgateway-platform
 
@@ -30,6 +35,7 @@ automatically. A team cannot express a traffic policy here even if it tries.
 | Delegation label    | this chart (`team` value)         | `team: team-alpha`      |
 | Path prefix         | this chart, from `team` value      | `/teams/team-alpha`     |
 | Namespace           | wherever this release is installed | `team-alpha`            |
+| Delegation grant    | this chart, from `platformNamespace` | `ReferenceGrant` in `team-alpha` |
 | Cost tier           | inherited from the platform — not settable here | e.g. `gold` |
 
 ## Install

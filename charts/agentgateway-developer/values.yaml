@@ -13,3 +13,7 @@ endpoints: []
 #        host: github-mcp.team-alpha.svc.cluster.local
 #        port: 8080
 #        protocol: StreamableHTTP
+
+# -- Namespace holding the platform team's parent route. The chart renders a
+#    ReferenceGrant authorizing that namespace to delegate into this one.
+platformNamespace: agentgateway-system

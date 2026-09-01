@@ -3,6 +3,9 @@
 0.13.9 - (9-1-26)
 ---
 - Drop the stale references to old versions in select labs
+- Bump Enterprise Agentgateway from `v2026.7.1-patch.0` to `v2026.8.2` across the install labs, air-gap and OpenShift installs, multi-cluster upgrades, identity-delegation labs, image list, and the three workshop chart `appVersion` fields
+- Refresh the support matrix in `labs/installation/system-requirements.md`: Gateway API `1.4 - 1.6`, Istio `1.26 - 1.30`
+- Cross-namespace `HTTPRoute` to `HTTPRoute` delegation now requires a `ReferenceGrant` in the child namespace (agentgateway/agentgateway#3110). Updated `labs/platform-engineering/platform-and-developer-helm-charts-mcp.md` to accomodate this change
 
 0.13.8 - (8-28-26)
 ---
