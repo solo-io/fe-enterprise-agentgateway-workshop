@@ -2,7 +2,7 @@
 
 ## Pre-requisites
 
-This lab assumes that you have completed the setup in `001` and that the gateway is running Enterprise AgentGateway **v2026.5.x or later** (the release that introduced `entMcp.toolMode`). Lab `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. Lab `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 
@@ -302,7 +302,7 @@ JSON typically tokenizes at ~3-4 characters per token, so byte counts track toke
 
 #### Intermediate-result elimination
 
-> **Note on identifier shape:** The run_code script below uses snake_case (`get_tiny_image`, `get_sum`) — that's what the gateway emits in v2026.5.x. If your cluster emits camelCase (`getTinyImage`) or hyphenated bracket-access (`tools['get-tiny-image']`) instead, substitute accordingly. The upstream tool names (used in the comparison block) are hyphenated regardless.
+> **Note on identifier shape:** The run_code script below uses snake_case (`get_tiny_image`, `get_sum`), which is what the gateway emits. If your cluster emits camelCase (`getTinyImage`) or hyphenated bracket-access (`tools['get-tiny-image']`) instead, substitute accordingly. The upstream tool names (used in the comparison block) are hyphenated regardless.
 
 This is the marquee Code-mode demonstration. A multi-step script calls `get_tiny_image()` — which returns a base64-encoded image that is KB of payload — then returns only a tiny summary. Compare what the model receives in Code mode to what it would have received with sequential standard calls:
 
@@ -430,8 +430,6 @@ EOF
 ```
 
 Note that `targetRefs.kind` is `EnterpriseAgentgatewayBackend` and `name` is `mcp-code-backend` — the policy attaches to the backend, not the HTTPRoute. The `mcp.tool.name` CEL attribute is a gateway-native value the proxy extracts from parsed MCP traffic.
-
-> The exact enterprise field path (`spec.backend.mcp.authorization`) is verified against `v2026.5.2`. If your cluster rejects the resource, run `kubectl explain enterpriseagentgatewaypolicies.spec.backend.mcp` to confirm the field shape on your installed version.
 
 ### Test with the demo JWT
 

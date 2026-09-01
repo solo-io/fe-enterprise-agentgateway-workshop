@@ -559,8 +559,6 @@ spec:
 EOF
 ```
 
-> The exact enterprise field path (`spec.backend.mcp.authorization`) is verified against `v2026.5.2`. If your cluster rejects the resource, run `kubectl explain enterpriseagentgatewaypolicies.spec.backend.mcp` to confirm the field shape on your installed version.
->
 > **Why `mcp.tool.target` and not `mcp.tool.name.startsWith(...)`?** In a multiplexed backend, `mcp.tool.name` evaluates to the upstream's *unprefixed* tool name (e.g., `search_arxiv`) — see [agentgateway-enterprise#398](https://github.com/solo-io/agentgateway-enterprise/issues/398). The `mcp.tool.target` attribute is the right hook for per-backend filtering in a federation.
 
 ### Cycle through the personas

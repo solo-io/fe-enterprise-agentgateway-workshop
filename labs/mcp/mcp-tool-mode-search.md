@@ -2,7 +2,7 @@
 
 ## Pre-requisites
 
-This lab assumes that you have completed the setup in `001` and that the gateway is running Enterprise AgentGateway **v2026.5.x or later** (the release that introduced `entMcp.toolMode`). Lab `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. Lab `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 
@@ -405,8 +405,6 @@ EOF
 ```
 
 Note that `targetRefs.kind` is `EnterpriseAgentgatewayBackend` and `name` is `mcp-search-backend` — the policy attaches to the backend, not the HTTPRoute. The `mcp.tool.name` CEL attribute is a gateway-native value the proxy extracts from parsed MCP traffic.
-
-> The exact enterprise field path (`spec.backend.mcp.authorization`) is verified against `v2026.5.2`. If your cluster rejects the resource, run `kubectl explain enterpriseagentgatewaypolicies.spec.backend.mcp` to confirm the field shape on your installed version.
 
 ### Test with the demo JWT
 

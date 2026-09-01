@@ -1,5 +1,9 @@
 # Changelog
 
+0.13.9 - (9-1-26)
+---
+- Drop the stale references to old versions in select labs
+
 0.13.8 - (8-28-26)
 ---
 - Enable the Solo UI `cost-management` feature flag by default
