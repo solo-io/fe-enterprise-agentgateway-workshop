@@ -1,20 +1,20 @@
 # Configure Semantic Routing with vLLM Semantic Router
 
-In this lab, you'll route LLM requests by **prompt content** instead of by the model name the client asks for. Clients send one stable virtual model name, `auto_model`. [vLLM Semantic Router](https://vllm-sr.ai/) (vSR), called by the gateway as an external processor, rewrites that name to an economy or a frontier model before the gateway routes the request, so simple prompts are served at economy pricing without any change to the client.
+In this lab, you'll route LLM requests by **prompt content** instead of by the model name the client asks for. Clients send one stable virtual model name, `auto_model`. [vLLM Semantic Router](https://vllm-sr.ai/) (vSR), called by the gateway as an external processor, rewrites that name to one of three price tiers before the gateway routes the request, so each prompt is served by the cheapest model that can handle it, without any change to the client.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
-- An OpenAI API key with access to two models of different price. This lab uses `gpt-5.4-nano` as the economy model and `gpt-5.6-terra` as the frontier model.
+- An OpenAI API key with access to three models of different price. This lab uses `gpt-5-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier. The same key also needs access to the embeddings API; the router uses `text-embedding-3-small` to classify prompts.
 - `helm` on your path. You install vSR from the upstream chart.
 
 > **The router is a separate deployment.** Enterprise Agentgateway does not ship an embedding model or a classifier. It calls whichever router you deploy over ExtProc and honors the answer. vSR owns the model-selection policy. The gateway owns auth, routing, rate limits, and telemetry.
 
 ## Lab Objectives
-- Install vLLM Semantic Router into the cluster and point it at a Kubernetes configuration namespace
-- Define the models a client may reach with an `IntelligentPool`, and the rule that picks among them with an `IntelligentRoute`
+- Install vLLM Semantic Router into the cluster, configured to compute embeddings through the OpenAI embeddings API
+- Define the models a client may reach with an `IntelligentPool`, and the rules that pick among three price tiers with `IntelligentRoute` embedding signals
 - Call vSR from the gateway with an `EnterpriseAgentgatewayPolicy` using `traffic.extProc` in the `PreRouting` phase
-- Send two requests that are identical except for the prompt, and observe two different models answering
-- Read the routing decision in the router logs and the per-model cost split in gateway metrics
+- Send requests that differ only in their prompt text, and observe different models answering
+- Read the routing decision and similarity score in the router logs and the per-model cost split in gateway metrics
 
 ## Architecture
 
@@ -26,9 +26,10 @@ EnterpriseAgentgatewayPolicy (traffic.phase: PreRouting, traffic.extProc)
     │  gRPC → semantic-router:50051, failureMode: FailClosed
     ▼
 vLLM Semantic Router
-    │  IntelligentRoute: keyword signal "hard" matched?
+    │  embeds the prompt via the OpenAI embeddings API
+    │  IntelligentRoute: cosine similarity vs candidate phrases ≥ threshold?
     │  IntelligentPool:  which models is this client allowed to reach?
-    │  rewrites body model: auto_model → gpt-5.4-nano | gpt-5.6-terra
+    │  rewrites body model: auto_model → gpt-5-nano | gpt-5.6-luna | gpt-5.6-terra
     ▼
 HTTPRoute /semantic  →  EnterpriseAgentgatewayBackend (openai-all-models)
     │  no model override, so the rewritten name passes straight through
@@ -40,16 +41,17 @@ OpenAI
 
 ### Why a virtual model name?
 
-Without this pattern, each client hardcodes a model name. Developers pick one that handles their hardest case, so `gpt-5.6-terra` ends up answering throwaway prompts like "Write a 500-word essay about nothing." at frontier prices. Fixing that client-side means writing model-selection logic in every application, and keeping the selection rules in sync as models and prices change.
+Without this pattern, each client hardcodes a model name. Developers pick one that handles their hardest case, so `gpt-5.6-terra` ends up answering throwaway prompts like "Write a 500-word essay about nothing." at high-tier prices. Fixing that client-side means writing model-selection logic in every application, and keeping the selection rules in sync as models and prices change.
 
 With a virtual model name, model choice becomes a platform decision. `auto_model` is the only name clients need, and the rule behind it lives in Kubernetes resources you can change at the platform layer. Clients keep calling the same OpenAI-compatible `/v1/chat/completions` endpoint with the same model name; only the answer's model changes.
 
 You set the name with `auto_model_name` in the vSR values below, and it is what opts a request into semantic selection.
-### What "semantic" means in this lab
 
-vSR evaluates signals of several classes: semantic (embedding), complexity, keyword, context, and structure. **This lab uses keyword signals only.** Keyword signals classify without an embedding model download or a persistent volume, so the lab can work anywhere. The decision is also deterministic, so you can predict which model each prompt below reaches.
+### How the routing decision is made
 
-The trade-off is that keyword matching is not semantics. A prompt that asks for a proof without using the word "prove" will not escalate. To route on meaning rather than on vocabulary, swap the keyword signal for an `embeddings` signal in the `IntelligentRoute` and enable `persistence` in the Helm values so the embedding model survives a restart. The ExtProc policy, the route, and the backend all stay the same.
+This lab uses **embedding signals**: vSR embeds each prompt and cosine-matches it against candidate phrases declared in the `IntelligentRoute`. One signal matches everyday coding tasks and routes to the mid tier, a second matches deep-reasoning work and routes to the high tier, and everything else falls to the economy default; when both match, decision `priority` picks the winner. The match is on semantic meaning rather than word matching, so a prompt asking for a proof escalates whether or not it contains the word "prove".
+
+vSR computes those embeddings through the OpenAI embeddings API, configured in the Helm values under `global.model_catalog.embeddings.semantic` with `embedding_config.model_type: remote` and `backend: openai_compatible`. Each prompt is classified through the embeddings endpoint, then served by the model that classification selects.
 
 ---
 
@@ -59,6 +61,20 @@ Create the namespace that will hold the routing configuration. The vSR process w
 
 ```bash
 kubectl create namespace semantic-router-config --dry-run=client -oyaml | kubectl apply -f -
+```
+
+Replace with a valid OpenAI API key.
+
+```bash
+export OPENAI_API_KEY=$OPENAI_API_KEY
+```
+
+The router reads its embeddings API key from an environment variable, mounted from this Secret:
+
+```bash
+kubectl create secret generic openai-embedding-key -n agentgateway-system \
+  --from-literal=OPENAI_API_KEY=$OPENAI_API_KEY \
+  --dry-run=client -oyaml | kubectl apply -f -
 ```
 
 Install the chart into `agentgateway-system`, watching that namespace.
@@ -72,10 +88,17 @@ helm upgrade -i semantic-router \
   --set image.pullPolicy=Always \
   --set-json 'args=["--secure=false","--namespace=semantic-router-config"]' \
   -f - <<'EOF'
-# No PVC. Keyword signals classify without a downloaded embedding model, so
-# there is nothing to persist. Enable this when you switch to embedding signals.
+# Embeddings come from the OpenAI embeddings API, so there is nothing to
+# persist and no PVC. Enable this only for a locally hosted embedding model.
 persistence:
   enabled: false
+
+extraEnv:
+  - name: OPENAI_API_KEY
+    valueFrom:
+      secretKeyRef:
+        name: openai-embedding-key
+        key: OPENAI_API_KEY
 
 resources:
   requests:
@@ -88,23 +111,25 @@ resources:
 config:
   providers:
     defaults:
-      default_model: gpt-5.4-nano
-      # Keep this map. See "Why declare reasoning_families?" below.
+      default_model: gpt-5-nano
+      # Tells vSR how to express reasoning for gpt-family models, so a decision
+      # with useReasoning: true sets OpenAI's reasoning_effort parameter.
       reasoning_families:
         gpt:
           type: reasoning_effort
           parameter: reasoning_effort
       default_reasoning_effort: high
     models:
-      - name: gpt-5.4-nano
-        provider_model_id: gpt-5.4-nano
+      - name: gpt-5-nano
+        provider_model_id: gpt-5-nano
         api_format: openai
   routing:
     # The router validates its default model before the Kubernetes reconciler
     # applies the IntelligentPool, so every name any pool can select has to be
     # declared here for the process to start cleanly.
     modelCards:
-      - name: gpt-5.4-nano
+      - name: gpt-5-nano
+      - name: gpt-5.6-luna
       - name: gpt-5.6-terra
     signals: {}
     decisions: []
@@ -122,6 +147,22 @@ config:
         enabled: true
         max_bytes: 10485760
         timeout_sec: 30
+    model_catalog:
+      embeddings:
+        semantic:
+          embedding_config:
+            backend: openai_compatible
+            model_type: remote
+            preload_embeddings: false
+            target_dimension: 1536
+          endpoint:
+            # vSR appends /embeddings to this URL.
+            base_url: https://api.openai.com/v1
+            model: text-embedding-3-small
+            api_key_env: OPENAI_API_KEY
+            timeout_seconds: 10
+            max_retries: 2
+            dimensions: 1536
     services:
       # The gateway owns rate limiting in this workshop. Disable the chart's
       # sample rules so the two do not both decide.
@@ -130,14 +171,12 @@ config:
 EOF
 ```
 
-Wait for the Deployment. First start pulls a large image and initializes the embedding backend, which can take a few minutes.
+Wait for the Deployment.
 
 ```bash
 kubectl wait --for=condition=Available deployment/semantic-router \
   -n agentgateway-system --timeout=600s
 ```
-
-> **Why declare `reasoning_families`?** The chart ships a `reasoning_families` map telling vSR how to express "think harder" for each model family; for `gpt` that is OpenAI's `reasoning_effort` parameter. Helm replaces maps you override, so setting `config.providers.defaults` without re-declaring `reasoning_families` drops it, and vSR falls back to injecting `chat_template_kwargs`, a vLLM parameter that OpenAI rejects with `400 Unknown parameter`.
 
 ## Define the pool and the routing rule
 
@@ -158,10 +197,11 @@ metadata:
   namespace: semantic-router-config
 spec:
   # Every request that matches no decision gets this model, so a prompt that
-  # fails to escalate falls back to the cheap model instead of erroring.
-  defaultModel: gpt-5.4-nano
+  # fails to escalate falls back to the cheapest model instead of erroring.
+  defaultModel: gpt-5-nano
   models:
-    - name: gpt-5.4-nano
+    - name: gpt-5-nano
+    - name: gpt-5.6-luna
     - name: gpt-5.6-terra
 ---
 apiVersion: vllm.ai/v1alpha1
@@ -173,30 +213,52 @@ spec:
   # Signals are the features vSR extracts from the prompt. Decisions are the
   # rules that turn features into a model choice.
   signals:
-    keywords:
+    embeddings:
+      # Cosine similarity against the candidates. With text-embedding-3-small,
+      # deep-reasoning prompts score ~0.4 on "hard", coding prompts ~0.5 on
+      # "moderate", and small talk stays at or below ~0.2 on both. Tune per
+      # embedding model; changing endpoint.model changes the score distribution.
       - name: hard
-        operator: OR
-        caseSensitive: false
-        keywords:
-          - prove
-          - derive
-          - theorem
-          - quantum physics
-          - stack trace
-          - race condition
-          - refactor
+        threshold: 0.3
+        aggregationMethod: max
+        candidates:
+          - prove a mathematical statement rigorously step by step
+          - derive an equation or theorem from first principles
+          - debug a subtle concurrency bug from a stack trace
+      - name: moderate
+        threshold: 0.3
+        aggregationMethod: max
+        candidates:
+          - write a python function to parse a file and compute results
+          - implement a small script or code snippet for a routine task
+          - fix a bug in this code and explain the change
   decisions:
+    # A hard prompt usually also resembles the moderate candidates, so both
+    # decisions can match; the higher priority wins.
     - name: escalate-hard-prompts
       priority: 100
-      description: Prompts that need deeper reasoning reach the frontier model.
+      description: Prompts that need deep reasoning reach the high-tier model.
       signals:
         operator: AND
         conditions:
-          - type: keyword
+          - type: embedding
             name: hard
       modelRefs:
+        # useReasoning sets reasoning_effort (via reasoning_families in the
+        # Helm values) at default_reasoning_effort on the selected model.
         - model: gpt-5.6-terra
-          useReasoning: false
+          useReasoning: true
+    - name: route-moderate-prompts
+      priority: 50
+      description: Everyday coding tasks reach the mid-tier model.
+      signals:
+        operator: AND
+        conditions:
+          - type: embedding
+            name: moderate
+      modelRefs:
+        - model: gpt-5.6-luna
+          useReasoning: true
 EOF
 ```
 
@@ -210,11 +272,7 @@ kubectl wait --for=condition=Ready \
 
 ## Create the OpenAI backend and route
 
-Replace with a valid OpenAI API key.
-
-```bash
-export OPENAI_API_KEY=$OPENAI_API_KEY
-```
+The completion path authenticates with its own Secret, in the header format the gateway forwards to OpenAI:
 
 ```bash
 kubectl create secret generic openai-secret -n agentgateway-system \
@@ -263,7 +321,7 @@ spec:
 EOF
 ```
 
-Confirm the plain path works before adding the router, so that a later failure has only one possible cause. This request names a real model, so it should answer normally.
+Confirm the plain path works before adding the router, so that a later failure has only one possible cause. This request names a model directly, so it should answer normally.
 
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
@@ -271,11 +329,11 @@ echo $GATEWAY_IP
 
 curl -s "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
+  -d '{"model":"gpt-5-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
 ```
 
 ```
-"gpt-5.4-nano-2026-03-17"
+"gpt-5-nano-2025-08-07"
 ```
 
 ## Call the router from the gateway
@@ -331,42 +389,40 @@ semantic-router   True       True       3s
 
 > **Why `FailClosed`?** With `FailOpen`, a router outage sends the request on with `auto_model` still in the body, and OpenAI answers `model_not_found`, which points you at the provider instead of at the router that failed. `FailClosed` rejects the request instead. Change it only if an unrouted request is better than no request. A router outage surfaces as HTTP 500 with `reason=ExtProc` in the access log, not the 503 you might expect from an unreachable dependency, so alerts keyed on 503 will miss it.
 
-> **Watch the `backendRef`.** A `backendRef` that resolves to no Service fails the policy with `failed to build extProc: unable to find the Service` while status still reports `Accepted=True`, so verify the wiring with the test requests below.
-
 ## Test the routing decision
 
-Both requests below are byte-identical except for the prompt text, and both name `auto_model` rather than a real model.
+The requests below differ only in their prompt text, and all name `auto_model`.
 
-An easy prompt matches no keyword, so it falls to the pool's `defaultModel`:
-
-```bash
-curl -s "$GATEWAY_IP:8080/semantic" \
-  -H "content-type: application/json" \
-  -d '{"model":"auto_model","messages":[{"role":"user","content":"Write a 500-word essay about nothing."}]}' | jq '.model'
-```
-
-```
-"gpt-5.4-nano-2026-03-17"
-```
-
-A prompt containing `prove` and `derive` matches the `hard` signal and escalates:
+An easy prompt scores well below both thresholds, so it falls to the pool's `defaultModel`:
 
 ```bash
 curl -s "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"auto_model","messages":[{"role":"user","content":"Prove that the square root of two is irrational, and derive the general theorem."}]}' | jq '.model'
+  -d '{"model":"auto_model","messages":[{"role":"user","content":"Summarize this email in one sentence: lunch moved to noon."}]}' | jq '.model'
 ```
 
 ```
-"gpt-5.6-terra"
+"gpt-5-nano-2025-08-07"
 ```
 
-Because `caseSensitive: false`, casing does not matter:
+A routine coding task matches the `moderate` signal and reaches the mid tier:
 
 ```bash
 curl -s "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"auto_model","messages":[{"role":"user","content":"Help me REFACTOR this race condition"}]}' | jq '.model'
+  -d '{"model":"auto_model","messages":[{"role":"user","content":"Write a Python function that parses a CSV file and returns the sum of each numeric column."}]}' | jq '.model'
+```
+
+```
+"gpt-5.6-luna"
+```
+
+A proof request escalates to the high tier even though it shares no words with the candidate phrases; the match is on meaning:
+
+```bash
+curl -s "$GATEWAY_IP:8080/semantic" \
+  -H "content-type: application/json" \
+  -d '{"model":"auto_model","messages":[{"role":"user","content":"Show that there are infinitely many primes."}]}' | jq '.model'
 ```
 
 ```
@@ -375,10 +431,10 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 
 ### Read the decision in the router log
 
-The gateway access log records the model that *served* the request. The reason it was chosen lives in the router, across two lines: `routing_decision` names the selected model and the rule that fired, and `router_replay_start` adds the signals that fired that rule.
+The gateway access log records the model that *served* the request. The reason it was chosen lives in the router, across two lines: `routing_decision` names the selected model and the rule that fired, and `router_replay_start` adds the signals that fired that rule along with the raw similarity score.
 
 ```bash
-kubectl logs -n agentgateway-system -l app.kubernetes.io/name=semantic-router --tail=50 | grep router_replay_start | tail -1 | jq '{original_model, selected_model, decision, decision_priority, keyword_signals: .signals.keyword}'
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=semantic-router --tail=50 | grep router_replay_start | tail -1 | jq '{original_model, selected_model, decision, decision_priority, embedding_signals: .signals.embedding, similarity: .signal_values."embedding:hard"}'
 ```
 
 ```json
@@ -387,17 +443,34 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=semantic-router --
   "selected_model": "gpt-5.6-terra",
   "decision": "escalate-hard-prompts",
   "decision_priority": 100,
-  "keyword_signals": [
+  "embedding_signals": [
     "hard"
-  ]
+  ],
+  "similarity": 0.4119
 }
+```
+
+The per-rule scoring also lands in the log at info level, useful when calibrating the thresholds. Each request scores against both signals, so the three test prompts produce six lines:
+
+```bash
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=semantic-router --tail=200 \
+  | grep embedding_classifier_scoring | jq -r '.msg' | grep '^Rule' | tail -6
+```
+
+```
+Rule "hard": score=0.1388 best=0.1475 support=0.1127 threshold=0.300 matched=false (prototypes=3)
+Rule "moderate": score=0.2270 best=0.2414 support=0.1837 threshold=0.300 matched=false (prototypes=3)
+Rule "hard": score=0.1069 best=0.1151 support=0.0825 threshold=0.300 matched=false (prototypes=3)
+Rule "moderate": score=0.5197 best=0.5733 support=0.3589 threshold=0.300 matched=true (prototypes=3)
+Rule "hard": score=0.4119 best=0.4204 support=0.3864 threshold=0.300 matched=true (prototypes=3)
+Rule "moderate": score=0.1279 best=0.1303 support=0.1208 threshold=0.300 matched=false (prototypes=3)
 ```
 
 ## Observability
 
 ### View Metrics Endpoint
 
-AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. Both tiers appear as distinct label sets, so cost and token usage split by the model vSR chose:
+AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. Each tier appears as a distinct label set, so cost and token usage split by the model vSR chose:
 
 ```bash
 kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
@@ -406,7 +479,8 @@ sleep 1 && curl -s http://localhost:15020/metrics \
 ```
 
 ```
-gen_ai_request_model="gpt-5.4-nano",gen_ai_response_model="gpt-5.4-nano-2026-03-17"
+gen_ai_request_model="gpt-5-nano",gen_ai_response_model="gpt-5-nano-2025-08-07"
+gen_ai_request_model="gpt-5.6-luna",gen_ai_response_model="gpt-5.6-luna"
 gen_ai_request_model="gpt-5.6-terra",gen_ai_response_model="gpt-5.6-terra"
 ```
 
@@ -429,8 +503,8 @@ kubectl logs -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=ag
 
 ```
 http.status=200 ... gen_ai.request.model=gpt-5.6-terra gen_ai.response.model=gpt-5.6-terra
-gen_ai.usage.input_tokens=14 gen_ai.usage.output_tokens=125 gen_ai.usage.reasoning_tokens=22
-agw.ai.usage.cost.total=0.001528 ... model="gpt-5.6-terra" total_cost_usd="0.001528"
+gen_ai.usage.input_tokens=18 gen_ai.usage.output_tokens=1167 gen_ai.usage.reasoning_tokens=27
+agw.ai.usage.cost.total=0.014040 ... model="gpt-5.6-terra" total_cost_usd="0.01404"
 ```
 
 ### View Metrics and Traces in Grafana
@@ -457,6 +531,7 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system semantic-rout
 kubectl delete httproute -n agentgateway-system semantic --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
+kubectl delete secret -n agentgateway-system openai-embedding-key --ignore-not-found
 kubectl delete intelligentroute -n semantic-router-config workshop-routing --ignore-not-found
 kubectl delete intelligentpool -n semantic-router-config workshop-models --ignore-not-found
 helm uninstall semantic-router -n agentgateway-system --ignore-not-found

@@ -6,7 +6,7 @@
 - Refresh the support matrix in `labs/installation/system-requirements.md`: Gateway API `1.4 - 1.6`, Istio `1.26 - 1.30`
 - Cross-namespace `HTTPRoute` to `HTTPRoute` delegation now requires a `ReferenceGrant` in the child namespace (agentgateway/agentgateway#3110). Updated `labs/platform-engineering/platform-and-developer-helm-charts-mcp.md` to accomodate this change
 - Drop the stale references to old versions in select labs
-- Add `labs/routing/configure-semantic-routing.md`: semantic routing with vLLM Semantic Router as an ExtProc processor. One virtual model name (`auto_model`) routed to an economy or frontier OpenAI model by prompt content, using `IntelligentPool` and `IntelligentRoute` with keyword signals
+- Add `labs/routing/configure-semantic-routing.md`: semantic routing with vLLM Semantic Router as an ExtProc processor. One virtual model name (`auto_model`) routed to one of three OpenAI price tiers (`gpt-5-nano`, `gpt-5.6-luna`, `gpt-5.6-terra`) by prompt content
 - List the new lab in `README.md` (Routing section and Use Cases) and in the Advanced Routing Strategies section of `tracks/llm-track.md`
 
 0.13.8 - (8-28-26)
