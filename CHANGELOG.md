@@ -1,13 +1,13 @@
 # Changelog
 
-0.13.9 - (9-1-26)
+0.13.9 - (9-3-26)
 ---
 - Bump Enterprise Agentgateway from `v2026.7.1-patch.0` to `v2026.8.2` across the install labs, air-gap and OpenShift installs, multi-cluster upgrades, identity-delegation labs, image list, and the three workshop chart `appVersion` fields
 - Refresh the support matrix in `labs/installation/system-requirements.md`: Gateway API `1.4 - 1.6`, Istio `1.26 - 1.30`
 - Cross-namespace `HTTPRoute` to `HTTPRoute` delegation now requires a `ReferenceGrant` in the child namespace (agentgateway/agentgateway#3110). Updated `labs/platform-engineering/platform-and-developer-helm-charts-mcp.md` to accomodate this change
 - Drop the stale references to old versions in select labs
-- Correct a reversed observability claim in 14 labs: spans carry message content as `llm.prompt.user` and `llm.completion.output`, while the access logs carry tokens and cost but no message text
-- Fix the access-log step in `labs/guardrails/advanced-guardrails-webhook.md`, which told readers to read the masked completion from a `llm.completion=` log attribute that is never emitted
+- Add `labs/routing/configure-semantic-routing.md`: semantic routing with vLLM Semantic Router as an ExtProc processor. One virtual model name (`auto_model`) routed to an economy or frontier OpenAI model by prompt content, using `IntelligentPool` and `IntelligentRoute` with keyword signals
+- List the new lab in `README.md` (Routing section and Use Cases) and in the Advanced Routing Strategies section of `tracks/llm-track.md`
 
 0.13.8 - (8-28-26)
 ---

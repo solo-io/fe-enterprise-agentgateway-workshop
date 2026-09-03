@@ -57,6 +57,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Basic Routing to OpenAI](labs/routing/configure-routing-openai.md) _(OpenAI)_
 - [Routing by Match Type (Path, Header, Query Parameter)](labs/routing/routing-match-types.md) _(OpenAI)_
 - [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
+- [Semantic Routing with vLLM Semantic Router](labs/routing/configure-semantic-routing.md) _(OpenAI + vLLM Semantic Router)_ — one virtual model name routed to an economy or frontier model by prompt content, via ExtProc
 - [Routing to AWS Bedrock](labs/routing/configure-routing-aws-bedrock.md) _(AWS Bedrock)_
 - [Routing to AWS Bedrock via API Keys](labs/routing/configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
 - [AWS Bedrock with IRSA](labs/routing/configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_
@@ -254,6 +255,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - Token-based metrics from LLM
 - LLM request/response metadata in Traces
 - Traffic Routing patterns (path, host, header, query parameter, request body)
+- Semantic routing: one virtual model name (`auto_model`) resolved to an economy or frontier model by prompt content, using vLLM Semantic Router as an ExtProc processor in the `PreRouting` phase
 - Inference routing to in-cluster LLMs via the Gateway API Inference Extension (`InferencePool` + `llm-d` Endpoint Picker)
 - Model Evaluations
 - Security & Access Control
