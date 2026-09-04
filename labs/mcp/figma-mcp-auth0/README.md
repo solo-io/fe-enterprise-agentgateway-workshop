@@ -48,7 +48,7 @@ Files in this folder:
 - Lab `001` baseline running (agentgateway-proxy Gateway with an HTTP listener on 8080). This
   runbook was validated against controller **v2026.6.1** on a local KinD cluster.
 - `kubectl`, `helm`, `openssl`, `jq`, `envsubst` (gettext), Node 18+ (for Claude Code).
-- A way to resolve `mcp-auth0.glootest.com` to the gateway LoadBalancer: a local
+- A way to resolve `mcp-auth0.try-solo.io` to the gateway LoadBalancer: a local
   `/etc/hosts` entry (this runbook; needs sudo).
 
 ### Auth0 (Layer A): you create these in the Auth0 dashboard
@@ -57,8 +57,8 @@ Files in this folder:
 2. **API** (an "audience") under Auth0 → APIs.
 3. Add **both** callbacks to the app's *Allowed Callback URLs*:
    ```
-   https://mcp-auth0.glootest.com/oauth-issuer/callback/downstream
-   https://mcp-auth0.glootest.com/oauth-issuer/callback/upstream
+   https://mcp-auth0.try-solo.io/oauth-issuer/callback/downstream
+   https://mcp-auth0.try-solo.io/oauth-issuer/callback/upstream
    ```
    The eager-OAuth issuer runs a dual flow; registering only one yields
    `invalid_request: callback url not allowed` after login.
@@ -70,7 +70,7 @@ Files in this folder:
 2. Give it a name (e.g. `agentgateway-mcp`). You'll get a **Client ID** and **Client secret**.
 3. Under the app's **OAuth 2.0** / redirect settings, add this **single** callback:
    ```
-   https://mcp-auth0.glootest.com/oauth-issuer/callback/upstream
+   https://mcp-auth0.try-solo.io/oauth-issuer/callback/upstream
    ```
    > This is the eager-OAuth issuer's *upstream* callback. Because the elicitation Secret uses
    > `mcp_resource` (not `redirect_uri`), the gateway routes the Figma redirect through
@@ -110,7 +110,7 @@ export FIGMA_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxx
 export FIGMA_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # --- Gateway ---
-export AUTH0_GATEWAY_HOST=mcp-auth0.glootest.com
+export AUTH0_GATEWAY_HOST=mcp-auth0.try-solo.io
 
 # --- Controller version (auto-detected from the running release) ---
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
@@ -137,21 +137,21 @@ echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" | sudo tee -a /etc/hosts
 ## Step 2: Self-signed TLS cert + HTTPS listener
 
 OAuth requires HTTPS for anything that isn't `localhost`. Create a self-signed cert for
-`mcp-auth0.glootest.com` and add a port-443 HTTPS listener alongside the existing HTTP:8080.
+`mcp-auth0.try-solo.io` and add a port-443 HTTPS listener alongside the existing HTTP:8080.
 
 ```bash
 mkdir -p example_certs
 openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 \
-  -subj '/O=Solo.io/CN=glootest.com' \
-  -keyout example_certs/glootest.com.key -out example_certs/glootest.com.crt
+  -subj '/O=Solo.io/CN=try-solo.io' \
+  -keyout example_certs/try-solo.io.key -out example_certs/try-solo.io.crt
 
 openssl req -out example_certs/gateway.csr -newkey rsa:2048 -nodes \
-  -keyout example_certs/gateway.key -subj "/CN=mcp-auth0.glootest.com/O=Solo.io"
+  -keyout example_certs/gateway.key -subj "/CN=mcp-auth0.try-solo.io/O=Solo.io"
 
 openssl x509 -req -sha256 -days 365 \
-  -CA example_certs/glootest.com.crt -CAkey example_certs/glootest.com.key -set_serial 0 \
+  -CA example_certs/try-solo.io.crt -CAkey example_certs/try-solo.io.key -set_serial 0 \
   -in example_certs/gateway.csr -out example_certs/gateway.crt \
-  -extfile <(printf "subjectAltName=DNS:mcp-auth0.glootest.com")
+  -extfile <(printf "subjectAltName=DNS:mcp-auth0.try-solo.io")
 
 kubectl create secret tls -n agentgateway-system mcp-auth0-tls \
   --key example_certs/gateway.key --cert example_certs/gateway.crt \
@@ -184,7 +184,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: mcp-auth0.glootest.com
+      hostname: mcp-auth0.try-solo.io
       tls:
         mode: Terminate
         certificateRefs:
@@ -302,7 +302,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-auth0.glootest.com
+    - mcp-auth0.try-solo.io
   rules:
     - matches:
         - path:
@@ -365,7 +365,7 @@ kubectl get enterpriseagentgatewaybackend ent-figma-openapi-backend \
 
 curl -sk "https://${AUTH0_GATEWAY_HOST}/.well-known/oauth-authorization-server/figma/openapi/mcp" \
   | jq .registration_endpoint
-# expect the GATEWAY host, e.g. https://mcp-auth0.glootest.com/oauth-issuer/register  (NOT Auth0)
+# expect the GATEWAY host, e.g. https://mcp-auth0.try-solo.io/oauth-issuer/register  (NOT Auth0)
 ```
 
 ---
@@ -373,8 +373,8 @@ curl -sk "https://${AUTH0_GATEWAY_HOST}/.well-known/oauth-authorization-server/f
 ## Step 7: Connect Claude Code
 
 ```bash
-claude mcp add figma-mcp-auth0 --transport http https://mcp-auth0.glootest.com/figma/openapi/mcp
-claude mcp list   # expect: figma-mcp-auth0: https://mcp-auth0.glootest.com/figma/openapi/mcp (http)
+claude mcp add figma-mcp-auth0 --transport http https://mcp-auth0.try-solo.io/figma/openapi/mcp
+claude mcp list   # expect: figma-mcp-auth0: https://mcp-auth0.try-solo.io/figma/openapi/mcp (http)
 ```
 
 Launch Claude Code with Node TLS verification disabled (self-signed gateway cert). Do **not**
@@ -393,7 +393,7 @@ Use figma-mcp-auth0 to get my current Figma user profile.
 What happens the first time:
 
 0. **Self-signed cert warning (up front).** The browser's very first hop is the gateway's own
-   `…/oauth-issuer/authorize` on `mcp-auth0.glootest.com`, so the "Your connection is not
+   `…/oauth-issuer/authorize` on `mcp-auth0.try-solo.io`, so the "Your connection is not
    private" warning appears **before** Auth0. Click **Advanced → Proceed**. Accepting it once
    covers the return `…/callback/upstream` hop too (same host), so you won't be prompted again.
 
@@ -440,11 +440,11 @@ Two quick gateway checks (no browser needed) confirm the inbound auth layer is w
 
 ```bash
 # 1) Unauthenticated request is challenged with 401 + WWW-Authenticate (not 406) → JWKS resolved
-curl -sk -D- -o /dev/null "https://mcp-auth0.glootest.com/figma/openapi/mcp" \
+curl -sk -D- -o /dev/null "https://mcp-auth0.try-solo.io/figma/openapi/mcp" \
   -H "accept: application/json, text/event-stream" | grep -iE "^HTTP|www-authenticate"
 
 # 2) The gateway serves its OWN authorization-server metadata (registration at the gateway, not Auth0)
-curl -sk "https://mcp-auth0.glootest.com/.well-known/oauth-authorization-server/figma/openapi/mcp" \
+curl -sk "https://mcp-auth0.try-solo.io/.well-known/oauth-authorization-server/figma/openapi/mcp" \
   | jq .registration_endpoint
 ```
 
@@ -509,7 +509,7 @@ returns 403.
 **Connect (left sidebar):**
 
 1. **Transport Type** → `Streamable HTTP`.
-2. **URL** → `https://mcp-auth0.glootest.com/figma/openapi/mcp`.
+2. **URL** → `https://mcp-auth0.try-solo.io/figma/openapi/mcp`.
 3. **Configuration → Request Timeout** → bump to `120000` ms. The connect triggers *two* browser
    logins (Auth0, then Figma); the default 10 s timeout will abort mid-flow.
 
@@ -519,7 +519,7 @@ returns 403.
    (recommended for debugging), or **Quick OAuth Flow** for a one-click redirect.
 5. The Inspector discovers the gateway's AS metadata and **dynamically registers itself** at
    `…/oauth-issuer/register` (DCR), then opens the browser. Just like Step 7: accept the self-signed
-   cert warning on `mcp-auth0.glootest.com` → log in at **Auth0** → **Allow access** at **Figma** →
+   cert warning on `mcp-auth0.try-solo.io` → log in at **Auth0** → **Allow access** at **Figma** →
    the browser returns to the Inspector's `http://localhost:6274/oauth/callback`.
    > You don't register the Inspector's callback anywhere. DCR registers `localhost:6274/oauth/callback`
    > on the fly. The Auth0/Figma callbacks from the pre-reqs are the *gateway's* upstream/downstream
@@ -547,14 +547,14 @@ returns 403.
 | `registration_endpoint` in AS metadata points at **Auth0**, not the gateway | `agentgateway.dev/issuer-proxy` missing, or `oauth-issuer` route not Accepted | Confirm `issuer-proxy` in the backend; `kubectl get httproute -n agentgateway-system oauth-issuer` |
 | `/oauth-issuer/register` 404/501 | Step 4 didn't enable `tokenExchange`, or Step 5 route missing | Re-check Step 4 values landed and the route is Accepted |
 | Auth0 `callback url not allowed` after login | Only one of the two Auth0 callbacks registered | Register **both** `/oauth-issuer/callback/downstream` and `.../callback/upstream` |
-| **Figma** error page after consent (`invalid redirect_uri`) | Figma app callback missing/wrong | Register `https://mcp-auth0.glootest.com/oauth-issuer/callback/upstream` in the Figma app |
+| **Figma** error page after consent (`invalid redirect_uri`) | Figma app callback missing/wrong | Register `https://mcp-auth0.try-solo.io/oauth-issuer/callback/upstream` in the Figma app |
 | Controller `CrashLoopBackOff`: `unsupported validator type:` | Missing a validator in Step 4 | Include all three (`subject`/`api`/`actor`) |
 | 401 after Auth0 login with a valid-looking JWT | `aud` doesn't match `${AUTH0_AUDIENCE}`, or issuer trailing-slash mismatch | Decode JWT at jwt.io; set `${AUTH0_AUDIENCE}` as the Auth0 **Default Audience** (Auth0 → Settings → API Authorization) if Auth0 omits `aud` |
 | Figma call returns **401/403** *after* the Figma consent completes (token not injected) | Elicitation stored the token but didn't inject it | On `ent-figma-openapi-exchange`, set `spec.backend.tokenExchange.mode: ElicitationOnly` (the validated MCP-elicitation mode) and re-apply |
 | Tool returns `{"status":403,"err":"Permission denied"}` even though auth succeeded | Args passed **flat** (`file_key`) so the OpenAPI path param is empty | Nest them: `{"path":{"file_key":"…"},"query":{…}}`. See Step 8. |
 | Elicitation never fires (no Figma browser prompt) | Policy-level `elicitation.secretName` not resolving | Confirm the `figma-token-exchange` Secret is in `agentgateway-system`; as a fallback add `tokenExchange.elicitation.secretName: figma-token-exchange` to the Step 4 helm values |
 | Claude Code SSL error / `unable to verify the first certificate` | Self-signed cert not trusted by Node | Launch with `NODE_TLS_REJECT_UNAUTHORIZED=0 claude` |
-| `mcp-auth0.glootest.com` doesn't resolve | `/etc/hosts` entry missing/stale | Re-run the Step 1 `tee -a /etc/hosts`; flush DNS on macOS |
+| `mcp-auth0.try-solo.io` doesn't resolve | `/etc/hosts` entry missing/stale | Re-run the Step 1 `tee -a /etc/hosts`; flush DNS on macOS |
 | **Inspector**: "Error Connecting to MCP Inspector Proxy" / 403 on connect | Proxy session token missing | Use the auto-opened `…?MCP_PROXY_AUTH_TOKEN=…` URL, or paste the console token into **Configuration → Proxy Session Token** |
 | **Inspector**: OAuth stalls / TLS error reaching the gateway | Launched without the self-signed escape hatch | Relaunch with `NODE_TLS_REJECT_UNAUTHORIZED=0 npx @modelcontextprotocol/inspector` |
 | **Inspector**: OAuth aborts before the browser returns | Default 10 s request timeout too short for two logins | **Configuration → Request Timeout** → `120000` ms |

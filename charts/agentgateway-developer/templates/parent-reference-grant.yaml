@@ -1,0 +1,15 @@
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-platform-delegation
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "agentgateway-developer.labels" . | nindent 4 }}
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: {{ required "platformNamespace is required (the namespace holding the platform team's parent route)" .Values.platformNamespace }}
+  to:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute

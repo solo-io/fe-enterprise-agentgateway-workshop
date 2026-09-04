@@ -759,11 +759,11 @@ Guardrail rejections carry `reason="Guardrail"` on the `agentgateway_requests_to
 sum(rate(agentgateway_requests_total{reason="Guardrail"}[5m])) by (status)
 ```
 
-Masked prompts and completions are text rather than metrics, so no dashboard panel shows them. Read them from the access logs as shown below.
+Masked prompts and completions are text rather than metrics, so no dashboard panel shows them. Read them from the response body, or from the `llm.prompt.user` and `llm.completion.output` span attributes.
 
 ### View traces
 
-Port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80`, open http://localhost:4000, and click **Tracing** in the left navigation. Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, and `gen_ai.usage.output_tokens`, plus per-request cost under `agw.ai.usage.cost`. Prompt and completion text is not attached to spans — the access logs carry that as `llm.prompt` and `llm.completion`.
+Port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80`, open http://localhost:4000, and click **Tracing** in the left navigation. Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, and `gen_ai.usage.output_tokens`, plus per-request cost under `agw.ai.usage.cost`. Spans also carry message content: the first user message as `llm.prompt.user` and the response text as `llm.completion.output`. The access logs record tokens and cost but no message text, because `001` ships the `llm_prompt` and `llm_completion` log attributes commented out.
 
 Rejected requests produce spans too, and they stand out: each carries `http.status=403`, `reason=Guardrail`, and `error="request rejected by webhook guardrail"`. Because the request never reached the provider, the span has no `gen_ai.*` or `agw.ai.usage.cost` attributes.
 
@@ -779,16 +779,7 @@ A rejected request logs the guardrail as the reason it never reached the provide
 http.path=/openai http.status=403 protocol=llm error="request rejected by webhook guardrail" reason=Guardrail duration=1389ms
 ```
 
-The access log also shows what the provider returned after masking, via the `llm.completion` attribute:
-
-```bash
-kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --tail 50 \
-  | grep -o 'llm.completion=.*' | tail -5
-```
-
-```
-llm.completion="You can email me at ****"
-```
+The access log records tokens and cost, not message text, so the masked completion is not visible here. To see what the provider returned after masking, read the response body as in the PII masking tests above, or open the span in the Solo UI and read its `llm.completion.output` attribute.
 
 ### View raw metrics
 

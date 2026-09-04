@@ -14,7 +14,7 @@ You do **not** need an external IdP account or dashboard for this lab. It deploy
 | `KC_CLIENT_ID` | Confidential client id — `mcp-gateway` |
 | `KC_CLIENT_SECRET` | Client secret baked into the realm import — `mcpGatewayWorkshopSecret` |
 | `KC_AUDIENCE` | Audience the client's mapper stamps on issued tokens — `mcp-gateway` — must match the `aud` claim |
-| `KC_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-keycloak.glootest.com` |
+| `KC_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-keycloak.try-solo.io` |
 | `KC_IP` | LoadBalancer address of the in-cluster Keycloak Service (captured in Step 0) |
 | `KC_ISSUER` | `http://<KC_IP>:8080/realms/<KC_REALM>` — **no trailing slash** (Keycloak emits `iss` without one) |
 
@@ -26,7 +26,7 @@ The `mcp-gateway` client is imported with `redirectUris: ["*"]`, so there is **n
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Step 9)
 - `jq` for inspecting JSON responses
-- A way to resolve `mcp-keycloak.glootest.com` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo). Note the `/etc/hosts` entry maps the **gateway** host only; Keycloak is reached directly at its LoadBalancer IP.
+- A way to resolve `mcp-keycloak.try-solo.io` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo). Note the `/etc/hosts` entry maps the **gateway** host only; Keycloak is reached directly at its LoadBalancer IP.
 
 ---
 
@@ -36,7 +36,7 @@ The `mcp-gateway` client is imported with `redirectUris: ["*"]`, so there is **n
 - Use a single pre-registered Keycloak `client_id` / `client_secret` for all MCP clients (no per-client DCR churn)
 - Broker the Keycloak authorization code flow through the gateway (`/oauth-issuer/...`)
 - Validate Keycloak-issued JWTs at the MCP backend against Keycloak JWKS
-- Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-keycloak.glootest.com`
+- Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-keycloak.try-solo.io`
 - Test end-to-end with MCP Inspector against an `mcp-server-everything` test server
 
 ---
@@ -133,7 +133,7 @@ export KC_REALM=mcp-enterprise
 export KC_CLIENT_ID=mcp-gateway
 export KC_CLIENT_SECRET=mcpGatewayWorkshopSecret
 export KC_AUDIENCE=mcp-gateway
-export KC_GATEWAY_HOST=mcp-keycloak.glootest.com
+export KC_GATEWAY_HOST=mcp-keycloak.try-solo.io
 
 # KC_IP was captured in Step 0; derive the issuer (NO trailing slash):
 export KC_ISSUER="http://${KC_IP}:8080/realms/${KC_REALM}"
@@ -159,7 +159,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
 echo "$GATEWAY_IP"
 ```
 
-Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-keycloak.glootest.com` to the gateway:
+Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-keycloak.try-solo.io` to the gateway:
 
 ```bash
 echo "$GATEWAY_IP $KC_GATEWAY_HOST" | sudo tee -a /etc/hosts
@@ -169,28 +169,28 @@ echo "$GATEWAY_IP $KC_GATEWAY_HOST" | sudo tee -a /etc/hosts
 
 ## Step 2 — Create a Self-Signed TLS Cert and Add an HTTPS Listener
 
-OAuth requires HTTPS for everything that is not `localhost`, since the browser will redirect to Keycloak and back. This step creates a self-signed cert for `mcp-keycloak.glootest.com` and adds a port 443 HTTPS listener to the existing `agentgateway-proxy` Gateway alongside Lab 001's port 8080 HTTP listener.
+OAuth requires HTTPS for everything that is not `localhost`, since the browser will redirect to Keycloak and back. This step creates a self-signed cert for `mcp-keycloak.try-solo.io` and adds a port 443 HTTPS listener to the existing `agentgateway-proxy` Gateway alongside Lab 001's port 8080 HTTP listener.
 
-Create a root certificate for the `glootest.com` domain and a leaf cert signed by that root:
+Create a root certificate for the `try-solo.io` domain and a leaf cert signed by that root:
 
 ```bash
 mkdir -p example_certs
 openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 \
-  -subj '/O=Solo.io/CN=glootest.com' \
-  -keyout example_certs/glootest.com.key \
-  -out    example_certs/glootest.com.crt
+  -subj '/O=Solo.io/CN=try-solo.io' \
+  -keyout example_certs/try-solo.io.key \
+  -out    example_certs/try-solo.io.crt
 
 openssl req -out example_certs/gateway.csr -newkey rsa:2048 -nodes \
   -keyout example_certs/gateway.key \
-  -subj  "/CN=mcp-keycloak.glootest.com/O=Solo.io"
+  -subj  "/CN=mcp-keycloak.try-solo.io/O=Solo.io"
 
 openssl x509 -req -sha256 -days 365 \
-  -CA    example_certs/glootest.com.crt \
-  -CAkey example_certs/glootest.com.key \
+  -CA    example_certs/try-solo.io.crt \
+  -CAkey example_certs/try-solo.io.key \
   -set_serial 0 \
   -in    example_certs/gateway.csr \
   -out   example_certs/gateway.crt \
-  -extfile <(printf "subjectAltName=DNS:mcp-keycloak.glootest.com")
+  -extfile <(printf "subjectAltName=DNS:mcp-keycloak.try-solo.io")
 ```
 
 Store the leaf cert in a Kubernetes TLS secret:
@@ -222,7 +222,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: mcp-keycloak.glootest.com
+      hostname: mcp-keycloak.try-solo.io
       tls:
         mode: Terminate
         certificateRefs:
@@ -470,7 +470,7 @@ kubectl rollout status -n agentgateway-system deployment/agentgateway-proxy --ti
 > `aud: mcp-gateway` into the **access token**, so audience validation in Step 8
 > works with no `/authorize` audience-param hack. If a login
 > completes but the JWT's `aud` is `account` instead of `mcp-gateway`, the mapper
-> didn't import or the wrong client is in use — see Troubleshooting.
+> didn't import or a client other than `mcp-gateway` was used, so re-run Step 0.
 
 ---
 
@@ -491,7 +491,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-keycloak.glootest.com
+    - mcp-keycloak.try-solo.io
   rules:
     - backendRefs:
         - name: enterprise-agentgateway
@@ -619,7 +619,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-keycloak.glootest.com
+    - mcp-keycloak.try-solo.io
   rules:
     - matches:
         - path:
@@ -752,12 +752,12 @@ EOF
 Before launching Inspector, hit the gateway in your browser once to accept the self-signed cert warning:
 
 ```
-https://mcp-keycloak.glootest.com/.well-known/oauth-protected-resource/mcp
+https://mcp-keycloak.try-solo.io/.well-known/oauth-protected-resource/mcp
 ```
 
 Click "Advanced → proceed" (Chrome) / "Accept the risk" (Firefox). You should see the JSON discovery document. Without this step, the browser blocks the OAuth redirect chain silently.
 
-![Chrome self-signed cert warning for mcp-keycloak.glootest.com](../../images/keycloak/01-cert-warning.png)
+![Chrome self-signed cert warning for mcp-keycloak.try-solo.io](../../images/keycloak/01-cert-warning.png)
 
 ### Launch Inspector locally
 
@@ -774,7 +774,7 @@ Inspector binds to `http://localhost:6274` and prints a session token in the ter
 In the Inspector UI:
 
 - **Transport type:** `Streamable HTTP`
-- **Server URL:** `https://mcp-keycloak.glootest.com/mcp` (replace any URL left over from a previous session)
+- **Server URL:** `https://mcp-keycloak.try-solo.io/mcp` (replace any URL left over from a previous session)
 - Click **Connect**.
 
 ![Inspector configured with Streamable HTTP transport and the gateway's /mcp URL](../../images/keycloak/02-inspector-config.png)
@@ -794,7 +794,7 @@ Inspector follows the protected-resource discovery automatically. You should see
 
 ### Confirm tools are reachable
 
-In the Inspector left panel, click **Tools → List Tools**. The `mcp-server-everything` tools should render (`echo`, `add`, `printEnv`, `longRunningOperation`, `getTinyImage`, …). Run one (`echo` with `{"message":"hi"}`) — you should get a tool result, not a 401.
+In the Inspector left panel, click **Tools → List Tools**. The `mcp-server-everything` tools should render (`echo`, `get-sum`, `get-env`, `get-tiny-image`, `trigger-long-running-operation`, …). Run one (`echo` with `{"message":"hi"}`) — you should get `Echo: hi` back, not a 401.
 
 ![Inspector Tools tab listing the mcp-server-everything tool set](../../images/keycloak/05-tools-list.png)
 
@@ -839,8 +839,10 @@ Claude Code is a Node.js process and won't accept the self-signed gateway cert b
 Add the gateway's MCP endpoint to Claude Code's local config:
 
 ```bash
-claude mcp add mcp-keycloak-gateway --transport http https://mcp-keycloak.glootest.com/mcp
+claude mcp add mcp-keycloak-gateway --transport http https://mcp-keycloak.try-solo.io/mcp
 ```
+
+This lands in Claude Code's **local** scope, which is private to the directory you ran it from. Run the rest of this step from that same directory, or later commands report `No MCP server named "mcp-keycloak-gateway"`. To reach it from anywhere, add `--scope user` instead.
 
 Verify it was added:
 
@@ -851,7 +853,7 @@ claude mcp list
 Expected output includes a line for the new server, with a health-check status that will read `Needs authentication` until the OAuth flow below completes:
 
 ```
-mcp-keycloak-gateway: https://mcp-keycloak.glootest.com/mcp (HTTP) - ! Needs authentication
+mcp-keycloak-gateway: https://mcp-keycloak.try-solo.io/mcp (HTTP) - ! Needs authentication
 ```
 
 > **Quick auth check.** `claude mcp login <name>` runs the same discovery → eager-OAuth → Keycloak → token exchange path on its own, without opening a chat session:
@@ -871,7 +873,7 @@ NODE_TLS_REJECT_UNAUTHORIZED=0 claude
 On the first prompt that triggers MCP tool discovery, Claude Code initiates the OAuth flow automatically:
 
 1. Claude Code fetches `/.well-known/oauth-protected-resource/mcp` to discover the authorization server.
-2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-keycloak.glootest.com/oauth-issuer/register`), not the Keycloak host — this confirms the eager-OAuth issuer is serving its own AS metadata.
+2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-keycloak.try-solo.io/oauth-issuer/register`), not the Keycloak host — this confirms the eager-OAuth issuer is serving its own AS metadata.
 3. Claude Code POSTs to `/oauth-issuer/register` and receives the pre-registered Keycloak `client_id`.
 4. A browser window opens to the **Keycloak login page** at `http://${KC_IP}:8080` (plain HTTP — expected for this lab). **Verify the URL bar shows the Keycloak host `${KC_IP}:8080`**, not the gateway hostname — this confirms the eager-OAuth issuer correctly delegated downstream.
 5. Complete the Keycloak login as `mcp-user` / `mcp-user`.
@@ -913,25 +915,21 @@ The Kubernetes resources for this lab are removed in the [Cleanup](#cleanup) sec
 
 ## Troubleshooting
 
-If MCP Inspector behaves unexpectedly, this table covers the common breakage modes for an eager-OAuth + Keycloak setup.
+Common breakage modes for an eager-OAuth + Keycloak setup, for both Inspector (Step 9) and Claude Code (Step 10).
 
-| Symptom in Inspector | Likely Cause | Where to Look |
+| Symptom | Likely Cause | Where to Look |
 |---|---|---|
-| `/.well-known/oauth-authorization-server/mcp` returns Keycloak's own metadata (registration endpoint points at Keycloak) | The `agentgateway.dev/issuer-proxy` annotation under `resourceMetadata` is missing, or the `oauth-issuer` HTTPRoute (Step 6) is misrouted | Step 8 — confirm `agentgateway.dev/issuer-proxy` is set; Step 6 — `kubectl get httproute -n agentgateway-system oauth-issuer` |
-| `/oauth-issuer/register` returns 404 or 501 | Step 5 helm upgrade did not apply `tokenExchange.enabled` + the issuer config, or the `/oauth-issuer` HTTPRoute (Step 6) is missing | `kubectl get httproute -n agentgateway-system oauth-issuer`; gateway pod logs |
-| `GET /mcp` without a token returns **406** instead of 401, and `/.well-known/oauth-*-resource/mcp` returns 404 | The MCP authentication policy is `PartiallyValid` because the controller can't fetch JWKS. Most often caused by a leading slash on `jwksPath` (`/realms/...`), which produces `http://$KC_IP//realms/...` (404 from Keycloak) | `kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-keycloak-eager -o jsonpath='{.status.ancestors[*].conditions[*].message}'` should say `Policy accepted Attached to all targets`. Controller logs: `kubectl logs -n agentgateway-system deployment/enterprise-agentgateway \| grep jwks`. Fix per Step 8 — `jwksPath: realms/${KC_REALM}/protocol/openid-connect/certs` (no leading slash) |
-| Controller pod CrashLoopBackOff with `error creating actor validator: unsupported validator type:` | Step 5 helm values are missing `tokenExchange.actorValidator` (and/or `apiValidator`) — all three validators are required at boot even though only the eager-OAuth issuer is being used | Re-run Step 5 with the validator block matching this lab |
-| Login completes but tools still 401, or the `agentgateway-proxy` Deployment shows fewer replicas / missing resource requests than expected | The Gateway was updated with a full `kubectl apply -f -` manifest instead of the merge patch in Step 2, wiping `spec.infrastructure.parametersRef` and with it the proxy's `STS_URI`/`STS_AUTH_TOKEN` env vars from Step 4 | `kubectl get gateway -n agentgateway-system agentgateway-proxy -o jsonpath='{.spec.infrastructure}'` — empty means it's gone. `kubectl get deployment -n agentgateway-system agentgateway-proxy -o jsonpath='{.spec.template.spec.containers[0].env}' \| jq .` — check `STS_URI`/`STS_AUTH_TOKEN` are present. Restore it per Step 2 |
-| Inspector errors immediately (no Keycloak redirect) and controller logs show `failed to start auth flow ... secret not found: agentgateway-system/elicitation-secret` | The `elicitation-secret` Secret from Step 7 wasn't created or is in the wrong namespace | `kubectl get secret -n agentgateway-system elicitation-secret`; recreate per Step 7 |
-| 401 after the browser flow with a valid-looking JWT / issuer mismatch | The `iss` in the JWT doesn't match the policy `issuer`. This happens when authorize, token, issuer, and JWKS are not all using the **same** Keycloak address (e.g. authorize on the LB IP but token on svc DNS) | Decode the access token (`jwt.io` or `... \| cut -d. -f2 \| base64 -d \| jq`) and compare `iss` to `${KC_ISSUER}`. Keycloak fixes `iss` from the address the token endpoint was called on — make authorize/token/issuer/JWKS all use one address (see the Topology-B row) |
-| Pods can't reach the LB IP (token exchange or JWKS lookups fail from in-cluster) | The LB IP is browser-reachable but not pod-reachable, so the controller/proxy can't hit Keycloak | **Topology-B fallback:** set `token_url`, the subject/api validator URLs, the `keycloak-jwks` backend `host`, and the policy `issuer` to the in-cluster svc DNS `http://keycloak.keycloak.svc.cluster.local:8080/realms/${KC_REALM}...`; keep `authorize_url` on the LB IP so the browser can still reach it. Because Keycloak fixes `iss` at the **token** endpoint, the token's `iss` becomes the svc-DNS host — so the policy `issuer` must be the svc-DNS host to match |
-| Login completes but the JWT's `aud` is `account`, not `mcp-gateway` (401) | The `oidc-audience-mapper` didn't import, or a different client than `mcp-gateway` was used | Verify the mapper exists on the `mcp-gateway` client / that the realm import (`mcp-enterprise.json`) applied: `kubectl exec` a curl of a client-credentials token and decode its `aud`, or re-run Step 0 |
-| Keycloak login page loads over plain **HTTP** (`http://${KC_IP}:8080`) | Expected — the in-cluster Keycloak runs with `KC_HTTP_ENABLED=true` and the realm's `sslRequired: none`. Only the gateway front-door (`mcp-keycloak.glootest.com`) is HTTPS | No action needed; this is by design for the lab |
-| Inspector shows "fetch failed" or `unable to verify the first certificate` | Inspector's Node process rejected the self-signed gateway cert | Restart Inspector with `NODE_TLS_REJECT_UNAUTHORIZED=0` (Step 9) |
-| Inspector loops on connect with no Keycloak redirect; browser DevTools console (F12) shows `Access to fetch at '.../.well-known/oauth-*-resource/mcp' has been blocked by CORS policy` or `mcp-protocol-version is not allowed by Access-Control-Allow-Headers` | OAuth metadata discovery runs in the **browser** (Inspector UI), not through Inspector's `localhost:6277` proxy. Inspector sends `mcp-protocol-version` on the preflight, but agentgateway's internal handler hardcodes `Access-Control-Allow-Headers: content-type` and rejects it | The Step 8 `mcp-route` HTTPRoute must attach a Gateway API `CORS` filter to both `/.well-known/oauth-*/mcp` rules that allows `mcp-protocol-version` (and `Authorization`). Confirm with `kubectl get httproute -n agentgateway-system mcp-route -o yaml \| grep -A6 'type: CORS'` |
-| Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-keycloak.glootest.com/.well-known/oauth-protected-resource/mcp` and click through the warning |
-| `mcp-keycloak.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $KC_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
-| Claude Code (Step 10) fails to connect with an SSL error or `unable to verify the first certificate` | `NODE_TLS_REJECT_UNAUTHORIZED` not set for the Claude Code process | Launch with `NODE_TLS_REJECT_UNAUTHORIZED=0 claude`; do **not** add this to your shell rc |
+| `GET /mcp` without a token returns **406** instead of 401, and `/.well-known/oauth-*-resource/mcp` returns 404 | The MCP authentication policy is `PartiallyValid` because the controller can't fetch JWKS. Usually a leading slash on `jwksPath` (`/realms/...`), which produces `http://$KC_IP//realms/...` and 404s | `kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-keycloak-eager -o jsonpath='{.status.ancestors[*].conditions[*].message}'` should say `Policy accepted Attached to all targets`. Then `kubectl logs -n agentgateway-system deployment/enterprise-agentgateway \| grep jwks`. Fix per Step 8: `jwksPath: realms/${KC_REALM}/protocol/openid-connect/certs` |
+| `/.well-known/oauth-authorization-server/mcp` returns Keycloak's own metadata, with `registration_endpoint` pointing at Keycloak | The `agentgateway.dev/issuer-proxy` entry under `resourceMetadata` is missing, or the `oauth-issuer` HTTPRoute is misrouted | Step 8 for the `issuer-proxy` value; `kubectl get httproute -n agentgateway-system oauth-issuer` for the route |
+| `/oauth-issuer/register` returns 404 or 501 | The Step 5 helm upgrade did not apply `tokenExchange.enabled` plus the issuer config, or the Step 6 HTTPRoute is missing | `helm get values enterprise-agentgateway -n agentgateway-system`; `kubectl get httproute -n agentgateway-system oauth-issuer` |
+| Controller pod CrashLoopBackOff with `error creating actor validator: unsupported validator type:` | Step 5 helm values are missing one of the three `tokenExchange` validators, all of which are required at boot | Re-run Step 5 with the validator block as written |
+| Client errors immediately with no Keycloak redirect, and controller logs show `secret not found: agentgateway-system/elicitation-secret` | The Step 7 `elicitation-secret` is missing or in the wrong namespace | `kubectl get secret -n agentgateway-system elicitation-secret` |
+| 401 after a successful browser login, with a valid-looking JWT | The JWT's `iss` doesn't match the policy `issuer`, because authorize, token, issuer, and JWKS are not all on the same Keycloak address | Decode the token (`... \| cut -d. -f2 \| base64 -d \| jq`) and compare `iss` to `${KC_ISSUER}`. Keycloak sets `iss` from the address the **token** endpoint was called on, so all four must use one address |
+| Token exchange or JWKS lookups fail from in-cluster, though the LB IP works from your browser | The LB IP is not pod-reachable, so the controller and proxy can't reach Keycloak | **Topology-B fallback:** point `token_url`, the subject/api validator URLs, the `keycloak-jwks` backend `host`, and the policy `issuer` at the in-cluster svc DNS `http://keycloak.keycloak.svc.cluster.local:8080/realms/${KC_REALM}...`, and leave `authorize_url` on the LB IP for the browser. The token's `iss` becomes the svc-DNS host, which is why the policy `issuer` must match it |
+| Inspector loops on connect with no Keycloak redirect, and DevTools (F12) reports a CORS block on `.../.well-known/oauth-*-resource/mcp` or `mcp-protocol-version is not allowed by Access-Control-Allow-Headers` | Inspector's browser UI fetches the discovery documents directly and sends `mcp-protocol-version` on the preflight | Both `.well-known` rules on `mcp-route` need the Step 7 `CORS` filter allowing that header: `kubectl get httproute -n agentgateway-system mcp-route -o yaml \| grep -A6 'type: CORS'` |
+| `unable to verify the first certificate`, `fetch failed`, or `ERR_CERT_AUTHORITY_INVALID` | The self-signed gateway cert is untrusted by the browser, by Inspector's Node process, or by Claude Code | Visit `https://mcp-keycloak.try-solo.io/.well-known/oauth-protected-resource/mcp` once and click through the warning, and launch Inspector or Claude Code with `NODE_TLS_REJECT_UNAUTHORIZED=0`. Keep that variable on the launch command rather than in your shell rc |
+| `mcp-keycloak.try-solo.io` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $KC_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step from Step 1; on macOS flush DNS |
+| `claude mcp login` or `claude mcp list` reports `No MCP server named "mcp-keycloak-gateway"` | `claude mcp add` defaults to **local** scope, private to the directory it ran in, and you are now in a different directory | `cd` back to where you ran `claude mcp add`, or re-add with `--scope user`. `claude mcp get mcp-keycloak-gateway` prints the scope |
 
 Useful commands:
 
@@ -993,13 +991,20 @@ spec:
 # 4. Re-run Lab 001's helm upgrade to drop tokenExchange + KGW_OAUTH_ISSUER_CONFIG.
 #    This restarts the controller and clears its stale postgres connection.
 #    Re-detect ENTERPRISE_AGW_VERSION in case this cleanup runs in a fresh shell.
-#    --reuse-values here too — see the note in Step 5.
+#    --reuse-values keeps everything else, so the two --set nulls are REQUIRED to
+#    drop this lab's values — --reuse-values alone would carry them forward and
+#    leave the controller pointed at the deleted postgres.
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
 helm upgrade -i -n agentgateway-system enterprise-agentgateway \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --version $ENTERPRISE_AGW_VERSION \
   --reuse-values \
-  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
+  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
+  --set tokenExchange=null \
+  --set controller.extraEnv=null
+
+# Confirm both are gone — this should print only licensing (and an empty controller).
+helm get values enterprise-agentgateway -n agentgateway-system
 
 kubectl rollout status -n agentgateway-system deployment/enterprise-agentgateway --timeout=180s
 

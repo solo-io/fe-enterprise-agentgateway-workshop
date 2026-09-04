@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 > ⚠ This lab requires enterprise-agentgateway **`v2026.7.0` or newer** — needed for the refresh token grant tested in Step 10.
 
-This lab uses the same gateway hostname (`mcp-auth0.glootest.com`) as [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md). The two labs cannot run concurrently — clean up the other lab before starting this one. The Okta labs use `mcp-okta.glootest.com` and do not collide.
+This lab uses the same gateway hostname (`mcp-auth0.try-solo.io`) as [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md). The two labs cannot run concurrently — clean up the other lab before starting this one. The Okta labs use `mcp-okta.try-solo.io` and do not collide.
 
 ### Auth0 requirements
 
@@ -19,7 +19,7 @@ You need a registered application in Auth0 (Regular Web Application) with the **
 | `AUTH0_CLIENT_ID` | Client ID of the Auth0 application |
 | `AUTH0_CLIENT_SECRET` | Client secret of the Auth0 application |
 | `AUTH0_AUDIENCE` | Auth0 API audience the JWT must carry |
-| `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-auth0.glootest.com` |
+| `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-auth0.try-solo.io` |
 
 > **Required:** this lab requests the `offline_access` scope so it can also test the refresh token grant. The Auth0 API behind `AUTH0_AUDIENCE` needs **Allow Offline Access** enabled — Auth0 Dashboard → Applications → APIs → *your API* → Settings → Access Settings → toggle "Allow Offline Access" → Save. Without this, Auth0 silently strips the `offline_access` scope and never issues a `refresh_token` — no error, the token response just omits it.
 
@@ -28,8 +28,8 @@ You need a registered application in Auth0 (Regular Web Application) with the **
 Add **both** of these gateway callbacks to the Auth0 application's "Allowed Callback URLs":
 
 ```
-https://mcp-auth0.glootest.com/oauth-issuer/callback/downstream
-https://mcp-auth0.glootest.com/oauth-issuer/callback/upstream
+https://mcp-auth0.try-solo.io/oauth-issuer/callback/downstream
+https://mcp-auth0.try-solo.io/oauth-issuer/callback/upstream
 ```
 
 The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback paths depending on the client. PKCE-capable MCP clients (e.g., MCP Inspector) trigger `/callback/upstream`; non-PKCE flows trigger `/callback/downstream`. Registering only one yields an Auth0 `invalid_request: callback url not allowed` error after login.
@@ -44,7 +44,7 @@ This lab demonstrates both the allow and deny paths of the pre-issuance hook, so
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Steps 10–11)
 - `jq` for inspecting JSON responses
-- A way to resolve `mcp-auth0.glootest.com` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
+- A way to resolve `mcp-auth0.try-solo.io` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
 
 ---
 
@@ -52,7 +52,7 @@ This lab demonstrates both the allow and deny paths of the pre-issuance hook, so
 
 - Stand up the eager-OAuth feature so the gateway acts as the OAuth Authorization Server visible to MCP clients
 - Broker the Auth0 authorization code flow through the gateway (`/oauth-issuer/...`)
-- Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-auth0.glootest.com`
+- Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-auth0.try-solo.io`
 - **Multiplex two MCP upstreams (in-cluster `server-everything` + remote `search.solo.io`) behind one `EnterpriseAgentgatewayBackend`**
 - **Gate OAuth token issuance with a pre-issuance ext_authz hook so only allowlisted Auth0 users receive a token — others are redirected to a configurable deny page**
 - **Test both allow and deny paths end-to-end with MCP Inspector, including redeeming a `refresh_token` to renew an access token without a repeat interactive login**
@@ -122,7 +122,7 @@ The hook integrates with the existing `ably7/grpc-ext-authz` image in `AUTH_MODE
 - **OAuth 2.0 Authorization Server**: agentgateway acts as the AS at `/oauth-issuer/...` (recap)
 - **Multiplexed MCP backend**: one `EnterpriseAgentgatewayBackend` fronts two upstreams — an in-cluster `server-everything` and the remote `search.solo.io` — letting one OAuth-protected MCP endpoint expose tools from both
 - **Pre-issuance ext_authz hook**: `KGW_OAUTH_ISSUER_CONFIG.pre_issuance` calls a gRPC service between Auth0 callback and gateway-issued token; allowlists by Auth0 `sub` via `source.principal`; on deny the browser is redirected to `denied_redirect`
-- **Frontend TLS termination**: HTTPS listener on `agentgateway-proxy` for `mcp-auth0.glootest.com` (recap)
+- **Frontend TLS termination**: HTTPS listener on `agentgateway-proxy` for `mcp-auth0.try-solo.io` (recap)
 - **Refresh token grant**: `/oauth-issuer/token` accepts `grant_type=refresh_token` and forwards it to Auth0 as a stateless passthrough, letting a client renew its access token without a repeat browser login
 
 ---
@@ -137,7 +137,7 @@ export AUTH0_DOMAIN=$AUTH0_DOMAIN                 # e.g. your-tenant.us.auth0.co
 export AUTH0_CLIENT_ID=$AUTH0_CLIENT_ID           # e.g. abc123XYZ...
 export AUTH0_CLIENT_SECRET=$AUTH0_CLIENT_SECRET   # long random string from Auth0
 export AUTH0_AUDIENCE=$AUTH0_AUDIENCE             # e.g. https://api.example.com  (your Auth0 API identifier)
-export AUTH0_GATEWAY_HOST=$AUTH0_GATEWAY_HOST     # this lab uses mcp-auth0.glootest.com
+export AUTH0_GATEWAY_HOST=$AUTH0_GATEWAY_HOST     # this lab uses mcp-auth0.try-solo.io
 
 # Controller version (auto-detected from the Lab 001 helm release) + license
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
@@ -161,7 +161,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
 echo "$GATEWAY_IP"
 ```
 
-Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-auth0.glootest.com` to the gateway:
+Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-auth0.try-solo.io` to the gateway:
 
 ```bash
 echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" | sudo tee -a /etc/hosts
@@ -171,28 +171,28 @@ echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" | sudo tee -a /etc/hosts
 
 ## Step 2 — Create a Self-Signed TLS Cert and Add an HTTPS Listener
 
-OAuth requires HTTPS for everything that is not `localhost`, since the browser will redirect to Auth0 and back. This step creates a self-signed cert for `mcp-auth0.glootest.com` and adds a port 443 HTTPS listener to the existing `agentgateway-proxy` Gateway alongside Lab 001's port 8080 HTTP listener.
+OAuth requires HTTPS for everything that is not `localhost`, since the browser will redirect to Auth0 and back. This step creates a self-signed cert for `mcp-auth0.try-solo.io` and adds a port 443 HTTPS listener to the existing `agentgateway-proxy` Gateway alongside Lab 001's port 8080 HTTP listener.
 
-Create a root certificate for the `glootest.com` domain and a leaf cert signed by that root:
+Create a root certificate for the `try-solo.io` domain and a leaf cert signed by that root:
 
 ```bash
 mkdir -p example_certs
 openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 \
-  -subj '/O=Solo.io/CN=glootest.com' \
-  -keyout example_certs/glootest.com.key \
-  -out    example_certs/glootest.com.crt
+  -subj '/O=Solo.io/CN=try-solo.io' \
+  -keyout example_certs/try-solo.io.key \
+  -out    example_certs/try-solo.io.crt
 
 openssl req -out example_certs/gateway.csr -newkey rsa:2048 -nodes \
   -keyout example_certs/gateway.key \
-  -subj  "/CN=mcp-auth0.glootest.com/O=Solo.io"
+  -subj  "/CN=mcp-auth0.try-solo.io/O=Solo.io"
 
 openssl x509 -req -sha256 -days 365 \
-  -CA    example_certs/glootest.com.crt \
-  -CAkey example_certs/glootest.com.key \
+  -CA    example_certs/try-solo.io.crt \
+  -CAkey example_certs/try-solo.io.key \
   -set_serial 0 \
   -in    example_certs/gateway.csr \
   -out   example_certs/gateway.crt \
-  -extfile <(printf "subjectAltName=DNS:mcp-auth0.glootest.com")
+  -extfile <(printf "subjectAltName=DNS:mcp-auth0.try-solo.io")
 ```
 
 Store the leaf cert in a Kubernetes TLS secret:
@@ -226,7 +226,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: mcp-auth0.glootest.com
+      hostname: mcp-auth0.try-solo.io
       tls:
         mode: Terminate
         certificateRefs:
@@ -503,7 +503,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-auth0.glootest.com
+    - mcp-auth0.try-solo.io
   rules:
     - backendRefs:
         - name: enterprise-agentgateway
@@ -740,7 +740,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-auth0.glootest.com
+    - mcp-auth0.try-solo.io
   rules:
     - matches:
         - path:
@@ -875,7 +875,7 @@ EOF
 Before launching Inspector, hit the gateway in your browser once to accept the self-signed cert warning:
 
 ```
-https://mcp-auth0.glootest.com/.well-known/oauth-protected-resource/mcp
+https://mcp-auth0.try-solo.io/.well-known/oauth-protected-resource/mcp
 ```
 
 Click "Advanced → proceed" (Chrome) / "Accept the risk" (Firefox). You should see the JSON discovery document. Without this step, the browser blocks the OAuth redirect chain silently.
@@ -895,7 +895,7 @@ Inspector binds to `http://localhost:6274` and prints a session token in the ter
 In the Inspector UI:
 
 - **Transport type:** `Streamable HTTP`
-- **Server URL:** `https://mcp-auth0.glootest.com/mcp`
+- **Server URL:** `https://mcp-auth0.try-solo.io/mcp`
 - Click **Connect**.
 
 ### Walk through the OAuth flow as an allowlisted user
@@ -1016,7 +1016,7 @@ If your Auth0 tenant cookie is still warm and the second login keeps short-circu
 
 In the (fresh) Inspector window:
 
-- **Server URL:** `https://mcp-auth0.glootest.com/mcp`
+- **Server URL:** `https://mcp-auth0.try-solo.io/mcp`
 - Click **Connect**.
 - When redirected to `${AUTH0_DOMAIN}`, log in as a user whose sub is **not** in `ALLOWED_PRINCIPALS` (e.g., `alex.ly@solo.io` against the default Solo demo tenant).
 
@@ -1085,8 +1085,8 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | 401 after browser flow with a valid-looking JWT | `mcp.authentication.audiences` doesn't include the `aud` claim Auth0 actually issued, or the `issuer` value's trailing slash doesn't match | Decode the JWT at `jwt.io`; compare `iss` to `${AUTH0_ISSUER}` (trailing slash) and `aud` to `${AUTH0_AUDIENCE}`. See the audience-injection callout in Step 5. |
 | Inspector shows "fetch failed" or `unable to verify the first certificate` | Inspector's Node process rejected the self-signed gateway cert | Restart Inspector with `NODE_TLS_REJECT_UNAUTHORIZED=0` (Step 10) |
 | Inspector loops on connect with no Auth0 redirect; browser DevTools console (F12) shows `Access to fetch at '.../.well-known/oauth-*-resource/mcp' has been blocked by CORS policy` or `mcp-protocol-version is not allowed by Access-Control-Allow-Headers` | OAuth metadata discovery runs in the **browser** (Inspector UI), not through Inspector's `localhost:6277` proxy. Inspector sends `mcp-protocol-version` on the preflight, but agentgateway's internal handler hardcodes `Access-Control-Allow-Headers: content-type` and rejects it | The Step 9 `mcp-route` HTTPRoute must attach a Gateway API `CORS` filter to both `/.well-known/oauth-*/mcp` rules that allows `mcp-protocol-version` (and `Authorization`). Confirm with `kubectl get httproute -n agentgateway-system mcp-route -o yaml \| grep -A6 'type: CORS'` |
-| Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-auth0.glootest.com/.well-known/oauth-protected-resource/mcp` and click through the warning |
-| `mcp-auth0.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
+| Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-auth0.try-solo.io/.well-known/oauth-protected-resource/mcp` and click through the warning |
+| `mcp-auth0.try-solo.io` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
 | **Every login redirects to `https://example.com/no-access`** (or your custom deny page) | The Auth0 sub of the user you logged in as is not in `ALLOWED_PRINCIPALS`. This is the expected deny-path behavior — but if you meant to be on the allow path, the allowlist needs to be updated. | `kubectl logs -n agentgateway-system deployment/grpc-ext-authz --tail=20` — every Check prints one line including the `source.principal` it saw. Edit `ALLOWED_PRINCIPALS` per Step 7's BYO sub-section. |
 | **Inspector shows "failed to process downstream callback" 400 instead of redirecting** | The ext-authz pod is unreachable or timing out. With `failure_policy: closed`, gRPC dial/timeout errors do NOT trigger the deny redirect — the redirect only fires on an explicit `PERMISSION_DENIED`. | `kubectl get pods -n agentgateway-system -l app=grpc-ext-authz`; `kubectl get svc -n agentgateway-system grpc-ext-authz`; controller logs |
 | **Inspector connects despite the user being absent from `ALLOWED_PRINCIPALS`** | `pre_issuance.enabled` is not actually true in `KGW_OAUTH_ISSUER_CONFIG` in the running controller | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].env[?(@.name=="KGW_OAUTH_ISSUER_CONFIG")].value}' \| jq .pre_issuance` |

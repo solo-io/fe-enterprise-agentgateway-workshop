@@ -33,6 +33,8 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 The contract: the platform assigns the team its namespace, its path prefix (`/teams/team-tools`), and its tier at onboarding; the developer chart stamps the `team: team-tools` delegation label on every route it creates and prepends the platform-owned prefix to every path. The parent route delegates **only** to child routes that carry the label **and** live in the team's namespace, and every child the team adds inherits what the platform attaches to the parent: authentication, logging, and tier policies.
 
+Delegation is mutual: the team's namespace must also authorize the platform's parent route to reach into it. The developer chart renders a `ReferenceGrant` for that, so the team consents to delegation by installing its own release rather than by the platform reaching across namespaces unilaterally.
+
 ---
 
 ## Step 1: The platform team installs the platform chart
@@ -222,10 +224,10 @@ helm install team-tools charts/agentgateway-developer \
   --values team-tools-values.yaml
 ```
 
-Verify the child route and backend, and note the delegation label:
+Verify the child route, the backend, the delegation grant, and the delegation label:
 
 ```bash
-kubectl get httproute,enterpriseagentgatewaybackend -n team-tools
+kubectl get httproute,enterpriseagentgatewaybackend,referencegrant -n team-tools
 kubectl get httproute team-tools-tools -n team-tools -o jsonpath='{.metadata.labels}{"\n"}'
 ```
 
@@ -238,10 +240,15 @@ httproute.gateway.networking.k8s.io/team-tools-tools               4s
 NAME                                                                            ACCEPTED   AGE
 enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/team-tools-tools   True       4s
 
+NAME                                                                  AGE
+referencegrant.gateway.networking.k8s.io/allow-platform-delegation    4s
+
 {"app.kubernetes.io/instance":"team-tools","app.kubernetes.io/managed-by":"Helm","team":"team-tools"}
 ```
 
 The chart stamped `team: team-tools` on the route, so the platform's parent route picks this child up, and prepended the platform-owned prefix: the route matches `/teams/team-tools/mcp` even though the team typed only `/mcp`.
+
+The `allow-platform-delegation` `ReferenceGrant` is the team's half of the contract. It names `agentgateway-system` as the only namespace whose `HTTPRoute`s may delegate here (override with `--set platformNamespace=<ns>` if the platform release lives elsewhere). Cross-namespace route delegation requires it from v2026.8.2 onward; drop the grant and the parent route selects no child, so every request under `/teams/team-tools` returns `404`.
 
 ### Call the tools
 
