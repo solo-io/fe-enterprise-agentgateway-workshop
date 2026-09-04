@@ -1,6 +1,6 @@
 # Changelog
 
-0.13.9 - (9-3-26)
+0.13.9 - (9-4-26)
 ---
 - Bump Enterprise Agentgateway from `v2026.7.1-patch.0` to `v2026.8.2` across the install labs, air-gap and OpenShift installs, multi-cluster upgrades, identity-delegation labs, image list, and the three workshop chart `appVersion` fields
 - Refresh the support matrix in `labs/installation/system-requirements.md`: Gateway API `1.4 - 1.6`, Istio `1.26 - 1.30`
@@ -8,6 +8,7 @@
 - Drop the stale references to old versions in select labs
 - Add `labs/routing/configure-semantic-routing.md`: semantic routing with vLLM Semantic Router as an ExtProc processor. One virtual model name (`auto_model`) routed to one of three OpenAI price tiers (`gpt-5-nano`, `gpt-5.6-luna`, `gpt-5.6-terra`) by prompt content
 - List the new lab in `README.md` (Routing section and Use Cases) and in the Advanced Routing Strategies section of `tracks/llm-track.md`
+- Rename the local demo domain from `glootest.com` to `try-solo.io` across all labs (hostnames, TLS SANs, IdP callback examples)
 
 0.13.8 - (8-28-26)
 ---

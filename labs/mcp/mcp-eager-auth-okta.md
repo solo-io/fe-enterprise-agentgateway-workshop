@@ -16,15 +16,15 @@ You need a registered application in Okta with the **Authorization Code** grant 
 | `OKTA_CLIENT_ID` | Client ID of the Okta application |
 | `OKTA_CLIENT_SECRET` | Client secret of the Okta application |
 | `OKTA_AUDIENCE` | Audience configured on the Okta authz server (e.g. `api://default`) — must match the `aud` claim on issued tokens |
-| `OKTA_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-okta.glootest.com` |
+| `OKTA_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-okta.try-solo.io` |
 
 ### Okta app callback URLs
 
 Add **both** of these gateway callbacks to the Okta application's "Sign-in redirect URIs":
 
 ```
-https://mcp-okta.glootest.com/oauth-issuer/callback/downstream
-https://mcp-okta.glootest.com/oauth-issuer/callback/upstream
+https://mcp-okta.try-solo.io/oauth-issuer/callback/downstream
+https://mcp-okta.try-solo.io/oauth-issuer/callback/upstream
 ```
 
 The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback paths depending on the client. PKCE-capable MCP clients (e.g., MCP Inspector) trigger `/callback/upstream`; non-PKCE flows trigger `/callback/downstream`. Registering only one yields an Okta `The 'redirect_uri' parameter must be a Login redirect URI` error after login — even though the URI you configured for `downstream_server.redirect_uri` *is* in the allowlist.
@@ -35,7 +35,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Step 9)
 - `jq` for inspecting JSON responses
-- A way to resolve `mcp-okta.glootest.com` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
+- A way to resolve `mcp-okta.try-solo.io` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
 
 ---
 
@@ -45,7 +45,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 - Use a single pre-registered Okta `client_id` / `client_secret` for all MCP clients (no Okta admin-UI churn from per-client DCR)
 - Broker the Okta authorization code flow through the gateway (`/oauth-issuer/...`)
 - Validate Okta-issued JWTs at the MCP backend against Okta JWKS
-- Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-okta.glootest.com`
+- Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-okta.try-solo.io`
 - Test end-to-end with MCP Inspector against an `mcp-server-everything` test server
 
 ---
@@ -106,7 +106,7 @@ export OKTA_ISSUER=$OKTA_ISSUER                   # e.g. https://your-tenant.okt
 export OKTA_CLIENT_ID=$OKTA_CLIENT_ID             # e.g. 0oa...
 export OKTA_CLIENT_SECRET=$OKTA_CLIENT_SECRET     # long random string from Okta
 export OKTA_AUDIENCE=$OKTA_AUDIENCE               # e.g. api://default
-export OKTA_GATEWAY_HOST=$OKTA_GATEWAY_HOST       # this lab uses mcp-okta.glootest.com
+export OKTA_GATEWAY_HOST=$OKTA_GATEWAY_HOST       # this lab uses mcp-okta.try-solo.io
 
 # Controller version (auto-detected from the Lab 001 helm release) + license
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
@@ -130,7 +130,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
 echo "$GATEWAY_IP"
 ```
 
-Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-okta.glootest.com` to the gateway:
+Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-okta.try-solo.io` to the gateway:
 
 ```bash
 echo "$GATEWAY_IP $OKTA_GATEWAY_HOST" | sudo tee -a /etc/hosts
@@ -140,28 +140,28 @@ echo "$GATEWAY_IP $OKTA_GATEWAY_HOST" | sudo tee -a /etc/hosts
 
 ## Step 2 — Create a Self-Signed TLS Cert and Add an HTTPS Listener
 
-OAuth requires HTTPS for everything that is not `localhost`, since the browser will redirect to Okta and back. This step creates a self-signed cert for `mcp-okta.glootest.com` and adds a port 443 HTTPS listener to the existing `agentgateway-proxy` Gateway alongside Lab 001's port 8080 HTTP listener.
+OAuth requires HTTPS for everything that is not `localhost`, since the browser will redirect to Okta and back. This step creates a self-signed cert for `mcp-okta.try-solo.io` and adds a port 443 HTTPS listener to the existing `agentgateway-proxy` Gateway alongside Lab 001's port 8080 HTTP listener.
 
-Create a root certificate for the `glootest.com` domain and a leaf cert signed by that root:
+Create a root certificate for the `try-solo.io` domain and a leaf cert signed by that root:
 
 ```bash
 mkdir -p example_certs
 openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 \
-  -subj '/O=Solo.io/CN=glootest.com' \
-  -keyout example_certs/glootest.com.key \
-  -out    example_certs/glootest.com.crt
+  -subj '/O=Solo.io/CN=try-solo.io' \
+  -keyout example_certs/try-solo.io.key \
+  -out    example_certs/try-solo.io.crt
 
 openssl req -out example_certs/gateway.csr -newkey rsa:2048 -nodes \
   -keyout example_certs/gateway.key \
-  -subj  "/CN=mcp-okta.glootest.com/O=Solo.io"
+  -subj  "/CN=mcp-okta.try-solo.io/O=Solo.io"
 
 openssl x509 -req -sha256 -days 365 \
-  -CA    example_certs/glootest.com.crt \
-  -CAkey example_certs/glootest.com.key \
+  -CA    example_certs/try-solo.io.crt \
+  -CAkey example_certs/try-solo.io.key \
   -set_serial 0 \
   -in    example_certs/gateway.csr \
   -out   example_certs/gateway.crt \
-  -extfile <(printf "subjectAltName=DNS:mcp-okta.glootest.com")
+  -extfile <(printf "subjectAltName=DNS:mcp-okta.try-solo.io")
 ```
 
 Store the leaf cert in a Kubernetes TLS secret:
@@ -195,7 +195,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: mcp-okta.glootest.com
+      hostname: mcp-okta.try-solo.io
       tls:
         mode: Terminate
         certificateRefs:
@@ -456,7 +456,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-okta.glootest.com
+    - mcp-okta.try-solo.io
   rules:
     - backendRefs:
         - name: enterprise-agentgateway
@@ -584,7 +584,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-okta.glootest.com
+    - mcp-okta.try-solo.io
   rules:
     - matches:
         - path:
@@ -717,7 +717,7 @@ EOF
 Before launching Inspector, hit the gateway in your browser once to accept the self-signed cert warning:
 
 ```
-https://mcp-okta.glootest.com/.well-known/oauth-protected-resource/mcp
+https://mcp-okta.try-solo.io/.well-known/oauth-protected-resource/mcp
 ```
 
 Click "Advanced → proceed" (Chrome) / "Accept the risk" (Firefox). You should see the JSON discovery document. Without this step, the browser blocks the OAuth redirect chain silently.
@@ -737,7 +737,7 @@ Inspector binds to `http://localhost:6274` and prints a session token in the ter
 In the Inspector UI:
 
 - **Transport type:** `Streamable HTTP`
-- **Server URL:** `https://mcp-okta.glootest.com/mcp`
+- **Server URL:** `https://mcp-okta.try-solo.io/mcp`
 - Click **Connect**.
 
 ### Walk through the OAuth flow
@@ -791,7 +791,7 @@ Claude Code is a Node.js process and won't accept the self-signed gateway cert b
 Add the gateway's MCP endpoint to Claude Code's local config:
 
 ```bash
-claude mcp add mcp-okta-gateway --transport http https://mcp-okta.glootest.com/mcp
+claude mcp add mcp-okta-gateway --transport http https://mcp-okta.try-solo.io/mcp
 ```
 
 Verify it was added:
@@ -803,7 +803,7 @@ claude mcp list
 Expected output includes:
 
 ```
-mcp-okta-gateway: https://mcp-okta.glootest.com/mcp (http)
+mcp-okta-gateway: https://mcp-okta.try-solo.io/mcp (http)
 ```
 
 ### Launch Claude Code and walk through the OAuth flow
@@ -815,7 +815,7 @@ NODE_TLS_REJECT_UNAUTHORIZED=0 claude
 On the first prompt that triggers MCP tool discovery, Claude Code initiates the OAuth flow automatically:
 
 1. Claude Code fetches `/.well-known/oauth-protected-resource/mcp` to discover the authorization server.
-2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-okta.glootest.com/oauth-issuer/register`), not Okta — this confirms the eager-OAuth issuer is serving its own AS metadata.
+2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-okta.try-solo.io/oauth-issuer/register`), not Okta — this confirms the eager-OAuth issuer is serving its own AS metadata.
 3. Claude Code POSTs to `/oauth-issuer/register` and receives the pre-registered Okta `client_id`.
 4. A browser window opens to **Okta's hosted login**. **Verify the URL bar shows `${OKTA_DOMAIN}`**, not the gateway hostname — this confirms the eager-OAuth issuer correctly delegated downstream.
 5. Complete the Okta login (with MFA if your tenant requires it).
@@ -870,8 +870,8 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | 401 after browser flow with a valid-looking JWT | `mcp.authentication.audiences` doesn't include the `aud` claim Okta issued, or the `issuer` value has a trailing-slash mismatch | Decode the JWT at `jwt.io`; compare `iss` to `${OKTA_ISSUER}` (**no** trailing slash) and `aud` to `${OKTA_AUDIENCE}`. Adjust the authz server's audience in the Okta admin console if needed. |
 | Inspector shows "fetch failed" or `unable to verify the first certificate` | Inspector's Node process rejected the self-signed gateway cert | Restart Inspector with `NODE_TLS_REJECT_UNAUTHORIZED=0` (Step 9) |
 | Inspector loops on connect with no Okta redirect; browser DevTools console (F12) shows `Access to fetch at '.../.well-known/oauth-*-resource/mcp' has been blocked by CORS policy` or `mcp-protocol-version is not allowed by Access-Control-Allow-Headers` | OAuth metadata discovery runs in the **browser** (Inspector UI), not through Inspector's `localhost:6277` proxy. Inspector sends `mcp-protocol-version` on the preflight, but agentgateway's internal handler hardcodes `Access-Control-Allow-Headers: content-type` and rejects it | The Step 8 `mcp-route` HTTPRoute must attach a Gateway API `CORS` filter to both `/.well-known/oauth-*/mcp` rules that allows `mcp-protocol-version` (and `Authorization`). Confirm with `kubectl get httproute -n agentgateway-system mcp-route -o yaml \| grep -A6 'type: CORS'` |
-| Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-okta.glootest.com/.well-known/oauth-protected-resource/mcp` and click through the warning |
-| `mcp-okta.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $OKTA_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
+| Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-okta.try-solo.io/.well-known/oauth-protected-resource/mcp` and click through the warning |
+| `mcp-okta.try-solo.io` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $OKTA_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
 | Claude Code (Step 10) fails to connect with an SSL error or `unable to verify the first certificate` | `NODE_TLS_REJECT_UNAUTHORIZED` not set for the Claude Code process | Launch with `NODE_TLS_REJECT_UNAUTHORIZED=0 claude`; do **not** add this to your shell rc |
 
 Useful commands:

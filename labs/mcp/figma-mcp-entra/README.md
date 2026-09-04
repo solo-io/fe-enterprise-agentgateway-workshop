@@ -59,7 +59,7 @@ Files in this folder:
 - Lab `001` baseline running (agentgateway-proxy Gateway with an HTTP listener on 8080). This
   runbook mirrors the Auth0 lab, validated against controller **v2026.6.1**+ on a local KinD cluster.
 - `kubectl`, `helm`, `openssl`, `jq`, `envsubst` (gettext), Node 18+ (for Claude Code).
-- A way to resolve `mcp-entra.glootest.com` to the gateway LoadBalancer: a local
+- A way to resolve `mcp-entra.try-solo.io` to the gateway LoadBalancer: a local
   `/etc/hosts` entry (this runbook; needs sudo).
 
 ### Entra ID (Layer A): you create this in the Azure portal
@@ -73,8 +73,8 @@ it fetched tokens with `az` instead of an interactive browser login).
    confidential client and exchanges the auth code with this secret.
 2. **Authentication → Add a platform → Web.** Register **both** eager-OAuth callbacks:
    ```
-   https://mcp-entra.glootest.com/oauth-issuer/callback/downstream
-   https://mcp-entra.glootest.com/oauth-issuer/callback/upstream
+   https://mcp-entra.try-solo.io/oauth-issuer/callback/downstream
+   https://mcp-entra.try-solo.io/oauth-issuer/callback/upstream
    ```
    The issuer runs a dual flow; registering only one yields `AADSTS50011: redirect URI ...
    does not match` after login. (This is the Entra equivalent of the Auth0 "both callbacks" rule.)
@@ -103,7 +103,7 @@ Identical to the Auth0 lab. Go to [figma.com/developers/apps](https://www.figma.
 1. Name it (e.g. `agentgateway-mcp`). You get a **Client ID** and **Client secret**.
 2. Under **OAuth 2.0** / redirect settings, add this **single** callback:
    ```
-   https://mcp-entra.glootest.com/oauth-issuer/callback/upstream
+   https://mcp-entra.try-solo.io/oauth-issuer/callback/upstream
    ```
    > Because the elicitation Secret uses `mcp_resource` (not `redirect_uri`), the gateway routes
    > the Figma redirect through the eager-OAuth issuer's *upstream* callback. There is no separate
@@ -144,7 +144,7 @@ export FIGMA_CLIENT_ID=xxxxxxxxxxxxxxxxxxxxxx
 export FIGMA_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # --- Gateway ---
-export ENTRA_GATEWAY_HOST=mcp-entra.glootest.com
+export ENTRA_GATEWAY_HOST=mcp-entra.try-solo.io
 
 # Derived Entra endpoints (v2 authorize/token; v1-style tenant JWKS discovery)
 export ENTRA_AUTHORITY="https://login.microsoftonline.com/${ENTRA_TENANT_ID}"
@@ -174,21 +174,21 @@ echo "$GATEWAY_IP $ENTRA_GATEWAY_HOST" | sudo tee -a /etc/hosts
 ## Step 2: Self-signed TLS cert + HTTPS listener
 
 OAuth requires HTTPS for anything that isn't `localhost`. Create a self-signed cert for
-`mcp-entra.glootest.com` and add a port-443 HTTPS listener alongside the existing HTTP:8080.
+`mcp-entra.try-solo.io` and add a port-443 HTTPS listener alongside the existing HTTP:8080.
 
 ```bash
 mkdir -p example_certs
 openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 \
-  -subj '/O=Solo.io/CN=glootest.com' \
-  -keyout example_certs/glootest.com.key -out example_certs/glootest.com.crt
+  -subj '/O=Solo.io/CN=try-solo.io' \
+  -keyout example_certs/try-solo.io.key -out example_certs/try-solo.io.crt
 
 openssl req -out example_certs/gateway.csr -newkey rsa:2048 -nodes \
-  -keyout example_certs/gateway.key -subj "/CN=mcp-entra.glootest.com/O=Solo.io"
+  -keyout example_certs/gateway.key -subj "/CN=mcp-entra.try-solo.io/O=Solo.io"
 
 openssl x509 -req -sha256 -days 365 \
-  -CA example_certs/glootest.com.crt -CAkey example_certs/glootest.com.key -set_serial 0 \
+  -CA example_certs/try-solo.io.crt -CAkey example_certs/try-solo.io.key -set_serial 0 \
   -in example_certs/gateway.csr -out example_certs/gateway.crt \
-  -extfile <(printf "subjectAltName=DNS:mcp-entra.glootest.com")
+  -extfile <(printf "subjectAltName=DNS:mcp-entra.try-solo.io")
 
 kubectl create secret tls -n agentgateway-system mcp-entra-tls \
   --key example_certs/gateway.key --cert example_certs/gateway.crt \
@@ -221,7 +221,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: mcp-entra.glootest.com
+      hostname: mcp-entra.try-solo.io
       tls:
         mode: Terminate
         certificateRefs:
@@ -351,7 +351,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-entra.glootest.com
+    - mcp-entra.try-solo.io
   rules:
     - matches:
         - path:
@@ -401,7 +401,7 @@ kubectl get enterpriseagentgatewaybackend ent-figma-openapi-backend \
 
 curl -sk "https://${ENTRA_GATEWAY_HOST}/.well-known/oauth-authorization-server/figma/openapi/mcp" \
   | jq .registration_endpoint
-# expect the GATEWAY host, e.g. https://mcp-entra.glootest.com/oauth-issuer/register  (NOT Entra)
+# expect the GATEWAY host, e.g. https://mcp-entra.try-solo.io/oauth-issuer/register  (NOT Entra)
 ```
 
 ---
@@ -409,8 +409,8 @@ curl -sk "https://${ENTRA_GATEWAY_HOST}/.well-known/oauth-authorization-server/f
 ## Step 7: Connect Claude Code
 
 ```bash
-claude mcp add figma-mcp-entra --transport http https://mcp-entra.glootest.com/figma/openapi/mcp
-claude mcp list   # expect: figma-mcp-entra: https://mcp-entra.glootest.com/figma/openapi/mcp (http)
+claude mcp add figma-mcp-entra --transport http https://mcp-entra.try-solo.io/figma/openapi/mcp
+claude mcp list   # expect: figma-mcp-entra: https://mcp-entra.try-solo.io/figma/openapi/mcp (http)
 ```
 
 Launch Claude Code with Node TLS verification disabled (self-signed gateway cert). Do **not**
@@ -429,7 +429,7 @@ Use figma-mcp-entra to get my current Figma user profile.
 What happens the first time:
 
 0. **Self-signed cert warning (up front).** The browser's first hop is the gateway's own
-   `…/oauth-issuer/authorize` on `mcp-entra.glootest.com`, so the "Your connection is not private"
+   `…/oauth-issuer/authorize` on `mcp-entra.try-solo.io`, so the "Your connection is not private"
    warning appears **before** the Microsoft login. Click **Advanced → Proceed**. Accepting it once
    covers the return `…/callback/upstream` hop too (same host).
 
@@ -477,11 +477,11 @@ Two quick gateway checks (no browser needed) confirm the inbound auth layer is w
 
 ```bash
 # 1) Unauthenticated request is challenged with 401 + WWW-Authenticate (not 406) → JWKS resolved
-curl -sk -D- -o /dev/null "https://mcp-entra.glootest.com/figma/openapi/mcp" \
+curl -sk -D- -o /dev/null "https://mcp-entra.try-solo.io/figma/openapi/mcp" \
   -H "accept: application/json, text/event-stream" | grep -iE "^HTTP|www-authenticate"
 
 # 2) The gateway serves its OWN authorization-server metadata (registration at the gateway, not Entra)
-curl -sk "https://mcp-entra.glootest.com/.well-known/oauth-authorization-server/figma/openapi/mcp" \
+curl -sk "https://mcp-entra.try-solo.io/.well-known/oauth-authorization-server/figma/openapi/mcp" \
   | jq .registration_endpoint
 ```
 
@@ -539,7 +539,7 @@ Use the auto-opened `http://localhost:6274/?MCP_PROXY_AUTH_TOKEN=…` URL (UI on
 **6277**). Connect with:
 
 1. **Transport Type** → `Streamable HTTP`.
-2. **URL** → `https://mcp-entra.glootest.com/figma/openapi/mcp`.
+2. **URL** → `https://mcp-entra.try-solo.io/figma/openapi/mcp`.
 3. **Configuration → Request Timeout** → `120000` ms (the connect triggers two browser logins;
    the default 10 s aborts mid-flow).
 
@@ -575,12 +575,12 @@ not a flat `file_key`.
 | 401 after Microsoft login with a valid-looking JWT: `JWT audience mismatch` | Token `aud` isn't `api://<client-id>`: the login didn't request the API scope | Confirm `${ENTRA_API_SCOPE}` is in the Step 4 `downstream_server.scopes` **and** exposed on the app (Pre-reqs step 3) |
 | 401 after login: `JWT issuer not recognized` | Token `iss` (v1 `sts.windows.net` vs v2 `login.microsoftonline.com/.../v2.0`) doesn't match `issuer:` in `figma-mcp.yaml` | Decode the token at jwt.io; set `issuer:` to match, governed by the app's `accessTokenAcceptedVersion` (Pre-reqs step 5) |
 | Controller `CrashLoopBackOff`: `unsupported validator type:` | Missing a validator in Step 4 | Include all three (`subject`/`api`/`actor`) |
-| **Figma** error page after consent (`invalid redirect_uri`) | Figma app callback missing/wrong | Register `https://mcp-entra.glootest.com/oauth-issuer/callback/upstream` in the Figma app |
+| **Figma** error page after consent (`invalid redirect_uri`) | Figma app callback missing/wrong | Register `https://mcp-entra.try-solo.io/oauth-issuer/callback/upstream` in the Figma app |
 | Figma call **401/403** *after* the Figma consent completes (token not injected) | Elicitation stored the token but didn't inject it | On `ent-figma-openapi-exchange`, set `spec.backend.tokenExchange.mode: ElicitationOnly` and re-apply |
 | Tool returns `{"status":403,"err":"Permission denied"}` even though auth succeeded | Args passed **flat** (`file_key`) so the OpenAPI path param is empty | Nest them: `{"path":{"file_key":"…"},"query":{…}}`. See Step 8. |
 | Elicitation never fires (no Figma browser prompt) | Policy-level `elicitation.secretName` not resolving | Confirm the `figma-token-exchange` Secret is in `agentgateway-system`; STS_URI in Step 3 uses the **`/elicitations/oauth2/token`** path (not `/oauth2/token`) |
 | Claude Code SSL error / `unable to verify the first certificate` | Self-signed cert not trusted by Node | Launch with `NODE_TLS_REJECT_UNAUTHORIZED=0 claude` |
-| `mcp-entra.glootest.com` doesn't resolve | `/etc/hosts` entry missing/stale | Re-run the Step 1 `tee -a /etc/hosts`; flush DNS on macOS |
+| `mcp-entra.try-solo.io` doesn't resolve | `/etc/hosts` entry missing/stale | Re-run the Step 1 `tee -a /etc/hosts`; flush DNS on macOS |
 
 Useful commands:
 

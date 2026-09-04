@@ -1,12 +1,12 @@
 # SNI Matching
-In this guide, you learn how to set up an HTTPS Gateway that serves two different domains, `mock-openai-foo.glootest.com` and `mock-openai-bar.glootest.com` on the same port 443. When sending a request to the Gateway, you indicate the hostname you want to connect to. Based on the selected hostname, the Gateway presents the hostname-specific certificate.
+In this guide, you learn how to set up an HTTPS Gateway that serves two different domains, `mock-openai-foo.try-solo.io` and `mock-openai-bar.try-solo.io` on the same port 443. When sending a request to the Gateway, you indicate the hostname you want to connect to. Based on the selected hostname, the Gateway presents the hostname-specific certificate.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
 ## Lab Objectives
 - Deploy a mock OpenAI server for testing
-- Create self-signed TLS certs for `mock-openai-foo.glootest.com` and `mock-openai-bar.glootest.com`
+- Create self-signed TLS certs for `mock-openai-foo.try-solo.io` and `mock-openai-bar.try-solo.io`
 - Configure our gateway to terminate TLS with SNI matching
 - Validate connectivity to the mock OpenAI server over HTTPS
 - Validate that requests without matching SNI are rejected
@@ -107,37 +107,37 @@ EOF
 
 ## Create a self-signed TLS cert
 
-Create a root certificate for the glootest.com domain. You use this certificate to sign the certificate for your client and gateway later.
+Create a root certificate for the try-solo.io domain. You use this certificate to sign the certificate for your client and gateway later.
 ```bash
 mkdir example_certs
-openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -subj '/O=Solo.io/CN=glootest.com' -keyout example_certs/glootest.com.key -out example_certs/glootest.com.crt
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -subj '/O=Solo.io/CN=try-solo.io' -keyout example_certs/try-solo.io.key -out example_certs/try-solo.io.crt
 ```
 
 Create a gateway certificate that is signed by the root CA certificate that you created in the previous step.
 
-First for mock-openai-foo.glootest.com
+First for mock-openai-foo.try-solo.io
 ```bash
-openssl req -out example_certs/mock-openai-foo.glootest.com.csr -newkey rsa:2048 -nodes -keyout example_certs/mock-openai-foo.glootest.com.key -subj "/CN=mock-openai-foo.glootest.com/O=mock-openai organization"
+openssl req -out example_certs/mock-openai-foo.try-solo.io.csr -newkey rsa:2048 -nodes -keyout example_certs/mock-openai-foo.try-solo.io.key -subj "/CN=mock-openai-foo.try-solo.io/O=mock-openai organization"
 
-openssl x509 -req -sha256 -days 365 -CA example_certs/glootest.com.crt -CAkey example_certs/glootest.com.key -set_serial 0 -in example_certs/mock-openai-foo.glootest.com.csr -out example_certs/mock-openai-foo.glootest.com.crt
+openssl x509 -req -sha256 -days 365 -CA example_certs/try-solo.io.crt -CAkey example_certs/try-solo.io.key -set_serial 0 -in example_certs/mock-openai-foo.try-solo.io.csr -out example_certs/mock-openai-foo.try-solo.io.crt
 ```
 
-Then for mock-openai-bar.glootest.com
+Then for mock-openai-bar.try-solo.io
 ```bash
-openssl req -out example_certs/mock-openai-bar.glootest.com.csr -newkey rsa:2048 -nodes -keyout example_certs/mock-openai-bar.glootest.com.key -subj "/CN=mock-openai-bar.glootest.com/O=solo.io"
+openssl req -out example_certs/mock-openai-bar.try-solo.io.csr -newkey rsa:2048 -nodes -keyout example_certs/mock-openai-bar.try-solo.io.key -subj "/CN=mock-openai-bar.try-solo.io/O=solo.io"
 
-openssl x509 -req -sha256 -days 365 -CA example_certs/glootest.com.crt -CAkey example_certs/glootest.com.key -set_serial 1 -in example_certs/mock-openai-bar.glootest.com.csr -out example_certs/mock-openai-bar.glootest.com.crt
+openssl x509 -req -sha256 -days 365 -CA example_certs/try-solo.io.crt -CAkey example_certs/try-solo.io.key -set_serial 1 -in example_certs/mock-openai-bar.try-solo.io.csr -out example_certs/mock-openai-bar.try-solo.io.crt
 ```
 
-Store the credentials for the mock-openai-foo.glootest.com domain in a Kubernetes secret.
+Store the credentials for the mock-openai-foo.try-solo.io domain in a Kubernetes secret.
 ```bash
 kubectl create -n agentgateway-system secret tls foo \
---key=example_certs/mock-openai-foo.glootest.com.key \
---cert=example_certs/mock-openai-foo.glootest.com.crt
+--key=example_certs/mock-openai-foo.try-solo.io.key \
+--cert=example_certs/mock-openai-foo.try-solo.io.crt
 
 kubectl create -n agentgateway-system secret tls bar \
---key=example_certs/mock-openai-bar.glootest.com.key \
---cert=example_certs/mock-openai-bar.glootest.com.crt
+--key=example_certs/mock-openai-bar.try-solo.io.key \
+--cert=example_certs/mock-openai-bar.try-solo.io.crt
 ```
 
 ## Set up SNI Routing
@@ -166,7 +166,7 @@ spec:
     - protocol: HTTPS
       port: 443
       name: foo
-      hostname: mock-openai-foo.glootest.com
+      hostname: mock-openai-foo.try-solo.io
       tls:
         mode: Terminate
         certificateRefs:
@@ -178,7 +178,7 @@ spec:
     - protocol: HTTPS
       port: 443
       name: bar
-      hostname: "mock-openai-bar.glootest.com"
+      hostname: "mock-openai-bar.try-solo.io"
       tls:
         mode: Terminate
         certificateRefs:
@@ -204,7 +204,7 @@ metadata:
   namespace: agentgateway-system
 spec:
   hostnames:
-  - "mock-openai-foo.glootest.com"
+  - "mock-openai-foo.try-solo.io"
   parentRefs:
     - name: agentgateway-sni
       namespace: agentgateway-system
@@ -227,7 +227,7 @@ metadata:
   namespace: agentgateway-system
 spec:
   hostnames:
-  - "mock-openai-bar.glootest.com"
+  - "mock-openai-bar.try-solo.io"
   parentRefs:
     - name: agentgateway-sni
       namespace: agentgateway-system
@@ -250,7 +250,7 @@ metadata:
   namespace: agentgateway-system
 spec:
   hostnames:
-  - "mock-openai-baz.glootest.com"
+  - "mock-openai-baz.try-solo.io"
   parentRefs:
     - name: agentgateway-sni
       namespace: agentgateway-system
@@ -274,7 +274,7 @@ curl mock-openai-foo over https:
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-sni -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -ikv --resolve "mock-openai-foo.glootest.com:443:${GATEWAY_IP}" https://mock-openai-foo.glootest.com:443/ \
+curl -ikv --resolve "mock-openai-foo.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-foo.try-solo.io:443/ \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -289,7 +289,7 @@ curl -ikv --resolve "mock-openai-foo.glootest.com:443:${GATEWAY_IP}" https://moc
 
 We can see the TLS handshake occurring
 ```
-* Connected to mock-openai-foo.glootest.com (192.168.64.2) port 443
+* Connected to mock-openai-foo.try-solo.io (192.168.64.2) port 443
 * ALPN: curl offers h2,http/1.1
 * (304) (OUT), TLS handshake, Client hello (1):
 * (304) (IN), TLS handshake, Server hello (2):
@@ -301,15 +301,15 @@ We can see the TLS handshake occurring
 * SSL connection using TLSv1.3 / AEAD-AES256-GCM-SHA384 / [blank] / UNDEF
 * ALPN: server accepted h2
 * Server certificate:
-*  subject: CN=mock-openai-foo.glootest.com; O=mock-openai organization
+*  subject: CN=mock-openai-foo.try-solo.io; O=mock-openai organization
 *  start date: Jan 23 18:46:30 2026 GMT
 *  expire date: Jan 23 18:46:30 2027 GMT
-*  issuer: O=Solo.io; CN=glootest.com
+*  issuer: O=Solo.io; CN=try-solo.io
 ```
 
 curl mock-openai-bar over https:
 ```bash
-curl -ikv --resolve "mock-openai-bar.glootest.com:443:${GATEWAY_IP}" https://mock-openai-bar.glootest.com:443/ \
+curl -ikv --resolve "mock-openai-bar.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-bar.try-solo.io:443/ \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -322,9 +322,9 @@ curl -ikv --resolve "mock-openai-bar.glootest.com:443:${GATEWAY_IP}" https://moc
   }'
 ```
 
-Again we can see the TLS handshake occurring, but this time for `mock-openai-bar.glootest.com`
+Again we can see the TLS handshake occurring, but this time for `mock-openai-bar.try-solo.io`
 ```
-* Connected to mock-openai-bar.glootest.com (192.168.64.2) port 443
+* Connected to mock-openai-bar.try-solo.io (192.168.64.2) port 443
 * ALPN: curl offers h2,http/1.1
 * (304) (OUT), TLS handshake, Client hello (1):
 * (304) (IN), TLS handshake, Server hello (2):
@@ -336,15 +336,15 @@ Again we can see the TLS handshake occurring, but this time for `mock-openai-bar
 * SSL connection using TLSv1.3 / AEAD-AES256-GCM-SHA384 / [blank] / UNDEF
 * ALPN: server accepted h2
 * Server certificate:
-*  subject: CN=mock-openai-bar.glootest.com; O=solo.io
+*  subject: CN=mock-openai-bar.try-solo.io; O=solo.io
 *  start date: Jan 23 18:46:35 2026 GMT
 *  expire date: Jan 23 18:46:35 2027 GMT
-*  issuer: O=Solo.io; CN=glootest.com
+*  issuer: O=Solo.io; CN=try-solo.io
 ```
 
 Now curl mock-openai-baz over https:
 ```bash
-curl -ikv --resolve "mock-openai-baz.glootest.com:443:${GATEWAY_IP}" https://mock-openai-baz.glootest.com:443/ \
+curl -ikv --resolve "mock-openai-baz.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-baz.try-solo.io:443/ \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -360,9 +360,9 @@ curl -ikv --resolve "mock-openai-baz.glootest.com:443:${GATEWAY_IP}" https://moc
 Although this is a valid route, this request should fail
 ```
 * (304) (OUT), TLS handshake, Client hello (1):
-* LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to mock-openai-baz.glootest.com:443 
+* LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to mock-openai-baz.try-solo.io:443 
 * Closing connection
-curl: (35) LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to mock-openai-baz.glootest.com:443
+curl: (35) LibreSSL SSL_connect: SSL_ERROR_SYSCALL in connection to mock-openai-baz.try-solo.io:443
 ```
 
 ✅ The TCP connection was accepted

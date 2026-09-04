@@ -15,15 +15,15 @@ You need a registered application in Auth0 (Regular Web Application) with the **
 | `AUTH0_CLIENT_ID` | Client ID of the Auth0 application |
 | `AUTH0_CLIENT_SECRET` | Client secret of the Auth0 application |
 | `AUTH0_AUDIENCE` | Auth0 API audience the JWT must carry |
-| `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-auth0.glootest.com` |
+| `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-auth0.try-solo.io` |
 
 ### Auth0 app callback URLs
 
 Add **both** of these gateway callbacks to the Auth0 application's "Allowed Callback URLs":
 
 ```
-https://mcp-auth0.glootest.com/oauth-issuer/callback/downstream
-https://mcp-auth0.glootest.com/oauth-issuer/callback/upstream
+https://mcp-auth0.try-solo.io/oauth-issuer/callback/downstream
+https://mcp-auth0.try-solo.io/oauth-issuer/callback/upstream
 ```
 
 The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback paths depending on the client. PKCE-capable MCP clients (e.g., MCP Inspector) trigger `/callback/upstream`; non-PKCE flows trigger `/callback/downstream`. Registering only one yields an Auth0 `invalid_request: callback url not allowed` error after login — even though the URI you configured for `downstream_server.redirect_uri` *is* in the allowlist.
@@ -34,7 +34,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Step 9)
 - `jq` for inspecting JSON responses
-- A way to resolve `mcp-auth0.glootest.com` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
+- A way to resolve `mcp-auth0.try-solo.io` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
 
 ---
 
@@ -44,7 +44,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 - Use a single pre-registered Auth0 `client_id` / `client_secret` for all MCP clients (no per-client DCR against Auth0's Management API)
 - Broker the Auth0 authorization code flow through the gateway (`/oauth-issuer/...`)
 - Validate Auth0-issued JWTs at the MCP backend against Auth0 JWKS
-- Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-auth0.glootest.com`
+- Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-auth0.try-solo.io`
 - Test end-to-end with MCP Inspector against an `mcp-website-fetcher` test server
 
 ---
@@ -104,7 +104,7 @@ export AUTH0_DOMAIN=$AUTH0_DOMAIN                 # e.g. your-tenant.us.auth0.co
 export AUTH0_CLIENT_ID=$AUTH0_CLIENT_ID           # e.g. abc123XYZ...
 export AUTH0_CLIENT_SECRET=$AUTH0_CLIENT_SECRET   # long random string from Auth0
 export AUTH0_AUDIENCE=$AUTH0_AUDIENCE             # e.g. https://api.example.com  (your Auth0 API identifier)
-export AUTH0_GATEWAY_HOST=$AUTH0_GATEWAY_HOST     # this lab uses mcp-auth0.glootest.com
+export AUTH0_GATEWAY_HOST=$AUTH0_GATEWAY_HOST     # this lab uses mcp-auth0.try-solo.io
 
 # Controller version (auto-detected from the Lab 001 helm release) + license
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
@@ -128,7 +128,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
 echo "$GATEWAY_IP"
 ```
 
-Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-auth0.glootest.com` to the gateway:
+Add an `/etc/hosts` entry so both your terminal and your browser resolve `mcp-auth0.try-solo.io` to the gateway:
 
 ```bash
 echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" | sudo tee -a /etc/hosts
@@ -138,28 +138,28 @@ echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" | sudo tee -a /etc/hosts
 
 ## Step 2 — Create a Self-Signed TLS Cert and Add an HTTPS Listener
 
-OAuth requires HTTPS for everything that is not `localhost`, since the browser will redirect to Auth0 and back. This step creates a self-signed cert for `mcp-auth0.glootest.com` and adds a port 443 HTTPS listener to the existing `agentgateway-proxy` Gateway alongside Lab 001's port 8080 HTTP listener.
+OAuth requires HTTPS for everything that is not `localhost`, since the browser will redirect to Auth0 and back. This step creates a self-signed cert for `mcp-auth0.try-solo.io` and adds a port 443 HTTPS listener to the existing `agentgateway-proxy` Gateway alongside Lab 001's port 8080 HTTP listener.
 
-Create a root certificate for the `glootest.com` domain and a leaf cert signed by that root:
+Create a root certificate for the `try-solo.io` domain and a leaf cert signed by that root:
 
 ```bash
 mkdir -p example_certs
 openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 \
-  -subj '/O=Solo.io/CN=glootest.com' \
-  -keyout example_certs/glootest.com.key \
-  -out    example_certs/glootest.com.crt
+  -subj '/O=Solo.io/CN=try-solo.io' \
+  -keyout example_certs/try-solo.io.key \
+  -out    example_certs/try-solo.io.crt
 
 openssl req -out example_certs/gateway.csr -newkey rsa:2048 -nodes \
   -keyout example_certs/gateway.key \
-  -subj  "/CN=mcp-auth0.glootest.com/O=Solo.io"
+  -subj  "/CN=mcp-auth0.try-solo.io/O=Solo.io"
 
 openssl x509 -req -sha256 -days 365 \
-  -CA    example_certs/glootest.com.crt \
-  -CAkey example_certs/glootest.com.key \
+  -CA    example_certs/try-solo.io.crt \
+  -CAkey example_certs/try-solo.io.key \
   -set_serial 0 \
   -in    example_certs/gateway.csr \
   -out   example_certs/gateway.crt \
-  -extfile <(printf "subjectAltName=DNS:mcp-auth0.glootest.com")
+  -extfile <(printf "subjectAltName=DNS:mcp-auth0.try-solo.io")
 ```
 
 Store the leaf cert in a Kubernetes TLS secret:
@@ -193,7 +193,7 @@ spec:
     - name: https
       port: 443
       protocol: HTTPS
-      hostname: mcp-auth0.glootest.com
+      hostname: mcp-auth0.try-solo.io
       tls:
         mode: Terminate
         certificateRefs:
@@ -454,7 +454,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-auth0.glootest.com
+    - mcp-auth0.try-solo.io
   rules:
     - backendRefs:
         - name: enterprise-agentgateway
@@ -582,7 +582,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-auth0.glootest.com
+    - mcp-auth0.try-solo.io
   rules:
     - matches:
         - path:
@@ -715,7 +715,7 @@ EOF
 Before launching Inspector, hit the gateway in your browser once to accept the self-signed cert warning:
 
 ```
-https://mcp-auth0.glootest.com/.well-known/oauth-protected-resource/mcp
+https://mcp-auth0.try-solo.io/.well-known/oauth-protected-resource/mcp
 ```
 
 Click "Advanced → proceed" (Chrome) / "Accept the risk" (Firefox). You should see the JSON discovery document. Without this step, the browser blocks the OAuth redirect chain silently.
@@ -735,7 +735,7 @@ Inspector binds to `http://localhost:6274` and prints a session token in the ter
 In the Inspector UI:
 
 - **Transport type:** `Streamable HTTP`
-- **Server URL:** `https://mcp-auth0.glootest.com/mcp`
+- **Server URL:** `https://mcp-auth0.try-solo.io/mcp`
 - Click **Connect**.
 
 ### Walk through the OAuth flow
@@ -789,7 +789,7 @@ Claude Code is a Node.js process and won't accept the self-signed gateway cert b
 Add the gateway's MCP endpoint to Claude Code's local config:
 
 ```bash
-claude mcp add mcp-auth0-gateway --transport http https://mcp-auth0.glootest.com/mcp
+claude mcp add mcp-auth0-gateway --transport http https://mcp-auth0.try-solo.io/mcp
 ```
 
 Verify it was added:
@@ -801,7 +801,7 @@ claude mcp list
 Expected output includes:
 
 ```
-mcp-auth0-gateway: https://mcp-auth0.glootest.com/mcp (http)
+mcp-auth0-gateway: https://mcp-auth0.try-solo.io/mcp (http)
 ```
 
 ### Launch Claude Code and walk through the OAuth flow
@@ -813,7 +813,7 @@ NODE_TLS_REJECT_UNAUTHORIZED=0 claude
 On the first prompt that triggers MCP tool discovery, Claude Code initiates the OAuth flow automatically:
 
 1. Claude Code fetches `/.well-known/oauth-protected-resource/mcp` to discover the authorization server.
-2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-auth0.glootest.com/oauth-issuer/register`), not Auth0 — this confirms the eager-OAuth issuer is serving its own AS metadata.
+2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-auth0.try-solo.io/oauth-issuer/register`), not Auth0 — this confirms the eager-OAuth issuer is serving its own AS metadata.
 3. Claude Code POSTs to `/oauth-issuer/register` and receives the pre-registered Auth0 `client_id`.
 4. A browser window opens to **Auth0's Universal Login**. **Verify the URL bar shows `${AUTH0_DOMAIN}`**, not the gateway hostname — this confirms the eager-OAuth issuer correctly delegated downstream.
 5. Complete the Auth0 login (with MFA if your tenant requires it).
@@ -867,8 +867,8 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | 401 after browser flow with a valid-looking JWT | `mcp.authentication.audiences` doesn't include the `aud` claim Auth0 actually issued, or the `issuer` value's trailing slash doesn't match | Decode the JWT at `jwt.io`; compare `iss` to `${AUTH0_ISSUER}` (trailing slash) and `aud` to `${AUTH0_AUDIENCE}`. See the audience-injection callout in Step 5. |
 | Inspector shows "fetch failed" or `unable to verify the first certificate` | Inspector's Node process rejected the self-signed gateway cert | Restart Inspector with `NODE_TLS_REJECT_UNAUTHORIZED=0` (Step 9) |
 | Inspector loops on connect with no Auth0 redirect; browser DevTools console (F12) shows `Access to fetch at '.../.well-known/oauth-*-resource/mcp' has been blocked by CORS policy` or `mcp-protocol-version is not allowed by Access-Control-Allow-Headers` | OAuth metadata discovery runs in the **browser** (Inspector UI), not through Inspector's `localhost:6277` proxy. Inspector sends `mcp-protocol-version` on the preflight, but agentgateway's internal handler hardcodes `Access-Control-Allow-Headers: content-type` and rejects it | The Step 8 `mcp-route` HTTPRoute must attach a Gateway API `CORS` filter to both `/.well-known/oauth-*/mcp` rules that allows `mcp-protocol-version` (and `Authorization`). Confirm with `kubectl get httproute -n agentgateway-system mcp-route -o yaml \| grep -A6 'type: CORS'` |
-| Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-auth0.glootest.com/.well-known/oauth-protected-resource/mcp` and click through the warning |
-| `mcp-auth0.glootest.com` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
+| Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-auth0.try-solo.io/.well-known/oauth-protected-resource/mcp` and click through the warning |
+| `mcp-auth0.try-solo.io` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
 | Claude Code (Step 10) fails to connect with an SSL error or `unable to verify the first certificate` | `NODE_TLS_REJECT_UNAUTHORIZED` not set for the Claude Code process | Launch with `NODE_TLS_REJECT_UNAUTHORIZED=0 claude`; do **not** add this to your shell rc |
 
 Useful commands:
