@@ -120,9 +120,7 @@ echo "controller version: $ENTERPRISE_AGW_VERSION"
 Map the hostname to the gateway LoadBalancer IP:
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
-  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
-  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 echo "$GATEWAY_IP"
 
 # Idempotent: drop any stale line for this host first, then add the current IP.

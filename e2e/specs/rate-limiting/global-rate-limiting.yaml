@@ -1,0 +1,220 @@
+lab: labs/rate-limiting/global-rate-limiting.md
+description: entRateLimit global counters — REQUEST vs TOKEN, header, multi-header, JWT claim, tier, IP, and mixed windows
+tier: t1-key
+timeout: 1500
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  # This lab's first two limits use HOUR windows and every counter lives in
+  # ext-cache Redis, so a second run inside the hour would start exhausted and
+  # the 200-then-429 patterns would collapse to 429-only. This is the reset the
+  # lab documents for exactly that situation.
+  - probe: "clear rate limit counters left by an earlier run"
+    script: |
+      kubectl rollout restart deployment/ext-cache-enterprise-agentgateway \
+        -n agentgateway-system
+      kubectl rollout status deployment/ext-cache-enterprise-agentgateway \
+        -n agentgateway-system --timeout=120s
+    assert:
+      - contains: "successfully rolled out"
+
+  - section: "Lab Objectives"
+    run: all
+
+  - section: "Get the gateway address and curl openai"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  # ---- REQUEST-based: counts calls, not tokens ----
+  - section: "Configure a global REQUEST-based rate limit of 5 requests per hour"
+    run: all
+
+  - section: "curl openai until the request limit trips"
+    run: [1]
+    retry:
+      attempts: 4
+      delay: 10
+      until: "HTTP 429"
+    assert:
+      - contains: "request 1: HTTP 200"
+      # 5/hour, so the sixth call is the first rejection.
+      - contains: "request 6: HTTP 429"
+
+  - section: "curl openai until the request limit trips"
+    run: [2]
+
+  # ---- TOKEN-based: counts input tokens ----
+  - section: "Configure global token-based rate limit of 10 input tokens per hour"
+    run: all
+
+  - section: "curl openai until the token limit trips"
+    run: all
+    retry:
+      attempts: 4
+      delay: 10
+      until: "HTTP 429"
+    assert:
+      - contains: "request 1: HTTP 200"
+      - contains: "HTTP 429"
+
+  # ---- Header-based: self-asserted identity ----
+  - section: "Configure header-based token rate limiting"
+    run: all
+
+  - section: "Test header-based rate limiting"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 5
+      until: "HTTP/[0-9.]+ (200|429)"
+    assert:
+      - matches: 'HTTP/[0-9.]+ (200|429)'
+
+  - section: "Test header-based rate limiting"
+    run: [2]
+    assert:
+      - matches: 'HTTP/[0-9.]+ (200|429)'
+
+  # ---- Multi-header composite descriptor ----
+  - section: "Configure multi-header based token rate limiting"
+    run: all
+
+  - section: "Test multi-header rate limiting"
+    run: all
+    retry:
+      attempts: 8
+      delay: 5
+      until: 'HTTP/[0-9.]+ (200|429)'
+    assert:
+      - matches: 'HTTP/[0-9.]+ (200|429)'
+
+  # ---- JWT claim-based: identity the client cannot forge ----
+  - section: "Configure JWT claim-based token rate limiting"
+    run: all
+
+  - section: "Mint two user tokens"
+    run: all
+    assert:
+      # The generator signs locally with lib/jwt keys; confirm the decoded claim
+      # the descriptor keys off.
+      - contains: "analyst-user"
+
+  - section: "Test JWT claim-based rate limiting"
+    run: [1]
+    retry:
+      attempts: 10
+      delay: 3
+      until: "authentication failure|401"
+    assert:
+      # JWT validation rejects before the rate limiter is consulted at all.
+      - contains: "authentication failure: no bearer token found"
+
+  - section: "Test JWT claim-based rate limiting"
+    run: [2]
+    retry:
+      attempts: 4
+      delay: 15
+      until: "HTTP 429"
+    assert:
+      - contains: "User A request 1: HTTP 200"
+      - contains: "HTTP 429"
+
+  # The lab's central claim for this section: User B's counter is untouched by
+  # User A's exhaustion.
+  - section: "Verify independent per-user counters"
+    run: all
+    retry:
+      attempts: 6
+      delay: 5
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  # And the security claim: a header cannot move you to a different counter,
+  # because the descriptor value comes from the signed claim.
+  - section: "The claim cannot be spoofed"
+    run: all
+    assert:
+      - status: 429
+
+  - section: "Composite keys: rate limit on multiple JWT claims"
+    run: all
+
+  # ---- Tier-based quotas from a plan claim ----
+  - section: "Configure tier-based token quotas"
+    run: all
+
+  - section: "Mint tier tokens"
+    run: all
+
+  - section: "Test tier-based rate limiting"
+    run: [1]
+    retry:
+      attempts: 4
+      delay: 15
+      until: "HTTP 429"
+    assert:
+      - contains: "Request 1: HTTP 200"
+      - contains: "HTTP 429"
+
+  - section: "Test tier-based rate limiting"
+    run: [2]
+    retry:
+      attempts: 6
+      delay: 5
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      # plan=premium is a different descriptor value, so a different counter.
+      - status: 200
+      - contains: "chat.completion"
+
+  # ---- IP-based: fires before any identity check ----
+  - section: "Configure IP-based token limiting"
+    run: all
+
+  - section: "Test IP-based rate limiting"
+    run: all
+    retry:
+      attempts: 4
+      delay: 15
+      until: "HTTP 429"
+    assert:
+      # No Authorization header anywhere, yet the limiter still counts — the
+      # distinguishing property of the IP descriptor.
+      - contains: "Request 1: HTTP 200"
+      - contains: "HTTP 429"
+      - not_contains: "authentication failure"
+
+  # ---- Mixed windows: minute burst plus hourly sustained ----
+  - section: "Configure mixed time windows (burst + sustained)"
+    run: all
+
+  - section: "Phase 1: exhaust the per-minute burst"
+    run: all
+    retry:
+      attempts: 3
+      delay: 20
+      until: "HTTP 429"
+    assert:
+      - contains: "Request 1: HTTP 200"
+      - contains: "HTTP 429"
+
+  # The lab's point: the minute bucket resets but the hour counter did not, so
+  # 200s return briefly and then 429 arrives sooner than in Phase 1.
+  - section: "Phase 2: minute resets, hour limit takes over"
+    run: all
+    assert:
+      - contains: "Waiting for minute window to reset"
+      - contains: "HTTP 200"
+      - contains: "HTTP 429"
+
+cleanup:
+  section: "Cleanup"

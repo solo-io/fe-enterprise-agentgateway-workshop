@@ -1,0 +1,30 @@
+lab: labs/routing/direct-response.md
+description: directResponse policy returns a fixed body without a backend
+tier: t0
+requires: []
+timeout: 180
+
+steps:
+  - section: "Create HTTPRoute and Direct Response Policy"
+    run: all
+
+  - section: "curl our agentgateway endpoint"
+    run: all
+    # Route programming is async: the first curl after apply can land before the
+    # proxy has the route, returning 404.
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "Status: Healthy"
+
+  - probe: "unmatched path is not served by the directResponse route"
+    script: |
+      curl -s -o /dev/null -w '%{http_code}' "http://$GATEWAY_IP:8080/not-health"
+    assert:
+      - contains: "404"
+
+cleanup:
+  section: "Cleanup"

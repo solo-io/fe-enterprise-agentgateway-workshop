@@ -1,0 +1,151 @@
+lab: labs/routing/llm-failover-advanced.md
+description: three failover patterns — intra-group ejection, 5XX eviction, and P2C plus per-provider eviction plus inter-group failover
+tier: t1-key
+timeout: 900
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  # ---- Base setup ----
+  - section: "Deploy Mock Server with Rate Limiting"
+    run: all
+    wait: "--for=condition=Available deploy/mock-gpt-4o -n agentgateway-system --timeout=240s"
+
+  - section: "Configure OpenAI Secret"
+    run: all
+
+  # Like llm-failover, this scales the shared proxy to one replica because health
+  # state is per-pod. The lab's Cleanup restores 2 and now waits for the rollout.
+  - section: "Configure Single Replica for Consistent Testing"
+    run: all
+
+  - probe: "exactly one proxy replica is serving"
+    script: |
+      kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system --timeout=180s
+      kubectl get deploy agentgateway-proxy -n agentgateway-system \
+        -o jsonpath='ready={.status.readyReplicas} desired={.spec.replicas}{"\n"}'
+    retry:
+      attempts: 10
+      delay: 5
+      until: "ready=1 desired=1"
+    assert:
+      - contains: "ready=1 desired=1"
+
+  - section: "Export the Gateway IP"
+    run: all
+
+  - section: "Apply the Base Backend, Route, and Health Policy"
+    run: all
+
+  # ---- Pattern 1: failover *within* a priority group ----
+  - section: "Update Configuration"
+    run: all
+
+  - section: "Test Intra-Priority-Group Failover"
+    run: all
+    retry:
+      attempts: 5
+      delay: 20
+      until: "HTTP Status: 200"
+    assert:
+      # The mock rejects, then a *sibling in the same group* takes over — the
+      # distinguishing claim of this pattern.
+      - contains: "RateLimitError"
+      - contains: "HTTP Status: 429"
+      - contains: "HTTP Status: 200"
+      # Group 1's healthy provider is terra; dropping to group 2 would serve
+      # nano instead, which is exactly what must NOT happen here.
+      - contains: "gpt-5.6-terra"
+      - not_contains: "gpt-5.4-nano"
+
+  - section: "Verify Failover in Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+      # Both endpoints appear: the ejected mock and the provider that took over.
+      - contains: "mock-gpt-4o-svc"
+      - contains: "api.openai.com:443"
+
+  # ---- Pattern 2: eviction on 5XX rather than 429 ----
+  - section: "Deploy Mock Server with Server Errors"
+    run: all
+    wait: "--for=condition=Available deploy/mock-gpt-4o-500 -n agentgateway-system --timeout=240s"
+
+  - section: "Create 5XX Failover Configuration"
+    run: all
+
+  - section: "Test 5XX Failover"
+    run: [1]
+    assert:
+      - contains: "successfully rolled out"
+
+  - section: "Test 5XX Failover"
+    run: [2]
+    retry:
+      attempts: 5
+      delay: 20
+      until: "HTTP Status: 200"
+    assert:
+      - contains: "HTTP Status: 503"
+      - contains: "HTTP Status: 200"
+
+  - section: "Verify 5XX Failover in Logs"
+    run: all
+    assert:
+      - contains: "mock-gpt-4o-500-svc"
+      - contains: "api.openai.com:443"
+
+  # The lab's claim is that one CEL expression classifies both 503 and 429.
+  - resource: enterpriseagentgatewaypolicy/mock-5xx-health
+    jsonpath: .spec.backend.health.unhealthyCondition
+    expect: "response.code >= 500"
+    name: a single unhealthyCondition covers both error classes
+
+  - resource: enterpriseagentgatewaypolicy/mock-5xx-health
+    jsonpath: .spec.backend.health.eviction.duration
+    expect: "30s"
+    name: the 5XX eviction duration matches the doc
+
+  # ---- Pattern 3: P2C load balancing + per-provider eviction + inter-group ----
+  - section: "Apply the Combined Configuration"
+    run: all
+
+  - section: "Test the Combined Behavior"
+    run: all
+    retry:
+      attempts: 5
+      delay: 20
+      until: 'model=gpt-5\.4-nano'
+    assert:
+      # Both group-1 providers must fail once each before group 2 is used, so
+      # both error types appear, then the group-2 model answers.
+      - contains: "InternalServerError"
+      - contains: "RateLimitError"
+      - matches: 'model=gpt-5\.4-nano'
+
+  - section: "Verify in the Access Logs"
+    run: all
+    assert:
+      # Three distinct endpoints across the five requests is the evidence for
+      # per-provider eviction plus inter-group failover.
+      - contains: "mock-gpt-4o-500-svc"
+      - contains: "mock-gpt-4o-svc"
+      - contains: "api.openai.com:443"
+
+  - probe: "group 2 was only reached after both group-1 providers were evicted"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 200 \
+        | grep 'route=agentgateway-system/combined-failover' \
+        | grep -oE 'endpoint=[a-z0-9.:-]+' | awk '!seen[$0]++' | head -5
+    retry:
+      attempts: 6
+      delay: 5
+      until: "api.openai.com"
+    assert:
+      # First-seen order: the two mocks precede OpenAI.
+      - matches: 'endpoint=mock-gpt-4o(-500)?-svc'
+      - contains: "endpoint=api.openai.com:443"
+
+cleanup:
+  section: "Cleanup"

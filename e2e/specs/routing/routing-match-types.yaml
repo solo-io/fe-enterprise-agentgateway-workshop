@@ -1,0 +1,158 @@
+lab: labs/routing/routing-match-types.md
+# Listed t0 in PLAN.md, but every curl here goes to the real OpenAI API via
+# openai-secret, so it is t1-key.
+description: path, header and query-param match types each select a model-pinned backend
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 420
+
+steps:
+  - section: "Setup"
+    run: all
+
+  # ---- Option A: path per model ----
+  - section: "Option A: Path-per-Model Matching"
+    run: [1]
+
+  - section: "Option A: Path-per-Model Matching"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      # The backend pins the model, so the response model proves which backend
+      # the path selected — the lab's "validate path to model mapping" objective.
+      - matches: '"model": *"gpt-5\.4-mini'
+      - not_contains: "gpt-5.4-nano"
+
+  - section: "Option A: Path-per-Model Matching"
+    run: [3]
+    assert:
+      - status: 200
+      - matches: '"model": *"gpt-5\.4-nano'
+      - not_contains: "gpt-5.4-mini"
+
+  - section: "Option A: Path-per-Model Matching"
+    run: [4]
+    assert:
+      - status: 200
+      - matches: '"model": *"gpt-5\.6-terra'
+
+  - probe: "a path with no matching rule is not served by the Option A route"
+    script: |
+      curl -s -o /dev/null -w '%{http_code}\n' \
+        "http://$GATEWAY_IP:8080/openai/gpt-4o" \
+        -H 'content-type: application/json' \
+        -d '{"messages":[{"role":"user","content":"hi"}]}'
+    assert:
+      - contains: "404"
+
+  # ---- Option B: header matching ----
+  - section: "Option B: Header Matching"
+    run: [1]
+
+  - section: "Option B: Header Matching"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - matches: '"model": *"gpt-5\.4-mini'
+
+  - section: "Option B: Header Matching"
+    run: [3]
+    assert:
+      - status: 200
+      - matches: '"model": *"gpt-5\.4-nano'
+
+  - section: "Option B: Header Matching"
+    run: [4]
+    assert:
+      - status: 200
+      - matches: '"model": *"gpt-5\.6-terra'
+
+  # The lab presents header matching as the way to *restrict* which models a
+  # client may reach. If a missing or unknown header still routed, the same
+  # /openai path would be an unrestricted passthrough.
+  - probe: "Option B routes only on a recognized model header"
+    script: |
+      for hdr in "model: gpt-4o" "x-none: x"; do
+        printf '%s -> ' "$hdr"
+        curl -s -o /dev/null -w '%{http_code}\n' "http://$GATEWAY_IP:8080/openai" \
+          -H 'content-type: application/json' -H "$hdr" \
+          -d '{"messages":[{"role":"user","content":"hi"}]}'
+      done
+    assert:
+      - contains: "model: gpt-4o -> 404"
+      - contains: "x-none: x -> 404"
+
+  # ---- Option C: query parameter matching ----
+  - section: "Option C: Query Parameter Matching"
+    run: [1]
+
+  - section: "Option C: Query Parameter Matching"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - matches: '"model": *"gpt-5\.4-mini'
+
+  - section: "Option C: Query Parameter Matching"
+    run: [3]
+    assert:
+      - status: 200
+      - matches: '"model": *"gpt-5\.4-nano'
+
+  - section: "Option C: Query Parameter Matching"
+    run: [4]
+    assert:
+      - status: 200
+      - matches: '"model": *"gpt-5\.6-terra'
+
+  # The Setup prose promises the override wins over a client-supplied model.
+  - probe: "the backend model override replaces a client-supplied model"
+    script: |
+      curl -s "http://$GATEWAY_IP:8080/openai?model=gpt-5.4-nano" \
+        -H 'content-type: application/json' \
+        -d '{"model":"gpt-5.6-terra","messages":[{"role":"user","content":"hi"}]}' \
+        | grep -o '"model": *"[^"]*"' | head -1
+    assert:
+      - matches: 'gpt-5\.4-nano'
+      - not_contains: "gpt-5.6-terra"
+
+  - section: "View Metrics Endpoint"
+    run: all
+    retry:
+      attempts: 3
+      delay: 3
+      until: "agentgateway_"
+    assert:
+      - matches: 'agentgateway_[a-z_]+[{ ]'
+
+  - section: "View Metrics and Traces in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "(Optional) View Traces in Jaeger"
+    run: none
+    reason: OpenShift-only alternative to the Solo UI
+
+cleanup:
+  section: "Cleanup"

@@ -1,0 +1,12 @@
+lab: labs/mcp/mcp-eager-auth-keycloak.md
+description: eager-OAuth MCP front door backed by in-cluster Keycloak + Postgres
+tier: excluded
+reason: >-
+  Destructive to the baseline and browser-gated. Step 4 patches the shared
+  EnterpriseAgentgatewayParameters and Step 5 helm-upgrades the controller to
+  enable tokenExchange with a Postgres URL; the lab's own troubleshooting notes
+  warn that an upgrade without `--reuse-values` deletes the ext-cache/ext-auth/
+  rate-limiter/WAF deployments. Its Cleanup does revert correctly, but the actual
+  validation is an interactive OAuth consent flow through MCP Inspector or Claude
+  Code, which cannot be driven headlessly. Belongs in a dedicated single-lab run
+  on a throwaway cluster (`--install-base` makes that cheap).

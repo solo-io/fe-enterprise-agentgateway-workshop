@@ -1,0 +1,98 @@
+lab: labs/transformations/prompt-enrichment.md
+description: backend.ai.prompt.prepend injects a system message the client never sent
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 360
+
+steps:
+  - section: "Lab Objectives"
+    run: all
+
+  - section: "curl openai"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  # Blocks share one shell, so this baseline is available to the comparison probe
+  # after the policy is applied. Taken from the log rather than the response so
+  # both sides of the comparison are measured the same way.
+  #
+  # `kubectl logs -l` concatenates the pods one after another, so a bare `tail -1`
+  # returns the last line of whichever pod is listed last — not the newest
+  # request. The proxy runs 2 replicas, so sort on the leading RFC3339 timestamp
+  # to get the genuinely latest line.
+  - probe: "record the un-enriched prompt token count"
+    script: |
+      export BASE_PROMPT_TOKENS=$(kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 200 \
+        | grep 'http.path=/openai' | sort | tail -1 \
+        | grep -o 'gen_ai.usage.input_tokens=[0-9]*' | cut -d= -f2)
+      echo "baseline=$BASE_PROMPT_TOKENS"
+    retry:
+      attempts: 6
+      delay: 5
+      until: "baseline=[1-9]"
+    assert:
+      - matches: 'baseline=[1-9]'
+
+  - section: "Apply prompt enrichment policy"
+    run: all
+
+  - section: "curl openai with enrichment applied"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  # The enrichment is a gateway-side edit the client cannot see in its own
+  # request, so prove it by what the provider billed: the same request body,
+  # sent twice, costs more input tokens once the prepended system message is in
+  # play. The forwarded prompt text itself cannot be asserted on: the baseline
+  # in 001 ships `llm_prompt` and `llm_completion` commented out, so the access
+  # log carries no message content.
+  - probe: "the prepended system message reached the provider"
+    script: |
+      line=$(kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 200 \
+        | grep 'http.path=/openai' | sort | tail -1)
+      now=$(grep -o 'gen_ai.usage.input_tokens=[0-9]*' <<<"$line" | cut -d= -f2)
+      echo "baseline=$BASE_PROMPT_TOKENS enriched=$now"
+      [ "${now:-0}" -gt "${BASE_PROMPT_TOKENS:-0}" ] && echo "input tokens grew"
+    retry:
+      attempts: 6
+      delay: 5
+      until: "input tokens grew"
+    assert:
+      - contains: "input tokens grew"
+
+  # The lab's own claim about the result. Retried because compliance with the
+  # instruction is the model's behaviour, not the gateway's contract.
+  - probe: "the completion comes back as JSON, as the lab promises"
+    script: |
+      # The model wraps JSON in a markdown fence, so drop the fence lines before
+      # asking jq whether what is left is really JSON.
+      curl -s "http://$GATEWAY_IP:8080/openai" \
+        -H 'content-type: application/json' \
+        -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Whats your favorite poem?"}]}' \
+        | jq -r '.choices[0].message.content' \
+        | sed '/^```/d' \
+        | jq -e . >/dev/null && echo "content parses as json"
+    retry:
+      attempts: 3
+      delay: 2
+      until: "content parses as json"
+    assert:
+      - contains: "content parses as json"
+
+cleanup:
+  section: "Cleanup"

@@ -133,9 +133,7 @@ EOF
 ### Export the Gateway IP
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
-  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
-  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
 ### Test the Route with curl
@@ -255,9 +253,7 @@ EOF
 ### Export the Gateway IP
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
-  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
-  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
 ### Test the Route with curl

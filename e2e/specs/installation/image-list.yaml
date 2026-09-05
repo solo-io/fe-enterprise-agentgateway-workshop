@@ -1,0 +1,9 @@
+lab: labs/installation/image-list.md
+description: reference list of charts and images to mirror for air-gapped installs
+tier: t5-manual
+reason: >-
+  Reference document, not a procedure. Its ```bash blocks are image and chart
+  coordinates, not commands, so there is nothing to execute. Covered by --lint,
+  which fails if the headings the air-gap lab points at are renamed. Verifying
+  that every listed tag still resolves needs registry pulls and belongs in the
+  release-bump workflow rather than here.

@@ -1,0 +1,130 @@
+lab: labs/mcp/remote-mcp.md
+description: proxy an external TLS MCP server (search.solo.io), then gate it with JWT + tool RBAC
+tier: t0
+requires: []
+timeout: 800
+
+# Needs cluster egress to https://search.solo.io. If the cluster is air-gapped
+# this lab will fail at the first probe rather than skip — that is intentional,
+# since the lab's whole subject is reaching a remote MCP server.
+steps:
+  - section: "Create Backend and HTTPRoute"
+    run: all
+
+  - section: "Get Gateway IP"
+    run: all
+    assert:
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+
+  - section: "Run the MCP Inspector"
+    run: none
+    reason: interactive npx browser app, replaced by curl probes
+
+  # `claude mcp add/remove` rewrites the operator's real Claude Code config.
+  # Never run it from the suite.
+  - section: "Integrate with Claude Code"
+    run: none
+    reason: mutates the operator's Claude Code MCP configuration
+
+  - probe: "the remote server's tools are federated through the gateway over TLS"
+    script: |
+      export E2E_MCP_URL="http://$GATEWAY_IP:8080/mcp"
+      SID="$(e2e_mcp_init)"
+      echo "session=$SID"
+      e2e_mcp_expect "search" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "search"
+      - contains: "get_chunks"
+      - contains: "get_full_page"
+
+  - probe: "a search tool call round-trips to the remote server"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_tool "$SID" search '{"query":"agentgateway"}' | head -c 600
+      echo
+    assert:
+      - not_contains: '"error"'
+      - matches: 'content|text|result'
+
+  - section: "View Metrics Endpoint"
+    run: all
+    retry:
+      attempts: 4
+      delay: 3
+      until: "agentgateway_"
+    assert:
+      - matches: 'agentgateway_[a-z_]+[{ ]'
+
+  - section: "View Metrics and Traces in Grafana"
+    run: none
+    reason: browser step
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: browser step
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "Secure Access to MCP Server"
+    run: all
+
+  - probe: "JWT Strict: unauthenticated initialize is rejected"
+    script: |
+      unset E2E_MCP_AUTH
+      e2e_mcp_expect "401" present e2e_mcp_status
+    assert:
+      - contains: "401"
+
+  - section: "Verify Authentication Failure"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - probe: "the lab's token is accepted against the remote server"
+    script: |
+      export E2E_MCP_AUTH=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "search" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "search"
+
+  - section: "Authorize Based on JWT Claims"
+    run: all
+
+  - probe: "RBAC deny: the catalog is filtered empty for the wrong org"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect '"name":"search"' absent e2e_mcp_tools "$SID"
+    assert:
+      - not_contains: '"name":"search"'
+
+  - section: "Allow Access for solo.io Organization"
+    run: all
+
+  - probe: "RBAC allow: the full remote catalog returns"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "get_chunks" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "search"
+      - contains: "get_chunks"
+
+  - section: "Limit Tool Access"
+    run: all
+
+  - probe: "tool RBAC: only search stays advertised, get_chunks is filtered out"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "get_chunks" absent e2e_mcp_tools "$SID"
+      echo "--- direct call to the unadvertised tool ---"
+      e2e_mcp_tool "$SID" get_chunks '{"query":"x"}'
+    assert:
+      - contains: "search"
+      - contains: "Unknown tool: get_chunks"
+
+# Cleanup block 2 is `claude mcp remove` / `claude mcp add`, which would rewrite
+# the operator's Claude Code config. Only the Kubernetes teardown is run.
+cleanup:
+  section: "Cleanup"
+  run: [1]

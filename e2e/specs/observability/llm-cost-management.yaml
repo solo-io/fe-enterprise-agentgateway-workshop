@@ -1,0 +1,195 @@
+lab: labs/observability/llm-cost-management.md
+description: model cost catalog overlay plus layered EnterpriseAgentgatewayBudget enforcement, delegation, and blocking
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 1200
+
+steps:
+  # Budget counters live in ext-cache Redis and outlive the lab's own cleanup,
+  # which deletes the budget resources but not their spend. Bob's cap is 2,000
+  # tokens per rolling day and the blocking step exhausts it on purpose, so a
+  # second run inside 24h would 429 during "Generate cost-attributed traffic"
+  # unless the counters are cleared first.
+  - probe: "reset budget counters left over from an earlier run"
+    script: |
+      kubectl rollout restart deployment/ext-cache-enterprise-agentgateway \
+        -n agentgateway-system
+      kubectl rollout status deployment/ext-cache-enterprise-agentgateway \
+        -n agentgateway-system --timeout=180s
+    assert:
+      - contains: "successfully rolled out"
+
+  # 002 turns Cost Management on, so the lab no longer enables it. Assert the
+  # prerequisite anyway: without the flag the whole lab has nowhere to render.
+  - probe: "002 left Cost Management enabled on the management release"
+    script: |
+      helm get values management -n agentgateway-system -a -o json \
+        | jq -r '.products.agentgateway.features["cost-management"] // "unset"' \
+        | sed 's/^/cost_management=/'
+    assert:
+      - contains: "cost_management=true"
+
+  - resource: deploy/solo-enterprise-ui
+    jsonpath: .status.readyReplicas
+    expect: "1"
+    name: the Solo UI 002 installed is ready to render Cost Management
+
+  - section: "Set up the OpenAI backend"
+    run: all
+
+  - section: "Create per-user virtual keys"
+    run: all
+
+  # Every dashboard pivot and every budget subject resolves from these
+  # dimensions, and virtualKey resolves from apiKey.id with no fallback, so
+  # assert the shipped dimension set rather than trusting the lab's prose.
+  - section: "Review the attribution dimensions"
+    run: all
+    assert:
+      - contains: "id: virtualKey"
+      - contains: "expression: apiKey.id"
+      - contains: "id: group"
+      - contains: "id: user"
+
+  - section: "Configure API key authentication"
+    run: [1]
+
+  - section: "Configure API key authentication"
+    run: [2]
+    retry:
+      attempts: 10
+      delay: 3
+      until: "alice: HTTP 200"
+    assert:
+      - contains: "alice: HTTP 200"
+      - contains: "bob: HTTP 200"
+      - contains: "invalid: HTTP 401"
+
+  - section: "Configure a model cost catalog"
+    run: all
+    assert:
+      # The lab warns that a full `kubectl apply` here would strip the fields 001
+      # set, which is why it uses a merge patch. This is that regression check:
+      # the last block prints the resulting resource.
+      - contains: "modelCatalog"
+      - contains: "logging"
+
+  # Three separately-owned budget resources, all enforced at once. The lab's
+  # claim is that entries compose across resources and the most restrictive wins.
+  - section: "Enforce layered budgets"
+    run: [1, 2]
+
+  - section: "Enforce layered budgets"
+    run: [3]
+    retry:
+      attempts: 10
+      delay: 6
+      until: "agw-budget-user-exceptions-"
+    assert:
+      # The controller compiles one managed RateLimitConfig per budget resource.
+      - matches: 'agw-budget-finance-guardrails-[a-z0-9]+'
+      - matches: 'agw-budget-platform-defaults-[a-z0-9]+'
+      - matches: 'agw-budget-user-exceptions-[a-z0-9]+'
+
+  # A budget in a team namespace is Accepted but not Enforced while discovery is
+  # scoped to Same. Assert both states, since a spec that only checked the final
+  # one would pass even if the budget had been enforced from the start.
+  - section: "Delegate a budget to a team namespace"
+    run: [1]
+
+  - section: "Delegate a budget to a team namespace"
+    run: [2]
+    retry:
+      attempts: 10
+      delay: 5
+      until: 'research-team-quota +True +False'
+    assert:
+      - matches: 'research-team-quota +True +False'
+
+  - section: "Delegate a budget to a team namespace"
+    run: [3]
+
+  - section: "Delegate a budget to a team namespace"
+    run: [4]
+    retry:
+      attempts: 12
+      delay: 6
+      until: 'research-team-quota +True +True'
+    assert:
+      - matches: 'research-team-quota +True +True'
+      # Widening discovery creates the compiled config next to the team's budget,
+      # in team-research rather than agentgateway-system.
+      - matches: 'agw-budget-research-team-quota-[a-z0-9]+'
+
+  - section: "Generate cost-attributed traffic"
+    run: all
+    assert:
+      - contains: "alice request 5: HTTP 200"
+      - contains: "bob request 3: HTTP 200"
+      # This traffic sits well inside every cap, and the team budgets are Audit
+      # rather than Block, so nothing here may be rejected yet.
+      - not_contains: "HTTP 429"
+
+  # The catalog is mounted as a ConfigMap and takes up to two minutes to reach
+  # the gateway, so retry generously. A priced request proves the whole chain:
+  # catalog -> parametersRef -> proxy -> cost attribution on the request.
+  - probe: "requests are priced from the catalog"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 300 \
+        | grep 'http.path=/openai' \
+        | grep -oE 'agw.ai.usage.cost.total=[0-9.e-]+' | tail -3
+    retry:
+      attempts: 12
+      delay: 15
+      until: 'cost.total=[0-9]*\.?[0-9]*[1-9]'
+    assert:
+      - matches: 'agw\.ai\.usage\.cost\.total=[0-9.e-]+'
+      # A model missing from the catalog still logs volume but zero spend, so a
+      # nonzero total is what distinguishes priced from unpriced.
+      - matches: 'cost\.total=[0-9]*\.?[0-9]*[1-9]'
+
+  # Enforcement, end to end: bob's 2,000-token cap rejects, and the
+  # exact-subject entry debits only him.
+  - section: "Watch a budget block"
+    run: [1]
+    assert:
+      - contains: "HTTP 429"
+
+  - section: "Watch a budget block"
+    run: [2]
+    assert:
+      # Alice keeps serving while bob is cut off, which is what a per-user entry
+      # buys over a shared cap.
+      - contains: "alice: HTTP 200"
+
+  - probe: "the compiled budgets carry the documented Block and Audit actions"
+    script: |
+      for b in finance-guardrails platform-defaults user-exceptions; do
+        kubectl get enterpriseagentgatewaybudget "$b" -n agentgateway-system \
+          -o jsonpath='{range .spec.budgets[*]}{.name}={.onBudgetExceeded} {end}{"\n"}'
+      done
+    assert:
+      - contains: "engineering-monthly-usd=Audit"
+      - contains: "any-user-daily-tokens=Block"
+      - contains: "alice-daily-tokens=Block"
+      - contains: "bob-daily-tokens=Block"
+
+  - section: "(Optional) Seed historical spend"
+    run: none
+    reason: >-
+      seeds 300k synthetic spans into the shared ClickHouse instance and its
+      cleanup truncates the spans table, which would destroy trace evidence
+      other labs assert on
+
+  - section: "View the Cost Management dashboard"
+    run: none
+    reason: foreground port-forward plus a browser step; the dashboard's inputs are asserted by the probes above
+
+cleanup:
+  # Block 1 tears down the lab's own resources. Block 2 truncates the shared
+  # ClickHouse spans table and block 3 disables Cost Management on the
+  # management release, both of which would break later labs in the same run.
+  - section: "Cleanup"
+    run: [1]

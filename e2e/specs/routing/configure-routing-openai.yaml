@@ -1,0 +1,71 @@
+lab: labs/routing/configure-routing-openai.md
+description: real OpenAI backend via secretRef, token usage returned
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 300
+
+steps:
+  - section: "Configure Required Variables"
+    run: all
+
+  - section: "curl openai"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "choices"
+      - contains: "gpt-5.4-nano"
+      # Guards the model-ID rename that bit 0.13.1: a dated response id means
+      # the request actually reached OpenAI rather than a mock.
+      - matches: '"id": *"(chatcmpl|resp)'
+
+  # The lab's one-liner port-forwards to a single proxy pod, but 001 runs
+  # replicas: 2 — the request may have been served by the other one. So assert
+  # only what this section claims (the endpoint serves agentgateway metrics),
+  # and check the request counter across every replica in the probe below.
+  - section: "View Metrics Endpoint"
+    run: all
+    retry:
+      attempts: 3
+      delay: 3
+      until: "agentgateway_"
+    assert:
+      - matches: 'agentgateway_[a-z_]+[{ ]'
+
+  - probe: "the LLM request was counted on some proxy replica"
+    script: |
+      found=0
+      for pod in $(kubectl get pods -n agentgateway-system \
+                     -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+        e2e_pf agentgateway-system "$pod" 15099:15020 || continue
+        curl -s localhost:15099/metrics | grep -q 'agentgateway_requests_total{' && found=1
+        e2e_pf_stop
+        [ "$found" = 1 ] && break
+      done
+      echo "requests_total_found=$found"
+    assert:
+      - contains: "requests_total_found=1"
+
+  - section: "View Metrics and Traces in Grafana"
+    run: none
+    reason: browser step
+
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: browser step
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "(Optional) View Traces in Jaeger"
+    run: none
+    reason: OpenShift-only alternative to the Solo UI
+
+cleanup:
+  section: "Cleanup"

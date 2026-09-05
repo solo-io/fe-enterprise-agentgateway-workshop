@@ -1,0 +1,121 @@
+lab: labs/routing/openai-audio.md
+description: TTS and Whisper transcription proxied through the gateway, text -> audio -> text
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 420
+
+steps:
+  # This lab is the only one that writes files (speech.mp3, speech.wav). Drivers
+  # run from the repo root, so without this the artifacts would land in a
+  # customer-facing repo. Blocks share one shell, so the cd carries through to
+  # every later block and the lab's relative paths still work unchanged.
+  - probe: "keep generated audio out of the repo"
+    script: |
+      cd "$E2E_WORKDIR" && pwd
+    assert:
+      - contains: ".work/routing/openai-audio"
+
+  - section: "Configure OpenAI Route with Audio Support"
+    run: all
+
+  # Block 2 is afplay/aplay — it would play audio out of the machine's speakers
+  # and aplay does not exist on macOS.
+  - section: "Generate Speech"
+    run: [1]
+
+  - probe: "the TTS response is real audio, not a JSON error body"
+    script: |
+      ls -l speech.mp3 | awk '{print "bytes=" $5}'
+      file speech.mp3
+    retry:
+      attempts: 8
+      delay: 3
+      until: '(MPEG|Audio)'
+    assert:
+      # A failed upstream call would still create the file, holding a small JSON
+      # error body — so assert on the format, not just existence. BSD `file`
+      # reports "MPEG ADTS, layer III" where GNU file says "Audio file".
+      - matches: 'bytes=[0-9]{5,}'
+      - matches: 'speech\.mp3: .*(MPEG|Audio)'
+
+  - section: "Available Voices"
+    run: all
+
+  - section: "Output Formats"
+    run: all
+
+  - probe: "response_format is honoured end to end"
+    script: |
+      file speech-nova.mp3 speech.wav
+    assert:
+      - matches: 'speech-nova\.mp3: .*(Audio|MPEG)'
+      - matches: 'speech\.wav: .*WAVE'
+
+  # The round trip the lab is built around: the transcription of the audio the
+  # first step generated has to come back as the text that was sent in.
+  - section: "Transcribe the Generated Audio"
+    run: all
+    retry:
+      attempts: 6
+      delay: 3
+      until: '"text"'
+    assert:
+      - contains: '"text"'
+      - contains: "Agent Gateway"
+      - contains: "OpenAI"
+
+  - section: "Transcription with Verbose Output"
+    run: all
+    assert:
+      - contains: '"task": "transcribe"'
+      - contains: '"language": "english"'
+      - contains: '"segments"'
+      - matches: '"duration": [0-9]'
+
+  - section: "View Access Logs"
+    run: all
+    # `kubectl logs -l <selector>` resolves the pod list first and then streams
+    # each pod, so it exits 1 with `pods "..." not found` if any selected pod
+    # disappears in between — which is what happens when a preceding lab has just
+    # rolled the shared proxy. Retry until an actual audio request line is
+    # present.
+    retry:
+      attempts: 8
+      delay: 3
+      until: 'http\.path=/v1/audio/'
+    assert:
+      - contains: "agentgateway-proxy"
+      # The lab's block passes `--prefix`, so every line already carries the
+      # `agentgateway-proxy` pod name: the assertion above holds even when the
+      # log contains no request at all. Assert the request line itself.
+      - matches: 'http\.path=/v1/audio/(speech|transcriptions).*http\.status=200'
+
+  # The lab's closing Note tells the reader audio endpoints are Passthrough, so
+  # token-level metrics are unavailable while request counts and statuses are
+  # still tracked. Assert both halves of that.
+  - probe: "audio endpoints are proxied but not parsed as LLM completions"
+    script: |
+      logs=$(kubectl logs -n agentgateway-system \
+               -l app.kubernetes.io/name=agentgateway-proxy --tail 300 \
+               | grep -E 'http.path=/v1/audio/')
+      grep -oE 'http.path=/v1/audio/[a-z]+' <<<"$logs" | sort -u
+      grep -q 'http.status=200' <<<"$logs" && echo "audio requests tracked"
+      grep -q 'gen_ai.usage' <<<"$logs" \
+        && echo "token metrics present" || echo "no token metrics, as documented"
+    retry:
+      attempts: 6
+      delay: 5
+      until: "http.path=/v1/audio/transcriptions"
+    assert:
+      - contains: "http.path=/v1/audio/speech"
+      - contains: "http.path=/v1/audio/transcriptions"
+      - contains: "audio requests tracked"
+      - contains: "no token metrics, as documented"
+
+  - section: "View Metrics in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+cleanup:
+  section: "Cleanup"

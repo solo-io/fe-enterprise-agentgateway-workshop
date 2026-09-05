@@ -1,0 +1,88 @@
+lab: labs/security/sni-matching.md
+description: two HTTPS listeners on :443, cert chosen by SNI, unknown SNI rejected
+tier: t0
+requires: []
+timeout: 600
+
+steps:
+  - section: "Deploy Mock OpenAI Server"
+    run: all
+    wait: "--for=condition=Available deploy/mock-gpt-4o -n agentgateway-system --timeout=300s"
+
+  # openssl writes progress to stderr; the certs and secrets are what matter.
+  - section: "Create a self-signed TLS cert"
+    run: all
+
+  - section: "Set up SNI Routing"
+    run: all
+
+  - probe: "the SNI Gateway is Programmed with both HTTPS listeners"
+    script: |
+      for i in $(seq 1 30); do
+        OUT="$(kubectl get gateway agentgateway-sni -n agentgateway-system \
+                 -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status} {.status.addresses[0].value}' 2>/dev/null)"
+        [[ "$OUT" == True*[0-9]* ]] && break
+        sleep 5
+      done
+      echo "programmed=$OUT"
+      kubectl get gateway agentgateway-sni -n agentgateway-system \
+        -o jsonpath='{range .spec.listeners[*]}{.name}:{.port} {end}'
+      echo
+      # The Gateway-level Programmed condition stays True even when an individual
+      # listener is Programmed=False/Invalid (e.g. a missing cert Secret), so
+      # check each listener's own condition rather than trusting the roll-up.
+      kubectl get gateway agentgateway-sni -n agentgateway-system \
+        -o jsonpath='{range .status.listeners[*]}{.name}={range .conditions[?(@.type=="Programmed")]}{.status}{end} {end}'
+      echo
+    assert:
+      - matches: 'programmed=True [0-9]'
+      - contains: "foo:443"
+      - contains: "bar:443"
+      - contains: "foo=True"
+      - contains: "bar=True"
+
+  # Regression guard for the bug this lab used to have: it applied its Gateway
+  # over the shared `agentgateway-proxy`, dropping :8080 and the parametersRef.
+  - probe: "the baseline agentgateway-proxy Gateway was left intact"
+    script: |
+      kubectl get gateway agentgateway-proxy -n agentgateway-system \
+        -o jsonpath='{.spec.listeners[*].port}|{.spec.infrastructure.parametersRef.name}'
+      echo
+    assert:
+      - contains: "8080|agentgateway-config"
+
+  # blocks: [1] curl foo  [2] curl bar  [3] curl baz (expected to fail TLS)
+  - section: "Validate connectivity to the application over HTTPS"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "CN=mock-openai-foo.try-solo.io"
+      - contains: "issuer: O=Solo.io; CN=try-solo.io"
+      - contains: "mock-gpt-4o"
+
+  - section: "Validate connectivity to the application over HTTPS"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "CN=mock-openai-bar.try-solo.io"
+      - contains: "mock-gpt-4o"
+
+  # baz has a route but no matching listener, so the gateway resets during the
+  # handshake — curl exits non-zero before any HTTP response.
+  - section: "Validate connectivity to the application over HTTPS"
+    run: [3]
+    allow_failure: true
+    assert:
+      - not_contains: "HTTP/1.1 200"
+      - matches: 'SSL_connect|TLS connect error|Connection reset|alert|handshake'
+
+cleanup:
+  section: "Cleanup"

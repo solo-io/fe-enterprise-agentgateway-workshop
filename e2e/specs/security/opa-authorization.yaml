@@ -1,0 +1,135 @@
+lab: labs/security/opa-authorization.md
+description: one Rego AuthConfig shared by an LLM route and an MCP route via entExtAuth
+tier: t1-key
+timeout: 600
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  - section: "Step 1: Create the OpenAI backend and route"
+    run: [1, 2]
+
+  - section: "Step 1: Create the OpenAI backend and route"
+    run: [3]
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+      # Baseline before OPA attaches, so a later 403 cannot be mistaken for a
+      # route that never worked.
+      - not_contains: "x-opa-decision"
+
+  - section: "Step 2: Create the OPA policy"
+    run: all
+
+  - section: "Step 3: Create the AuthConfig"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "Accepted"
+    assert:
+      - contains: "Accepted"
+
+  - section: "Step 4: Attach the policy to the OpenAI route"
+    run: all
+
+  # The Rego default rule drives all four observable outputs: status, client
+  # response header, body, and the stripped request header.
+  - section: "Step 5: Test LLM authorization"
+    run: [1]
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - contains: "x-opa-decision: denied"
+      - contains: "Access denied: missing or invalid API key"
+      - not_contains: "chat.completion"
+
+  - section: "Step 5: Test LLM authorization"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "x-opa-decision: allowed"
+      - contains: "chat.completion"
+
+  # A wrong key must take the default deny branch, not be treated as present.
+  # The lab only tests the missing-header case.
+  - probe: "an incorrect api-key is denied, not merely a missing one"
+    script: |
+      curl -s -o /dev/null -w 'wrong_key=%{http_code}\n' "http://$GATEWAY_IP:8080/openai" \
+        -H 'content-type: application/json' \
+        -H 'api-key: not-the-right-key' \
+        -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Say hi"}],"max_tokens":5}'
+    assert:
+      - contains: "wrong_key=403"
+
+  # ---- Part 2: the same AuthConfig in front of an MCP route ----
+  - section: "Step 1: Create the MCP backend and route"
+    run: all
+
+  - section: "Step 2: Attach the OPA policy to the MCP route"
+    run: all
+
+  - section: "Step 3: Test MCP authorization"
+    run: [1]
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - contains: "x-opa-decision: denied"
+      - contains: "Access denied: missing or invalid API key"
+
+  - section: "Step 3: Test MCP authorization"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 5
+      until: '"tools"'
+    assert:
+      - contains: '"tools"'
+      # The Solo.io docs MCP server's own catalog, proving the request reached
+      # the upstream rather than being answered by the gateway.
+      - contains: "search"
+      - contains: "get_chunks"
+
+  - section: "Step 3: Test MCP authorization"
+    run: [3]
+    retry:
+      attempts: 6
+      delay: 5
+      until: '"result"'
+    assert:
+      - contains: '"result"'
+      - not_contains: '"error"'
+
+  # The point of Part 2 is that one AuthConfig serves both routes. Prove the
+  # sharing rather than assuming it: two policies, one authConfigRef.
+  - probe: "both routes are gated by the same AuthConfig"
+    script: |
+      for p in llm-opa-policy mcp-opa-policy; do
+        kubectl get enterpriseagentgatewaypolicy "$p" -n agentgateway-system \
+          -o jsonpath="$p -> {.spec.traffic.entExtAuth.authConfigRef.name} on {.spec.targetRefs[*].name}{\"\n\"}"
+      done
+    assert:
+      - contains: "llm-opa-policy -> llm-opa on openai"
+      - contains: "mcp-opa-policy -> llm-opa on soloio-docs-mcp"
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+cleanup:
+  section: "Cleanup"

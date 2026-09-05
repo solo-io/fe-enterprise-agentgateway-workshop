@@ -1,0 +1,124 @@
+lab: labs/mcp/mcp-tool-mode-search.md
+description: MCP Search tool mode — two meta-tools instead of the full catalog, RBAC inside get_tool
+tier: t0
+requires: []
+timeout: 1200
+
+steps:
+  - section: "Step 1: Deploy the MCP Server"
+    run: all
+    wait: "--for=condition=Available deploy/mcp-server-everything -n mcp --timeout=300s"
+
+  - section: "Step 2: Create the EnterpriseAgentgatewayBackend and HTTPRoute"
+    run: all
+
+  # blocks: [1] export GATEWAY_IP  [2] npx Inspector
+  - section: "Step 3: Verify with MCP Inspector"
+    run: [1]
+    assert:
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+
+  # The backend uses sessionRouting: Stateless, so the gateway deliberately does
+  # not return an mcp-session-id — $SID is expected to be empty here. Assert only
+  # that the step ran, never on the session value.
+  - section: "Initialize and capture the session ID"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "Session:"
+    assert:
+      - contains: "Session:"
+
+  - section: "List tools — confirm only the two meta-tools come back"
+    run: all
+    assert:
+      - contains: "get_tool"
+      - contains: "invoke_tool"
+      - not_contains: '"get-sum"'
+      - not_contains: '"get-env"'
+
+  - section: "Look up a tool"
+    run: all
+    assert:
+      - contains: "get-sum"
+      - contains: "tool_description"
+
+  - section: "Invoke it"
+    run: all
+    assert:
+      - contains: "The sum of 2 and 3 is 5."
+
+  # blocks: [1] search-mode byte count  [2] upstream byte count via port-forward
+  #         [3] python reduction calculation
+  - section: "Measure the savings"
+    run: [1]
+    assert:
+      - matches: 'Search-mode tools/list:[[:space:]]+[0-9]+ bytes'
+
+  - section: "Measure the savings"
+    run: [2]
+    assert:
+      - matches: 'Upstream \(Standard equivalent\) tools/list:[[:space:]]+[0-9]+ bytes'
+
+  - section: "Measure the savings"
+    run: [3]
+    assert:
+      - matches: 'Standard catalog:[[:space:]]+[0-9]+ bytes'
+      - matches: 'Search meta-tools:[[:space:]]+[0-9]+ bytes'
+      - matches: 'Reduction:[[:space:]]+[0-9]+ bytes \([0-9.]+%\)'
+
+  - section: "Apply JWT validation"
+    run: all
+
+  - section: "Apply per-tool authorization"
+    run: all
+
+  # The restricted tool is filtered inside get_tool rather than rejected, so the
+  # lookup comes back no_match and never names get-env.
+  - section: "Test with the demo JWT"
+    run: all
+    retry:
+      attempts: 8
+      delay: 4
+      until: '"status"'
+    assert:
+      - contains: "no_match"
+      - not_contains: "get-env"
+
+  - section: "Deploy the synthetic server"
+    run: all
+    wait: "--for=condition=Available deploy/mcp-stub -n mcp --timeout=300s"
+
+  - section: "Re-point the backend at the stub server"
+    run: all
+
+  - section: "Re-measure"
+    run: all
+    retry:
+      attempts: 8
+      delay: 4
+      until: 'Reduction'
+    assert:
+      - matches: 'Stub catalog \([0-9]+ tools\) upstream:[[:space:]]+[0-9]+ bytes'
+      - matches: 'Reduction:[[:space:]]+[0-9]+ bytes \([0-9.]+%\)'
+
+  - section: "Point the backend back to `mcp-server-everything` before continuing"
+    run: all
+
+  - section: "View access logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "View MCP metrics"
+    run: all
+    retry:
+      attempts: 4
+      delay: 3
+      until: "agentgateway_mcp"
+    assert:
+      - matches: 'agentgateway_mcp_requests_total\{'
+
+cleanup:
+  section: "Cleanup"

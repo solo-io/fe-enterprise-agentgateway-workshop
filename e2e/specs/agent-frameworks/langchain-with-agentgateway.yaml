@@ -1,0 +1,99 @@
+lab: labs/agent-frameworks/langchain-with-agentgateway.md
+description: LangChain researcher→writer pipeline whose LLM calls traverse the gateway
+tier: t1-key
+timeout: 900
+requires:
+  - OPENAI_API_KEY
+
+# No `cd $E2E_WORKDIR` here: every path in this lab is relative to the repo root
+# (lib/langchain/...), and the venv it creates is removed by the lab's Cleanup.
+
+steps:
+  - section: "Configure Required Variables"
+    run: all
+
+  - section: "Create OpenAI Route and Backend"
+    run: all
+
+  - section: "Get the Gateway IP"
+    run: all
+
+  - section: "Verify the Endpoint"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "choices"
+
+  # pip install of the LangChain stack — slow, hence this spec's long timeout.
+  - section: "Run the LangChain Two-Agent Pipeline"
+    run: [1]
+    assert:
+      - not_contains: "ERROR: "
+
+  - section: "Run the LangChain Two-Agent Pipeline"
+    run: [2]
+    assert:
+      # The script prints the base_url it dialled: proof the SDK was pointed at
+      # the gateway rather than api.openai.com, which is the whole lab.
+      - matches: 'Using base_url: http://[0-9.]+:8080/openai/v1'
+      - contains: "AI Gateway key patterns and concepts"
+      - contains: "Running Researcher agent"
+      - contains: "Running Writer agent"
+      - contains: "FINAL BLOG POST:"
+      - not_contains: "Traceback"
+
+  - section: "Run the LangChain Two-Agent Pipeline"
+    run: [3]
+    assert:
+      - contains: "Service Mesh key patterns and concepts"
+      - contains: "FINAL BLOG POST:"
+      - not_contains: "Traceback"
+
+  # Two chains, each making its own call, so the gateway must have recorded at
+  # least two completions per run — the observable difference between "the app
+  # works" and "the app's traffic actually went through the proxy".
+  - probe: "both chains' calls were proxied and billed through the gateway"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 500 \
+        | grep 'http.path=/openai' | grep -c 'gen_ai.operation.name=chat' \
+        | sed 's/^/proxied_completions=/'
+    retry:
+      attempts: 6
+      delay: 5
+      # Must cover two-digit counts exactly as the assertion does: both chains
+      # make several calls, so a healthy run logs 10+ and a `[2-9]`-only guard
+      # never matches, burning all 6 attempts before passing on the assertion.
+      until: 'proxied_completions=([2-9]|[0-9]{2,})'
+    assert:
+      - matches: 'proxied_completions=[2-9]|proxied_completions=[0-9]{2,}'
+
+  - section: "View access logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+      - contains: "gen_ai.request.model=gpt-5.4-nano"
+
+  - section: "View Metrics and Traces in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View the Prometheus metrics endpoint"
+    run: all
+    retry:
+      attempts: 3
+      delay: 3
+      until: "agentgateway_"
+    assert:
+      - matches: 'agentgateway_[a-z_]+[{ ]'
+
+cleanup:
+  section: "Cleanup"

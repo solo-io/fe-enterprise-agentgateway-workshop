@@ -1,0 +1,60 @@
+lab: labs/routing/openai-streaming.md
+description: SSE streaming through the gateway to OpenAI; chunks, final usage chunk, [DONE]
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 300
+
+steps:
+  - section: "Configure OpenAI Route"
+    run: all
+
+  - section: "Test Streaming Response"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "chat.completion.chunk"
+    assert:
+      # Every claim the lab's "Key observations" list makes about the stream.
+      - contains: "data: "
+      - contains: "chat.completion.chunk"
+      - contains: '"delta"'
+      - contains: '"finish_reason":"stop"'
+      - contains: "data: [DONE]"
+      - matches: '"id":"(chatcmpl|resp)'
+      # The gateway sets stream_options.include_usage for its own token metrics
+      # and forwards the resulting final chunk, which OpenAI does not send on its
+      # own. The lab documents that chunk, so assert its exact shape: usage after
+      # an empty choices array, and null on the content chunks.
+      - contains: '"choices":[],"usage":{'
+      - matches: '"total_tokens":[0-9]+'
+      - contains: '"usage":null'
+
+  - section: "View Streaming Metrics in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - probe: "streaming token usage also reaches the access log, as the lab claims"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 200 \
+        | grep -o 'gen_ai[.a-z_]*output_tokens=[0-9]*' | tail -3
+    retry:
+      attempts: 6
+      delay: 5
+      until: "output_tokens=[1-9]"
+    assert:
+      - matches: 'output_tokens=[1-9]'
+
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+cleanup:
+  section: "Cleanup"

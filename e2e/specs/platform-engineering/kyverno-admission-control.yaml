@@ -1,0 +1,166 @@
+lab: labs/platform-engineering/kyverno-admission-control.md
+description: Kyverno admission policies reject unsafe Agentgateway backend manifests
+tier: t0
+requires: []
+timeout: 600
+
+# Every "denied" step here is an intentional non-zero exit: kubectl fails when an
+# admission webhook rejects the manifest, so the block's rc is 1 and the lab is
+# working exactly as documented. Hence allow_failure on those steps, with the
+# assertions carrying the real verification — that the *named policy and rule*
+# did the blocking, not some unrelated CRD-schema rejection that would also
+# produce rc 1.
+
+steps:
+  - section: "Install Kyverno"
+    run: [1]
+    assert:
+      - rc: 0
+
+  - section: "Install Kyverno"
+    run: [2]
+    retry: {attempts: 20, delay: 5, until: "admission-controller.*Running"}
+    assert:
+      - contains: "kyverno-admission-controller"
+      - contains: "kyverno-background-controller"
+      - contains: "kyverno-reports-controller"
+
+  # Must precede the policies: Kyverno's reports controller caches a failed
+  # watcher, so granting this afterwards needs a restart the lab would rather
+  # not make the reader do.
+  - section: "Grant Kyverno Access to the Agentgateway CRDs"
+    assert:
+      - contains: "kyverno:agentgateway-backends"
+
+  # ---- Policy 1: Enterprise Backends Only ------------------------------------
+  - section: "Policy 1: Enterprise Backends Only"
+    run: [1]
+    assert:
+      - contains: "agentgateway-enterprise-crds-only"
+
+  - section: "Policy 1: Enterprise Backends Only"
+    run: [2]
+    retry: {attempts: 12, delay: 3, until: "True"}
+    assert:
+      - contains: "Ready"
+
+  - section: "Policy 1: Enterprise Backends Only"
+    run: [3]
+    allow_failure: true
+    retry: {attempts: 10, delay: 3, until: "was blocked due to the following policies"}
+    assert:
+      - contains: "agentgateway-enterprise-crds-only"
+      - contains: "block-oss-backend-kind"
+      - contains: "is not allowed on"
+
+  # The Enterprise kind admits the identical spec the OSS kind just denied.
+  - section: "Policy 1: Enterprise Backends Only"
+    run: [4]
+    assert:
+      - contains: "ent-openai-backend created"
+      - not_contains: "was blocked"
+
+  # ---- Policy 2: Approved LLM Providers Only ---------------------------------
+  - section: "Policy 2: Approved LLM Providers Only"
+    run: [1]
+    assert:
+      - contains: "agentgateway-restrict-providers"
+
+  - section: "Policy 2: Approved LLM Providers Only"
+    run: [2]
+    retry: {attempts: 12, delay: 3, until: "True"}
+    assert:
+      - contains: "Ready"
+
+  - section: "Policy 2: Approved LLM Providers Only"
+    run: [3]
+    allow_failure: true
+    retry: {attempts: 10, delay: 3, until: "was blocked due to the following policies"}
+    assert:
+      - contains: "agentgateway-restrict-providers"
+      - contains: "validate-provider"
+      - contains: "Only approved LLM providers are allowed"
+
+  # bedrock is on the allowlist alongside openai — proves the AllNotIn condition
+  # allows a second provider, not just the one used elsewhere in the lab.
+  - section: "Policy 2: Approved LLM Providers Only"
+    run: [4]
+    assert:
+      - contains: "bedrock-backend created"
+      - not_contains: "was blocked"
+
+  # ---- Policy 3: MCP Targets Must Point at Approved Hosts --------------------
+  - section: "Policy 3: MCP Targets Must Point at Approved Hosts"
+    run: [1]
+    retry: {attempts: 12, delay: 3, until: "configured|created"}
+    assert:
+      - contains: "agentgateway-restrict-mcp-hosts"
+
+  - section: "Policy 3: MCP Targets Must Point at Approved Hosts"
+    run: [2]
+    allow_failure: true
+    retry: {attempts: 10, delay: 3, until: "was blocked due to the following policies"}
+    assert:
+      - contains: "agentgateway-restrict-mcp-hosts"
+      - contains: "validate-mcp-host"
+      - contains: "may only point at approved"
+
+  - section: "Policy 3: MCP Targets Must Point at Approved Hosts"
+    run: [3]
+    assert:
+      - contains: "soloio-docs-mcp-backend created"
+      - not_contains: "was blocked"
+
+  # ---- Policy 4: No Plaintext Credentials in Manifests -----------------------
+  - section: "Policy 4: No Plaintext Credentials in Manifests"
+    run: [1]
+    assert:
+      - contains: "key"
+      - contains: "secretRef"
+
+  - section: "Policy 4: No Plaintext Credentials in Manifests"
+    run: [2]
+    retry: {attempts: 12, delay: 3, until: "configured|created"}
+    assert:
+      - contains: "agentgateway-no-plaintext-credentials"
+
+  # Distinct rules must fire for the MCP-target path and the backend-level path.
+  # Asserting the rule name is what proves the three-rule structure works.
+  - section: "Policy 4: No Plaintext Credentials in Manifests"
+    run: [3]
+    allow_failure: true
+    retry: {attempts: 10, delay: 3, until: "was blocked due to the following policies"}
+    assert:
+      - contains: "no-inline-key-mcp-target"
+
+  - section: "Policy 4: No Plaintext Credentials in Manifests"
+    run: [4]
+    allow_failure: true
+    retry: {attempts: 10, delay: 3, until: "was blocked due to the following policies"}
+    assert:
+      - contains: "no-inline-key-backend"
+
+  # ---- Observability ---------------------------------------------------------
+  # Background scan latency: reports for backends admitted earlier in the run
+  # can lag the admission decision by up to ~a minute.
+  - section: "View Policy Reports"
+    retry: {attempts: 12, delay: 5, until: "agentgateway-system"}
+    assert:
+      - contains: "agentgateway-system"
+      - rc: 0
+
+  - section: "View Blocked Admission Attempts"
+    allow_failure: true   # grep exits 1 when the log window holds no matches
+    assert:
+      - contains: "agentgateway-enterprise-crds-only"
+      - contains: "agentgateway-no-plaintext-credentials"
+
+  - section: "Check Policy Health"
+    assert:
+      - contains: "agentgateway-enterprise-crds-only"
+      - contains: "agentgateway-restrict-providers"
+      - contains: "agentgateway-restrict-mcp-hosts"
+      - contains: "agentgateway-no-plaintext-credentials"
+
+cleanup:
+  section: "Cleanup"
