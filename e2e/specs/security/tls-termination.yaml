@@ -99,7 +99,7 @@ steps:
       # around `=` differs between macOS LibreSSL ("CN=*, O=any domain") and
       # OpenSSL 1.1+ ("O = any domain"), so match either.
       - matches: 'subject=.*O *= *any domain'
-      - matches: 'issuer=.*CN *= *glootest\.com'
+      - matches: 'issuer=.*CN *= *try-solo\.io'
 
   # 8080 has to keep working for every other lab in the suite while the HTTPS
   # listener is attached, and the parameters reference must survive. This lab

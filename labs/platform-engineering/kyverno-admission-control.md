@@ -688,7 +688,12 @@ kubectl delete clusterpolicy \
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system \
   ent-openai-backend bedrock-backend soloio-docs-mcp-backend --ignore-not-found
 
-# 3. RBAC grant
+# 3. The OSS backend from the Policy 1 denial test, in case it was applied
+#    before the policy was Ready
+kubectl delete agentgatewaybackend -n agentgateway-system \
+  oss-openai-backend --ignore-not-found
+
+# 4. RBAC grant
 kubectl delete clusterrole kyverno:agentgateway-backends --ignore-not-found
 ```
 

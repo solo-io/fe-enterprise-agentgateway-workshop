@@ -32,6 +32,42 @@ steps:
     assert:
       - contains: "kyverno:agentgateway-backends"
 
+  # `helm --wait` returns when the Kyverno pods are Ready, but the policy
+  # mutating webhook starts refusing connections for a few more seconds while
+  # kyverno-svc gets its endpoints. Applying Policy 1 into that window fails with
+  # "dial tcp ...: connect: connection refused", and every later assertion about
+  # that policy then fails too. Gate on the webhook actually answering.
+  - probe: "the kyverno policy webhook accepts a ClusterPolicy"
+    script: |
+      cat > "$E2E_WORKDIR/webhook-probe.yaml" <<'EOF'
+      apiVersion: kyverno.io/v1
+      kind: ClusterPolicy
+      metadata:
+        name: e2e-webhook-readiness-probe
+      spec:
+        rules:
+          - name: noop
+            match:
+              any:
+                - resources:
+                    kinds:
+                      - ConfigMap
+            validate:
+              failureAction: Audit
+              message: noop
+              pattern:
+                metadata:
+                  name: "?*"
+      EOF
+      if kubectl apply --dry-run=server -f "$E2E_WORKDIR/webhook-probe.yaml" >/dev/null 2>&1; then
+        echo webhook_ready=yes
+      else
+        echo webhook_ready=no
+      fi
+    retry: {attempts: 20, delay: 3, until: "webhook_ready=yes"}
+    assert:
+      - contains: "webhook_ready=yes"
+
   # ---- Policy 1: Enterprise Backends Only ------------------------------------
   - section: "Policy 1: Enterprise Backends Only"
     run: [1]

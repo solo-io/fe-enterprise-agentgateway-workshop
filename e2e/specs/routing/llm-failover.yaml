@@ -67,7 +67,7 @@ steps:
   # just the outcome: the health policy's CEL condition is what classifies 429.
   - resource: enterpriseagentgatewaypolicy/mock-ratelimit-health
     jsonpath: .spec.backend.health.unhealthyCondition
-    expect: "response.code == 429"
+    expect: "response.code >= 500 || response.code == 429"
     name: the health policy is what evicts the group-1 provider
 
   - resource: enterpriseagentgatewaypolicy/mock-ratelimit-health

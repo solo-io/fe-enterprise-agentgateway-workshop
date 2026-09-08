@@ -14,6 +14,9 @@
 #   ./e2e/run-e2e.sh --lint                   # validate specs against labs, run nothing
 #   ./e2e/run-e2e.sh --list                   # show coverage table
 #
+# Only one run at a time: labs share a cluster, so a second invocation is
+# refused while another holds e2e/.work/.run.lock.
+#
 set -uo pipefail
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -49,6 +52,8 @@ export E2E_VERBOSE="${E2E_VERBOSE:-0}"
 usage() {
   sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
+
+ORIGINAL_ARGS=("$@")
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -137,6 +142,14 @@ baseline_fingerprint() {
   printf '%s\x1f%s\x1f%s' "$gw" "$routes" "$pols"
 }
 
+baseline_exists() {
+  # The fingerprint always carries its two separator bytes, so it is never the
+  # empty string — test the Gateway field instead.
+  local gw
+  IFS=$'\x1f' read -r gw _ _ <<<"$1"
+  [[ -n "$gw" ]]
+}
+
 baseline_restore() {
   kubectl patch gateway "$BASELINE_GW" -n "$BASELINE_NS" --type=merge -p \
     "{\"spec\":{\"infrastructure\":{\"parametersRef\":{\"group\":\"enterpriseagentgateway.solo.io\",\"kind\":\"EnterpriseAgentgatewayParameters\",\"name\":\"${BASELINE_PARAMS}\"}}}}" \
@@ -189,16 +202,23 @@ run_lab() {
 
   printf "${CYAN}${BOLD}[%s]${NC} ${DIM}%s${NC}\n" "$key" "${E2E_SPEC_DESC:-}"
 
-  local base_before base_after
-  base_before="$(baseline_fingerprint)"
+  # The _base labs *establish* the baseline — 001 creates the Gateway and the
+  # three observability policies — so drift is meaningless for them. Every
+  # other lab is measured against what they left behind.
+  local is_base=false
+  [[ "$spec" == *"/_base/"* ]] && is_base=true
+
+  local base_before="" base_after=""
+  [[ "$is_base" == "false" ]] && base_before="$(baseline_fingerprint)"
 
   local rc=0
   run_with_timeout "$E2E_SPEC_TIMEOUT" bash "$driver" || rc=$?
 
   # Attribute baseline damage to the lab that caused it, while we still know
   # which lab that was.
-  base_after="$(baseline_fingerprint)"
-  if [[ -n "$base_before" && "$base_after" != "$base_before" ]]; then
+  [[ "$is_base" == "false" ]] && base_after="$(baseline_fingerprint)"
+  if [[ "$is_base" == "false" ]] && baseline_exists "$base_before" &&
+     [[ "$base_after" != "$base_before" ]]; then
     printf "  ${RED}✗${NC} %-58s ${RED}BASELINE DRIFT${NC}\n" "$key"
     local gw_b routes_b pols_b gw_a routes_a pols_a
     IFS=$'\x1f' read -r gw_b routes_b pols_b <<<"$base_before"
@@ -298,10 +318,51 @@ install_base() {
 }
 
 # ---------------------------------------------------------------------------
+# acquire_run_lock
+#   Labs share one cluster and one Gateway, so two concurrent runs corrupt each
+#   other: a lab races ahead of the baseline install, or a Gateway-scoped policy
+#   from one run 401s the other. The failures land on whichever lab was unlucky
+#   and look like product regressions, so refuse to start instead.
+#
+#   No flock(1) on macOS. mkdir is atomic on every filesystem we care about.
+#   A run killed with SIGKILL leaves the directory behind, so a lock whose PID
+#   is gone (or is no longer a run-e2e.sh) is stale and gets taken over.
+# ---------------------------------------------------------------------------
+RUN_LOCK=""
+acquire_run_lock() {
+  local lock="${WORK_ROOT}/.run.lock" holder
+  if ! mkdir "$lock" 2>/dev/null; then
+    holder="$(cat "${lock}/pid" 2>/dev/null || true)"
+    if [[ -n "$holder" ]] && kill -0 "$holder" 2>/dev/null &&
+       ps -o command= -p "$holder" 2>/dev/null | grep -q run-e2e.sh; then
+      printf "${RED}Another run-e2e.sh is already running (pid %s).${NC}\n" "$holder" >&2
+      printf "${DIM}  started: %s${NC}\n" "$(cat "${lock}/started" 2>/dev/null || echo unknown)" >&2
+      printf "${DIM}  args:    %s${NC}\n" "$(cat "${lock}/args" 2>/dev/null || echo unknown)" >&2
+      printf "\nLabs share one cluster; overlapping runs void both. Wait for it, or kill it.\n" >&2
+      exit 1
+    fi
+    printf "${YELLOW}Clearing stale lock from pid %s${NC}\n" "${holder:-unknown}" >&2
+    rm -rf "$lock"
+    mkdir "$lock" 2>/dev/null || {
+      printf "${RED}Could not acquire %s${NC}\n" "$lock" >&2; exit 1; }
+  fi
+  RUN_LOCK="$lock"
+  printf '%s\n' "$$" > "${lock}/pid"
+  date '+%Y-%m-%d %H:%M:%S' > "${lock}/started"
+  printf '%s\n' "${ORIGINAL_ARGS[*]:-}" > "${lock}/args"
+  trap 'release_run_lock' EXIT
+}
+
+release_run_lock() {
+  [[ -n "$RUN_LOCK" ]] && rm -rf "$RUN_LOCK"
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 START="$SECONDS"
 mkdir -p "$WORK_ROOT"
+acquire_run_lock
 e2e_load_env_local
 
 if [[ "$INSTALL_BASE" == "true" ]]; then
