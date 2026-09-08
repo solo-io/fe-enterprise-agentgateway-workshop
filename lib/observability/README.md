@@ -6,6 +6,8 @@ Shared assets for the observability labs. Run everything from the workshop root.
 
 The AgentGateway Grafana dashboard installed by `002`: GenAI metrics, cost tracking, infrastructure, streaming, and MCP panels. `update-dashboard.sh` reloads it into a running Grafana without reinstalling the chart.
 
+This is the canonical copy. Nine other checkouts ship the same JSON so their installers can apply it standalone, and they carry none of the tooling below. After changing a price here, propagate the rendered JSON with the `syncing-files-across-repos` skill.
+
 Per-model token prices are hardcoded in this dashboard's PromQL and pricing tables. Change them through the `/update-dashboard-pricing` skill rather than by hand, using the tools below.
 
 ## `dash_prices.py`
@@ -64,3 +66,16 @@ Seeding fills the **Dashboard** tab only. The **Budgets** tab reads live rate-li
 
 - [`labs/observability/llm-cost-management.md`](../../labs/observability/llm-cost-management.md) — `seed-cost-data.sh`
 - [`002-set-up-ui-and-monitoring-tools.md`](../../002-set-up-ui-and-monitoring-tools.md) — the Grafana dashboard JSON
+
+## Downstream copies of the dashboard JSON
+
+Keep these byte-identical to `agentgateway-grafana-dashboard-v1.json`:
+
+| Repo | Path |
+| --- | --- |
+| `solo-field-installer` | `lib/observability/agentgateway/` |
+| `enrollment-agent` | `k8s/observability/` |
+| `vertical-agent-demos` | `banking-agent/k8s/observability/`, `telco-agent/k8s/observability/` |
+| `demogen` | `templates/k8s/observability/` |
+| `agentgateway-benchmarking` | `scenario-{1a,1b,2,3}/installation-steps/lib/observability/` |
+

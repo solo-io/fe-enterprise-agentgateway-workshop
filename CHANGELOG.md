@@ -1,12 +1,13 @@
 # Changelog
 
-0.14.0 - (9-5-26)
+0.14.0 - (9-8-26)
 ---
 - Fable 5 Code Review Improvements
   - Introduce /e2e tests
   - Generate the `lib/jwt` keypair and `jwks.json` on first run of `generate-jwt.sh` instead of committing them
   - Add `lib/observability/dash_prices.py`, `model-map.json`, and `pricing.json`: a pinned rate card for the Grafana cost dashboard, plus `models-dev-check.py` to report drift against models.dev, and tests for both
   - Apply the Grafana dashboard update server-side in `update-dashboard.sh` instead of delete-then-create
+  - Document `lib/observability/` as the canonical home of the dashboard JSON and its price tooling, and list the nine downstream checkouts that carry a copy of the JSON
 
 0.13.9 - (9-4-26)
 ---
