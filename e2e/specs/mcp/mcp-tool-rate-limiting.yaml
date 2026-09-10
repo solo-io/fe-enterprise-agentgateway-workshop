@@ -1,0 +1,86 @@
+lab: labs/mcp/mcp-tool-rate-limiting.md
+description: per-tool MCP rate limit via entRateLimit + RateLimitConfig CEL
+tier: t0
+requires: []
+timeout: 700
+
+steps:
+  - section: "Deploy the MCP Server"
+    run: all
+    wait: "--for=condition=Available deploy/mcp-server-everything -n mcp --timeout=300s"
+
+  - section: "Create Backend and HTTPRoute"
+    run: all
+
+  - section: "Get Gateway IP"
+    run: all
+    assert:
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+
+  - section: "Verify Connectivity"
+    run: none
+    reason: interactive npx Inspector, replaced by the probe below
+
+  - probe: "before any limit, get-env and echo are both callable"
+    script: |
+      export E2E_MCP_URL="http://$GATEWAY_IP:8080/mcp"
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "get-env" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "get-env"
+      - contains: "echo"
+
+  # blocks: [1] RateLimitConfig  [2] EnterpriseAgentgatewayPolicy  [3] get -o yaml
+  - section: "Configure Per-Tool Rate Limiting"
+    run: all
+    retry:
+      attempts: 8
+      delay: 4
+      until: 'type: Attached'
+    assert:
+      - contains: "mcp-tool-rate-limit"
+      - matches: 'type: Accepted'
+      - matches: 'type: Attached'
+      - not_contains: 'status: "False"'
+
+  # The rate limiter uses a fixed wall-clock minute window, so a burst that
+  # straddles a boundary can get a fresh budget mid-burst. Retry the whole burst
+  # rather than assert on a single call.
+  - probe: "get-env is limited to 3 calls per minute"
+    script: |
+      burst() {
+        SID="$(e2e_mcp_init)"
+        for n in 1 2 3 4 5 6; do
+          curl -s -o /dev/null -w '%{http_code} ' -X POST "$E2E_MCP_URL" \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json, text/event-stream' \
+            -H "mcp-session-id: $SID" \
+            -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get-env","arguments":{}}}'
+        done
+        echo
+      }
+      # entRateLimit needs a few seconds to settle after the policy attaches.
+      sleep 12
+      for attempt in 1 2 3 4 5; do
+        OUT="$(burst)"
+        echo "attempt${attempt}: $OUT"
+        grep -q '429' <<<"$OUT" && break
+        sleep 20
+      done
+    assert:
+      - contains: "429"
+      - contains: "200"
+
+  - probe: "echo matches no descriptor, so it is never counted"
+    script: |
+      SID="$(e2e_mcp_init)"
+      for n in 1 2 3 4 5; do
+        e2e_mcp_tool "$SID" echo '{"message":"still-allowed"}' | tail -c 200
+        echo
+      done
+    assert:
+      - contains: "Echo: still-allowed"
+      - not_contains: "429"
+
+cleanup:
+  section: "Cleanup"

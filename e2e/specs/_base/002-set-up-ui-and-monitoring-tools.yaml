@@ -1,0 +1,90 @@
+lab: 002-set-up-ui-and-monitoring-tools.md
+description: Solo UI + OTEL collector, Prometheus, Grafana, AgentGateway dashboard
+tier: t0
+requires:
+  - SOLO_TRIAL_LICENSE_KEY
+timeout: 1500
+
+# Run by `--install-base`, after 001. No `cleanup:` — this is baseline state.
+steps:
+  - section: "Set required variables"
+    run: all
+
+  - section: "Step 1: Install/upgrade CRDs"
+    run: all
+
+  # blocks: [1] helm install management  [2] get pods
+  - section: "Step 2: Install/upgrade the chart"
+    run: all
+    wait: "--for=condition=Available deploy/solo-enterprise-ui -n agentgateway-system --timeout=900s"
+
+  # blocks: [1] export GRAFANA_ADMIN_PASSWORD  [2] helm install kube-prometheus-stack  [3] PodMonitor
+  # Block 1 is an optional illustrative export — running it would literally set the
+  # admin password to "your-secure-password". Skipped so the documented default
+  # (prom-operator) applies and the Grafana probes below can authenticate.
+  - section: "Deploy metrics"
+    run: [2, 3]
+    wait: "--for=condition=Available deploy/grafana-prometheus -n monitoring --timeout=900s"
+
+  - section: "Install AgentGateway Grafana Dashboard"
+    run: all
+    assert:
+      - contains: "grafana-prometheus"
+
+  - section: "Access Solo UI"
+    run: none
+    reason: "`kubectl port-forward` in the foreground never returns; probed below"
+
+  - section: "Access Grafana"
+    run: none
+    reason: "`kubectl port-forward` in the foreground never returns; probed below"
+
+  - probe: "Solo UI serves the app over its Service"
+    script: |
+      e2e_pf agentgateway-system svc/solo-enterprise-ui 14000:80
+      echo "solo_ui=$(curl -s -o /dev/null -w '%{http_code}' localhost:14000)"
+      e2e_pf_stop
+    assert:
+      - contains: "solo_ui=200"
+
+  - resource: svc/solo-enterprise-telemetry-collector
+    jsonpath: ".spec.ports[?(@.port==4317)].port"
+    expect: "4317"
+    name: the OTEL collector that 001's tracing policy targets exists
+
+  - probe: "Grafana is healthy and has loaded the AgentGateway dashboard"
+    script: |
+      e2e_pf monitoring svc/grafana-prometheus 13000:3000
+      curl -s localhost:13000/api/health
+      # The sidecar can take a few scrape cycles to pick the ConfigMap up.
+      for i in $(seq 1 20); do
+        FOUND="$(curl -s -u "admin:${GRAFANA_ADMIN_PASSWORD:-prom-operator}" \
+                   'localhost:13000/api/search?query=AgentGateway')"
+        [[ "$FOUND" == *AgentGateway* ]] && break
+        sleep 5
+      done
+      echo "dashboards=$FOUND"
+      e2e_pf_stop
+    assert:
+      - contains: '"database": "ok"'
+      - contains: "AgentGateway"
+
+  - probe: "Prometheus scrapes both agentgateway proxy pods via the PodMonitor"
+    script: |
+      e2e_pf monitoring svc/grafana-prometheus-kube-pr-prometheus 19090:9090
+      # PodMonitor discovery plus one scrape interval.
+      for i in $(seq 1 24); do
+        UP="$(curl -s --get localhost:19090/api/v1/query \
+                --data-urlencode 'query=count(up{job=~".*agentgateway.*"})' \
+              | jq -r '.data.result[0].value[1] // "0"')"
+        [[ "${UP:-0}" -ge 1 ]] && break
+        sleep 5
+      done
+      echo "agentgateway_targets_up=${UP:-0}"
+      e2e_pf_stop
+    assert:
+      - matches: 'agentgateway_targets_up=[1-9]'
+
+  - section: "Uninstall"
+    run: none
+    reason: this lab is the baseline; tearing it down would break every other lab

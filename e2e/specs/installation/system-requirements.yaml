@@ -1,0 +1,83 @@
+lab: labs/installation/system-requirements.md
+description: the documented version support matrix matches what the cluster actually runs
+tier: t0
+requires: []
+timeout: 180
+
+# This lab has no bash blocks — it is a version support matrix. So rather than
+# replay commands, the probes parse the lab's own tables and assert the live
+# cluster falls inside the documented ranges. That makes the doc fail a test when
+# it goes stale after a release bump, which is the only way it can be wrong.
+steps:
+  - probe: "the documented Kubernetes range covers the live cluster"
+    script: |
+      DOC=labs/installation/system-requirements.md
+      row() { grep -E "^\| *$1 *\|" "$DOC" | head -1 | awk -F'|' '{print $3}' | sed 's/^ *//; s/ *$//'; }
+
+      K8S_DOC="$(row Kubernetes)"
+      echo "documented: $K8S_DOC"
+      LOW="$(grep -oE '[0-9]+\.[0-9]+' <<<"$K8S_DOC" | head -1 | cut -d. -f2)"
+      HIGH="$(grep -oE '[0-9]+\.[0-9]+' <<<"$K8S_DOC" | tail -1 | cut -d. -f2)"
+      LIVE="$(kubectl version -o json | jq -r '.serverVersion.minor' | tr -dc '0-9')"
+      echo "live: 1.$LIVE  (documented 1.$LOW - 1.$HIGH)"
+      if [ "$LIVE" -ge "$LOW" ] && [ "$LIVE" -le "$HIGH" ]; then
+        echo "k8s_in_range=yes"
+      else
+        echo "k8s_in_range=no"
+      fi
+    assert:
+      - contains: "k8s_in_range=yes"
+
+  - probe: "the documented Gateway API range covers the installed bundle"
+    script: |
+      DOC=labs/installation/system-requirements.md
+      GW_DOC="$(grep -E '^\| *Gateway API CRDs *\|' "$DOC" | head -1 | awk -F'|' '{print $3}' | sed 's/^ *//; s/ *$//')"
+      echo "documented: $GW_DOC"
+      BUNDLE="$(kubectl get crd gateways.gateway.networking.k8s.io \
+        -o jsonpath='{.metadata.annotations.gateway\.networking\.k8s\.io/bundle-version}')"
+      echo "installed bundle: $BUNDLE"
+      LOW="$(grep -oE '[0-9]+\.[0-9]+' <<<"$GW_DOC" | head -1 | cut -d. -f2)"
+      HIGH="$(grep -oE '[0-9]+\.[0-9]+' <<<"$GW_DOC" | tail -1 | cut -d. -f2)"
+      LIVE="$(grep -oE '^v?[0-9]+\.[0-9]+' <<<"$BUNDLE" | cut -d. -f2)"
+      if [ "${LIVE:-0}" -ge "$LOW" ] && [ "${LIVE:-0}" -le "$HIGH" ]; then
+        echo "gwapi_in_range=yes"
+      else
+        echo "gwapi_in_range=no"
+      fi
+    assert:
+      - contains: "gwapi_in_range=yes"
+
+  - probe: "the documented Helm floor is satisfied"
+    script: |
+      DOC=labs/installation/system-requirements.md
+      HELM_DOC="$(grep -E '^\| *Helm *\|' "$DOC" | head -1 | awk -F'|' '{print $3}' | sed 's/^ *//; s/ *$//')"
+      echo "documented: $HELM_DOC"
+      LIVE="$(helm version --short | grep -oE '[0-9]+\.[0-9]+' | head -1)"
+      echo "live: $LIVE"
+      DOC_MAJ="$(grep -oE '[0-9]+' <<<"$HELM_DOC" | head -1)"
+      LIVE_MAJ="${LIVE%%.*}"
+      if [ "$LIVE_MAJ" -ge "$DOC_MAJ" ]; then echo "helm_ok=yes"; else echo "helm_ok=no"; fi
+    assert:
+      - contains: "helm_ok=yes"
+
+  - probe: "the documented Solo UI version matches the installed release"
+    script: |
+      DOC=labs/installation/system-requirements.md
+      UI_DOC="$(grep -E '^\| *Solo UI *\|' "$DOC" | head -1 | awk -F'|' '{print $3}' | sed 's/^ *//; s/ *$//')"
+      LIVE="$(helm list -n agentgateway-system -o json | jq -r '.[] | select(.name=="management") | .chart' | sed 's/^management-//')"
+      echo "documented=$UI_DOC installed=$LIVE"
+      if [ "$UI_DOC" = "$LIVE" ]; then echo "ui_match=yes"; else echo "ui_match=no"; fi
+    assert:
+      - contains: "ui_match=yes"
+
+  # The POC sizing table claims 2 proxy replicas minimum; 001 configures exactly
+  # that, so a drift between the two tables and the install lab shows up here.
+  - resource: deploy/agentgateway-proxy
+    jsonpath: .spec.replicas
+    expect: "2"
+    name: the POC sizing guidance matches what 001 deploys for the proxy
+
+  - resource: deploy/enterprise-agentgateway
+    jsonpath: .spec.replicas
+    expect: "1"
+    name: the POC sizing guidance matches what 001 deploys for the control plane

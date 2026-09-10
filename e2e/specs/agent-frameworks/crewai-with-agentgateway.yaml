@@ -1,0 +1,102 @@
+lab: labs/agent-frameworks/crewai-with-agentgateway.md
+description: CrewAI researcher→writer crew whose LLM calls traverse the gateway
+tier: t1-key
+timeout: 1200
+requires:
+  - OPENAI_API_KEY
+
+# Safe to run because lib/crewai/multi-agent-researcher-writer/crew.py builds its
+# Crew with `tracing=False`. CrewAI 1.x POSTs full first-run prompts and
+# completions to app.crewai.com otherwise — and CREWAI_TRACING_ENABLED=false does
+# *not* stop it, only the constructor argument does. If that line ever
+# disappears from crew.py, this spec must not run.
+#
+# No `cd $E2E_WORKDIR`: every path here is relative to the repo root, and the
+# venv is removed by the lab's Cleanup.
+
+steps:
+  - section: "Configure Required Variables"
+    run: all
+
+  - section: "Create OpenAI Route and Backend"
+    run: all
+
+  - section: "Get the Gateway IP"
+    run: all
+
+  - section: "Verify the Endpoint"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "choices"
+
+  - probe: "the crew script still opts out of CrewAI cloud tracing"
+    script: |
+      grep -n 'tracing=False' lib/crewai/multi-agent-researcher-writer/crew.py
+    assert:
+      # Guards the one line that keeps first-run prompts off app.crewai.com.
+      - contains: "tracing=False"
+
+  # tiktoken has no wheels for Python 3.13+, so the lab pins 3.12. Slow pip
+  # install, hence this spec's long timeout.
+  - section: "Run the CrewAI Two-Agent Crew"
+    run: [1]
+    assert:
+      - not_contains: "ERROR: "
+
+  - section: "Run the CrewAI Two-Agent Crew"
+    run: [3]
+    assert:
+      - matches: 'Using base_url: http://[0-9.]+:8080/openai'
+      - contains: "AI Gateway key patterns and concepts"
+      - contains: "FINAL BLOG POST:"
+      - not_contains: "Traceback"
+
+  - section: "Run the CrewAI Two-Agent Crew"
+    run: [4]
+    assert:
+      - contains: "Service Mesh key patterns and concepts"
+      - contains: "FINAL BLOG POST:"
+      - not_contains: "Traceback"
+
+  - probe: "both agents' calls were proxied through the gateway"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 500 \
+        | grep 'http.path=/openai' | grep -c 'gen_ai.operation.name=chat' \
+        | sed 's/^/proxied_completions=/'
+    retry:
+      attempts: 6
+      delay: 5
+      until: 'proxied_completions=[2-9]'
+    assert:
+      - matches: 'proxied_completions=([2-9]|[0-9]{2,})'
+
+  - section: "View access logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "View Metrics and Traces in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View the Prometheus metrics endpoint"
+    run: all
+    retry:
+      attempts: 3
+      delay: 3
+      until: "agentgateway_"
+    assert:
+      - matches: 'agentgateway_[a-z_]+[{ ]'
+
+cleanup:
+  section: "Cleanup"

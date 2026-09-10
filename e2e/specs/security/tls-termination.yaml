@@ -1,0 +1,131 @@
+lab: labs/security/tls-termination.md
+description: HTTPS listener appended to the shared gateway by JSON patch; :80 refused, :443 terminated
+tier: t1-key
+timeout: 420
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  # openssl writes example_certs/ relative to the cwd, and drivers run from the
+  # repo root. Blocks share one shell, so this cd carries through.
+  - probe: "keep generated certificates out of the repo"
+    script: |
+      cd "$E2E_WORKDIR" && pwd
+    assert:
+      - contains: ".work/security/tls-termination"
+
+  - section: "Create self-signed TLS certificates"
+    run: all
+    assert:
+      - contains: "secret/https created"
+
+  # The lab appends the listener with a JSON patch precisely so nothing else on
+  # the shared Gateway is restated. Its own verification block prints the result.
+  - section: "Configure the gateway to terminate TLS"
+    run: all
+    assert:
+      - contains: "listeners=8080 443"
+      - contains: "params=agentgateway-config"
+
+  # The Gateway-level Programmed condition is already True from 001's :8080
+  # listener, so `kubectl wait --for=condition=Programmed` returns instantly and
+  # says nothing about the listener this lab just appended — a listener can sit
+  # at Programmed=False/Invalid underneath a Programmed=True Gateway. That blind
+  # spot is what let security/frontend-mtls fail against a listener that was not
+  # serving TLS yet. Gate on the https listener itself, plus the proxy rollout.
+  - probe: "the https listener is programmed and the proxy has settled"
+    script: |
+      kubectl rollout status deploy/agentgateway-proxy \
+        -n agentgateway-system --timeout=180s
+      for i in $(seq 1 30); do
+        s="$(kubectl get gateway agentgateway-proxy -n agentgateway-system \
+          -o jsonpath='{range .status.listeners[?(@.name=="https")].conditions[?(@.type=="Programmed")]}{.status}{end}')"
+        [[ "$s" == "True" ]] && break
+        sleep 3
+      done
+      echo "https_programmed=$s"
+      # Programmed=True is not proof the data path serves TLS: after a proxy roll
+      # the dataplane can NACK the listener ("TLS certificate is invalid: no
+      # certificate") while status stays Programmed=True, and handshakes get a
+      # TCP reset. Gate on a real handshake.
+      export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
+        --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
+        -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+      tls_ready=no
+      for i in $(seq 1 40); do
+        if echo | openssl s_client -connect "$GATEWAY_IP:443" \
+             -servername try-solo.io 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
+          tls_ready=yes; break
+        fi
+        sleep 3
+      done
+      echo "tls_handshake=$tls_ready"
+    assert:
+      - contains: "successfully rolled out"
+      - contains: "https_programmed=True"
+      - contains: "tls_handshake=yes"
+
+  - section: "Configure Required Variables"
+    run: all
+
+  - section: "Validate HTTP traffic is blocked"
+    run: all
+    # curl cannot connect at all, so a nonzero exit is the documented outcome.
+    allow_failure: true
+    assert:
+      - not_contains: "HTTP/1.1 200"
+      - matches: '(Failed to connect|Connection refused|Couldn.t connect)'
+
+  - section: "Validate OpenAI access over HTTPS"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+      # The lab's expected output shows HTTP/2, which only happens if the TLS
+      # handshake negotiated h2 via ALPN — worth pinning, since an h1 fallback
+      # would still return 200 and quietly contradict the lab.
+      - contains: "HTTP/2 200"
+
+  - probe: "the listener serves the certificate the lab generated"
+    script: |
+      echo | openssl s_client -connect "$GATEWAY_IP:443" -servername try-solo.io 2>/dev/null \
+        | openssl x509 -noout -subject -issuer 2>&1
+    assert:
+      # Gateway cert subject, and the try-solo.io root that signed it. Spacing
+      # around `=` differs between macOS LibreSSL ("CN=*, O=any domain") and
+      # OpenSSL 1.1+ ("O = any domain"), so match either.
+      - matches: 'subject=.*O *= *any domain'
+      - matches: 'issuer=.*CN *= *try-solo\.io'
+
+  # 8080 has to keep working for every other lab in the suite while the HTTPS
+  # listener is attached, and the parameters reference must survive. This lab
+  # used to apply a full Gateway manifest here and then "restore" it without
+  # parametersRef, leaving the baseline permanently detached.
+  - probe: "the plaintext baseline still works alongside TLS"
+    script: |
+      curl -s -o /dev/null -w 'plaintext_8080=%{http_code}\n' \
+        "http://$GATEWAY_IP:8080/openai" \
+        -H 'content-type: application/json' \
+        -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Hello!"}]}'
+    assert:
+      - contains: "plaintext_8080=200"
+
+  - section: "View Metrics in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  # Only reachable because the HTTPS listener lives on the shared proxy: a
+  # separate Gateway would get its own deployment, whose pods are labelled with
+  # that Gateway's name and so are invisible to this command.
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+      - contains: "http.path=/openai"
+
+cleanup:
+  section: "Cleanup"

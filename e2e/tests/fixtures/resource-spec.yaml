@@ -1,0 +1,12 @@
+lab: e2e/tests/fixtures/mini-lab.md
+tier: t0
+steps:
+  - section: Deploy the echo server
+  - resource: deploy/echo
+    namespace: mini
+    jsonpath: .status.readyReplicas
+    expect: "1"
+  - resource: gateway/agentgateway-proxy
+    jsonpath: .spec.listeners[0].port
+    expect: "8080"
+    name: gateway listens on 8080

@@ -1,0 +1,102 @@
+lab: labs/evaluations/evaluate-openai-model-performance.md
+description: promptfoo evals routed through the gateway via OPENAI_BASE_URL
+tier: t1-key
+timeout: 900
+requires:
+  - OPENAI_API_KEY
+
+# NOTE: no `cd $E2E_WORKDIR` here, unlike the other artifact-producing specs.
+# The eval configs are referenced as `labs/evaluations/...`, relative to the repo
+# root, so moving the cwd would break the lab's own commands. promptfoo's only
+# stray output is promptfoo-errors.log, which the lab's Cleanup removes.
+
+steps:
+  - section: "Lab Objectives"
+    run: all
+
+  - section: "curl openai"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  - probe: "promptfoo is available without installing anything"
+    script: |
+      command -v promptfoo >/dev/null && echo "promptfoo present" || echo "promptfoo missing"
+    assert:
+      - contains: "promptfoo present"
+
+  # Block 1 is `brew install promptfoo`, which would install software on the
+  # operator's machine; block 2 is `promptfoo view -y`, a foreground UI server
+  # that never returns. Blocks 3-5 are the export and the two evals.
+  - section: "Install promptfoo"
+    run: [3]
+
+  - probe: "the eval configs the lab points at actually exist"
+    script: |
+      ls labs/evaluations/openai_eval_coding.yaml labs/evaluations/openai_eval_messaging.yaml
+      echo "base_url=$OPENAI_BASE_URL"
+    assert:
+      # These paths were stale after the 0.11.4 lab reorg moved the configs under
+      # labs/; both eval commands failed for readers until they were corrected.
+      - contains: "labs/evaluations/openai_eval_coding.yaml"
+      - contains: "labs/evaluations/openai_eval_messaging.yaml"
+      - matches: 'base_url=http://[0-9.]+:8080/openai'
+
+  # Individual test verdicts come from an llm-as-a-judge, so a specific test
+  # failing is not a lab regression, and promptfoo exits nonzero whenever any
+  # test fails, hence allow_failure. The eval must run end to end through the
+  # gateway and score real completions.
+  #
+  # The error count is asserted as a rate, not as zero. A misconfigured provider
+  # entry cannot be called at all and errors out every one of its rows, which is
+  # a double-digit share of the run. A single dropped socket is the provider's
+  # network rather than this lab: promptfoo reported "1 error (3.33%)" on
+  # 2026-09-01 after its own 4 retries, and that must not fail the suite.
+  - section: "Install promptfoo"
+    run: [4]
+    allow_failure: true
+    assert:
+      - matches: '[1-9][0-9]* passed'
+      # promptfoo prints "0 errors (0%)" but "1 error (3.33%)", so the decimals
+      # are optional. Two leading digits separate a double-digit rate from a
+      # stray single failure.
+      - not_matches: '[0-9]+ errors? \([0-9]{2,3}(\.[0-9]+)?%\)'
+      - not_contains: "No providers found"
+      - not_contains: "Invalid config"
+
+  - section: "Install promptfoo"
+    run: [5]
+    allow_failure: true
+    assert:
+      - matches: '[1-9][0-9]* passed'
+      # promptfoo prints "0 errors (0%)" but "1 error (3.33%)", so the decimals
+      # are optional. Two leading digits separate a double-digit rate from a
+      # stray single failure.
+      - not_matches: '[0-9]+ errors? \([0-9]{2,3}(\.[0-9]+)?%\)'
+      - not_contains: "No providers found"
+      - not_contains: "Invalid config"
+
+  # OPENAI_BASE_URL is the whole point: the evals must traverse the gateway
+  # rather than calling OpenAI directly, which is what makes them observable.
+  - probe: "the eval traffic went through the gateway"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 500 \
+        | grep 'http.path=/openai' \
+        | grep -oE 'gen_ai.request.model=[a-z0-9.-]+' | sort | uniq -c | sed 's/^ *//'
+    retry:
+      attempts: 6
+      delay: 5
+      until: 'gen_ai.request.model='
+    assert:
+      # The eval configs list these providers, so seeing more than one proves the
+      # matrix ran through the proxy.
+      - matches: 'gen_ai\.request\.model=gpt-5\.4-(nano|mini)'
+
+cleanup:
+  section: "Cleanup"

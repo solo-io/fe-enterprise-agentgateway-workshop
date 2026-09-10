@@ -1,0 +1,70 @@
+lab: labs/observability/production-observability-alerting-and-scaling.md
+description: PDB managed by the operator, topology spread visibility, pre-upgrade checklist
+tier: t0
+requires: []
+timeout: 600
+
+# Almost all of this lab is prose plus `yaml`-fenced guidance snippets that the
+# reader merges into their own EnterpriseAgentgatewayParameters, so only four
+# bash blocks exist. The interesting claim — "the operator creates and manages the
+# PDB" — is only observable if the snippet is actually applied, so the probe
+# below applies the documented snippet, lets the lab's own verify block prove it,
+# then reverts the baseline.
+steps:
+  - probe: "apply the PDB snippet the lab documents"
+    script: |
+      kubectl patch enterpriseagentgatewayparameters agentgateway-config \
+        -n agentgateway-system --type=merge \
+        -p '{"spec":{"podDisruptionBudget":{"spec":{"minAvailable":1}}}}'
+      for i in $(seq 1 24); do
+        kubectl get pdb -n agentgateway-system 2>/dev/null | grep -q agentgateway-proxy && break
+        sleep 5
+      done
+      echo "patched"
+    assert:
+      - contains: "patched"
+
+  - section: "Pod Disruption Budgets"
+    run: all
+    retry:
+      attempts: 6
+      delay: 5
+      until: "agentgateway-proxy"
+    assert:
+      - contains: "agentgateway-proxy"
+      - matches: 'agentgateway-proxy\s+1\s'
+
+  - probe: "revert the PDB so the baseline is unchanged"
+    script: |
+      kubectl patch enterpriseagentgatewayparameters agentgateway-config \
+        -n agentgateway-system --type=json \
+        -p '[{"op":"remove","path":"/spec/podDisruptionBudget"}]' || true
+      for i in $(seq 1 24); do
+        kubectl get pdb -n agentgateway-system 2>/dev/null | grep -q agentgateway-proxy || break
+        sleep 5
+      done
+      echo "remaining_pdbs=$(kubectl get pdb -n agentgateway-system --no-headers 2>/dev/null | grep -c agentgateway-proxy)"
+    assert:
+      - contains: "remaining_pdbs=0"
+
+  - section: "Topology Spread and Anti-Affinity"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+      - contains: "NODE"
+
+  # Multi-command block: PDBs, replica count, image, pod health, then a
+  # port-forward to the controller's metrics port.
+  - section: "Pre-Upgrade Checklist"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+      - matches: 'enterprise-agentgateway.*:v?2026'
+      - contains: "Running"
+
+  - section: "Upgrade"
+    run: none
+    reason: >-
+      `--version <new-version>` is a placeholder, and a controller helm upgrade
+      would mutate the shared baseline. Rolling upgrades are covered by
+      labs/upgrades/in-place-rolling-upgrades.md, which is excluded as destructive.

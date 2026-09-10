@@ -1,0 +1,212 @@
+lab: labs/guardrails/advanced-guardrails-webhook.md
+description: LLM-classifier webhook guardrail — reject, mask, context-aware pass, live policy reload
+tier: t1-key
+timeout: 900
+requires:
+  - OPENAI_API_KEY
+
+# Every verdict in this lab comes from an LLM classifier, so assertions stick to
+# what the lab itself calls deterministic — the status code and whether masking
+# happened — and retry rather than pinning generated wording. The lab says so
+# outright: "the exact wording varies between runs".
+
+steps:
+  - section: "Create OpenAI API secret"
+    run: all
+
+  - section: "Create OpenAI route and backend"
+    run: all
+
+  - section: "Baseline test — no guardrail policy yet"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: '[a-z]'
+    assert:
+      - not_contains: "null"
+
+  - section: "Step 1 — Apply the guardrail policy ConfigMap"
+    run: all
+
+  - section: "Step 2 — Deploy the webhook server"
+    run: all
+    wait: "--for=condition=Available deploy/ai-guardrail-webhook -n agentgateway-system --timeout=300s"
+
+  - section: "Apply webhook guardrail policy"
+    run: all
+
+  - section: "Test: innocent request (should pass)"
+    run: [1]
+    retry:
+      attempts: 10
+      delay: 5
+      until: '[a-z]'
+    assert:
+      - not_contains: "null"
+
+  # The webhook's own log is the only place the PASS/REJECT/MASK decision is
+  # visible, so each test asserts the classifier verdict as well as the response.
+  - section: "Test: innocent request (should pass)"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 5
+      until: "PassAction returned"
+    assert:
+      - contains: "LLM decision: PASS"
+      - contains: "PassAction returned (request)"
+      # A passing request reaches the provider, so the response webhook fires too.
+      - contains: "/response"
+
+  - section: "Test: harassment — rejected by LLM classifier"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 5
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - not_contains: "chat.completion"
+
+  - section: "Test: harassment — rejected by LLM classifier"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 5
+      until: "RejectAction"
+    assert:
+      - contains: "LLM decision: REJECT"
+      - contains: "RejectAction"
+
+  - section: "Test: jailbreak attempt — rejected by LLM classifier"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 5
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - not_contains: "chat.completion"
+
+  - section: "Test: PII masking — credit card number"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 5
+      until: '\*\*\*\*'
+    assert:
+      # The webhook returns its own MaskAction content, so this is literal
+      # asterisks — not the <CREDIT_CARD> entity tag the *builtin* recognizers
+      # emit in the builtin-guardrails lab.
+      - contains: "****"
+      - not_contains: "4111"
+
+  - section: "Test: PII masking — credit card number"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 5
+      until: "MaskAction"
+    assert:
+      - contains: "LLM decision: MASK"
+      - contains: "MaskAction"
+
+  - section: "Test: PII masking — email address"
+    run: all
+    retry:
+      attempts: 8
+      delay: 5
+      until: '\*\*\*\*'
+    assert:
+      - contains: "****"
+      - not_contains: "support@example.com"
+
+  # The lab's headline claim: semantic classification beats regex because it
+  # reads intent. A regex on "prompt injection" would block this; the LLM must
+  # let it through.
+  - section: "Test: false positive avoidance — LLM understands context"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 5
+      until: '[a-z]'
+    assert:
+      - contains: "prompt injection"
+      - not_contains: "null"
+
+  - section: "Test: indirect jailbreak — catches what regex misses"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 5
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - not_contains: "chat.completion"
+
+  # ---- Live policy update: same prompt, opposite verdict ----
+  - section: "Sub-step A — Confirm the current policy has no medical rule"
+    run: all
+    retry:
+      attempts: 8
+      delay: 5
+      until: 'ibuprofen|mg'
+    assert:
+      # Passes today because no medical rule exists yet.
+      - matches: '(ibuprofen|mg)'
+
+  - section: "Sub-step B — Add a medical advice rule to the policy"
+    run: all
+
+  - section: "Sub-step C — Confirm the new rule is enforced"
+    run: [1]
+    retry:
+      attempts: 12
+      delay: 10
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      # The identical prompt that passed in sub-step A is now rejected, purely
+      # from a ConfigMap edit — the point of the whole section.
+      - status: 403
+      - not_contains: "chat.completion"
+
+  - section: "Sub-step C — Confirm the new rule is enforced"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 5
+      until: "REJECT"
+    assert:
+      - contains: "LLM decision: REJECT"
+
+  - section: "View webhook logs"
+    run: all
+    assert:
+      - contains: "webhook"
+
+  - section: "View metrics in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View AgentGateway access logs"
+    run: [1]
+    assert:
+      - contains: "agentgateway-proxy"
+      # The gateway attributes a webhook rejection to the guardrail, exactly as
+      # the lab's sample log line shows.
+      - contains: "reason=Guardrail"
+      - contains: "request rejected by webhook guardrail"
+
+
+  - section: "View raw metrics"
+    run: all
+    retry:
+      attempts: 3
+      delay: 3
+      until: "agentgateway_"
+    assert:
+      - matches: 'agentgateway_[a-z_]+[{ ]'
+
+cleanup:
+  section: "Cleanup"

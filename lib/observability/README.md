@@ -6,7 +6,37 @@ Shared assets for the observability labs. Run everything from the workshop root.
 
 The AgentGateway Grafana dashboard installed by `002`: GenAI metrics, cost tracking, infrastructure, streaming, and MCP panels. `update-dashboard.sh` reloads it into a running Grafana without reinstalling the chart.
 
-Per-model token prices are hardcoded in this dashboard's PromQL and pricing tables. Change them through the `/update-dashboard-pricing` skill rather than by hand.
+This is the canonical copy. Nine other checkouts ship the same JSON so their installers can apply it standalone, and they carry none of the tooling below. After changing a price here, propagate the rendered JSON with the `syncing-files-across-repos` skill.
+
+Per-model token prices are hardcoded in this dashboard's PromQL and pricing tables. Change them through the `/update-dashboard-pricing` skill rather than by hand, using the tools below.
+
+## `dash_prices.py`
+
+Reads and rewrites the dashboard's per-model rates. `extract` prints the rate card the dashboard currently implements; `plan`/`apply` change a rate or add/remove a tracked model everywhere it appears (PromQL cost panels, the markdown pricing tables, the derived cache-convention constants) and refuse to write if the result fails their own invariant checks; `validate` runs those checks standalone. Never hand-edit a price in the dashboard JSON, `dash_prices.py` is the only writer.
+
+## `pricing.json`
+
+The rate card `dash_prices.py extract --json` writes, checked in as the reviewable diff surface for a price change. `lib/observability/tests/test_dashboard.py` pins the dashboard's live rates to this file, so regenerate it after any `apply`:
+
+```bash
+python3 lib/observability/dash_prices.py extract --json lib/observability/pricing.json
+```
+
+## `models-dev-check.py`
+
+Compares `pricing.json` against [models.dev](https://models.dev/api.json), the pricing source of record for this dashboard, and reports drift. It never edits the dashboard; feed its `--out` card to `dash_prices.py plan`/`apply` to act on a change.
+
+```bash
+python3 lib/observability/models-dev-check.py --out proposed-card.json
+```
+
+## Tests
+
+```bash
+python3 -m unittest discover -s lib/observability/tests -v
+```
+
+Checks the dashboard JSON parses, `dash_prices.py validate` passes, and the dashboard's live rates match `pricing.json`.
 
 ## `seed-cost-data.sh`
 
@@ -36,3 +66,16 @@ Seeding fills the **Dashboard** tab only. The **Budgets** tab reads live rate-li
 
 - [`labs/observability/llm-cost-management.md`](../../labs/observability/llm-cost-management.md) — `seed-cost-data.sh`
 - [`002-set-up-ui-and-monitoring-tools.md`](../../002-set-up-ui-and-monitoring-tools.md) — the Grafana dashboard JSON
+
+## Downstream copies of the dashboard JSON
+
+Keep these byte-identical to `agentgateway-grafana-dashboard-v1.json`:
+
+| Repo | Path |
+| --- | --- |
+| `solo-field-installer` | `lib/observability/agentgateway/` |
+| `enrollment-agent` | `k8s/observability/` |
+| `vertical-agent-demos` | `banking-agent/k8s/observability/`, `telco-agent/k8s/observability/` |
+| `demogen` | `templates/k8s/observability/` |
+| `agentgateway-benchmarking` | `scenario-{1a,1b,2,3}/installation-steps/lib/observability/` |
+

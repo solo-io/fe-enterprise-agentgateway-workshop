@@ -1,0 +1,86 @@
+lab: labs/mcp/openapi-to-mcp-in-cluster.md
+description: OpenAPI schema synthesized into MCP tools in front of an in-cluster Stripe mock
+tier: t0
+requires: []
+timeout: 800
+
+steps:
+  - section: "Step 1: Deploy the Stripe mock server"
+    run: all
+    wait: "--for=condition=Available deploy/stripe-mock -n stripe-mcp --timeout=300s"
+
+  - section: "Step 2: Store the OpenAPI schema in a ConfigMap"
+    run: all
+
+  - section: "Step 3: Create the backend, upstream credential, and HTTPRoute"
+    run: all
+
+  # Block 2 is a foreground `kubectl port-forward`, which never returns. The
+  # lab's curl steps below address localhost:8080, so background it instead.
+  - section: "Get the gateway address"
+    run: [1]
+    assert:
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+
+  - section: "Run MCP Inspector"
+    run: none
+    reason: interactive npx browser app; the lab's own curl steps cover the same ground
+
+  - section: "List and run a tool"
+    run: none
+    reason: MCP Inspector UI steps
+
+  - probe: "background the port-forward the lab's curl steps expect"
+    script: |
+      e2e_pf agentgateway-system svc/agentgateway-proxy 8080:8080
+      echo "port_forward_ready=$?"
+    assert:
+      - contains: "port_forward_ready=0"
+
+  # blocks: [1] initialize + capture SESSION  [2] tools/list  [3] tools/call listProducts
+  - section: "Step 5 (optional): Verify with curl"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 3
+      until: 'session: [0-9a-zA-Z]'
+    assert:
+      - matches: 'session: [0-9a-zA-Z]'
+
+  - section: "Step 5 (optional): Verify with curl"
+    run: [2]
+    assert:
+      - contains: "listProducts"
+      - contains: "listPrices"
+      - contains: "listCustomers"
+      - contains: "listCharges"
+
+  # The upstream JSON arrives escaped inside the MCP text content, so the wire
+  # form is \"object\":\"list\" — the lab's prose shows it decoded.
+  - section: "Step 5 (optional): Verify with curl"
+    run: [3]
+    assert:
+      - contains: '\"object\":\"list\"'
+      - contains: "T-shirt"
+      - contains: "Comfortable gray cotton t-shirt"
+
+  - section: "View access logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "View MCP metrics"
+    run: all
+    retry:
+      attempts: 4
+      delay: 3
+      until: "agentgateway_mcp_requests_total"
+    assert:
+      - matches: 'agentgateway_mcp_requests_total\{'
+
+  - section: "View in Grafana"
+    run: none
+    reason: browser step
+
+cleanup:
+  section: "Cleanup"

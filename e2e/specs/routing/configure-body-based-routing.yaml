@@ -1,0 +1,113 @@
+lab: labs/routing/configure-body-based-routing.md
+description: PreRouting CEL lifts model from the body into headers the HTTPRoute matches on
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 480
+
+steps:
+  - section: "Deploy the Mock LLM Server"
+    run: all
+    wait: "--for=condition=Available deploy/mock-gpt-4o -n agentgateway-system --timeout=240s"
+
+  - section: "Configure Required Variables"
+    run: all
+
+  - section: "Create EnterpriseAgentgatewayBackend Resources"
+    run: all
+
+  # NOTE: the PreRouting policy targets the shared Gateway, so it sets these two
+  # headers on every request the baseline serves until Cleanup removes it.
+  - section: "Step 1: Extract Model from Request Body"
+    run: all
+
+  - section: "Step 2: Route on the Extracted Headers"
+    run: all
+
+  - section: "Test Body-Based Routing"
+    run: all
+    assert:
+      - contains: "Gateway IP:"
+
+  - section: "Route to OpenAI"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      # The dated build proves this reached OpenAI, not the mock — the whole
+      # point of the routing decision under test.
+      - matches: '"model": *"gpt-5\.4-nano-[0-9]{4}-[0-9]{2}-[0-9]{2}'
+      - not_contains: "mock-gpt-4o"
+
+  - section: "Route to Mock LLM"
+    run: all
+    retry:
+      attempts: 6
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "mock-gpt-4o"
+      - not_contains: "gpt-5.4-nano"
+
+  - section: "Fallback — No Model in Body"
+    run: all
+    retry:
+      attempts: 6
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      # A body with no model must reach the mock via the unspecified fallback
+      # rule rather than 404 on no matching rule.
+      - contains: "mock-gpt-4o"
+
+  # The lab calls the PreRouting phase "critical" but gives the reader no way to
+  # see the headers it injects. Echo them back off the mock's own view of the
+  # request by asserting the route each request actually matched.
+  - probe: "each request matched the rule its body implied"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 200 \
+        | grep 'route=agentgateway-system/body-based-routing' \
+        | grep -oE 'gen_ai.request.model=[a-z0-9.-]+' | sort | uniq -c \
+        | sed 's/^ *//'
+    retry:
+      attempts: 6
+      delay: 5
+      until: "gen_ai.request.model=mock-gpt-4o"
+    assert:
+      - contains: "gen_ai.request.model=mock-gpt-4o"
+      - contains: "gen_ai.request.model=gpt-5.4-nano"
+
+  - section: "View Metrics Endpoint"
+    run: all
+    retry:
+      attempts: 3
+      delay: 3
+      until: "agentgateway_"
+    assert:
+      - matches: 'agentgateway_[a-z_]+[{ ]'
+
+  - section: "View Metrics and Traces in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "(Optional) View Traces in Jaeger"
+    run: none
+    reason: OpenShift-only alternative to the Solo UI
+
+cleanup:
+  section: "Cleanup"

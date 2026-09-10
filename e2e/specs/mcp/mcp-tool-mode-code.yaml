@@ -1,0 +1,132 @@
+lab: labs/mcp/mcp-tool-mode-code.md
+description: MCP Code tool mode — one run_code tool, sandboxed composition, timeout, per-tool RBAC
+tier: t0
+requires: []
+# "Hit the timeout" deliberately waits out the configured 60s codeMode.timeout,
+# so this lab is inherently slow.
+timeout: 1500
+
+steps:
+  - section: "Step 1: Deploy the MCP Server"
+    run: all
+    wait: "--for=condition=Available deploy/mcp-server-everything -n mcp --timeout=300s"
+
+  - section: "Step 2: Create the EnterpriseAgentgatewayBackend and HTTPRoute"
+    run: all
+
+  - section: "Step 3: Verify with MCP Inspector"
+    run: [1]
+    assert:
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+
+  # sessionRouting: Stateless, so $SID is expected to be empty (see the sibling
+  # search-mode lab). Assert only that the step ran.
+  - section: "Initialize and capture the session ID"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "Session:"
+    assert:
+      - contains: "Session:"
+
+  - section: "List tools — confirm only run_code comes back"
+    run: all
+    retry:
+      attempts: 6
+      delay: 4
+      until: "run_code"
+    assert:
+      - contains: "run_code"
+      - not_contains: '"name": "echo"'
+      - not_contains: '"name": "get-sum"'
+
+  - section: "Run a composing script"
+    run: all
+    assert:
+      - contains: "hello"
+      - contains: "structuredContent"
+      - not_contains: '"isError": true'
+
+  # The 70s upstream operation is aborted at the 60s codeMode.timeout and comes
+  # back as a normal MCP error result rather than a dropped connection.
+  # Races the 60s codeMode.timeout against the route's own request timeout: when
+  # the route wins, the connection is dropped and the block yields no output at
+  # all. Retry so the suite does not fail on which timer fires first.
+  - section: "Hit the timeout"
+    run: all
+    retry:
+      attempts: 3
+      delay: 5
+      until: 'timed out'
+    # This block does not pretty-print, so the assertion matches raw SSE.
+    assert:
+      - contains: "Code mode execution timed out"
+      - contains: '"isError":true'
+
+  - section: "Intermediate-result elimination"
+    run: all
+    assert:
+      - matches: 'Code mode \(3 tools, 1 round trip, summary only\):[[:space:]]+[0-9]+ bytes'
+
+  - section: "Apply JWT validation"
+    run: all
+
+  - section: "Apply per-tool authorization"
+    run: all
+
+  # get-env is filtered out of the generated typed API rather than rejected at
+  # call time, so it stops appearing as a function in run_code's description.
+  # The lab's own block ends with `grep -E "function|get_env|..."`, so only the
+  # matching lines survive — run_code itself is filtered out of the output.
+  - section: "Test with the demo JWT"
+    run: all
+    retry:
+      attempts: 8
+      delay: 4
+      until: "async function"
+    assert:
+      - contains: "async function"
+      - contains: "get_sum"
+      - not_contains: "get_env"
+
+  - section: "Verify a script that calls the restricted tool fails"
+    run: all
+    assert:
+      - matches: 'not defined|isError|error'
+
+  - section: "Deploy the synthetic server"
+    run: all
+    wait: "--for=condition=Available deploy/mcp-stub -n mcp --timeout=300s"
+
+  - section: "Re-point the backend at the stub server"
+    run: all
+
+  - section: "Re-measure"
+    run: all
+    retry:
+      attempts: 8
+      delay: 4
+      until: 'bytes'
+    assert:
+      - matches: '[0-9]+ bytes'
+
+  - section: "Point the backend back to `mcp-server-everything` before continuing"
+    run: all
+
+  - section: "View access logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "View MCP metrics"
+    run: all
+    retry:
+      attempts: 4
+      delay: 3
+      until: "agentgateway_mcp"
+    assert:
+      - matches: 'agentgateway_mcp_requests_total\{'
+
+cleanup:
+  section: "Cleanup"

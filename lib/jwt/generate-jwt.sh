@@ -5,22 +5,38 @@
 #   generate-jwt.sh <claims.json>    # read claims from file
 #   generate-jwt.sh -                # read claims JSON from stdin
 #
-# Prints the signed JWT to stdout and exits. Uses the committed keypair
-# (private.pem / public.pem) next to this script; the matching JWKS lives
-# at jwks.json so the gateway can verify tokens this script signs.
+# Prints the signed JWT to stdout and exits. Uses the keypair
+# (private.pem / public.pem) next to this script, generating it on first
+# run; the matching JWKS lives at jwks.json so the gateway can verify
+# tokens this script signs.
 #
-# Demo-only: the private key is checked into the repo. Do not use these
-# keys outside of workshop labs.
+# Demo-only: do not use these keys outside of workshop labs.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PRIVATE_KEY="$SCRIPT_DIR/private.pem"
 KID="workshop-jwt-key-001"
+PUBLIC_KEY="$SCRIPT_DIR/public.pem"
+JWKS_FILE="$SCRIPT_DIR/jwks.json"
 
+# First run generates a demo-only keypair and the matching JWKS document.
+# The keys are gitignored: every clone mints its own, and jwks.json always
+# matches the private key that signs.
 if [[ ! -f "$PRIVATE_KEY" ]]; then
-  echo "error: private key not found at $PRIVATE_KEY" >&2
-  exit 1
+  echo "generating demo keypair at $SCRIPT_DIR (first run)" >&2
+  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$PRIVATE_KEY" 2>/dev/null
+  openssl rsa -in "$PRIVATE_KEY" -pubout -out "$PUBLIC_KEY" 2>/dev/null
+fi
+
+if [[ ! -f "$JWKS_FILE" || "$PRIVATE_KEY" -nt "$JWKS_FILE" ]]; then
+  MODULUS_HEX="$(openssl rsa -in "$PRIVATE_KEY" -noout -modulus | cut -d= -f2)"
+  python3 - "$MODULUS_HEX" "$KID" >"$JWKS_FILE" <<'PYEOF'
+import base64, json, sys
+n = base64.urlsafe_b64encode(bytes.fromhex(sys.argv[1])).rstrip(b"=").decode()
+print(json.dumps({"keys": [{"kty": "RSA", "use": "sig", "alg": "RS256",
+                            "kid": sys.argv[2], "n": n, "e": "AQAB"}]}, indent=2))
+PYEOF
 fi
 
 if [[ $# -ne 1 ]]; then

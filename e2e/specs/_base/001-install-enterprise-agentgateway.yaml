@@ -1,0 +1,90 @@
+lab: 001-install-enterprise-agentgateway.md
+description: Gateway API CRDs, Enterprise CRDs, controller, proxy Gateway, policies
+tier: t0
+requires:
+  - SOLO_TRIAL_LICENSE_KEY
+timeout: 1200
+
+# Run by `--install-base`. There is deliberately no `cleanup:` — this lab IS the
+# baseline every other lab depends on, so its Uninstall section is never run.
+steps:
+  - section: "Kubernetes Gateway API CRDs"
+    run: all
+    assert:
+      - contains: "gatewayclasses"
+      - contains: "httproutes"
+      - contains: "referencegrants"
+
+  - section: "Configure Required Variables"
+    run: all
+
+  # blocks: [1] create namespace  [2] helm crds  [3] api-resources check
+  - section: "Enterprise Agentgateway CRDs"
+    run: [1]
+    allow_failure: true   # AlreadyExists when re-running against a live cluster
+
+  - section: "Enterprise Agentgateway CRDs"
+    run: [2, 3]
+    assert:
+      - contains: "enterpriseagentgatewaybackends"
+      - contains: "enterpriseagentgatewaypolicies"
+      - contains: "enterpriseagentgatewayparameters"
+      - contains: "ratelimitconfigs"
+      - contains: "authconfigs"
+
+  - section: "Install Enterprise Agentgateway Controller"
+    run: all
+    wait: "--for=condition=Available deploy/enterprise-agentgateway -n agentgateway-system --timeout=600s"
+    assert:
+      - contains: "enterprise-agentgateway"
+
+  - section: "Deploy Agentgateway with customizations"
+    run: all
+    wait: "--for=condition=Available deploy/agentgateway-proxy -n agentgateway-system --timeout=600s"
+
+  - probe: "Gateway is Programmed and has an address"
+    script: |
+      for i in $(seq 1 30); do
+        OUT="$(kubectl get gateway agentgateway-proxy -n agentgateway-system \
+                 -o jsonpath='{.status.conditions[?(@.type=="Programmed")].status} {.status.addresses[0].value}' 2>/dev/null)"
+        [[ "$OUT" == True*[0-9a-z]* ]] && break
+        sleep 5
+      done
+      echo "programmed=$OUT"
+    assert:
+      - matches: 'programmed=True [0-9a-z]'
+
+  - probe: "the enterprise extension services are all running"
+    script: |
+      kubectl wait --for=condition=Available -n agentgateway-system \
+        deploy/ext-auth-service-enterprise-agentgateway \
+        deploy/ext-cache-enterprise-agentgateway \
+        deploy/rate-limiter-enterprise-agentgateway \
+        deploy/waf-server-enterprise-agentgateway \
+        --timeout=600s
+    assert:
+      - rc: 0
+
+  - section: "Configure metric labels"
+    run: all
+
+  - section: "Configure access logs (optional)"
+    run: all
+
+  - section: "Configure tracing"
+    run: all
+
+  - probe: "all three observability policies attached to the Gateway"
+    script: |
+      sleep 5
+      kubectl get eagpol -n agentgateway-system metrics access-logs tracing \
+        -o custom-columns='NAME:.metadata.name,ACCEPTED:.status.ancestors[0].conditions[?(@.type=="Accepted")].status'
+    assert:
+      - contains: "metrics"
+      - contains: "access-logs"
+      - contains: "tracing"
+      - not_contains: "False"
+
+  - section: "Uninstall"
+    run: none
+    reason: this lab is the baseline; tearing it down would break every other lab

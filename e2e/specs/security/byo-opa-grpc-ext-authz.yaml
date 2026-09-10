@@ -1,0 +1,172 @@
+lab: labs/security/byo-opa-grpc-ext-authz.md
+description: one BYO OPA gRPC service gating an LLM route, an MCP route, then a body-aware per-tool rule
+tier: t1-key
+timeout: 900
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  - section: "Step 1: Create the policy and OPA config"
+    run: all
+
+  - section: "Step 2: Deploy OPA"
+    run: all
+    wait: "--for=condition=Available deploy/opa-ext-authz -n agentgateway-system --timeout=300s"
+
+  - section: "Step 3: Expose OPA over gRPC"
+    run: all
+
+  # ---- Part 1: LLM route ----
+  - section: "Step 1: Create the OpenAI backend and route"
+    run: all
+
+  - section: "Step 2: Verify the route works before applying OPA"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  - section: "Step 3: Attach OPA as the ext-authz backend"
+    run: all
+
+  - section: "Step 4: Test — request denied without required header"
+    run: [1]
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - not_contains: "chat.completion"
+
+  # OPA's decision log is where the lab tells the reader to look for the verdict.
+  - section: "Step 4: Test — request denied without required header"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 5
+      until: '"result":false'
+    assert:
+      # OPA's decision log is compact JSON — no space after the colon. The lab
+      # rendered it spaced, so a reader grepping for it found nothing.
+      - contains: '"result":false'
+
+  - section: "Step 5: Test — request allowed with required header"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  # ---- Part 2: the same OPA service in front of an MCP route ----
+  - section: "Step 1: Create the MCP backend and route"
+    run: all
+
+  - section: "Step 2: Attach the same OPA backend to the MCP route"
+    run: all
+
+  - section: "Step 3: Test — MCP request denied without required header"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+
+  - section: "Step 4: Test — MCP request allowed with required header"
+    run: all
+    retry:
+      attempts: 8
+      delay: 5
+      until: '"tools"'
+    assert:
+      - contains: '"tools"'
+      - contains: "search"
+      - contains: "get_chunks"
+
+  - probe: "one OPA service backs both routes"
+    script: |
+      for p in openai-opa-ext-auth-policy mcp-opa-ext-auth-policy; do
+        kubectl get enterpriseagentgatewaypolicy "$p" -n agentgateway-system \
+          -o jsonpath="$p -> {.spec.traffic.extAuth.backendRef.name}:{.spec.traffic.extAuth.backendRef.port}{\"\n\"}" 2>/dev/null
+      done
+    assert:
+      - contains: "openai-opa-ext-auth-policy -> opa-ext-authz:9191"
+      - contains: "mcp-opa-ext-auth-policy -> opa-ext-authz:9191"
+
+  # ---- Part 3: body-aware policy, gating on the JSON-RPC method ----
+  - section: "Step 1: Enable body forwarding on the MCP policy"
+    run: all
+
+  - section: "Step 2: Update the Rego policy to read the JSON-RPC method"
+    run: all
+
+  - section: "Step 3: Test — calling an allowed tool"
+    run: all
+    retry:
+      attempts: 10
+      delay: 5
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: '"result"'
+
+  # The decisive assertion of Part 3: identical header to the allowed call, so a
+  # 403 here can only have come from the request body.
+  - section: "Step 4: Test — calling a denied tool"
+    run: all
+    retry:
+      attempts: 8
+      delay: 5
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - not_contains: '"result"'
+
+  - probe: "the deny decision was made off the forwarded body"
+    script: |
+      kubectl logs -n agentgateway-system -l app=opa-ext-authz --tail=100 \
+        | grep -o 'get_full_page' | head -1
+      kubectl get enterpriseagentgatewaypolicy mcp-opa-ext-auth-policy \
+        -n agentgateway-system \
+        -o jsonpath='forwardBody={.spec.traffic.extAuth.forwardBody}{"\n"}'
+    retry:
+      attempts: 8
+      delay: 5
+      until: "get_full_page"
+    assert:
+      # OPA only ever saw the tool name because the body was forwarded to it.
+      - contains: "get_full_page"
+      - contains: "maxSize"
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  # The bundle-serving alternative reconfigures OPA to pull its policy from a
+  # bundle server instead of the ConfigMap. It is a parallel path to what Parts
+  # 1-3 already proved, and it leaves OPA pointed at a different policy source,
+  # so it stays out of the automated run.
+  - section: "Step 1: Build and host the bundle"
+    run: none
+    reason: alternative policy-distribution path; reconfigures OPA away from the ConfigMap the rest of the lab uses
+
+  - section: "Step 2: Reconfigure OPA to pull the bundle"
+    run: none
+    reason: alternative policy-distribution path
+
+  - section: "Step 3: Verify"
+    run: none
+    reason: alternative policy-distribution path
+
+cleanup:
+  section: "Cleanup"

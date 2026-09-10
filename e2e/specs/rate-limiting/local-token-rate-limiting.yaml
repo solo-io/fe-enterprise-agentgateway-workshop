@@ -1,0 +1,58 @@
+lab: labs/rate-limiting/local-token-rate-limiting.md
+description: per-replica local input-token budget of 5/min returns 429 once spent
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 420
+
+steps:
+  - section: "Lab Objectives"
+    run: all
+
+  - section: "curl openai"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  - section: "Configure Local token-based rate limit of 5 input tokens per minute"
+    run: all
+
+  # The burst has to cover both proxy replicas, since a local limit is a
+  # per-replica counter. Retried as a whole: the limiter uses a fixed wall-clock
+  # minute, so a burst that starts near a boundary can see the window roll over.
+  - section: "curl openai until the limit trips"
+    run: all
+    retry:
+      attempts: 4
+      delay: 15
+      until: "HTTP 429"
+    assert:
+      - contains: "HTTP 429"
+      # Not a blanket rejection — the first request per replica must still pass,
+      # or the policy would be indistinguishable from a broken route.
+      - contains: "HTTP 200"
+
+  # The burst is sized for two replicas because the limit is enforced on each
+  # one separately. Confirm that framing holds: both replicas rejected, so the
+  # policy is not being enforced only on whichever replica served request 1.
+  - probe: "the limit is enforced on every replica, not just one"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 200 \
+        | grep 'http.status=429' | grep -oE 'pod/[a-z0-9-]+' | sort -u | wc -l \
+        | sed 's/^[[:space:]]*/pods_returning_429=/'
+    assert:
+      - contains: "pods_returning_429=2"
+
+  - resource: deploy/agentgateway-proxy
+    jsonpath: .status.readyReplicas
+    expect: "2"
+    name: both proxy replicas are up to be rate-limited independently
+
+cleanup:
+  section: "Cleanup"

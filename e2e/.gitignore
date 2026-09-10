@@ -1,0 +1,7 @@
+# Cached credentials from interactive prompts (chmod 600) — never commit.
+.env.local
+
+# Per-run generated drivers, extracted lab blocks, and captured output.
+.work/
+
+__pycache__/

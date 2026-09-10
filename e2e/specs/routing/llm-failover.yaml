@@ -1,0 +1,97 @@
+lab: labs/routing/llm-failover.md
+description: priority-group failover — a 429 evicts group 1, later requests land on OpenAI
+tier: t1-key
+timeout: 600
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  - section: "Deploy Mock Server with Rate Limiting"
+    run: all
+    wait: "--for=condition=Available deploy/mock-gpt-4o -n agentgateway-system --timeout=240s"
+
+  - section: "Configure OpenAI Secret"
+    run: all
+
+  - section: "Create Priority Group Failover Configuration"
+    run: all
+
+  # This lab scales the shared proxy to 1 replica, because provider health state
+  # is per-pod. It patches EnterpriseAgentgatewayParameters with a merge patch
+  # (the safe idiom) and its Cleanup restores 2, so the baseline survives — the
+  # probe after cleanup-adjacent steps below checks the count while it is down.
+  # Assertions attach to a step's last block, and this section's last block is
+  # `kubectl get pods` — so the rollout wait needs its own step.
+  - section: "Configure Single Replica for Consistent Testing"
+    run: [1, 2]
+    assert:
+      - contains: "successfully rolled out"
+
+  - section: "Configure Single Replica for Consistent Testing"
+    run: [3]
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - resource: deploy/agentgateway-proxy
+    jsonpath: .status.readyReplicas
+    expect: "1"
+    name: exactly one proxy replica is ready, as the lab requires
+
+  - resource: deploy/agentgateway-proxy
+    jsonpath: .spec.replicas
+    expect: "1"
+    name: exactly one proxy replica is desired, as the lab requires
+
+  - section: "Test Priority Group Failover"
+    run: all
+
+  # Request 1 gets the mock's 429, which trips eviction at consecutiveFailures: 1;
+  # requests 2 and 3 land on OpenAI. Retried as a whole because eviction lasts
+  # 60s — if a previous attempt already evicted the mock, the pattern shifts.
+  - section: "Testing Failover Behavior"
+    run: all
+    retry:
+      attempts: 4
+      delay: 20
+      until: "HTTP 200"
+    assert:
+      # Both halves of the documented pattern: the mock rejects, then failover
+      # succeeds against the real provider.
+      - contains: "RateLimitError"
+      - contains: "HTTP 429"
+      - contains: "HTTP 200"
+      # The failover response must come from OpenAI's model, not the mock's.
+      - matches: '"model": *"gpt-5\.4-nano'
+
+  # The lab explains eviction is what enables failover. Prove the mechanism, not
+  # just the outcome: the health policy's CEL condition is what classifies 429.
+  - resource: enterpriseagentgatewaypolicy/mock-ratelimit-health
+    jsonpath: .spec.backend.health.unhealthyCondition
+    expect: "response.code >= 500 || response.code == 429"
+    name: the health policy is what evicts the group-1 provider
+
+  - resource: enterpriseagentgatewaypolicy/mock-ratelimit-health
+    jsonpath: .spec.backend.health.eviction.duration
+    expect: "60s"
+    name: the group-1 eviction duration matches the doc
+
+  - resource: enterpriseagentgatewaypolicy/mock-ratelimit-health
+    jsonpath: .spec.backend.health.eviction.consecutiveFailures
+    expect: "1"
+    name: the group-1 eviction trips after one failure
+
+  - section: "View Metrics in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+cleanup:
+  section: "Cleanup"

@@ -1,0 +1,146 @@
+lab: labs/guardrails/builtin-guardrails.md
+description: eight request guards reject at ingress, two response guards mask at egress
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 600
+
+steps:
+  - section: "Create the OpenAI API key secret"
+    run: all
+
+  - section: "Create the OpenAI route and backend"
+    run: all
+
+  - section: "Baseline test (no guardrails)"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  - section: "Apply comprehensive built-in guardrails"
+    run: all
+
+  # Each guard asserts both halves of what the lab's table promises: the status
+  # code and the operator-authored message. Asserting the status alone would let
+  # a guard fire for the wrong reason and still pass.
+  - section: "Guard 1: Prompt Injection — System Override"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - contains: "prompt injection detected"
+
+  - section: "Guard 2: Jailbreak — DAN & Role Hijacking"
+    run: all
+    assert:
+      - status: 403
+      - contains: "jailbreak attempt detected"
+
+  - section: "Guard 3: System Prompt Extraction"
+    run: all
+    assert:
+      - status: 403
+      - contains: "system prompt extraction attempt detected"
+
+  - section: "Guard 4: PII Detection"
+    run: all
+    assert:
+      - status: 422
+      - contains: "personally identifiable information (PII) detected"
+
+  - section: "Guard 5: Credentials & Secrets"
+    run: all
+    assert:
+      - status: 422
+      - contains: "credential or secret detected"
+
+  - section: "Guard 6: Harmful Content"
+    run: all
+    assert:
+      - status: 403
+      - contains: "harmful content request detected"
+
+  - section: "Guard 7: Encoding Evasion & Delimiter Injection"
+    run: [1]
+    assert:
+      - status: 403
+      - contains: "encoding evasion or prompt delimiter injection detected"
+
+  - section: "Guard 7: Encoding Evasion & Delimiter Injection"
+    run: [2]
+    assert:
+      - status: 403
+      - contains: "encoding evasion or prompt delimiter injection detected"
+
+  - section: "Guard 8: Self-Harm, Hate Speech & Dangerous Advisory"
+    run: all
+    assert:
+      - status: 403
+      - contains: "harmful, hateful, or dangerous advisory content"
+
+  # Response guards let the request through and edit the reply, so these two
+  # depend on the model actually emitting a match. Retried for that reason —
+  # the gateway's masking is deterministic, the model's output is not.
+  - section: "Response Guards R1 & R2: PII and Secret Masking in LLM Output"
+    run: [1]
+    retry:
+      attempts: 5
+      delay: 3
+      until: "<EMAIL_ADDRESS>"
+    assert:
+      - status: 200
+      # Builtin recognizers mask with their entity tag, so the client learns the
+      # kind of data redacted. Verified against v2026.7.0 — never asterisks.
+      - contains: "<EMAIL_ADDRESS>"
+      - not_contains: "@example.com"
+
+  - section: "Response Guards R1 & R2: PII and Secret Masking in LLM Output"
+    run: [2]
+    retry:
+      attempts: 5
+      delay: 3
+      until: "<masked>"
+    assert:
+      - status: 200
+      # A raw regex carries no entity type, so custom matches mask generically.
+      - contains: "<masked>"
+      - not_contains: "AKIAIOSFODNN7EXAMPLE"
+
+  - section: "View access logs"
+    run: all
+    assert:
+      - contains: "reason=Guardrail"
+      - contains: "request rejected by regex guardrail"
+      - contains: "http.status=403"
+      - contains: "http.status=422"
+
+  # The lab tells the reader blocked traffic is never billed. The evidence for
+  # that is the absence of gen_ai usage fields on a rejected request, since a
+  # request that reached OpenAI would carry token counts and a cost.
+  - probe: "rejected requests never reach the provider, so nothing is billed"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 100 \
+        | grep 'reason=Guardrail' | sort | tail -1 \
+        | grep -q 'agw.ai.usage.cost' && echo "billed" || echo "not billed"
+    assert:
+      - contains: "not billed"
+
+  - section: "View metrics in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View traces"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+cleanup:
+  section: "Cleanup"

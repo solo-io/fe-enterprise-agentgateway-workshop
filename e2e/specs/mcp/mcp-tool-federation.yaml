@@ -1,0 +1,205 @@
+lab: labs/mcp/mcp-tool-federation.md
+description: four MCP servers multiplexed behind one backend, FailOpen, persona-based tool filtering
+tier: t1-key
+requires:
+  - FRED_API_KEY
+timeout: 1500
+
+# Needs egress to the arXiv, FRED, SEC EDGAR and BLS APIs. Uses the dedicated
+# demo keypair under lib/jwt (not the solo.io-issuer token other labs use).
+steps:
+  # Blocks 2 and 3 create the API-key secrets from `<your-fred-key>` placeholders,
+  # which is right for a reader but cannot be replayed. The probe below creates
+  # the same secrets from resolved environment variables instead.
+  - section: "Step 1: Namespace and API key secrets"
+    run: [1]
+
+  - probe: "create the API-key secrets from the resolved environment"
+    script: |
+      kubectl create secret generic fred-api-key --namespace mcp \
+        --from-literal="FRED_API_KEY=${FRED_API_KEY}" \
+        --dry-run=client -o yaml | kubectl apply -f -
+      if [ -n "${BLS_API_KEY:-}" ]; then
+        kubectl create secret generic bls-api-key --namespace mcp \
+          --from-literal="BLS_API_KEY=${BLS_API_KEY}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+      else
+        # The lab documents BLS as optional — the pod runs without it.
+        kubectl create secret generic bls-api-key --namespace mcp \
+          --from-literal="BLS_API_KEY=" --dry-run=client -o yaml | kubectl apply -f -
+        echo "note: BLS_API_KEY not set; created an empty secret as the lab allows"
+      fi
+    assert:
+      - contains: "fred-api-key"
+      - contains: "bls-api-key"
+
+  - section: "Step 2: Deploy the four MCP servers"
+    run: all
+    wait: "--for=condition=Available deploy/mcp-airxiv deploy/mcp-fred deploy/mcp-sec-edgar deploy/mcp-bls -n mcp --timeout=600s"
+
+  - section: "Step 3: Create the multiplexed backend and HTTPRoute"
+    run: all
+
+  - section: "Get the gateway address"
+    run: all
+    assert:
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+
+  - section: "Run MCP Inspector"
+    run: none
+    reason: interactive npx browser app, replaced by curl probes
+
+  # The four targets are discovered independently, so poll until all four
+  # prefixes appear rather than returning as soon as the first one does.
+  - probe: "the federated catalog unions all four backends"
+    script: |
+      export E2E_MCP_URL="http://$GATEWAY_IP:8080/mcp"
+      for i in $(seq 1 20); do
+        SID="$(e2e_mcp_init)"
+        OUT="$(e2e_mcp_tools "$SID")"
+        missing=0
+        for p in mcp-airxiv-80_ mcp-fred-80_ mcp-sec-edgar-80_ mcp-bls-80_; do
+          grep -qF -- "$p" <<<"$OUT" || missing=1
+        done
+        [ "$missing" = 0 ] && break
+        sleep 6
+      done
+      printf '%s\n' "$OUT"
+    assert:
+      - contains: "mcp-airxiv-80_"
+      - contains: "mcp-fred-80_"
+      - contains: "mcp-sec-edgar-80_"
+      - contains: "mcp-bls-80_"
+
+  # blocks: [1] scale mcp-bls to 0  [2] restore it
+  - section: "Step 5: Demonstrate FailOpen"
+    run: [1]
+
+  - probe: "FailOpen: the dead backend's tools vanish, the rest keep serving"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "mcp-bls-80_" absent e2e_mcp_tools "$SID"
+    assert:
+      - not_contains: "mcp-bls-80_"
+      - contains: "mcp-airxiv-80_"
+      - contains: "mcp-sec-edgar-80_"
+
+  - section: "Step 5: Demonstrate FailOpen"
+    run: [2]
+    wait: "--for=condition=Available deploy/mcp-bls -n mcp --timeout=300s"
+
+  - probe: "FailOpen: the restored backend's tools come back"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "mcp-bls-80_" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "mcp-bls-80_"
+
+  - section: "Inspect the bundled JWKS"
+    run: all
+
+  - section: "Apply the JWT policy"
+    run: all
+
+  - probe: "one policy gates the whole federation"
+    script: |
+      unset E2E_MCP_AUTH
+      e2e_mcp_expect "401" present e2e_mcp_status
+    assert:
+      - contains: "401"
+
+  - section: "Mint an admin token and reconnect"
+    run: all
+    assert:
+      - matches: 'ey[A-Za-z0-9_-]+\.'
+
+  - probe: "the admin token reaches the full federated catalog"
+    script: |
+      export E2E_MCP_AUTH="$TOKEN"
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "mcp-bls-80_" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "mcp-airxiv-80_"
+      - contains: "mcp-bls-80_"
+
+  - section: "Inspect the JWT claims"
+    run: all
+
+  - section: "Apply the persona policy"
+    run: all
+
+  # Each block mints one persona's token into $TOKEN; the probe after it checks
+  # which slice of the federated surface that persona can see.
+  - section: "Cycle through the personas"
+    run: [1]
+
+  - probe: "academic persona sees only the arXiv slice"
+    script: |
+      export E2E_MCP_AUTH="$TOKEN"
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "mcp-fred-80_" absent e2e_mcp_tools "$SID"
+    assert:
+      - contains: "mcp-airxiv-80_"
+      - not_contains: "mcp-fred-80_"
+      - not_contains: "mcp-sec-edgar-80_"
+
+  - section: "Cycle through the personas"
+    run: [2]
+
+  - probe: "economist persona sees FRED and BLS but not arXiv"
+    script: |
+      export E2E_MCP_AUTH="$TOKEN"
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "mcp-fred-80_" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "mcp-fred-80_"
+      - contains: "mcp-bls-80_"
+      - not_contains: "mcp-airxiv-80_"
+
+  - section: "Cycle through the personas"
+    run: [3]
+
+  - probe: "analyst persona sees only the SEC EDGAR slice"
+    script: |
+      export E2E_MCP_AUTH="$TOKEN"
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "mcp-sec-edgar-80_" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "mcp-sec-edgar-80_"
+      - not_contains: "mcp-airxiv-80_"
+      - not_contains: "mcp-fred-80_"
+
+  - section: "Cycle through the personas"
+    run: [4]
+
+  - probe: "admin persona sees the whole union again"
+    script: |
+      export E2E_MCP_AUTH="$TOKEN"
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "mcp-bls-80_" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "mcp-airxiv-80_"
+      - contains: "mcp-fred-80_"
+      - contains: "mcp-sec-edgar-80_"
+      - contains: "mcp-bls-80_"
+
+  - section: "View access logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "View MCP metrics"
+    run: all
+    retry:
+      attempts: 4
+      delay: 3
+      until: "agentgateway_mcp"
+    assert:
+      - matches: 'agentgateway_mcp_requests_total\{'
+
+  - section: "View in Grafana"
+    run: none
+    reason: browser step
+
+cleanup:
+  section: "Cleanup"

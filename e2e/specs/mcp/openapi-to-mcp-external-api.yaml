@@ -1,0 +1,81 @@
+lab: labs/mcp/openapi-to-mcp-external-api.md
+description: OpenAPI schema synthesized into MCP tools in front of the public Open-Meteo API
+tier: t0
+requires: []
+timeout: 700
+
+# Needs cluster egress to https://api.open-meteo.com — the lab's subject is
+# fronting a public API, so a failure here is a real failure, not a skip.
+steps:
+  - section: "Step 1: Store the OpenAPI schema in a ConfigMap"
+    run: all
+
+  - section: "Step 2: Create the OpenAPI backend and HTTPRoute"
+    run: all
+
+  # Block 2 is a foreground `kubectl port-forward`, which never returns.
+  - section: "Get the gateway address"
+    run: [1]
+    assert:
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+
+  - section: "Run MCP Inspector"
+    run: none
+    reason: interactive npx browser app; the lab's own curl steps cover the same ground
+
+  - probe: "background the port-forward the lab's curl steps expect"
+    script: |
+      e2e_pf agentgateway-system svc/agentgateway-proxy 8080:8080
+      echo "port_forward_ready=$?"
+    assert:
+      - contains: "port_forward_ready=0"
+
+  # blocks: [1] initialize  [2] initialized + tools/list  [3] tools/call
+  - section: "Step 4 (optional): Verify with curl"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 3
+      until: 'session: [0-9a-zA-Z]'
+    assert:
+      - matches: 'session: [0-9a-zA-Z]'
+
+  - section: "Step 4 (optional): Verify with curl"
+    run: [2]
+    assert:
+      - contains: "getWeatherForecast"
+      - contains: "inputSchema"
+
+  # Live external API: a cold upstream connection can exceed the gateway's
+  # connect deadline ("upstream call failed: Connect: deadline has elapsed").
+  - section: "Step 4 (optional): Verify with curl"
+    run: [3]
+    retry:
+      attempts: 5
+      delay: 6
+      until: 'temperature_2m'
+    assert:
+      - contains: '"isError":false'
+      - contains: "temperature_2m"
+      - contains: "wind_speed_10m"
+
+  - section: "View access logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "View MCP metrics"
+    run: all
+    retry:
+      attempts: 4
+      delay: 3
+      until: "agentgateway_mcp_requests_total"
+    assert:
+      - matches: 'agentgateway_mcp_requests_total\{'
+
+  - section: "View in Grafana"
+    run: none
+    reason: browser step
+
+cleanup:
+  section: "Cleanup"

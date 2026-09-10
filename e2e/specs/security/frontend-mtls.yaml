@@ -1,0 +1,156 @@
+lab: labs/security/frontend-mtls.md
+description: frontend mTLS on the shared gateway; no client cert is refused at handshake
+tier: t1-key
+timeout: 420
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  # openssl writes example_certs/ relative to the cwd, and drivers run from the
+  # repo root. Blocks share one shell, so this cd carries through.
+  - probe: "keep generated certificates out of the repo"
+    script: |
+      cd "$E2E_WORKDIR" && pwd
+    assert:
+      - contains: ".work/security/frontend-mtls"
+
+  - section: "Create self-signed TLS certificates"
+    run: all
+
+  - probe: "the CA bundle and both keypairs exist"
+    script: |
+      ls example_certs | sort | tr '\n' ' '
+      echo
+      kubectl get configmap ca-cert -n agentgateway-system \
+        -o jsonpath='ca_keys={range .data}{@}{"\n"}{end}' | head -1
+    assert:
+      - contains: "client.try-solo.io.crt"
+      - contains: "gateway.crt"
+      - contains: "try-solo.io.crt"
+
+  # Two JSON patch ops: spec.tls.frontend for the client-cert validation, and an
+  # appended HTTPS listener. Neither restates anything 001 set. The lab's own
+  # verification block prints the result.
+  - section: "Configure the gateway to terminate mTLS"
+    run: all
+    assert:
+      - contains: "listeners=8080 443"
+      - contains: "mtls=AllowValidOnly"
+      - contains: "params=agentgateway-config"
+
+  # `kubectl wait --for=condition=Programmed gateway/agentgateway-proxy` is NOT a
+  # usable gate here: the Gateway-level condition is already True from 001's
+  # :8080 listener and returns "condition met" instantly, even while the new
+  # https listener is Programmed=False/Invalid. Observed live — the suite then
+  # ran its TLS curls against a listener that was not serving yet and every
+  # retry got a TCP reset at Client Hello. Gate on the https listener's own
+  # condition, and on the proxy rollout, since the routing/llm-failover* labs
+  # patch agentgateway-config and can leave the proxy mid-roll.
+  - probe: "the https listener is programmed and the proxy has settled"
+    script: |
+      kubectl rollout status deploy/agentgateway-proxy \
+        -n agentgateway-system --timeout=180s
+      for i in $(seq 1 30); do
+        s="$(kubectl get gateway agentgateway-proxy -n agentgateway-system \
+          -o jsonpath='{range .status.listeners[?(@.name=="https")].conditions[?(@.type=="Programmed")]}{.status}{end}')"
+        [[ "$s" == "True" ]] && break
+        sleep 3
+      done
+      echo "https_programmed=$s"
+      # Programmed=True is still not proof the data path serves TLS. Observed on
+      # v2026.7.1-patch.0: after the proxy rolls, the dataplane can NACK the
+      # listener ("AgentGatewayNackError ... TLS certificate is invalid: no
+      # certificate") while the listener status stays Programmed=True, and every
+      # handshake gets a TCP reset at Client Hello. So gate on an actual
+      # handshake — the server sends its certificate before it requires ours,
+      # so this succeeds without a client cert.
+      export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
+        --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
+        -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+      tls_ready=no
+      for i in $(seq 1 40); do
+        if echo | openssl s_client -connect "$GATEWAY_IP:443" \
+             -servername try-solo.io 2>/dev/null | grep -q 'BEGIN CERTIFICATE'; then
+          tls_ready=yes; break
+        fi
+        sleep 3
+      done
+      echo "tls_handshake=$tls_ready"
+    assert:
+      - contains: "successfully rolled out"
+      - contains: "https_programmed=True"
+      - contains: "tls_handshake=yes"
+
+  - section: "Configure Required Variables"
+    run: all
+
+  # The whole point of AllowValidOnly: the gateway refuses at the TLS layer, so
+  # there is no HTTP status at all. curl exits nonzero, which is the documented
+  # outcome.
+  - section: "Validate OpenAI access without a client mTLS certificate"
+    run: all
+    allow_failure: true
+    retry:
+      attempts: 10
+      delay: 3
+      # The rejection is not a handshake-time alert: the gateway completes the
+      # TLS handshake with an empty client Certificate, then tears the
+      # connection down once the request arrives, so curl reports
+      # `(56) ... SSL routines` rather than `certificate required`. Keep this
+      # guard in step with the assertion below or it never matches and all 10
+      # attempts are spent before the step passes anyway.
+      until: 'certificate required|tlsv13 alert|handshake fail|SSL routines'
+    assert:
+      - not_contains: "chat.completion"
+      - matches: '(certificate required|tlsv13 alert|handshake fail|SSL routines)'
+
+  - section: "Validate OpenAI access with a trusted client mTLS certificate"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+      - contains: "HTTP/2 200"
+
+  # A cert signed by a different CA has to be rejected too, otherwise
+  # AllowValidOnly would just mean "any client cert" — a much weaker guarantee
+  # than the lab describes, and one the lab never tests.
+  - probe: "a client cert from an untrusted CA is rejected"
+    script: |
+      openssl req -x509 -sha256 -nodes -days 1 -newkey rsa:2048 \
+        -subj '/O=Rogue/CN=rogue.example.com' \
+        -keyout example_certs/rogue.key -out example_certs/rogue.crt 2>/dev/null
+      curl -sk "https://$GATEWAY_IP/openai" \
+        -H 'content-type: application/json' \
+        -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Hello!"}]}' \
+        --cert example_certs/rogue.crt --key example_certs/rogue.key 2>&1
+      echo "rogue_exit=$?"
+    assert:
+      # A nonzero curl exit means the connection died at the TLS layer rather
+      # than returning any HTTP response — observed as 56 (recv failure) here.
+      - matches: 'rogue_exit=[1-9][0-9]*'
+      - not_contains: "chat.completion"
+
+  - probe: "the plaintext baseline still works alongside mTLS"
+    script: |
+      curl -s -o /dev/null -w 'plaintext_8080=%{http_code}\n' \
+        "http://$GATEWAY_IP:8080/openai" \
+        -H 'content-type: application/json' \
+        -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Hello!"}]}'
+    assert:
+      - contains: "plaintext_8080=200"
+
+  - section: "View Metrics in Grafana"
+    run: none
+    reason: foreground port-forward plus a browser step
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+cleanup:
+  section: "Cleanup"

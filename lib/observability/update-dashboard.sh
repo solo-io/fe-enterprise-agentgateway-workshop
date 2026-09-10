@@ -42,16 +42,7 @@ fi
 log_info "Updating AgentGateway Grafana dashboard on context: $CONTEXT"
 log_info "Dashboard file: $DASHBOARD_FILE"
 
-# Check if ConfigMap exists
-if kubectl get configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" --context "$CONTEXT" &>/dev/null; then
-  log_info "Deleting existing ConfigMap: $CONFIGMAP_NAME"
-  kubectl delete configmap "$CONFIGMAP_NAME" -n "$NAMESPACE" --context "$CONTEXT"
-else
-  log_warn "ConfigMap $CONFIGMAP_NAME not found, creating new one"
-fi
-
-# Create new ConfigMap with updated dashboard
-log_info "Creating ConfigMap with updated dashboard..."
+log_info "Applying dashboard ConfigMap..."
 kubectl create configmap "$CONFIGMAP_NAME" \
   --from-file=agentgateway-overview.json="$DASHBOARD_FILE" \
   --namespace "$NAMESPACE" \
@@ -60,7 +51,7 @@ kubectl create configmap "$CONFIGMAP_NAME" \
   kubectl label -f - \
     grafana_dashboard="1" \
     --local --dry-run=client -o yaml | \
-  kubectl create -f - --context "$CONTEXT"
+  kubectl apply --server-side --force-conflicts -f - --context "$CONTEXT"
 
 log_info "✅ Dashboard ConfigMap updated successfully"
 log_info "   Grafana sidecar will automatically reload the dashboard in a few seconds"

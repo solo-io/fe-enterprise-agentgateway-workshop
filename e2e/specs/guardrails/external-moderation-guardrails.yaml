@@ -1,0 +1,53 @@
+lab: labs/guardrails/external-moderation-guardrails.md
+description: promptGuard delegates classification to OpenAI's omni-moderation endpoint
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 360
+
+steps:
+  - section: "Lab Objectives"
+    run: all
+
+  - section: "curl openai"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  - section: "Reject inappropriate requests using the external moderation endpoint"
+    run: [1]
+
+  - section: "Reject inappropriate requests using the external moderation endpoint"
+    run: [2]
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - contains: "restricted topic triggered by the omni-moderation-latest endpoint"
+
+  - section: "Reject inappropriate requests using the external moderation endpoint"
+    run: [3]
+    assert:
+      - status: 403
+      - contains: "restricted topic triggered by the omni-moderation-latest endpoint"
+
+  # Unlike the regex guards, this one calls out to OpenAI per request, so a benign
+  # prompt must still pass — otherwise a moderation outage or a misconfigured
+  # secret would read as "the guard works".
+  - probe: "a benign prompt still passes the moderation guard"
+    script: |
+      curl -s -o /dev/null -w 'benign=%{http_code}\n' "http://$GATEWAY_IP:8080/openai" \
+        -H 'content-type: application/json' \
+        -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"What is the capital of France?"}]}'
+    assert:
+      - contains: "benign=200"
+
+cleanup:
+  section: "Cleanup"

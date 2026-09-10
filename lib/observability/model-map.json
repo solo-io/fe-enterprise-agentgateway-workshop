@@ -1,0 +1,228 @@
+{
+  "models": [
+    {
+      "key": "anthropic.claude-fable-5",
+      "provider": "bedrock",
+      "matcher": "(us|eu|au|global)?\\\\.?anthropic\\\\.claude-fable-5.*",
+      "cache_convention": "full",
+      "table_panel": 100,
+      "table_label": "anthropic.claude-fable-5 (Bedrock)"
+    },
+    {
+      "key": "anthropic.claude-opus-4-8",
+      "provider": "bedrock",
+      "matcher": "(us|eu|au|global)?\\\\.?anthropic\\\\.claude-opus-4-8.*",
+      "cache_convention": "full",
+      "table_panel": 100,
+      "table_label": "anthropic.claude-opus-4-8 (Bedrock)"
+    },
+    {
+      "key": "anthropic.claude-opus-5",
+      "provider": "bedrock",
+      "matcher": "(us|eu|au|global)?\\\\.?anthropic\\\\.claude-opus-5.*",
+      "cache_convention": "full",
+      "table_panel": 100,
+      "table_label": "anthropic.claude-opus-5 (Bedrock)"
+    },
+    {
+      "key": "anthropic.claude-sonnet-5",
+      "provider": "bedrock",
+      "matcher": "(us|eu|au|global)?\\\\.?anthropic\\\\.claude-sonnet-5.*",
+      "cache_convention": "full",
+      "table_panel": 100,
+      "table_label": "anthropic.claude-sonnet-5 (Bedrock)"
+    },
+    {
+      "key": "meta.llama3-1-8b",
+      "provider": "bedrock",
+      "matcher": "(us|eu|au|global)?\\\\.?meta\\\\.llama3-1-8b-.*",
+      "cache_convention": "full",
+      "table_panel": 100,
+      "table_label": "meta.llama3-1-8b (Bedrock)"
+    },
+    {
+      "key": "claude-fable-5",
+      "provider": "anthropic",
+      "matcher": "claude-fable-5.*",
+      "cache_convention": "full",
+      "table_panel": 90,
+      "table_label": "claude-fable-5"
+    },
+    {
+      "key": "claude-haiku-4-5",
+      "provider": "anthropic",
+      "matcher": "claude-haiku-4-5-.*",
+      "cache_convention": "full",
+      "table_panel": 90,
+      "table_label": "claude-haiku-4-5"
+    },
+    {
+      "key": "claude-opus-4-7",
+      "provider": "anthropic",
+      "matcher": "claude-opus-4-7.*",
+      "cache_convention": "full",
+      "table_panel": 90,
+      "table_label": "claude-opus-4-7"
+    },
+    {
+      "key": "claude-opus-4-8",
+      "provider": "anthropic",
+      "matcher": "claude-opus-4-8.*",
+      "cache_convention": "full",
+      "table_panel": 90,
+      "table_label": "claude-opus-4-8"
+    },
+    {
+      "key": "claude-opus-5",
+      "provider": "anthropic",
+      "matcher": "claude-opus-5.*",
+      "cache_convention": "full",
+      "table_panel": 90,
+      "table_label": "claude-opus-5"
+    },
+    {
+      "key": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "matcher": "claude-sonnet-4-5-.*",
+      "cache_convention": "full",
+      "table_panel": 90,
+      "table_label": "claude-sonnet-4-5"
+    },
+    {
+      "key": "claude-sonnet-4-6",
+      "provider": "anthropic",
+      "matcher": "claude-sonnet-4-6.*",
+      "cache_convention": "full",
+      "table_panel": 90,
+      "table_label": "claude-sonnet-4-6"
+    },
+    {
+      "key": "claude-sonnet-5",
+      "provider": "anthropic",
+      "matcher": "claude-sonnet-5.*",
+      "cache_convention": "full",
+      "table_panel": 90,
+      "table_label": "claude-sonnet-5"
+    },
+    {
+      "key": "gpt-5",
+      "provider": "openai",
+      "matcher": "gpt-5-2025.*",
+      "cache_convention": "delta",
+      "table_panel": 87,
+      "table_label": "gpt-5"
+    },
+    {
+      "key": "gpt-5-mini",
+      "provider": "openai",
+      "matcher": "gpt-5-mini-2025.*",
+      "cache_convention": "delta",
+      "table_panel": 87,
+      "table_label": "gpt-5-mini"
+    },
+    {
+      "key": "gpt-5-nano",
+      "provider": "openai",
+      "matcher": "gpt-5-nano-2025.*",
+      "cache_convention": "delta",
+      "table_panel": 87,
+      "table_label": "gpt-5-nano"
+    },
+    {
+      "key": "gpt-5.4",
+      "provider": "openai",
+      "matcher": "gpt-5\\\\.4-2026.*",
+      "cache_convention": "delta",
+      "table_panel": 87,
+      "table_label": "gpt-5.4"
+    },
+    {
+      "key": "gpt-5.4-mini",
+      "provider": "openai",
+      "matcher": "gpt-5\\\\.4-mini.*",
+      "cache_convention": "delta",
+      "table_panel": 87,
+      "table_label": "gpt-5.4-mini"
+    },
+    {
+      "key": "gpt-5.4-nano",
+      "provider": "openai",
+      "matcher": "gpt-5\\\\.4-nano.*",
+      "cache_convention": "delta",
+      "table_panel": 87,
+      "table_label": "gpt-5.4-nano"
+    },
+    {
+      "key": "gpt-5.6-luna",
+      "provider": "openai",
+      "matcher": "gpt-5\\\\.6-luna.*",
+      "cache_convention": "delta",
+      "table_panel": 87,
+      "table_label": "gpt-5.6-luna"
+    },
+    {
+      "key": "gpt-5.6-sol",
+      "provider": "openai",
+      "matcher": "gpt-5\\\\.6-sol.*",
+      "cache_convention": "delta",
+      "table_panel": 87,
+      "table_label": "gpt-5.6-sol"
+    },
+    {
+      "key": "gpt-5.6-terra",
+      "provider": "openai",
+      "matcher": "gpt-5\\\\.6-terra.*",
+      "cache_convention": "delta",
+      "table_panel": 87,
+      "table_label": "gpt-5.6-terra"
+    },
+    {
+      "key": "mistral.voxtral-mini-3b",
+      "provider": "bedrock",
+      "matcher": "mistral\\\\.voxtral-mini-3b-.*",
+      "cache_convention": "full",
+      "table_panel": 100,
+      "table_label": "mistral.voxtral-mini-3b (Bedrock)"
+    },
+    {
+      "key": "mock-gpt-4o",
+      "provider": "mock",
+      "matcher": "mock-gpt-4o",
+      "cache_convention": "full",
+      "table_panel": 87,
+      "table_label": "mock-gpt-4o"
+    },
+    {
+      "key": "mock-gpt-5-2",
+      "provider": "mock",
+      "matcher": "mock-gpt-5.2",
+      "cache_convention": "full",
+      "table_panel": 87,
+      "table_label": "mock-gpt-5-2"
+    },
+    {
+      "key": "us.anthropic.claude-haiku-4-5",
+      "provider": "bedrock",
+      "matcher": "us\\\\.anthropic\\\\.claude-haiku-4-5.*",
+      "cache_convention": "full",
+      "table_panel": 100,
+      "table_label": "us.anthropic.claude-haiku-4-5 (Bedrock)"
+    },
+    {
+      "key": "us.anthropic.claude-opus-4-7",
+      "provider": "bedrock",
+      "matcher": "us\\\\.anthropic\\\\.claude-opus-4-7.*",
+      "cache_convention": "full",
+      "table_panel": 100,
+      "table_label": "us.anthropic.claude-opus-4-7 (Bedrock)"
+    },
+    {
+      "key": "us.anthropic.claude-sonnet-4-6",
+      "provider": "bedrock",
+      "matcher": "us\\\\.anthropic\\\\.claude-sonnet-4-6.*",
+      "cache_convention": "full",
+      "table_panel": 100,
+      "table_label": "us.anthropic.claude-sonnet-4-6 (Bedrock)"
+    }
+  ]
+}

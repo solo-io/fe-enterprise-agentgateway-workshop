@@ -1,0 +1,176 @@
+lab: labs/mcp/in-cluster-mcp.md
+description: MCP static->dynamic backend, session stickiness, JWT + tool RBAC
+tier: t0
+requires: []
+timeout: 900
+
+# This lab validates almost everything through the MCP Inspector (a browser
+# app), so the doc's own bash blocks only cover setup. The probes below drive
+# the same protocol steps over curl: initialize, tools/list, tools/call.
+steps:
+  - section: "Step 1: Deploy the MCP Server"
+    run: all
+    wait: "--for=condition=Available deploy/mcp-server-everything -n mcp --timeout=300s"
+
+  - section: "Step 2: Create a Static Backend and HTTPRoute"
+    run: all
+
+  - section: "Get gateway IP"
+    run: all
+    assert:
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[a-z0-9.-]+\.'
+
+  - section: "Run the MCP Inspector"
+    run: none
+    reason: interactive npx browser app, replaced by curl probes
+
+  - section: "Run a tool"
+    run: none
+    reason: MCP Inspector UI steps, replaced by curl probes
+
+  - probe: "static backend: initialize + tools/list advertises echo and get-sum"
+    script: |
+      export E2E_MCP_URL="http://$GATEWAY_IP:8080/mcp"
+      SID="$(e2e_mcp_init)"
+      echo "session=$SID"
+      e2e_mcp_tools "$SID"
+    assert:
+      - contains: "echo"
+      - contains: "get-sum"
+
+  - probe: "static backend: tools/call echo round-trips through the gateway"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_tool "$SID" echo '{"message":"Hello from AgentGateway!"}'
+    assert:
+      - contains: "Echo: Hello from AgentGateway!"
+
+  - section: "Step 3: Migrate to a Dynamic Backend"
+    run: all
+
+  - section: "Verify nothing else had to change"
+    run: none
+    reason: MCP Inspector reconnect, replaced by the probe below
+
+  - probe: "dynamic backend: same route and backend name still serve echo"
+    script: |
+      # label-selector discovery has to resolve the Service endpoints first
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "Echo: dynamic" present e2e_mcp_tool "$SID" echo '{"message":"dynamic"}'
+    assert:
+      - contains: "Echo: dynamic"
+
+  - section: "Scale the deployment"
+    run: all
+    wait: "--for=condition=Ready pod -l app=mcp-server-everything -n mcp --timeout=300s"
+
+  - section: "Tail both pod logs"
+    run: none
+    reason: "`kubectl logs --follow` never returns"
+
+  - section: "Observe session stickiness"
+    run: none
+    reason: MCP Inspector UI steps
+
+  - section: "Observe load balancing on reconnect"
+    run: none
+    reason: MCP Inspector UI steps
+
+  - probe: "session stickiness: one session id is reused across calls"
+    script: |
+      SID="$(e2e_mcp_init)"
+      echo "session=$SID"
+      e2e_mcp_tool "$SID" echo '{"message":"one"}'
+      e2e_mcp_tool "$SID" echo '{"message":"two"}'
+    assert:
+      - contains: "Echo: one"
+      - contains: "Echo: two"
+
+  - section: "View Metrics Endpoint"
+    run: all
+    retry:
+      attempts: 4
+      delay: 3
+      until: "agentgateway_mcp_requests_total"
+    assert:
+      - matches: 'agentgateway_mcp_requests_total\{.*method="tools/call"'
+
+  - section: "View Metrics and Traces in Grafana"
+    run: none
+    reason: browser step
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: browser step
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+  - section: "(Optional) View Traces in Jaeger"
+    run: none
+    reason: OpenShift-only alternative
+
+  - section: "Secure access to MCP Server"
+    run: all
+
+  - probe: "JWT Strict: unauthenticated MCP initialize is rejected"
+    script: |
+      # policy attachment is async, so poll until the 401 appears
+      unset E2E_MCP_AUTH
+      e2e_mcp_expect "401" present e2e_mcp_status
+    assert:
+      - contains: "401"
+
+  - section: "Provide a valid JWT"
+    run: none
+    reason: MCP Inspector custom-header UI, replaced by the probe below
+
+  - probe: "JWT Strict: the lab's token is accepted and echo succeeds"
+    script: |
+      # Same token the lab pastes into the Inspector (iss=solo.io, org=solo.io).
+      export E2E_MCP_AUTH=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_tool "$SID" echo '{"message":"authed"}'
+    assert:
+      - contains: "Echo: authed"
+
+  - section: "Authorize based on JWT Claims"
+    run: all
+
+  - probe: "RBAC deny (org==admin): tool catalog is filtered empty"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect '"name":"echo"' absent e2e_mcp_tools "$SID"
+    assert:
+      - not_contains: '"name":"echo"'
+
+  - section: "Restore access"
+    run: all
+
+  - probe: "RBAC allow (org==solo.io): full catalog returns"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "get-sum" present e2e_mcp_tools "$SID"
+    assert:
+      - contains: "echo"
+      - contains: "get-sum"
+
+  - section: "Limit tool access"
+    # Block 1 applies the echo-only policy; block 2 is the doc's own curl proving
+    # get-sum is now rejected as an unknown tool.
+    run: [1]
+
+  - probe: "tool RBAC: echo stays listed, get-sum is filtered out"
+    script: |
+      SID="$(e2e_mcp_init)"
+      e2e_mcp_expect "get-sum" absent e2e_mcp_tools "$SID"
+    assert:
+      - contains: "echo"
+      - not_contains: "get-sum"
+
+  - section: "Limit tool access"
+    run: [2]
+    assert:
+      - contains: "Unknown tool: get-sum"
+
+cleanup:
+  section: "Cleanup"

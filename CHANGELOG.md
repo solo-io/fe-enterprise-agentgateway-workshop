@@ -1,5 +1,15 @@
 # Changelog
 
+0.14.0 - (9-10-26)
+---
+- Fable 5 Code Review Improvements
+  - Introduce /e2e tests
+  - Generate the `lib/jwt` keypair and `jwks.json` on first run of `generate-jwt.sh` instead of committing them
+  - Add `lib/observability/dash_prices.py`, `model-map.json`, and `pricing.json`: a pinned rate card for the Grafana cost dashboard, plus `models-dev-check.py` to report drift against models.dev, and tests for both
+  - Apply the Grafana dashboard update server-side in `update-dashboard.sh` instead of delete-then-create
+  - Document `lib/observability/` as the canonical home of the dashboard JSON and its price tooling, and list the nine downstream checkouts that carry a copy of the JSON
+- Document `--set installRateLimitCRDs=false` in the `001` install labs (default, air-gap, OpenShift) for clusters where Gloo Gateway or kgateway already owns the `ratelimit.solo.io` CRDs
+
 0.13.9 - (9-4-26)
 ---
 - Bump Enterprise Agentgateway from `v2026.7.1-patch.0` to `v2026.8.2` across the install labs, air-gap and OpenShift installs, multi-cluster upgrades, identity-delegation labs, image list, and the three workshop chart `appVersion` fields

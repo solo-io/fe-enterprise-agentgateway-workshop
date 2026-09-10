@@ -1,0 +1,144 @@
+lab: labs/routing/configure-openai-embeddings.md
+description: one backend fronting chat/embeddings/models via policies.ai.routes, plus path rewrites
+tier: t1-key
+requires:
+  - OPENAI_API_KEY
+timeout: 420
+
+steps:
+  - section: "Configure Required Variables"
+    run: all
+
+  - section: "Test OpenAI Chat Completions and Embeddings"
+    run: all
+
+  - section: "Test Chat Completions"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+      - matches: '"model": *"gpt-5\.4-nano'
+
+  - section: "Test /embeddings endpoint"
+    run: all
+    retry:
+      attempts: 6
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      # The documented embeddings response shape. Matched with a regex because
+      # OpenAI returns embeddings as compact JSON but /v1/models pretty-printed,
+      # so the space after the colon is not something a spec can rely on.
+      - matches: '"object": *"list"'
+      - matches: '"object": *"embedding"'
+      - contains: "text-embedding-3-small"
+
+  - section: "Test /models endpoint"
+    run: all
+    retry:
+      attempts: 6
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - matches: '"object": *"list"'
+      - matches: '"object": *"model"'
+
+  - section: "Compare access logs across endpoints"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  # The lab's central claim: the route *type* decides how much the gateway
+  # records. A Completions route yields full gen_ai telemetry; a Passthrough
+  # route yields HTTP fields only. Asserted per-line, because asserting on the
+  # whole log dump would let a chat line satisfy an embeddings expectation.
+  - probe: "Completions logs gen_ai telemetry, Passthrough logs HTTP fields only"
+    script: |
+      logs=$(kubectl logs -n agentgateway-system \
+               -l app.kubernetes.io/name=agentgateway-proxy --tail 200)
+      chat=$(grep 'http.path=/v1/chat/completions' <<<"$logs" | sort | tail -1)
+      emb=$(grep 'http.path=/v1/embeddings' <<<"$logs" | sort | tail -1)
+      # Message content is absent because 001 ships `llm_prompt` and
+      # `llm_completion` commented out, so only telemetry fields are logged.
+      for f in gen_ai.operation.name=chat gen_ai.request.model gen_ai.usage.output_tokens \
+               agw.ai.usage.cost.total; do
+        grep -q "$f" <<<"$chat" && echo "chat has $f" || echo "chat MISSING $f"
+      done
+      grep -q 'gen_ai\.' <<<"$emb" && echo "embeddings has gen_ai" || echo "embeddings has no gen_ai"
+      grep -q 'protocol=llm' <<<"$emb" && echo "embeddings has protocol=llm"
+      grep -q 'duration=' <<<"$emb" && echo "embeddings has duration"
+    retry:
+      attempts: 6
+      delay: 5
+      until: "chat has gen_ai.operation.name=chat"
+    assert:
+      - contains: "chat has gen_ai.operation.name=chat"
+      - contains: "chat has gen_ai.request.model"
+      - contains: "chat has gen_ai.usage.output_tokens"
+      - contains: "chat has agw.ai.usage.cost.total"
+      - contains: "embeddings has no gen_ai"
+      - contains: "embeddings has protocol=llm"
+      - contains: "embeddings has duration"
+      - not_contains: "MISSING"
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "Advanced: Using Path Rewrites"
+    run: all
+
+  - section: "Test with Rewritten Paths"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  - section: "Test with Rewritten Paths"
+    run: [2]
+    assert:
+      - status: 200
+      - matches: '"object": *"embedding"'
+
+  - section: "Test with Rewritten Paths"
+    run: [3]
+    assert:
+      - status: 200
+      - matches: '"object": *"model"'
+
+  # The lab's closing claim that the trailing catch-all rule keeps the standard
+  # OpenAI paths working alongside the rewrites.
+  - section: "Test with Rewritten Paths"
+    run: [4]
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+
+  # The rewrite has to land on the OpenAI path the backend's ai.routes matches,
+  # or /openai/chat would silently degrade to Passthrough and lose telemetry.
+  - probe: "the rewritten /openai/chat path is still logged as an LLM completion"
+    script: |
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 200 \
+        | grep 'http.path=/openai/chat' | sort | tail -1
+    retry:
+      attempts: 6
+      delay: 5
+      until: "gen_ai.operation.name=chat"
+    assert:
+      - contains: "gen_ai.operation.name=chat"
+      - matches: 'gen_ai\.usage\.output_tokens=[1-9]'
+
+cleanup:
+  section: "Cleanup"

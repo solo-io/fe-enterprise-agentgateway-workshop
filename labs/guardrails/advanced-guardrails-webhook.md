@@ -71,9 +71,7 @@ EOF
 Get the gateway IP:
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
-  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
-  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 echo "Gateway IP: $GATEWAY_IP"
 ```
 

@@ -1,0 +1,132 @@
+lab: labs/security/llm-byo-grpc-ext-authz.md
+description: route-scoped BYO gRPC ext-authz gating an LLM route on a header
+tier: t1-key
+timeout: 480
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  - section: "Deploy the ext-authz server"
+    run: all
+    wait: "--for=condition=Available deploy/grpc-ext-authz -n agentgateway-system --timeout=240s"
+
+  - section: "Set up the OpenAI route"
+    run: all
+
+  - section: "Verify the route works without ext-authz"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+      # Nothing is gating the route yet, so the check-result header must be absent.
+      - not_contains: "x-ext-authz-check-result"
+
+  - section: "Create the ext-authz policy"
+    run: all
+
+  - section: "Test: request denied without required header"
+    run: [1]
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 403"
+    assert:
+      - status: 403
+      - contains: "x-ext-authz-check-result: denied"
+      - contains: "denied by ext_authz"
+      - not_contains: "chat.completion"
+
+  # The ext-authz server's own log is the authoritative record of the decision.
+  - section: "Test: request denied without required header"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "DENIED"
+    assert:
+      - contains: "DENIED"
+      - contains: "x-ext-authz: allow` not found"
+
+  - section: "Test: request allowed with required header"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "chat.completion"
+      # x-ext-authz-check-result appears only on denies, where the ext-authz
+      # server generates the whole response. On an allow the gateway forwards the
+      # original request, so the client never sees that header — the lab used to
+      # claim otherwise.
+      - not_contains: "x-ext-authz-check-result"
+
+  - section: "Test: request allowed with required header"
+    run: [2]
+    retry:
+      attempts: 8
+      delay: 3
+      until: '(ALLOWED|allowed)'
+    assert:
+      - matches: '(ALLOWED|allowed)'
+
+  # The lab's stated reason for targeting the HTTPRoute rather than the Gateway:
+  # "only traffic to this specific route requires ext-authz — other routes remain
+  # unaffected." Nothing in the lab actually checks that, so prove it against a
+  # second route that shares the gateway.
+  - probe: "other routes on the same gateway stay ungated"
+    script: |
+      kubectl apply -f - >/dev/null <<'YAML'
+      apiVersion: gateway.networking.k8s.io/v1
+      kind: HTTPRoute
+      metadata:
+        name: e2e-ungated-probe
+        namespace: agentgateway-system
+      spec:
+        parentRefs:
+          - name: agentgateway-proxy
+            namespace: agentgateway-system
+        rules:
+          - matches:
+              - path:
+                  type: PathPrefix
+                  value: /e2e-ungated
+            filters:
+              - type: ResponseHeaderModifier
+                responseHeaderModifier:
+                  set:
+                    - name: x-e2e-probe
+                      value: reached
+            backendRefs:
+              - name: openai-all-models
+                group: enterpriseagentgateway.solo.io
+                kind: EnterpriseAgentgatewayBackend
+      YAML
+      for i in $(seq 1 10); do
+        out=$(curl -si "http://$GATEWAY_IP:8080/e2e-ungated" \
+          -H 'content-type: application/json' \
+          -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Hello!"}]}')
+        grep -q 'x-e2e-probe: reached' <<<"$out" && break
+        sleep 3
+      done
+      grep -qE '^HTTP/[0-9.]+ 200' <<<"$out" && echo "ungated_route=200"
+      grep -q 'x-ext-authz-check-result' <<<"$out" \
+        && echo "ext-authz applied to other route" \
+        || echo "ext-authz not applied to other route"
+      kubectl delete httproute e2e-ungated-probe -n agentgateway-system >/dev/null
+    assert:
+      - contains: "ungated_route=200"
+      - contains: "ext-authz not applied to other route"
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+cleanup:
+  section: "Cleanup"

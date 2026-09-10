@@ -63,6 +63,9 @@ helm upgrade -i --create-namespace --namespace agentgateway-system \
     oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds
 ```
 
+> [!NOTE]
+> If the cluster already runs Gloo Gateway or kgateway, those installs own the `ratelimit.solo.io` CRDs. Add `--set installRateLimitCRDs=false` so this chart leaves them alone.
+
 To check if the the Enterprise Agentgateway CRDs are installed-
 
 ```bash

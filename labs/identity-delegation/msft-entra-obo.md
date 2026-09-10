@@ -411,9 +411,7 @@ EOF
 ## Step 10 — Get the Gateway Address
 
 ```bash
-export GATEWAY_IP=$(kubectl get svc -n agentgateway-system \
-  --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy \
-  -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
+export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
 export GATEWAY_URL="http://${GATEWAY_IP}:8080"
 echo "Gateway: $GATEWAY_URL"
