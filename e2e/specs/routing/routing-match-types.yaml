@@ -1,6 +1,6 @@
 lab: labs/routing/routing-match-types.md
-# Listed t0 in PLAN.md, but every curl here goes to the real OpenAI API via
-# openai-secret, so it is t1-key.
+# Tiered t1-key, not t0: every curl here goes to the real OpenAI API via
+# openai-secret.
 description: path, header and query-param match types each select a model-pinned backend
 tier: t1-key
 requires:
