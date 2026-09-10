@@ -1,5 +1,9 @@
 # Changelog
 
+0.14.1 - (9-10-26)
+---
+- Updates in /e2e
+
 0.14.0 - (9-10-26)
 ---
 - Fable 5 Code Review Improvements

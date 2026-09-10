@@ -2,8 +2,8 @@
 
 Automated tests for the workshop labs. Each lab's markdown **is** its test: the
 harness lifts the ```bash blocks out of the lab and runs them in one shell, so a
-lab that stops working fails here. See [PLAN.md](PLAN.md) for the design and the
-full per-lab coverage table.
+lab that stops working fails here. `--list` prints every lab with its tier and
+whether it has a spec; `--lint` prints the ones that do not.
 
 ## Quick start
 
@@ -20,6 +20,12 @@ full per-lab coverage table.
 
 Flags: `--install-base`, `--only-base`, `--tier <t0|t1-key|…>`, `--lint`,
 `--list`, `--no-prompt`, `--verbose`, `--keep-work`.
+
+`--list` is the authority on tiers and per-lab coverage, and `--lint` on which
+labs have no spec yet. Both are derived from `e2e/specs/`, so re-run them after
+any change rather than trusting a recorded total. A full run that reports fewer
+passing assertions than the last one, with nothing removed, means coverage
+stopped running.
 
 `--lint` also runs `e2e/lib/conventions.py` against every README/tracks/labs
 markdown file. It checks four things: relative `.md` links resolve, every
@@ -72,6 +78,24 @@ load-testing labs).
 Assertions: `status`, `contains`, `not_contains`, `matches`, `not_matches`, `rc`.
 All apply to the combined stdout+stderr of the step's last block.
 
+`run:` is `all`, `none`, or 1-based ordinals within the section (`run: [1, 3]`).
+`assert:`, `wait:`, and `retry:` all attach to the step's **last** block, so a
+section that opens with `kubectl create namespace` waits after its final block,
+not its first. To assert on several blocks of one section, write several steps
+against the same section. `run: none` requires a `reason:`, which surfaces as
+SKIP so the gap stays visible.
+
+Write `retry.until` to match what the last block prints, and keep it no stricter
+than the step's own assertion. A guard demanding `proxied_completions=[2-9]`
+under an assertion of `[2-9]|[0-9]{2,}` can never match a two-digit count, so it
+spins out its whole budget and protects nothing.
+
+Reaching `attempt N/N` in the log does not mean the guard ever matched: the loop
+in `lib.sh` breaks whether the regex matched or the budget ran out, and the step
+then passes on its assertions either way. Audit rather than read the counters.
+For each `e2e_run_block` in `.work/*/*/driver.sh` carrying `attempts > 1`, grep
+its `until` regex against the sibling `.out`; a guard that never matched is dead.
+
 Field reads use `resource:` instead of a probe:
 
 ```yaml
@@ -114,6 +138,32 @@ visible to later probes too (the MCP spec defines `mcp_init`/`mcp_rpc` once).
 
 **Anything asynchronous needs `retry`.** Route programming, policy attachment, and
 label-selector backend discovery all complete after `kubectl apply` returns.
+
+**Drivers run with no `set -e`, `-u`, or `-o pipefail`,** deliberately, to match
+a reader's terminal. `pipefail` breaks `cmd | grep -q`: grep exits at the first
+match, the producer takes SIGPIPE, and the pipeline reports failure. It only
+shows up on large output such as a 128KB `/metrics` dump, so it presents as a
+flake. Assertions use here-strings for the same reason, never `printf | grep -q`.
+
+**curl's progress meter can land inside a response body.** It goes to stderr with
+`\r` and no trailing newline, so a merged capture can yield
+`"total_tokens":<CR>100 16966 ... 14009<CR>91,` and fail
+`matches: '"total_tokens":[0-9]+'` on a body that is correct. `e2e_run_block`
+captures the two streams separately and concatenates stderr-then-stdout with a
+newline between them, which keeps stdout last for `assert_status`'s
+`-w '%{http_code}'` branch. Never repair a merged capture by stripping the `\r`:
+the regex then matches the meter's own digits and passes for the wrong reason.
+A lab whose printed output is part of the lesson should pass
+`--no-progress-meter` in its own curl.
+
+**BSD `wc -c` pads with spaces.** Match `[[:space:]]+[0-9]+ bytes`, not a single
+space.
+
+**Namespace `mcp` is shared by six labs, so no lab's Cleanup may delete it.**
+Deleting it leaves the namespace `Terminating` while the next lab deploys into
+it. The idempotent `kubectl create namespace mcp --dry-run=client -o yaml |
+kubectl apply -f -` already covers re-runnability. Lab-private namespaces such
+as `stripe-mcp` and `composable-mcp` are deleted by their own labs.
 
 **Renamed a lab heading?** The spec fails loudly with `DRIFT: ... has no section`.
 That is intended — fix the spec, don't loosen the matcher.
@@ -166,9 +216,45 @@ Redis for the whole window, so a budget lab run twice inside an hour starts
 exhausted and its isolation assertions fail for the wrong reason. Open the spec
 with the lab's own documented reset
 (`kubectl rollout restart deployment/ext-cache-enterprise-agentgateway -n
-agentgateway-system`). See `security/virtual-keys`.
+agentgateway-system`). See `security/virtual-keys`. `entRateLimit` counts in a
+fixed wall-clock minute, so retry the whole burst instead of asserting on a
+single call, and allow ~10s of settle after the policy attaches.
 
-**The baseline-drift guard detects gateway-spec drift and leftover HTTPRoutes/policies, but auto-restore only re-patches the Gateway parametersRef; leftover resources are reported for manual cleanup.**
+**The baseline-integrity guard fingerprints the shared Gateway** on
+`listeners[*].port` plus `infrastructure.parametersRef.name`, before and after
+every lab. It names the lab that changed either one and re-patches the
+`parametersRef`; leftover HTTPRoutes and policies are reported for manual
+cleanup. A full `kubectl apply` of the shared Gateway drops `parametersRef`,
+which detaches the params and freezes the proxy replica count. A lab that needs
+its own listener should patch one in and remove it on Cleanup, as
+`security/tls-termination` and `security/frontend-mtls` do.
+
+**Some blocks must never run from the suite.** Give each `run: none` with a
+`reason:`, or replace it with a probe:
+
+- `claude mcp add` / `claude mcp remove` (`remote-mcp` Cleanup) rewrite the
+  operator's own Claude Code config.
+- Placeholder-bearing blocks (`<your-fred-key>`, `--version <new-version>`) need
+  a probe that uses the resolved env var instead.
+- Foreground `kubectl port-forward` and `kubectl logs --follow` never return.
+- 002's optional `GRAFANA_ADMIN_PASSWORD` export sets the Grafana password to the
+  literal string `your-secure-password`.
+
+## MCP labs
+
+`lib.sh` exports `e2e_mcp_init`, `_rpc`, `_tool`, `_tools`, `_status`, and
+`_expect`; use them rather than hand-rolling JSON-RPC. `e2e_mcp_expect <needle>
+present|absent <cmd...>` polls, which took `in-cluster-mcp` from 77s to 51s.
+
+- The gateway answers MCP over `text/event-stream`, so bodies arrive as
+  `data: {...}`. Strip the prefix with `sed -n 's/^data: //p'` before any JSON
+  parse.
+- Upstream JSON inside MCP content arrives escaped, so assert on
+  `\"object\":\"list\"`.
+- With `sessionRouting: Stateless` the gateway issues no session id. An empty
+  `$SID` is correct there; never assert on its value.
+- `agentgateway_*` metrics render as `name{labels} value`, so match
+  `agentgateway_[a-z_]+[{ ]`. A trailing space alone fails.
 
 ## Debugging
 
