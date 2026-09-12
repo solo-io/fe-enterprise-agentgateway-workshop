@@ -5,11 +5,11 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Deploy an LLM-powered guardrail webhook that uses OpenAI to semantically classify content
-- Load guardrail policy from a Kubernetes ConfigMap — no code changes required
+- Load guardrail policy from a Kubernetes ConfigMap, with no code changes
 - Validate that requests are appropriately rejected or masked by the webhook
 - Demonstrate false positive avoidance: the LLM understands context, static regex does not
 - Demonstrate indirect jailbreak detection: the LLM catches attacks that bypass keyword filters
-- Perform a live policy update by editing a ConfigMap and restarting the pod — no image rebuild
+- Perform a live policy update by editing a ConfigMap and restarting the pod, with no image rebuild
 
 ---
 
@@ -94,7 +94,7 @@ curl -s "http://$GATEWAY_IP:8080/openai" \
 
 ## Deploy LLM-powered guardrail webhook
 
-Unlike the built-in static guardrails, this webhook uses an OpenAI model to **semantically classify** every request and response. The guardrail rules are plain-English instructions stored in a Kubernetes ConfigMap — updating the policy is as simple as editing the ConfigMap and restarting the pod.
+Unlike the built-in static guardrails, this webhook uses an OpenAI model to semantically classify every request and response. The guardrail rules are plain-English instructions stored in a Kubernetes ConfigMap: to update the policy, edit the ConfigMap and restart the pod.
 
 ### Step 1 — Apply the guardrail policy ConfigMap
 
@@ -264,7 +264,7 @@ kubectl wait --for=condition=ready pod \
 
 ## Apply webhook guardrail policy
 
-This policy tells AgentGateway to send every request **and** every response through the webhook for classification before forwarding or returning it.
+This policy tells AgentGateway to send every request and every response through the webhook for classification before forwarding or returning it.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -341,7 +341,7 @@ INFO:     10.244.2.8:52934 - "POST /response HTTP/1.1" 200 OK
 
 ## Test: harassment — rejected by LLM classifier
 
-The LLM recognises hate speech and returns `REJECT`. No keyword list needed.
+The LLM recognises hate speech and returns `REJECT` without a keyword list.
 
 ```bash
 curl -si "http://$GATEWAY_IP:8080/openai" \
@@ -360,7 +360,7 @@ content-length: 51
 I can't help with harassment or harmful requests.
 ```
 
-The body is the `rejection_message` the classifier generated for this specific request, so the exact wording varies between runs — the `403` status is the deterministic part.
+The body is the `rejection_message` the classifier generated for this specific request, so the exact wording varies between runs; the `403` status is the deterministic part.
 
 Inspect webhook logs:
 
@@ -378,13 +378,13 @@ Example log output:
 INFO:     10.244.2.7:57232 - "POST /request HTTP/1.1" 200 OK
 ```
 
-No `/response` webhook call follows — the request never reached OpenAI.
+No `/response` webhook call follows because the request never reached OpenAI.
 
 ---
 
 ## Test: jailbreak attempt — rejected by LLM classifier
 
-Explicit prompt injection using the well-known "DAN" pattern is caught immediately.
+The LLM classifier catches explicit prompt injection using the "DAN" pattern.
 
 ```bash
 curl -si "http://$GATEWAY_IP:8080/openai" \
@@ -428,7 +428,7 @@ curl -s "http://$GATEWAY_IP:8080/openai" \
   }' | jq '.choices[0].message.content'
 ```
 
-Expected response content — the card number is gone, replaced group-by-group with `****`:
+Expected response content, with each group of the card number replaced by `****`:
 ```
 "Here is my number: **** **** **** ****."
 ```
@@ -455,7 +455,7 @@ INFO:     10.244.2.8:55500 - "POST /request HTTP/1.1" 200 OK
 INFO:     10.244.2.8:55500 - "POST /response HTTP/1.1" 200 OK
 ```
 
-The card was masked on the way *in*, so OpenAI never saw it — what the model echoed back was already `****`. The response webhook then classifies those echoed asterisks as a number pattern and masks them a second time, which is a no-op here.
+The card was masked on the way *in*, so OpenAI never saw it: what the model echoed back was already `****`. The response webhook then classifies those echoed asterisks as a number pattern and masks them a second time, which is a no-op here.
 
 ---
 
@@ -479,7 +479,7 @@ Expected response content:
 
 ## Test: false positive avoidance — LLM understands context
 
-**This is where LLM-based classification meaningfully outperforms static regex.**
+This test shows where LLM-based classification outperforms static regex.
 
 A regex pattern matching "prompt injection" would block the request below. The LLM recognises the defensive, research-oriented intent and allows it through.
 
@@ -508,7 +508,7 @@ Example log output:
 INFO:     10.244.2.8:54800 - "POST /request HTTP/1.1" 200 OK
 ```
 
-Now send a superficially similar message that is an actual attack — the phrasing borrows from security research language but the intent is to extract a working exploit:
+Now send a superficially similar message that is an actual attack: the phrasing borrows from security research language but the intent is to extract a working exploit.
 
 ```bash
 curl -si "http://$GATEWAY_IP:8080/openai" \
@@ -541,20 +541,20 @@ The "security researcher" framing is the same, but the ask has flipped from *und
 
 **Why static rules fail here and LLMs succeed:**
 
-A regex or keyword filter operates purely on the presence of tokens — it has no concept of meaning or intent. A rule that blocks `"prompt injection"` would reject this request because the phrase appears in the message, regardless of whether the user is an attacker or a defender.
+A regex or keyword filter operates on the presence of tokens; it has no concept of meaning or intent. A rule that blocks `"prompt injection"` would reject this request because the phrase appears in the message, regardless of whether the user is an attacker or a defender.
 
 An LLM classifier reads the entire message as language. It recognises that:
 - The user identifies themselves as a security researcher
 - The goal stated is *building defenses*, not bypassing them
 - The phrase "what prompt injection attacks look like" is asking for educational content, not an exploit
 
-This is fundamentally different from what a static rule can express. A keyword list can encode *what words are present*; a language model can evaluate *why someone is asking*. The cost of false positives here is real — blocking legitimate security teams from using an AI assistant erodes trust and forces teams to carve out policy exceptions manually, creating the exact fragility that LLM-based guardrails are meant to avoid.
+A keyword list can encode *what words are present*; a language model can evaluate *why someone is asking*. False positives carry a cost: blocking legitimate security teams from using an AI assistant erodes trust and forces teams to carve out policy exceptions manually.
 
 ---
 
 ## Test: indirect jailbreak — catches what regex misses
 
-Sophisticated attackers avoid explicit trigger words and use roleplay or fictional framing instead. There is no "DAN", no "ignore instructions" — a keyword filter would allow this through. The LLM recognises the persona-based manipulation pattern regardless.
+Attackers avoid explicit trigger words and use roleplay or fictional framing instead. The message below contains neither "DAN" nor "ignore instructions", so a keyword filter would allow it through. The LLM recognises the persona-based manipulation pattern regardless.
 
 ```bash
 curl -si "http://$GATEWAY_IP:8080/openai" \
@@ -583,13 +583,11 @@ Example log output:
 INFO:     10.244.2.8:55900 - "POST /request HTTP/1.1" 200 OK
 ```
 
-> No "DAN", no "ignore instructions" — static regex would have allowed this through. The LLM understands the intent behind the framing.
-
 ---
 
 ## Live policy update via ConfigMap
 
-This demonstrates one of the most powerful capabilities of the LLM webhook approach: **adding a new domain-specific rule in plain English with zero code changes and zero image rebuilds.**
+This section adds a new domain-specific rule in plain English, with no code change and no image rebuild.
 
 ### Sub-step A — Confirm the current policy has no medical rule
 
@@ -611,7 +609,7 @@ The typical adult dosage of ibuprofen for a headache is ...
 
 ### Sub-step B — Add a medical advice rule to the policy
 
-Apply an updated ConfigMap that adds one new bullet to the `request-prompt`. All original rules are preserved — this is purely additive.
+Apply an updated ConfigMap that adds one new bullet to the `request-prompt`. All original rules are preserved; the change is additive.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -724,7 +722,7 @@ Example log output:
 INFO:     10.244.2.8:44720 - "POST /request HTTP/1.1" 200 OK
 ```
 
-> One `kubectl apply`. No Dockerfile. No Python. No regex. The new rule was written in plain English.
+> The new rule was written in plain English and enforced after one `kubectl apply` and a pod restart.
 
 ---
 

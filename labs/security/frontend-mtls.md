@@ -48,7 +48,7 @@ openssl x509 -req -sha256 -days 365 -CA example_certs/try-solo.io.crt -CAkey exa
 
 Configure the `agentgateway-proxy` Gateway from `001` with frontend TLS validation to require client certificates. The `spec.tls.frontend.default.validation` section enables mTLS by referencing the CA certificate ConfigMap, and an HTTPS listener terminates TLS on port 443 alongside the plaintext listener already on 8080.
 
-Both changes go in with a **JSON patch** rather than `kubectl apply`. A full `apply` replaces the whole object, so it would drop any field `001` set that the manifest does not restate — including `infrastructure.parametersRef`, which supplies the proxy's replica count, logging, and model catalog. The patch below adds the two fields and touches nothing else.
+Both changes go in with a JSON patch rather than `kubectl apply`. A full `apply` replaces the whole object, so it would drop any field `001` set that the manifest does not restate, including `infrastructure.parametersRef`, which supplies the proxy's replica count, logging, and model catalog. The patch below adds the two fields and touches nothing else.
 
 ```bash
 kubectl patch gateway agentgateway-proxy -n agentgateway-system --type=json -p '[

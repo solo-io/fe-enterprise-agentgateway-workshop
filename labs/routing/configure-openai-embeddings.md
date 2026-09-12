@@ -157,7 +157,7 @@ Example output for embeddings, which the backend maps to `Passthrough`:
 The route type you assign in `policies.ai.routes` decides how much the gateway records:
 
 - `Completions` routes are parsed as LLM traffic, so the log line carries `gen_ai.operation.name=chat`, the requested and served models, input and output token counts, per-request cost under `agw.ai.usage.cost.total`, and the prompt and completion text as `llm.prompt` and `llm.completion`.
-- `Passthrough` routes are proxied without LLM parsing, so their log lines carry only the HTTP fields — method, path, status, and duration. Token usage for embeddings is still returned to the client in the response body's `usage` object, but the gateway does not extract it.
+- `Passthrough` routes are proxied without LLM parsing, so their log lines carry only the HTTP fields: method, path, status, and duration. Token usage for embeddings is still returned to the client in the response body's `usage` object, but the gateway does not extract it.
 
 Use `Passthrough` when you want the gateway to front an endpoint for auth, routing, and TLS, and `Completions` when you also want token accounting, cost attribution, and guardrails.
 

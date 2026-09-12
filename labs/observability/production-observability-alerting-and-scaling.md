@@ -45,7 +45,7 @@ These are the primary metrics for monitoring gateway health and performance. Eve
 
 **Response `reason` Values:**
 
-The `reason` label tells you _why_ a response was generated — critical for distinguishing between "upstream returned an error" vs. "the gateway itself rejected the request":
+The `reason` label tells you _why_ a response was generated, so you can distinguish "upstream returned an error" from "the gateway itself rejected the request":
 
 | Reason | Meaning | Typical Status Codes |
 |---|---|---|
@@ -103,7 +103,7 @@ These follow the [OpenTelemetry GenAI semantic conventions](https://opentelemetr
 
 MCP requests also flow through the general `agentgateway_request_duration_seconds` histogram for latency tracking.
 
-**Example — MCP tool call rate per route and server:**
+**MCP tool call rate per route and server:**
 ```promql
 sum(rate(agentgateway_mcp_requests{method="tools/call"}[5m])) by (route, server, resource)
 ```
@@ -147,7 +147,7 @@ The proxy runs on a Tokio async runtime. These metrics indicate proxy-level heal
 |---|---|---|
 | `agentgateway_tokio_num_workers` | Gauge | Number of Tokio worker threads. Defaults to the number of CPU cores (or the value of `CPU_LIMIT`). Should be stable. |
 | `agentgateway_tokio_num_alive_tasks` | Gauge | Number of currently active async tasks. Each in-flight request and connection is a task. A sustained upward trend may indicate task leaks or connection backlog. |
-| `agentgateway_tokio_global_queue_depth` | Gauge | Tasks waiting to be picked up by a worker thread. Sustained values > 0 mean worker threads are saturated — a strong scale-up signal. |
+| `agentgateway_tokio_global_queue_depth` | Gauge | Tasks waiting to be picked up by a worker thread. Sustained values > 0 mean worker threads are saturated: a strong scale-up signal. |
 
 ---
 
@@ -193,7 +193,7 @@ The control plane is a Go-based Kubernetes controller. It watches Gateway API an
 |---|---|---|---|
 | `ratelimit_solo_io_total_hits` | Counter | `descriptor` | Total rate limit evaluation requests. The `descriptor` label encodes the rate limit policy (e.g. `solo.io\|generic_key^namespace.policyname`). |
 | `ratelimit_solo_io_over_limit` | Counter | `descriptor` | Requests that exceeded the configured limit and were rejected (429). |
-| `ratelimit_solo_io_near_limit` | Counter | `descriptor` | Requests that were within 80% of the limit — an early warning signal. |
+| `ratelimit_solo_io_near_limit` | Counter | `descriptor` | Requests that were within 80% of the limit: an early warning signal. |
 
 ---
 
@@ -519,11 +519,11 @@ spec:
 
 ### What to Scale Against
 
-**CPU is the primary scaling signal** for the vast majority of deployments. There is a strong correlation between CPU utilization and tail latency — when CPU gets too high, p99 latency increases. This makes CPU-based HPA the recommended default.
+**CPU is the primary scaling signal** for most deployments. CPU utilization correlates strongly with tail latency: when CPU gets too high, p99 latency increases. This makes CPU-based HPA the recommended default.
 
 Memory is the next signal to consider, but in practice the proxy's memory footprint stays low. Memory scaling is only relevant for niche traffic patterns, such as a large number of low-activity, long-lived streams (e.g., thousands of idle MCP/SSE connections).
 
-The proxy is extremely lightweight. In [Gateway API benchmarks](https://github.com/howardjohn/gateway-api-bench/blob/v2/README-v2.md), agentgateway used 4-40MB of memory and under 1% CPU with 5,000 configured routes, with memory growing sub-linearly as route count increased. Avoid over-provisioning — start with modest resource requests and scale based on observed metrics.
+The proxy is lightweight. In [Gateway API benchmarks](https://github.com/howardjohn/gateway-api-bench/blob/v2/README-v2.md), agentgateway used 4-40MB of memory and under 1% CPU with 5,000 configured routes, with memory growing sub-linearly as route count increased. Avoid over-provisioning: start with modest resource requests and scale based on observed metrics.
 
 ### Scaling Signals
 
@@ -577,13 +577,13 @@ spec:
 
 AI/LLM traffic differs from traditional HTTP:
 
-- **Long-lived connections**: A streaming chat completion can last 30-120 seconds. The proxy holds an async task for the entire duration.
-- **Low RPS, high connection time**: 100 concurrent streaming users at 60s average = only ~1.7 rps but 100 concurrent tasks.
-- **Body buffering**: For LLM requests, the proxy buffers request and response bodies to extract token counts and apply guardrails. This contributes to both CPU (JSON parsing) and memory usage per request.
-- **Tokio worker threads**: Default to `CPU_LIMIT` cores. Each worker thread can handle many concurrent async tasks, but CPU-bound work (TLS, JSON parsing) blocks the thread.
-- **Scale-down risk**: Aggressive scale-down can terminate pods with active streaming connections. The 300s `stabilizationWindowSeconds` above protects against this.
+- Long-lived connections: A streaming chat completion can last 30-120 seconds. The proxy holds an async task for the entire duration.
+- Low RPS, high connection time: 100 concurrent streaming users at 60s average = only ~1.7 rps but 100 concurrent tasks.
+- Body buffering: For LLM requests, the proxy buffers request and response bodies to extract token counts and apply guardrails. This contributes to both CPU (JSON parsing) and memory usage per request.
+- Tokio worker threads: Default to `CPU_LIMIT` cores. Each worker thread can handle many concurrent async tasks, but CPU-bound work (TLS, JSON parsing) blocks the thread.
+- Scale-down risk: Aggressive scale-down can terminate pods with active streaming connections. The 300s `stabilizationWindowSeconds` above protects against this.
 
-**Recommendation:** Load test your specific workload and observe the `agentgateway_tokio_global_queue_depth` metric. When queue depth starts consistently rising above 0, you've found the saturation point for that pod. Throughput varies significantly based on payload size, TLS overhead, guardrails enabled, and whether responses are streaming.
+**Recommendation:** Load test your specific workload and observe the `agentgateway_tokio_global_queue_depth` metric. When queue depth starts consistently rising above 0, you've found the saturation point for that pod. Throughput varies with payload size, TLS overhead, guardrails enabled, and whether responses are streaming.
 
 ---
 
@@ -595,10 +595,10 @@ LLM streaming responses, MCP/SSE connections, and agent workloads can run for mi
 
 When a pod receives `SIGTERM`:
 
-1. **Minimum drain period** (`spec.shutdown.min`, default: `10s`) — the proxy continues accepting connections for this duration but signals clients to migrate: `connection: close` for HTTP/1 and `GOAWAY` for HTTP/2. This gives load balancers and clients time to shift traffic to other pods.
-2. **Drain in-flight requests** — after the minimum period, the proxy stops accepting new connections and waits for all active request handlers to complete.
-3. **Maximum drain period** (`spec.shutdown.max`, default: `60s`) — hard deadline. Any connections still active after this are forcefully terminated.
-4. **Kubernetes SIGKILL** — sent at `terminationGracePeriodSeconds`. This must be greater than `spec.shutdown.max` to allow the proxy to finish draining before being killed.
+1. Minimum drain period (`spec.shutdown.min`, default: `10s`). The proxy continues accepting connections for this duration but signals clients to migrate: `connection: close` for HTTP/1 and `GOAWAY` for HTTP/2. This gives load balancers and clients time to shift traffic to other pods.
+2. Drain in-flight requests. After the minimum period, the proxy stops accepting new connections and waits for all active request handlers to complete.
+3. Maximum drain period (`spec.shutdown.max`, default: `60s`), a hard deadline. Any connections still active after this are forcefully terminated.
+4. Kubernetes SIGKILL, sent at `terminationGracePeriodSeconds`. This must be greater than `spec.shutdown.max` to allow the proxy to finish draining before being killed.
 
 ### Configuration
 
@@ -626,7 +626,7 @@ spec:
 
 ## Pod Disruption Budgets
 
-PDBs ensure minimum availability during voluntary disruptions (node drains, upgrades, cluster autoscaler). `EnterpriseAgentgatewayParameters` has a native `spec.podDisruptionBudget` field — the operator creates and manages the PDB. Add the following to your `EnterpriseAgentgatewayParameters`:
+PDBs ensure minimum availability during voluntary disruptions (node drains, upgrades, cluster autoscaler). `EnterpriseAgentgatewayParameters` has a native `spec.podDisruptionBudget` field; the operator creates and manages the PDB. Add the following to your `EnterpriseAgentgatewayParameters`:
 
 ```yaml
 spec:
@@ -689,7 +689,7 @@ spec:
 
 **Why `ScheduleAnyway` instead of `DoNotSchedule`:**
 - `DoNotSchedule` can prevent scaling if no valid node/zone is available
-- `ScheduleAnyway` is a best-effort spread — the scheduler tries to spread but won't block scheduling
+- `ScheduleAnyway` is a best-effort spread: the scheduler tries to spread but won't block scheduling
 - Use `DoNotSchedule` only if you have nodes in 3+ zones and can guarantee capacity in each
 
 Verify pods are spread:
@@ -704,7 +704,7 @@ kubectl get pods -n agentgateway-system -l app.kubernetes.io/name=agentgateway-p
 
 > **Hands-on validation:** To *prove* zero downtime by driving continuous traffic through a rollout, see [In-Place Rolling Upgrades — Validate Zero Downtime](../upgrades/in-place-rolling-upgrades.md).
 
-With PDBs, graceful shutdown, and topology spread configured, rolling upgrades can be performed with minimal disruption. AgentGateway's config propagation is fast — [benchmarks show ~30ms route propagation](https://github.com/howardjohn/gateway-api-bench/blob/v2/README-v2.md) even under concurrent traffic load — but real-world upgrades involve pod restarts, connection draining, and load balancer health checks, so brief interruptions are possible depending on your environment.
+With PDBs, graceful shutdown, and topology spread configured, rolling upgrades can be performed with minimal disruption. AgentGateway's config propagation is fast: [benchmarks show ~30ms route propagation](https://github.com/howardjohn/gateway-api-bench/blob/v2/README-v2.md) even under concurrent traffic load. But real-world upgrades involve pod restarts, connection draining, and load balancer health checks, so brief interruptions are possible depending on your environment.
 
 ### Pre-Upgrade Checklist
 
@@ -752,7 +752,7 @@ kill %1 2>/dev/null
 ### What to Monitor During Upgrade
 
 Key metrics to watch in Grafana:
-- `agentgateway_build_info` — should show old and new version during rollout, then only new version
-- `agentgateway_requests_total{status=~"5.."}` — error rate should not spike
-- `agentgateway_xds_connection_terminations` — expect `Reconnect` reasons as proxies restart, but no `ConnectionError`
-- `kgateway_controller_reconciliations_total{result="error"}` — should remain at 0
+- `agentgateway_build_info`: should show old and new version during rollout, then only new version
+- `agentgateway_requests_total{status=~"5.."}`: error rate should not spike
+- `agentgateway_xds_connection_terminations`: expect `Reconnect` reasons as proxies restart, but no `ConnectionError`
+- `kgateway_controller_reconciliations_total{result="error"}`: should remain at 0

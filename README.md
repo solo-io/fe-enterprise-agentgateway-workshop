@@ -57,13 +57,13 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Basic Routing to OpenAI](labs/routing/configure-routing-openai.md) _(OpenAI)_
 - [Routing by Match Type (Path, Header, Query Parameter)](labs/routing/routing-match-types.md) _(OpenAI)_
 - [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
-- [Semantic Routing with vLLM Semantic Router](labs/routing/configure-semantic-routing.md) _(OpenAI + vLLM Semantic Router)_ — one virtual model name routed to an economy, mid, or high tier model by prompt content, via ExtProc
+- [Semantic Routing with vLLM Semantic Router](labs/routing/configure-semantic-routing.md) _(OpenAI + vLLM Semantic Router)_: one virtual model name routed to an economy, mid, or high tier model by prompt content, via ExtProc
 - [Routing to AWS Bedrock](labs/routing/configure-routing-aws-bedrock.md) _(AWS Bedrock)_
 - [Routing to AWS Bedrock via API Keys](labs/routing/configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
 - [AWS Bedrock with IRSA](labs/routing/configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_
 - [AWS Bedrock Titan Embeddings](labs/routing/configure-routing-aws-bedrock-titan-embeddings.md) _(AWS Bedrock)_
 - [Routing to Anthropic](labs/routing/configure-routing-anthropic.md) _(Anthropic)_
-- [Routing to Groq](labs/routing/configure-routing-groq.md) _(Groq)_ — OpenAI-compatible provider via `host` / `pathPrefix` override
+- [Routing to Groq](labs/routing/configure-routing-groq.md) _(Groq)_: OpenAI-compatible provider via `host` / `pathPrefix` override
 - [Routing to Azure OpenAI and Azure AI Foundry](labs/routing/configure-routing-azure-openai.md) _(Azure OpenAI / Azure AI Foundry)_
 - [Azure OpenAI with Workload Identity](labs/routing/configure-routing-azure-openai-workload-identity.md) _(Azure OpenAI / AKS)_
 - [Routing to Google Vertex AI](labs/routing/configure-routing-vertexai.md) _(Google Vertex AI)_
@@ -137,7 +137,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [OpenAPI to MCP — External API](labs/mcp/openapi-to-mcp-external-api.md)
 - [OpenAPI to MCP — In-Cluster Deployment](labs/mcp/openapi-to-mcp-in-cluster.md)
 - [MCP Tool Federation](labs/mcp/mcp-tool-federation.md)
-- [Composable MCP — Tool Aggregation & Orchestration](labs/mcp/composable-mcp.md) — one tool call fans out to distinct MCP + HTTP backends and merges the responses (vs. federation, which routes each call)
+- [Composable MCP — Tool Aggregation & Orchestration](labs/mcp/composable-mcp.md): one tool call fans out to distinct MCP + HTTP backends and merges the responses (vs. federation, which routes each call)
 - [MCP Tool Mode — Search](labs/mcp/mcp-tool-mode-search.md)
 - [MCP Tool Mode — Code](labs/mcp/mcp-tool-mode-code.md)
 - [MCP Tool Rate Limiting](labs/mcp/mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
@@ -145,8 +145,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: Security, Identity & Delegation)_
 - [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: Security, Identity & Delegation)_
 - [MCP Pre-Issuance Entitlement Gating with Auth0](labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: Security, Identity & Delegation)_
-- [Figma MCP with Auth0 + Token-Exchange Elicitation](labs/mcp/figma-mcp-auth0/README.md) — OpenAPI→MCP + eager OAuth (Auth0) + per-user Figma OAuth via elicitation _(see also: Security, Identity & Delegation)_
-- [Figma MCP with Microsoft Entra ID + Token-Exchange Elicitation](labs/mcp/figma-mcp-entra/README.md) — Entra front-door variant of the Auth0 lab _(see also: Security, Identity & Delegation)_
+- [Figma MCP with Auth0 + Token-Exchange Elicitation](labs/mcp/figma-mcp-auth0/README.md): OpenAPI→MCP + eager OAuth (Auth0) + per-user Figma OAuth via elicitation _(see also: Security, Identity & Delegation)_
+- [Figma MCP with Microsoft Entra ID + Token-Exchange Elicitation](labs/mcp/figma-mcp-entra/README.md): Entra front-door variant of the Auth0 lab _(see also: Security, Identity & Delegation)_
 - [CrewAI Agent with MCP and OBO Auth](labs/mcp/obo-crewai-agent-with-mcp.md) _(see also: Identity & Delegation)_
 
 ---
@@ -161,7 +161,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 ## Agent Harnesses
 
 - [Claude Code](labs/agent-harnesses/claude-code.md)
-- [Keep Claude Code Authenticated with Per-User Auth0 Tokens](labs/agent-harnesses/claude-code-auth0-pkce.md) _(Auth0 / Anthropic)_ — per-user PKCE token renewed automatically via `apiKeyHelper`
+- [Keep Claude Code Authenticated with Per-User Auth0 Tokens](labs/agent-harnesses/claude-code-auth0-pkce.md) _(Auth0 / Anthropic)_: per-user PKCE token renewed automatically via `apiKeyHelper`
 - [Claude Desktop](labs/agent-harnesses/claude-desktop.md)
 - [Claude Code as MCP Client with Eager OAuth (Auth0)](labs/mcp/mcp-eager-auth-auth0.md#step-10--test-with-claude-code)
 - [Claude Code as MCP Client with Eager OAuth (Okta)](labs/mcp/mcp-eager-auth-okta.md#step-10--test-with-claude-code)
@@ -178,8 +178,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: MCP)_
 - [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: MCP)_
 - [MCP Pre-Issuance Entitlement Gating with Auth0](labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) _(see also: MCP, Security)_
-- [Figma MCP with Auth0 + Token-Exchange Elicitation](labs/mcp/figma-mcp-auth0/README.md) — per-user credential forwarding to a vendor-provided IdP (Figma) via elicitation _(see also: MCP, Security)_
-- [Figma MCP with Microsoft Entra ID + Token-Exchange Elicitation](labs/mcp/figma-mcp-entra/README.md) — Entra front-door + Figma elicitation (why not OBO for a vendor-provided IdP) _(see also: MCP, Security)_
+- [Figma MCP with Auth0 + Token-Exchange Elicitation](labs/mcp/figma-mcp-auth0/README.md): per-user credential forwarding to a vendor-provided IdP (Figma) via elicitation _(see also: MCP, Security)_
+- [Figma MCP with Microsoft Entra ID + Token-Exchange Elicitation](labs/mcp/figma-mcp-entra/README.md): Entra front-door + Figma elicitation (why not OBO for a vendor-provided IdP) _(see also: MCP, Security)_
 
 ---
 
@@ -207,18 +207,18 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 > Strategies for upgrading Enterprise Agentgateway without dropping traffic.
 
-- [Migration Guide: v2026.5.x → v2026.7.x](labs/upgrades/migrate-v2026.5.x-to-v2026.7.x.md) — version-to-version deltas (image registry consolidation, Kubernetes floor, imagePullSecrets consolidation), prerequisites, and the exact upgrade commands
+- [Migration Guide: v2026.5.x → v2026.7.x](labs/upgrades/migrate-v2026.5.x-to-v2026.7.x.md): version-to-version deltas (image registry consolidation, Kubernetes floor, imagePullSecrets consolidation), prerequisites, and the exact upgrade commands
 - [In-Place Rolling Upgrades — Validate Zero Downtime](labs/upgrades/in-place-rolling-upgrades.md)
 - [Blue/Green Upgrades Across Namespaces](labs/upgrades/blue-green-namespaces.md)
-- [Multi-Cluster Upgrades](labs/upgrades/multi-cluster-upgrades.md) — upgrade a whole cluster while a peer serves the same global LLM over an ambient multicluster mesh
+- [Multi-Cluster Upgrades](labs/upgrades/multi-cluster-upgrades.md): upgrade a whole cluster while a peer serves the same global LLM over an ambient multicluster mesh
 
 ---
 
 ## Platform Engineering
 
-- [MCP Endpoints, Delegated: Self-Service Within Guardrails](labs/platform-engineering/platform-and-developer-helm-charts-mcp.md) — MCP servers are team workloads, so teams self-serve their endpoints; a platform chart owns the gateway, cost tiers, security, and URL space, and teams structurally cannot escape their tier, their prefix, or weaken a control _(see also: Rate Limiting, Security, MCP)_
-- [LLM Access, Centralized: The Platform as Provider](labs/platform-engineering/centralized-llm-ops-helm-chart.md) — LLM backends are a vendor relationship, so the platform runs LLM consumption as an internal product: a model-alias catalog, per-team API keys and token budgets, one chart, no self-service
-- [Networking Architecture: Every Connection in a Single-Cluster Install](labs/platform-engineering/networking-architecture.md) — how the controller, proxies, extension services, and observability stack communicate: every port, protocol, and initiator, with a connection reference table for firewall and NetworkPolicy planning
+- [MCP Endpoints, Delegated: Self-Service Within Guardrails](labs/platform-engineering/platform-and-developer-helm-charts-mcp.md): MCP servers are team workloads, so teams self-serve their endpoints; a platform chart owns the gateway, cost tiers, security, and URL space, and teams structurally cannot escape their tier, their prefix, or weaken a control _(see also: Rate Limiting, Security, MCP)_
+- [LLM Access, Centralized: The Platform as Provider](labs/platform-engineering/centralized-llm-ops-helm-chart.md): LLM backends are a vendor relationship, so the platform runs LLM consumption as an internal product: a model-alias catalog, per-team API keys and token budgets, one chart, no self-service
+- [Networking Architecture: Every Connection in a Single-Cluster Install](labs/platform-engineering/networking-architecture.md): how the controller, proxies, extension services, and observability stack communicate: every port, protocol, and initiator, with a connection reference table for firewall and NetworkPolicy planning
 - [Admission Control with Kyverno](labs/platform-engineering/kyverno-admission-control.md)
 
 ---
@@ -251,7 +251,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - Microsoft Entra ID On-Behalf-Of (OBO) token exchange
 - LLM API Key Management
     - API Key masking in logs
-    - Virtual keys — per-user API keys with independent token budgets and budget isolation
+    - Virtual keys: per-user API keys with independent token budgets and budget isolation
 - Token-based metrics from LLM
 - LLM request/response metadata in Traces
 - Traffic Routing patterns (path, host, header, query parameter, request body)
@@ -262,7 +262,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - Control access with org-specific API-key
     - Control access with JWT authentication
     - JWT-based RBAC (Role-Based Access Control)
-    - Keep an agent harness authenticated with Authorization Code + PKCE from a public client (no client secret) — Claude Code's `apiKeyHelper` renews a per-user Auth0 token silently, so the provider key never leaves the cluster and offboarding is an IdP action
+    - Keep an agent harness authenticated with Authorization Code + PKCE from a public client (no client secret): Claude Code's `apiKeyHelper` renews a per-user Auth0 token silently, so the provider key never leaves the cluster and offboarding is an IdP action
     - Frontend TLS termination
     - Frontend mTLS with client certificate validation
     - SNI (Server Name Indication) matching for multi-domain HTTPS
@@ -270,7 +270,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - BYO gRPC external authorization (ext-authz) for LLM and MCP routes
     - Tunnel a backend connection (e.g. JWKS fetch) through a corporate forward proxy via `BackendTunnel` (`HTTPS_PROXY`-style CONNECT)
 - Prompt Guard & Content Moderation
-    - Comprehensive built-in Prompt Guard (prompt injection, jailbreak, PII, secrets, harmful content, encoding evasion, and more)
+    - Built-in Prompt Guard (prompt injection, jailbreak, PII, secrets, harmful content, encoding evasion, and more)
     - External moderation guardrails (OpenAI moderation API)
     - Advanced Webhook Prompt Guard
 - Prompt Enrichment
@@ -287,13 +287,13 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - Dynamic MCP backends via label selectors (scale targets without editing the backend)
     - Expose existing REST APIs as MCP tools from an OpenAPI spec (external public APIs and in-cluster services)
     - Federate multiple MCP servers behind one backend (tool-name prefixing, FailOpen, per-persona tool filtering)
-    - Composite MCP tools that fan out to multiple MCP + HTTP backends and merge the responses — aggregation, sequential orchestration, and structured output
-    - MCP tool modes — Search (`get_tool` / `invoke_tool` meta-tools) and Code (`run_code` in a sandboxed JS runtime)
+    - Composite MCP tools that fan out to multiple MCP + HTTP backends and merge the responses: aggregation, sequential orchestration, and structured output
+    - MCP tool modes: Search (`get_tool` / `invoke_tool` meta-tools) and Code (`run_code` in a sandboxed JS runtime)
     - Secure MCP servers with JWT auth
     - BYO gRPC external authorization (ext-authz) for MCP routes
-    - Eager OAuth with a pre-registered upstream IdP (Auth0 and Okta) — gateway acts as the OAuth Authorization Server visible to MCP clients
-    - Pre-issuance entitlement gating — gRPC ext_authz hook gates OAuth token issuance per user, redirects denied users to a configurable URL
-    - Two-layer OAuth for a real SaaS API (Figma) — eager OAuth front door (Auth0 or Microsoft Entra ID) plus per-user downstream credential forwarding to a vendor-provided IdP via token-exchange elicitation
+    - Eager OAuth with a pre-registered upstream IdP (Auth0 and Okta): gateway acts as the OAuth Authorization Server visible to MCP clients
+    - Pre-issuance entitlement gating: gRPC ext_authz hook gates OAuth token issuance per user, redirects denied users to a configurable URL
+    - Two-layer OAuth for a real SaaS API (Figma): eager OAuth front door (Auth0 or Microsoft Entra ID) plus per-user downstream credential forwarding to a vendor-provided IdP via token-exchange elicitation
     - Tool-level access control
     - Per-tool rate limiting for MCP traffic
     - Integration with Claude Code CLI
@@ -336,7 +336,7 @@ As a platform operator, I want the AI Gateway to apply granular token quotas and
 
 ---
 
-This section is a comprehensive list of all the functionality and data requirements.
+This section lists the functionality and data requirements.
 
 #### Flexible Identification
 - The AI Gateway must be able to authenticate requests using either a static API key or by validating a JWT.
@@ -372,9 +372,9 @@ This section is a comprehensive list of all the functionality and data requireme
 
 ### Why This is Important
 
-This functionality is crucial for managing an enterprise-scale AI Gateway and directly addresses critical business needs:
+This functionality addresses the business needs of managing an enterprise-scale AI Gateway:
 
 - **Financial Control:** By setting and enforcing token quotas, the organization can prevent unexpected cost overruns and maintain predictable spending on AI services.
-- **Operational Excellence:** Real-time metrics and detailed logs provide the necessary visibility to monitor system health, troubleshoot issues quickly, and ensure the gateway is performing as expected.
-- **Organizational Governance:** The ability to track and attribute costs to specific teams or departments facilitates an accurate chargeback model, making business units accountable for their resource consumption and promoting efficient usage.
+- **Operational Excellence:** Real-time metrics and detailed logs provide the visibility to monitor system health, troubleshoot issues quickly, and ensure the gateway is performing as expected.
+- **Organizational Governance:** The ability to track and attribute costs to specific teams or departments supports an accurate chargeback model that makes business units accountable for their resource consumption.
 - **Fair Access:** Quotas and rate limits prevent a small number of users or applications from monopolizing resources and ensure that the AI services remain available and performant for all teams.

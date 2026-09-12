@@ -1,6 +1,6 @@
 # Install Enterprise Agentgateway
 
-In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on labs that showcase routing, security, observability, and agentic capabilities.
+In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on labs that cover routing, security, observability, and agentic capabilities.
 
 ## Pre-requisites
 - Kubernetes > 1.31
@@ -42,7 +42,7 @@ tlsroutes                         gateway.networking.k8s.io/v1   true         TL
 ```
 
 > [!NOTE]
-> The command above installs the **standard** channel. If you also need `TCPRoute` or `UDPRoute` (`gateway.networking.k8s.io/v1alpha2`), install the **experimental** channel instead — swap `standard-install.yaml` for `experimental-install.yaml`. No lab in this workshop requires them.
+> The command above installs the **standard** channel. If you also need `TCPRoute` or `UDPRoute` (`gateway.networking.k8s.io/v1alpha2`), install the **experimental** channel instead: swap `standard-install.yaml` for `experimental-install.yaml`. No lab in this workshop requires them.
 
 ## Install Enterprise Agentgateway
 
@@ -89,7 +89,7 @@ authconfigs                             ac           extauth.solo.io/v1         
 ratelimitconfigs                        rlc          ratelimit.solo.io/v1alpha1                true         RateLimitConfig
 ```
 
-The OSS `agentgateway.dev` CRDs and the Enterprise `enterpriseagentgateway.solo.io` CRDs are distinct resources — the Enterprise kinds wrap their OSS counterparts. This workshop uses the Enterprise kinds (`eagbe`, `eagpar`, `eagpol`) throughout.
+The OSS `agentgateway.dev` CRDs and the Enterprise `enterpriseagentgateway.solo.io` CRDs are distinct resources: the Enterprise kinds wrap their OSS counterparts. This workshop uses the Enterprise kinds (`eagbe`, `eagpar`, `eagpol`) throughout.
 
 ## Install Enterprise Agentgateway Controller
 
@@ -120,7 +120,7 @@ enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 ## Deploy Agentgateway with customizations
 This applies a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the gateway-specific infrastructure settings: deployment, service, and logging. You configure metric labels, access logs, and tracing separately, with the `EnterpriseAgentgatewayPolicy` resources in the sections below.
 
-The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`, so the linkage is explicit on the Gateway that consumes it. Apply the parameters before or alongside the Gateway. If the Gateway is applied first, the proxy simply won't deploy until the referenced parameters exist.
+The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`, so the linkage is explicit on the Gateway that consumes it. Apply the parameters before or alongside the Gateway. If the Gateway is applied first, the proxy won't deploy until the referenced parameters exist.
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -242,7 +242,7 @@ EOF
 
 ## Configure access logs (optional)
 
-Agentgateway emits access logs by default. This step is optional — the enrichment fields below are not required by any later lab, but are useful for debugging and observability. Apply an `EnterpriseAgentgatewayPolicy` to enrich the default access logs with additional metadata extracted from the request and response. Each attribute is a [CEL expression](https://docs.solo.io/agentgateway/latest/reference/cel/); wrap fields that are absent on some requests (for example `llm.*` on non-LLM routes, or `jwt.*` before a JWT policy is attached) in `default()` so the log field is always present:
+Agentgateway emits access logs by default. This step is optional: the enrichment fields below are not required by any later lab, but are useful for debugging and observability. Apply an `EnterpriseAgentgatewayPolicy` to enrich the default access logs with additional metadata extracted from the request and response. Each attribute is a [CEL expression](https://docs.solo.io/agentgateway/latest/reference/cel/); wrap fields that are absent on some requests (for example `llm.*` on non-LLM routes, or `jwt.*` before a JWT policy is attached) in `default()` so the log field is always present:
 
 ```bash
 kubectl apply -f- <<'EOF'

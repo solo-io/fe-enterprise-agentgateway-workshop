@@ -466,10 +466,8 @@ A successful `getMe` returns your real Figma profile:
   "img_url": "https://s3-alpha.figma.com/profile/…" }
 ```
 
-> **Validated live** (controller v2026.6.1): the inbound Microsoft login SSO'd through an existing
-> Entra session, chained to the Figma consent, and `getMe` returned the real profile. Both OAuth
-> layers end-to-end. If you have no active Entra session, you'll see the `login.microsoftonline.com`
-> sign-in before the Figma consent.
+> If you have no active Entra session, you'll see the `login.microsoftonline.com` sign-in before
+> the Figma consent.
 
 Two quick gateway checks (no browser needed) confirm the inbound auth layer is wired correctly:
 
@@ -554,10 +552,6 @@ operations; run **getMe** for your profile. For **getFile**, fill `path.file_key
 not a flat `file_key`.
 
 ![getMe returns the real Figma profile in MCP Inspector](images/06-getme-result.png)
-
-> **Validated live** here on controller v2026.6.1 via this exact Guided flow: Microsoft login SSO'd
-> through an existing Entra session, chained to the Figma consent, and `getMe` returned the real
-> profile, confirming both OAuth layers end-to-end.
 
 ---
 

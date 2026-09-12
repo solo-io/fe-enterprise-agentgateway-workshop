@@ -2,7 +2,7 @@
 
 This lab walks through three advanced failover patterns on Enterprise AgentGateway: intra-priority-group failover, eviction on 5XX server errors, and the combined behavior that proves intra-group P2C load balancing, per-provider eviction, and inter-group failover work together.
 
-If you have already completed the [LLM Failover](llm-failover.md) lab, you can skip the **Base Setup** section below — your resources are already in place.
+If you have already completed the [LLM Failover](llm-failover.md) lab, you can skip the **Base Setup** section below; your resources are already in place.
 
 ## Pre-requisites
 
@@ -222,7 +222,7 @@ EOF
 
 ## Pattern 1: Intra-Priority-Group Failover
 
-The simplest failover case is between priority groups (group 1 to group 2 when group 1 fails). This pattern tests a more nuanced scenario: **failover between multiple backends within the same priority group**.
+The simplest failover case is between priority groups (group 1 to group 2 when group 1 fails). This pattern tests a more nuanced scenario: failover between multiple backends within the same priority group.
 
 ### Why This Matters
 
@@ -233,14 +233,14 @@ When you have multiple backends in a single priority group:
 - The gateway only moves to a lower priority group when ALL backends in the current group are unhealthy
 
 This enables:
-- **Heterogeneous backends**: Mix different provider types or model tiers in the same priority group
-- **Partial failure handling**: Keep serving traffic even when some backends fail
-- **Quality preservation**: Stay in the preferred tier with better models as long as ANY backend is healthy
-- **Graceful degradation**: Fallback to lower-quality but functional models only when necessary
+- Heterogeneous backends: Mix different provider types or model tiers in the same priority group
+- Partial failure handling: Keep serving traffic even when some backends fail
+- Quality preservation: Stay in the preferred tier with better models as long as ANY backend is healthy
+- Graceful degradation: Fall back to lower-quality but functional models only when necessary
 
 ### Health Policy
 
-The `EnterpriseAgentgatewayPolicy` (`mock-ratelimit-health`) created in the Base Setup already targets `mock-ratelimit-backend` by name, so it continues to apply here. No additional policy configuration is needed — the same `unhealthyCondition` and `eviction` settings govern this scenario.
+The `EnterpriseAgentgatewayPolicy` (`mock-ratelimit-health`) created in the Base Setup already targets `mock-ratelimit-backend` by name, so it continues to apply here. No additional policy configuration is needed; the same `unhealthyCondition` and `eviction` settings govern this scenario.
 
 ### Test Scenario
 
@@ -416,11 +416,11 @@ endpoint=api.openai.com:443 http.path=/openai http.status=200 duration=491ms
 ### What This Proves
 
 This pattern demonstrates that:
-1. **Intra-pool failover**: Failover works correctly between backends within the same priority group
-2. **Backend ejection**: The gateway ejects an unhealthy backend and skips it on subsequent requests
-3. **Priority group preference**: The gateway stays within the current priority group as long as ANY backend is healthy
-4. **Graceful degradation**: The gateway drops to a lower priority group, and its less capable models (gpt-5.4-nano), only when every backend in the higher groups has failed
-5. **Quality preservation**: Users get responses from the more capable model (gpt-5.6-terra) when available
+1. Intra-pool failover: Failover works between backends within the same priority group
+2. Backend ejection: The gateway ejects an unhealthy backend and skips it on subsequent requests
+3. Priority group preference: The gateway stays within the current priority group as long as ANY backend is healthy
+4. Graceful degradation: The gateway drops to a lower priority group, and its less capable models (gpt-5.4-nano), only when every backend in the higher groups has failed
+5. Quality preservation: Users get responses from the more capable model (gpt-5.6-terra) when available
 
 The result trades answer quality for availability only when it has to: Priority Group 1 carries the models you prefer, and Priority Group 2 still returns an answer, at lower quality, once every backend in the preferred tier is down.
 
@@ -428,11 +428,11 @@ The result trades answer quality for availability only when it has to: Priority 
 
 ## Pattern 2: 5XX Server Error Failover
 
-Pattern 1 demonstrated failover triggered by 429 rate limit errors. This pattern tests failover triggered by **5XX server errors**, showing that the `EnterpriseAgentgatewayPolicy` health policy can handle any error condition defined by the CEL expression.
+Pattern 1 demonstrated failover triggered by 429 rate limit errors. This pattern tests failover triggered by 5XX server errors. The `EnterpriseAgentgatewayPolicy` health policy can handle any error condition defined by the CEL expression.
 
 ### Why This Matters
 
-LLM providers can fail with more than just rate limits. Server errors (500, 502, 503) indicate the backend is experiencing issues and should be temporarily removed from the pool. With the `EnterpriseAgentgatewayPolicy`, you can define exactly which error codes trigger eviction using CEL expressions, giving you fine-grained control over failover behavior.
+LLM providers can fail with more than just rate limits. Server errors (500, 502, 503) indicate the backend is experiencing issues and should be temporarily removed from the pool. With the `EnterpriseAgentgatewayPolicy`, you can define exactly which error codes trigger eviction using CEL expressions.
 
 ### Deploy Mock Server with Server Errors
 
@@ -613,7 +613,7 @@ EOF
 ```
 
 **Key differences from the 429 example:**
-- The `unhealthyCondition` uses `"response.code >= 500"` — only server errors trigger eviction, not rate limits
+- The `unhealthyCondition` uses `"response.code >= 500"`: only server errors trigger eviction, not rate limits
 - The policy's `eviction.duration: 30s` controls how long the backend is removed from the pool
 - The route uses `/openai-5xx` so both examples can coexist during testing
 
@@ -639,9 +639,9 @@ done
 ```
 
 **Expected response pattern:**
-- **Request 1**: `503 Service Unavailable` from mock-gpt-4o-500
-- **Request 2**: `200 OK` from OpenAI (failover successful)
-- **Request 3**: `200 OK` from OpenAI (continues using failover)
+- Request 1: `503 Service Unavailable` from mock-gpt-4o-500
+- Request 2: `200 OK` from OpenAI (failover successful)
+- Request 3: `200 OK` from OpenAI (continues using failover)
 
 **What's happening:**
 1. The first request hits the mock server and receives a 503 error
@@ -673,10 +673,10 @@ endpoint=api.openai.com:443 http.path=/openai-5xx http.status=200 duration=861ms
 ### What This Proves
 
 This pattern demonstrates that:
-1. **Non-429 failover**: The `EnterpriseAgentgatewayPolicy` health policy enables failover for any error condition, not just rate limits
-2. **CEL flexibility**: The `unhealthyCondition` expression can target specific error ranges (`>= 500`), individual codes (`== 429`), or combinations (`>= 500 || == 429`)
-3. **Policy-controlled duration**: The policy's `eviction.duration` controls how long the backend is removed from the pool
-4. **Multiplicative backoff**: Repeated evictions increase the eviction duration automatically, preventing rapid cycling on persistently failing backends
+1. Non-429 failover: The `EnterpriseAgentgatewayPolicy` health policy enables failover for any error condition, not just rate limits
+2. CEL flexibility: The `unhealthyCondition` expression can target specific error ranges (`>= 500`), individual codes (`== 429`), or combinations (`>= 500 || == 429`)
+3. Policy-controlled duration: The policy's `eviction.duration` controls how long the backend is removed from the pool
+4. Multiplicative backoff: Repeated evictions increase the eviction duration automatically, preventing rapid cycling on persistently failing backends
 
 ---
 
@@ -684,7 +684,7 @@ This pattern demonstrates that:
 
 The previous patterns each demonstrated one piece of the failover model. This pattern combines all three behaviors in a single backend to address a common real-world requirement: running multiple providers in the same priority group, where the platform must load balance across them, evict individual providers that return 429 or 5xx responses, and fail over to a lower-priority group **only** once the current group has no usable providers left.
 
-The piece this pattern clarifies is *where health tracking lives*. Eviction is tracked **per provider** — each entry in `groups[].providers[]` is an individually evictable backend. The decision to move to the next priority group is derived from that per-provider state: it triggers only when every provider in the current group has been evicted. In other words, intra-group P2C load balancing, per-provider eviction, and inter-group failover are not three separate features — they are the same mechanism observed at different scopes.
+The piece this pattern clarifies is *where health tracking lives*. Eviction is tracked **per provider**: each entry in `groups[].providers[]` is an individually evictable backend. The decision to move to the next priority group is derived from that per-provider state: it triggers only when every provider in the current group has been evicted. In other words, intra-group P2C load balancing, per-provider eviction, and inter-group failover are the same mechanism observed at different scopes.
 
 This pattern proves the behavior end-to-end on the cluster by combining the 429 mock and the 503 mock in a single priority group, with OpenAI as the lower-priority fallback.
 
@@ -868,7 +868,7 @@ endpoint=api.openai.com:443                                              http.st
 | Behavior | Observed |
 |---|---|
 | **Intra-group P2C load balancing** | Requests 1 and 2 hit *different* providers in group 1 (different endpoints, different error codes). P2C, not round-robin, but the practical effect is that both providers receive traffic before either is fully written off. |
-| **Per-provider eviction** | Each provider is evicted independently on its first matching failure (`consecutiveFailures: 1`). The 503 and 429 mocks are tracked as separate backends — the policy applied to the backend `combined-backend` evaluates eviction per provider, not per group. |
+| **Per-provider eviction** | Each provider is evicted independently on its first matching failure (`consecutiveFailures: 1`). The 503 and 429 mocks are tracked as separate backends: the policy applied to the backend `combined-backend` evaluates eviction per provider, not per group. |
 | **Inter-group failover gated on whole-group eviction** | Group 2 (`api.openai.com`) is not used until **both** providers in group 1 are evicted. Request 3 is the first request after the second mock is evicted, and it is the first to hit OpenAI. |
 | **CEL `unhealthyCondition` covers both codes** | A single policy with `response.code >= 500 \|\| response.code == 429` correctly classified the 503 from mock-503 and the 429 from mock-429 as unhealthy. |
 

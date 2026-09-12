@@ -21,7 +21,7 @@ This lab configures Claude Desktop to send inference requests through Enterprise
 > Connection — Invalid custom3p enterprise config: baseUrl: must use https (or http on loopback)
 > ```
 >
-> The third-party inference connector enforces TLS for any non-loopback endpoint — the base URL must be either `https://...` or `http://localhost...` / `http://127.0.0.1...`. To keep this workshop simple, without provisioning a TLS cert for the gateway, we port-forward the `agentgateway-proxy` Service to `localhost:8080` and point Claude Desktop at `http://localhost:8080/claude`, which satisfies the loopback exception. In a real deployment you would terminate TLS on the gateway and use the `https://` URL directly.
+> The third-party inference connector enforces TLS for any non-loopback endpoint: the base URL must be either `https://...` or `http://localhost...` / `http://127.0.0.1...`. To keep this workshop simple, without provisioning a TLS cert for the gateway, we port-forward the `agentgateway-proxy` Service to `localhost:8080` and point Claude Desktop at `http://localhost:8080/claude`, which satisfies the loopback exception. In a real deployment you would terminate TLS on the gateway and use the `https://` URL directly.
 
 ## Choose Your Access Method
 
@@ -299,7 +299,7 @@ Configure the **Gateway Credentials** section as shown:
 |---|---|
 | **Credential kind** | `Static API key` |
 | **Gateway base URL** | `http://localhost:8080/claude` |
-| **Gateway API key** | `dummy` *(any non-empty value — the gateway injects the real credential server-side)* |
+| **Gateway API key** | `dummy` *(any non-empty value; the gateway injects the real credential server-side)* |
 | **Gateway auth scheme** | `bearer` |
 
 Under **Models**, leave **Model discovery** enabled so Claude Desktop auto-populates the model picker from `GET /claude/v1/models` at launch.
@@ -340,7 +340,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 ![grafana-1.png](../../images/claude-desktop/grafana-1.png)
 
 The dashboard provides real-time visualization of:
-- Core GenAI metrics (request rates, token usage by model — you should see `claude-haiku-4-5-*` and `claude-opus-4-*` / `claude-sonnet-4-*` rows populate as you chat with Claude Desktop)
+- Core GenAI metrics (request rates, token usage by model; you should see `claude-haiku-4-5-*` and `claude-opus-4-*` / `claude-sonnet-4-*` rows populate as you chat with Claude Desktop)
 - Latency percentiles (P50 / P95 / P99) and request/token rates
 - Cost tracking (1h / 24h / 7d totals and projected monthly cost by model)
 - Streaming metrics (TTFT, TPOT)
@@ -381,9 +381,9 @@ Use the **search spans** box at the top to filter, the time-range selector to sc
 
 The detail view gives you three coordinated panels:
 
-- **Execution Flow** — a visual `Start → POST /claude/* → End` graph of the request through the gateway
-- **Trace Tree** — the underlying span hierarchy
-- **Span Details** — the full OpenTelemetry attributes for the selected span, including the gen-AI semantic conventions emitted by AgentGateway: `operation: "chat"`, `provider: "anthropic"`, `request.model`, `request.max_tokens`, `response.model`, and `usage.input_tokens` / `usage.output_tokens` / `usage.cache_creation` / `usage.cache_read`
+- **Execution Flow**: a visual `Start → POST /claude/* → End` graph of the request through the gateway
+- **Trace Tree**: the underlying span hierarchy
+- **Span Details**: the full OpenTelemetry attributes for the selected span, including the gen-AI semantic conventions emitted by AgentGateway: `operation: "chat"`, `provider: "anthropic"`, `request.model`, `request.max_tokens`, `response.model`, and `usage.input_tokens` / `usage.output_tokens` / `usage.cache_creation` / `usage.cache_read`
 
 Cross-reference the **Trace ID** with the access logs (next section) to jump from a single log line directly to its full prompt/completion payload and span attributes.
 

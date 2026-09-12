@@ -129,7 +129,7 @@ ordinals: `run: [1, 2]`.
 ```
 
 Use `e2e_pf`/`e2e_pf_stop` rather than a raw `kubectl port-forward &` plus
-`kill`/`wait` — `wait` on a killed job returns 143, which becomes the block's exit
+`kill`/`wait`: `wait` on a killed job returns 143, which becomes the block's exit
 code and fails the step even when every assertion passed.
 
 **Blocks share one shell.** A lab that exports `GATEWAY_IP` or a `SESSION` id in
@@ -166,7 +166,7 @@ kubectl apply -f -` already covers re-runnability. Lab-private namespaces such
 as `stripe-mcp` and `composable-mcp` are deleted by their own labs.
 
 **Renamed a lab heading?** The spec fails loudly with `DRIFT: ... has no section`.
-That is intended — fix the spec, don't loosen the matcher.
+That is intended: fix the spec, don't loosen the matcher.
 
 **A lab that isn't re-runnable** (e.g. a bare `kubectl create namespace` whose
 Cleanup doesn't delete the namespace) needs `allow_failure: true` on that block.
@@ -175,7 +175,7 @@ visible.
 
 **Two labs cannot share a heading, even across letter case.** Headings are
 matched case-insensitively, so a lab with both `View access logs` and
-`View Access Logs` — or two `curl openai` sections — makes neither addressable
+`View Access Logs` (or two `curl openai` sections) makes neither addressable
 and the parser raises `has 2 sections named`. That is a real defect in the lab;
 rename the more specific one rather than working around it.
 
@@ -196,17 +196,17 @@ the lab's relative paths keep working unchanged. See `routing/openai-audio`.
 **A heredoc containing a backslash escape must be quoted.** Lab blocks are
 replayed by a real shell, so `kubectl apply -f - <<EOF` with `\\s` in a YAML
 double-quoted scalar collapses to `\s` and kubectl rejects it:
-`error converting YAML to JSON: found unknown escape character`. Quote it —
-`<<'EOF'` — as `builtin-guardrails` does. This is a lab bug, not a harness
+`error converting YAML to JSON: found unknown escape character`. Quote it
+(`<<'EOF'`) as `builtin-guardrails` does. This is a lab bug, not a harness
 limitation: the reader hits it too. `security/WAF` Use Case D shipped this way.
 
 **Never run two suite invocations against one cluster.** The labs share one
-Gateway, and several attach Gateway-scoped policies while they run — `virtual-keys`
+Gateway, and several attach Gateway-scoped policies while they run: `virtual-keys`
 and `llm-cost-management` both apply `api-key-auth` with `mode: Strict`, which
 401s *all* gateway traffic until their Cleanup removes it. A second run overlapping
 that window fails in ways that look like real lab bugs: `api key authentication
 failure: no API Key found` on a lab that has nothing to do with API keys.
-`llm-failover` is worse in the other direction — it scales the shared proxy to one
+`llm-failover` is worse in the other direction: it scales the shared proxy to one
 replica, so it silently changes the environment every concurrently-running lab
 sees. Check with `pgrep -f run-e2e.sh` before starting, and treat any run that
 overlapped another as void rather than debugging its failures.

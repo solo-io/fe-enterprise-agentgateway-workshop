@@ -7,12 +7,12 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - Deploy Keycloak in-cluster as the identity provider
 - Upgrade the controller to enable the STS (port 7777) pointing to Keycloak JWKS
 - Deploy a protected mock backend and configure JWT auth requiring STS-issued tokens
-- **Part A — Impersonation:** Exchange a Keycloak user JWT for an STS-signed OBO token (no actor token required)
-- **Part B — Delegation:** Add the `may_act` mapper in Keycloak, then exchange user JWT + k8s SA token for a delegated OBO token containing both `sub` and `act`
+- **Part A (Impersonation):** Exchange a Keycloak user JWT for an STS-signed OBO token (no actor token required)
+- **Part B (Delegation):** Add the `may_act` mapper in Keycloak, then exchange user JWT + k8s SA token for a delegated OBO token containing both `sub` and `act`
 
 ## Background
 
-**On-Behalf-Of (OBO) token exchange** (RFC 8693) allows an agent to act on behalf of an end user when calling downstream services. Instead of passing the raw user token forward, the agent exchanges it at a trusted Security Token Service (STS) for a new token that preserves the user's identity — and optionally embeds the agent's identity too.
+**On-Behalf-Of (OBO) token exchange** (RFC 8693) allows an agent to act on behalf of an end user when calling downstream services. Instead of passing the raw user token forward, the agent exchanges it at a trusted Security Token Service (STS) for a new token that preserves the user's identity, and optionally embeds the agent's identity too.
 
 ```
 User --[user JWT]--> STS :7777 --[OBO token (sub=user)]--> Protected Route
@@ -27,7 +27,7 @@ Enterprise Agentgateway includes a built-in STS on port 7777 that:
 2. Optionally validates the agent's Kubernetes service account token
 3. Issues a short-lived OBO token embedding the user identity (and optionally the actor identity)
 
-This lab uses **Keycloak** as the identity provider. Keycloak supports the `may_act` claim natively via a hardcoded-claim protocol mapper — no custom image or plugin required.
+This lab uses **Keycloak** as the identity provider. Keycloak supports the `may_act` claim natively via a hardcoded-claim protocol mapper; no custom image or plugin is required.
 
 ---
 
@@ -103,7 +103,7 @@ curl -s -X POST "${KEYCLOAK_URL}/admin/realms/obo-realm/users" \
 export KEYCLOAK_JWKS_URL="http://keycloak.keycloak.svc.cluster.local:8080/realms/obo-realm/protocol/openid-connect/certs"
 ```
 
-> **Note:** `KEYCLOAK_JWKS_URL` uses the in-cluster DNS name. The STS runs inside the cluster and will use this URL directly — no port-forward is needed for JWKS validation.
+> **Note:** `KEYCLOAK_JWKS_URL` uses the in-cluster DNS name. The STS runs inside the cluster and will use this URL directly; no port-forward is needed for JWKS validation.
 
 ---
 
@@ -426,7 +426,7 @@ Expected Output:
 }
 ```
 
-The token is signed by Keycloak's key. There is no `may_act` claim yet — this is a plain user JWT suitable for the impersonation flow.
+The token is signed by Keycloak's key. There is no `may_act` claim yet; this is a plain user JWT suitable for the impersonation flow.
 
 ---
 
@@ -485,7 +485,7 @@ Expected Output:
 }
 ```
 
-The OBO token is now signed by the **STS key** (not Keycloak). The `sub` is the original user identity. There is no `act` claim — this is the impersonation flow.
+The OBO token is now signed by the STS key (not Keycloak). The `sub` is the original user identity. There is no `act` claim; this is the impersonation flow.
 
 ---
 
@@ -509,7 +509,7 @@ content-type: application/json
 {"id":"chatcmpl-...","choices":[{"index":0,"message":{"role":"assistant","content":"Hello! How can I help you today?"},"finish_reason":"stop"}],"model":"mock-gpt-4o",...}
 ```
 
-Verify that the **raw Keycloak JWT is rejected** (it is not signed by the STS):
+Verify that the raw Keycloak JWT is rejected (it is not signed by the STS):
 
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
@@ -608,7 +608,7 @@ curl -s -X POST "${KEYCLOAK_URL}/admin/realms/obo-realm/clients/${CLIENT_UUID}/p
 
 ## Step 12B — Get a Fresh User JWT (now includes `may_act`)
 
-Fetch a new user token — it will now contain the `may_act` claim:
+Fetch a new user token; it will now contain the `may_act` claim:
 
 ```bash
 export USER_JWT=$(curl -s -X POST "${KEYCLOAK_URL}/realms/obo-realm/protocol/openid-connect/token" \
@@ -636,7 +636,7 @@ Expected Output:
 }
 ```
 
-The `may_act.sub` matches the `obo-agent` service account identity — Keycloak is now authorizing this specific actor to act on behalf of the user.
+The `may_act.sub` matches the `obo-agent` service account identity: Keycloak is now authorizing this specific actor to act on behalf of the user.
 
 ---
 
@@ -667,7 +667,7 @@ kubectl wait pod/obo-agent-test -n agentgateway-system --for=condition=Ready --t
 
 ## Step 14B — Perform the Delegation Token Exchange
 
-From inside the agent pod, call the STS in-cluster. The pod's mounted service account token is the `actor_token`; the user JWT (with `may_act`) is the `subject_token`. No port-forward is needed — the pod can reach the STS directly via in-cluster DNS:
+From inside the agent pod, call the STS in-cluster. The pod's mounted service account token is the `actor_token`; the user JWT (with `may_act`) is the `subject_token`. No port-forward is needed; the pod can reach the STS directly via in-cluster DNS:
 
 ```bash
 export DELEGATED_TOKEN=$(kubectl exec obo-agent-test -n agentgateway-system -- /bin/sh -c "
@@ -745,7 +745,7 @@ HTTP/1.1 401 Unauthorized
 authentication failure: token uses the unknown key "..."
 ```
 
-Only tokens issued by the STS — whether impersonation tokens (Part A) or delegation tokens (Part B) — are accepted by the protected route.
+Only tokens issued by the STS, whether impersonation tokens (Part A) or delegation tokens (Part B), are accepted by the protected route.
 
 ---
 

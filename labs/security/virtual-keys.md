@@ -15,15 +15,15 @@ Virtual key management is a common feature in AI gateway solutions (LiteLLM, Por
 
 Agentgateway achieves virtual keys by composing three capabilities:
 
-1. **API key authentication** — validates incoming keys and extracts per-key metadata
-2. **Token-based rate limiting** — enforces independent per-key token budgets
-3. **Observability** — tracks per-user spending via access logs and metrics
+1. **API key authentication**: validates incoming keys and extracts per-key metadata
+2. **Token-based rate limiting**: enforces independent per-key token budgets
+3. **Observability**: tracks per-user spending via access logs and metrics
 
-The key security advantage over header-based rate limiting: the budget key (`user_id`) is extracted from the API key credential by the gateway — the client cannot forge or override it.
+The key security advantage over header-based rate limiting: the budget key (`user_id`) is extracted from the API key credential by the gateway; the client cannot forge or override it.
 
 ## Set up the OpenAI backend
 
-Create the OpenAI credential secret. The gateway uses this to authenticate upstream — callers never see it.
+Create the OpenAI credential secret. The gateway uses this to authenticate upstream; callers never see it.
 
 ```bash
 kubectl create secret generic openai-secret -n agentgateway-system \
@@ -84,9 +84,9 @@ The backend should show `ACCEPTED   True`. The route (which has no status column
 
 ## Create per-user API keys
 
-Create one Secret per user, each carrying the label `app: llm-virtual-keys`. The auth policy discovers keys by this label (next section) instead of by a single Secret name, so the keys can live in separate Secrets — owned and RBAC-scoped by different teams — and new users are onboarded by adding another labeled Secret, with no edit to a central Secret or the policy.
+Create one Secret per user, each carrying the label `app: llm-virtual-keys`. The auth policy discovers keys by this label (next section) instead of by a single Secret name, so the keys can live in separate Secrets, owned and RBAC-scoped by different teams, and new users are onboarded by adding another labeled Secret, with no edit to a central Secret or the policy.
 
-Each entry stores the API key and a `user_id` that the gateway extracts for rate limiting — the client never supplies it. (A single Secret may hold multiple entries; one-per-user is used here to demonstrate discovery across Secrets.)
+Each entry stores the API key and a `user_id` that the gateway extracts for rate limiting; the client never supplies it. (A single Secret may hold multiple entries; one-per-user is used here to demonstrate discovery across Secrets.)
 
 ```bash
 kubectl apply -f- <<EOF
@@ -126,11 +126,11 @@ stringData:
 EOF
 ```
 
-> **Note — unique entry ids:** Each entry key (the `alice` / `bob` map key) must be unique across all labeled Secrets. If the same entry id appears in two matched Secrets, the resulting key set is undefined.
+> **Note on unique entry ids:** Each entry key (the `alice` / `bob` map key) must be unique across all labeled Secrets. If the same entry id appears in two matched Secrets, the resulting key set is undefined.
 
 ## Configure API key authentication
 
-Create an `EnterpriseAgentgatewayPolicy` that requires API key authentication for all gateway traffic. Instead of naming a single Secret with `secretRef`, use `secretSelector` to discover **every** Secret in the namespace carrying the `app: llm-virtual-keys` label and union their entries into the valid-key set. The `mode: Strict` setting rejects any request that does not present a recognized key.
+Create an `EnterpriseAgentgatewayPolicy` that requires API key authentication for all gateway traffic. Instead of naming a single Secret with `secretRef`, use `secretSelector` to discover every Secret in the namespace carrying the `app: llm-virtual-keys` label and union their entries into the valid-key set. The `mode: Strict` setting rejects any request that does not present a recognized key.
 
 ```bash
 kubectl apply -f- <<EOF
@@ -153,7 +153,7 @@ spec:
 EOF
 ```
 
-`secretRef` and `secretSelector` are mutually exclusive — set exactly one. (`secretRef` by name is covered in the public docs; this lab uses the label-selector approach so keys can be spread across Secrets and discovered automatically.)
+`secretRef` and `secretSelector` are mutually exclusive; set exactly one. (`secretRef` by name is covered in the public docs; this lab uses the label-selector approach so keys can be spread across Secrets and discovered automatically.)
 
 ## Test authentication
 
@@ -200,7 +200,7 @@ Expected: `HTTP 401`.
 
 ## Add per-user token budgets
 
-Token budgets use **global rate limiting** against the rate limiter that already ships with the enterprise install. You declare the budget in a `RateLimitConfig` CRD; the controller pushes it to `rate-limiter-enterprise-agentgateway`, and counters are stored in the shared `ext-cache` Redis — so budgets stay consistent across every gateway replica with no extra components to deploy.
+Token budgets use global rate limiting against the rate limiter that already ships with the enterprise install. You declare the budget in a `RateLimitConfig` CRD; the controller pushes it to `rate-limiter-enterprise-agentgateway`, and counters are stored in the shared `ext-cache` Redis, so budgets stay consistent across every gateway replica with no extra components to deploy.
 
 ### Configure the token budget
 
@@ -230,10 +230,10 @@ spec:
 EOF
 ```
 
-Two fields make this a **token** budget rather than a request budget:
+Two fields make this a token budget rather than a request budget:
 
-- `type: TOKEN` — counts LLM tokens against the limit instead of requests. Without it, `requestsPerUnit: 100` would mean *100 requests per hour*; with it, it means *100 tokens per hour*.
-- `cel.expression: 'apiKey.user_id'` — extracts the user identity embedded in the API key credential. The key's `metadata` block is flattened onto `apiKey`, so the `user_id` field is referenced as **`apiKey.user_id`** (not `apiKey.metadata.user_id`). Clients cannot forge or override this value — it comes from the validated credential, not from a request header.
+- `type: TOKEN`: counts LLM tokens against the limit instead of requests. Without it, `requestsPerUnit: 100` would mean *100 requests per hour*; with it, it means *100 tokens per hour*.
+- `cel.expression: 'apiKey.user_id'`: extracts the user identity embedded in the API key credential. The key's `metadata` block is flattened onto `apiKey`, so the `user_id` field is referenced as `apiKey.user_id` (not `apiKey.metadata.user_id`). Clients cannot forge or override this value: it comes from the validated credential, not from a request header.
 
 ### Create the token budget policy
 
@@ -261,7 +261,7 @@ EOF
 
 ## Test budget isolation
 
-> **Note — resetting rate limit counters:** Token counters are stored in `ext-cache` (Redis) and persist for the duration of the budget window. If alice hits `429` on the first request, reset the counters:
+> **Note on resetting rate limit counters:** Token counters are stored in `ext-cache` (Redis) and persist for the duration of the budget window. If alice hits `429` on the first request, reset the counters:
 > ```bash
 > kubectl rollout restart deployment/ext-cache-enterprise-agentgateway -n agentgateway-system
 > kubectl rollout status deployment/ext-cache-enterprise-agentgateway -n agentgateway-system
@@ -302,13 +302,13 @@ Expected: `HTTP 200`. Bob's token budget is tracked independently from alice's.
 
 ## Advanced configuration
 
-These sections extend the lab. Each is independent — apply whichever patterns are relevant. Each replaces the `token-budgets` RateLimitConfig from above.
+These sections extend the lab. Each is independent; apply whichever patterns are relevant. Each replaces the `token-budgets` RateLimitConfig from above.
 
-> **Note:** The `RateLimitConfig` CRD is watched by the controller and pushed to the rate limiter automatically — no restart is needed when you change it. Existing counters in `ext-cache` are **not** reset by a config change, though; to clear budgets between tests: `kubectl rollout restart deployment/ext-cache-enterprise-agentgateway -n agentgateway-system`
+> **Note:** The `RateLimitConfig` CRD is watched by the controller and pushed to the rate limiter automatically; no restart is needed when you change it. Existing counters in `ext-cache` are **not** reset by a config change, though; to clear budgets between tests: `kubectl rollout restart deployment/ext-cache-enterprise-agentgateway -n agentgateway-system`
 
 ### Tiered budgets based on user type
 
-Embed the budget tier directly in the API key credential so users cannot self-upgrade their quota. The `tier` field in the key metadata is set by whoever creates the key — the client never touches it.
+Embed the budget tier directly in the API key credential so users cannot self-upgrade their quota. The `tier` field in the key metadata is set by whoever creates the key; the client never touches it.
 
 1. Update alice to `premium` tier and add a `free` user charlie:
 
@@ -409,7 +409,7 @@ spec:
 EOF
 ```
 
-3. The `token-budget-policy` is unchanged — it already references `token-budgets` by name. Apply it again if needed:
+3. The `token-budget-policy` is unchanged; it already references `token-budgets` by name. Apply it again if needed:
 
 ```bash
 kubectl apply -f- <<EOF
@@ -532,9 +532,9 @@ spec:
 EOF
 ```
 
-The `token-budget-policy` is unchanged — it references `token-budgets` by name.
+The `token-budget-policy` is unchanged; it references `token-budgets` by name.
 
-Exhaust alice's budget in `tenant-a`, then verify requests using `tenant-b` still succeed — the budget key is the `(tenant, user)` pair, not the user alone:
+Exhaust alice's budget in `tenant-a`, then verify requests using `tenant-b` still succeed; the budget key is the `(tenant, user)` pair, not the user alone:
 
 ```bash
 # Exhaust alice in tenant-a

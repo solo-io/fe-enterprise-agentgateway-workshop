@@ -1,6 +1,6 @@
 # Configure Timeouts and Retries with Backoff
 
-In this lab, you'll learn how timeout, retry, and backoff policies interact together. You'll see how the gateway retries failed requests with configurable delays between attempts until the overall timeout is exceeded, demonstrating resilient request handling.
+In this lab, you'll learn how timeout, retry, and backoff policies interact together. You'll see how the gateway retries failed requests with configurable delays between attempts until the overall timeout is exceeded.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -178,10 +178,7 @@ agentgateway-system   timeout-retry-policy   True       True
 
 ### Understanding the Configuration
 
-- **Timeout**: 100ms total request timeout
-- **Retry attempts**: 10 retries on 503 errors
-- **Retry backoff**: 25ms delay between retry attempts
-- **How they interact**: The gateway will retry up to 10 times with a 25ms delay between each retry, but will stop when the 100ms timeout is exceeded. With the backoff, fewer retries will occur before the timeout.
+The gateway retries a 503 up to 10 times with a 25ms delay between each retry, but stops when the 100ms request timeout is exceeded. With the backoff, fewer retries occur before the timeout.
 
 ## Test Baseline (Successful Request)
 
@@ -245,7 +242,7 @@ date: Wed, 07 Jan 2026 22:47:38 GMT
 request timeout
 ```
 
-Check the agentgateway logs, you should see that the request was retried a few times before the timeout. The access log is a single logfmt line — these are the relevant fields from it:
+Check the agentgateway logs, you should see that the request was retried a few times before the timeout. The access log is a single logfmt line; these are the relevant fields from it:
 
 ```
 http.status=504 retry.attempt=3 error="request timeout" reason=Timeout duration=102ms
@@ -253,14 +250,14 @@ http.status=504 retry.attempt=3 error="request timeout" reason=Timeout duration=
 
 ### What Happened?
 
-1. **Request sent** to scaled-down backend (no pods available)
-2. **503 Service Unavailable** returned
-3. **Gateway retries** automatically (up to 10 attempts configured)
-4. **Only 3 retries completed** - the 25ms backoff delays consume the timeout window quickly
-5. **100ms timeout exceeded** after retry attempt 3
-6. **504 Gateway Timeout** returned to client
+1. Request sent to scaled-down backend (no pods available)
+2. 503 Service Unavailable returned
+3. Gateway retries automatically (up to 10 attempts configured)
+4. Only 3 retries completed: the 25ms backoff delays consume the timeout window quickly
+5. 100ms timeout exceeded after retry attempt 3
+6. 504 Gateway Timeout returned to client
 
-This demonstrates that with a short timeout (100ms) and backoff delays (25ms), the timeout is reached before the max retry attempts (10), limiting actual retries to just 3.
+With a short timeout (100ms) and backoff delays (25ms), the timeout is reached before the max retry attempts (10), so only 3 retries complete.
 
 ## Test Retry Backoff with Longer Timeout
 
@@ -289,10 +286,7 @@ spec:
 EOF
 ```
 
-This configuration sets:
-- **2s timeout**: Longer window to observe retry behavior
-- **10 retry attempts**: Maximum retries before giving up
-- **200ms backoff**: Observable delay between each retry attempt
+The longer 2s timeout leaves room for several 200ms backoff delays before the request times out.
 
 Make another request with the mock server still scaled to 0:
 
@@ -331,7 +325,7 @@ With a 200ms backoff and 2s timeout, the gateway will make approximately:
 - Retry 3: ~600ms
 - ...continuing until timeout
 
-The total time consumed = (retry attempts × backoff delay) + network latency. With 200ms backoff and 2s timeout, you should see around **7 retry attempts** before the timeout is reached, demonstrating that the timeout limit is hit before the configured 10 max attempts.
+The total time consumed = (retry attempts × backoff delay) + network latency. With 200ms backoff and 2s timeout, you should see around **7 retry attempts** before the timeout is reached.
 
 ## Cleanup
 

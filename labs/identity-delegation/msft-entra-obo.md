@@ -13,7 +13,7 @@ You need two app registrations in Azure Active Directory:
 | **Middle-tier app** | Represents the gateway client; your user token will target this app's API |
 | **Downstream API app** | Represents the backend API; the OBO-exchanged token grants access to this app |
 
-Configure the middle-tier app to have the **delegated permission** for the downstream API scope, and grant admin consent. Create a **client secret** for the middle-tier app — you will need it in Step 4.
+Configure the middle-tier app to have the **delegated permission** for the downstream API scope, and grant admin consent. Create a **client secret** for the middle-tier app; you will need it in Step 4.
 
 ### Required tools
 
@@ -21,7 +21,7 @@ Configure the middle-tier app to have the **delegated permission** for the downs
 - `az` CLI (or any MSAL-capable tool) to obtain a user access token
 - `jq` for decoding JWTs in the verification steps
 
-> **Note:** This lab modifies the controller's `tokenExchange` configuration. If you have completed the [OBO Token Exchange Fundamentals lab](obo-token-exchange-fundamentals.md), run the cleanup from that lab first, or simply proceed — the Helm upgrade in Step 2 will replace whatever tokenExchange config is currently set.
+> **Note:** This lab modifies the controller's `tokenExchange` configuration. If you have completed the [OBO Token Exchange Fundamentals lab](obo-token-exchange-fundamentals.md), run the cleanup from that lab first, or proceed: the Helm upgrade in Step 2 will replace whatever tokenExchange config is currently set.
 
 ---
 
@@ -38,7 +38,7 @@ Configure the middle-tier app to have the **delegated permission** for the downs
 
 ## Background
 
-**Entra On-Behalf-Of (OBO)** is Microsoft's implementation of RFC 8693 token exchange. When a user calls a middle-tier service (the gateway), the gateway exchanges the user's Entra token for a new Entra token scoped to a downstream API — without the user ever needing to know about or authenticate to that downstream API directly.
+**Entra On-Behalf-Of (OBO)** is Microsoft's implementation of RFC 8693 token exchange. When a user calls a middle-tier service (the gateway), the gateway exchanges the user's Entra token for a new Entra token scoped to a downstream API; the user never sees or authenticates to that downstream API directly.
 
 ```
 Client
@@ -66,7 +66,7 @@ Backend
   │  (6) Receives request with Authorization: Bearer <exchanged token>
 ```
 
-**Contrast with the [OBO Token Exchange Fundamentals lab](obo-token-exchange-fundamentals.md) (Keycloak OBO):** In that lab the STS issues its own signed token (the backend validates against the STS JWKS). In this lab, the STS calls the Entra `/oauth2/token` endpoint and forwards the Entra-issued exchanged token directly — so the backend receives a real Entra token, not an STS-issued one. This is configured via `spec.backend.tokenExchange.entra` in the policy (rather than the internal STS exchange path used by Keycloak OBO).
+**Contrast with the [OBO Token Exchange Fundamentals lab](obo-token-exchange-fundamentals.md) (Keycloak OBO):** In that lab the STS issues its own signed token (the backend validates against the STS JWKS). In this lab, the STS calls the Entra `/oauth2/token` endpoint and forwards the Entra-issued exchanged token directly, so the backend receives a real Entra token, not an STS-issued one. This is configured via `spec.backend.tokenExchange.entra` in the policy (rather than the internal STS exchange path used by Keycloak OBO).
 
 ---
 
@@ -126,7 +126,7 @@ tokenExchange:
 EOF
 ```
 
-> **Note:** The STS token exchange path for Entra OBO is `/oauth2/token` — this is the path used by the `EnterpriseAgentgatewayParameters` STS URI (Step 5). Do not confuse this with the internal RFC 8693 path `/oauth2/token/exchange` used in Keycloak OBO (the [OBO Token Exchange Fundamentals lab](obo-token-exchange-fundamentals.md)).
+> **Note:** The STS token exchange path for Entra OBO is `/oauth2/token`; this is the path used by the `EnterpriseAgentgatewayParameters` STS URI (Step 5). Do not confuse this with the internal RFC 8693 path `/oauth2/token/exchange` used in Keycloak OBO (the [OBO Token Exchange Fundamentals lab](obo-token-exchange-fundamentals.md)).
 
 ---
 
@@ -343,7 +343,7 @@ httpbin-6c7b5d4b8f-xq7tz   1/1     Running   0          30s
 
 ## Step 8 — Apply the JWT Authentication Policy
 
-Apply a policy targeting the `jwt-secure-obo` HTTPRoute that validates incoming user tokens against Entra's JWKS. The policy enforces `Strict` mode — requests without a valid Entra token are rejected at the gateway before reaching the backend.
+Apply a policy targeting the `jwt-secure-obo` HTTPRoute that validates incoming user tokens against Entra's JWKS. The policy enforces `Strict` mode: requests without a valid Entra token are rejected at the gateway before reaching the backend.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -453,13 +453,13 @@ Expected Output:
 }
 ```
 
-The `aud` must match `api://${ENTRA_MIDDLETIER_CLIENT_ID}` — this is what the JWT auth policy in Step 8 validates against.
+The `aud` must match `api://${ENTRA_MIDDLETIER_CLIENT_ID}`; this is what the JWT auth policy in Step 8 validates against.
 
 ---
 
 ## Step 12 — Call the Gateway and Verify OBO Token Exchange
 
-Send a request to `GET /headers`. httpbin echoes back all request headers, so you can see the `Authorization` header that the backend actually received — which will contain the OBO-exchanged Entra token, not the original user token.
+Send a request to `GET /headers`. httpbin echoes back all request headers, so you can see the `Authorization` header that the backend received, which will contain the OBO-exchanged Entra token, not the original user token.
 
 ```bash
 curl -i -H "Authorization: Bearer $USER_TOKEN" $GATEWAY_URL/headers
@@ -505,7 +505,7 @@ Expected Output:
 }
 ```
 
-The `aud` is now the downstream API — not the middle-tier app. The OBO exchange succeeded.
+The `aud` is now the downstream API, not the middle-tier app. The OBO exchange succeeded.
 
 **Troubleshooting:**
 
@@ -522,7 +522,7 @@ The `aud` is now the downstream API — not the middle-tier app. The OBO exchang
 
 ## Step 13 — Verify the Request is Rejected Without a Token
 
-Confirm the JWT auth policy is enforced — requests without a token should be rejected at the gateway:
+Confirm the JWT auth policy is enforced; requests without a token should be rejected at the gateway:
 
 ```bash
 curl -i $GATEWAY_URL/headers

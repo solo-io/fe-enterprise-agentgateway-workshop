@@ -1,5 +1,5 @@
 # Configure Mock OpenAI Server
-In this lab, you’ll deploy a lightweight OpenAI compatible mock server to validate core routing, metrics, and tracing AI Gateway features without needing real OpenAI credentials. Later labs will use OpenAI as the backend, but this mock server can be swapped in with minimal changes.
+In this lab, you’ll deploy a lightweight OpenAI compatible mock server to validate core routing, metrics, and tracing AI Gateway features without real OpenAI credentials. Later labs will use OpenAI as the backend, but this mock server can be swapped in with minimal changes.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.

@@ -29,7 +29,7 @@ When a model override is configured, the gateway overrides any user-input `model
 
 Create an `EnterpriseAgentgatewayBackend` per model for finer-grained control over which models clients can access.
 
-**When model overrides are specified, the client does not need to supply a `model` parameter in the request body, since the gateway injects it. A client-supplied model is accepted but overwritten.**
+When model overrides are specified, the client does not need to supply a `model` parameter in the request body, since the gateway injects it. A client-supplied model is accepted but overwritten.
 
 Lets create an OpenAI `EnterpriseAgentgatewayBackend` per specific-model if you haven't already
 ```bash

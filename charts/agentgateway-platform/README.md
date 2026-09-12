@@ -2,13 +2,13 @@
 
 Installed once by the platform team. It owns the `Gateway`, the proxy fleet
 shape, the observability pipeline, the security baseline (JWT, WAF), the
-**URL space**, and the **cost tiers**. It also onboards application teams —
+**URL space**, and the **cost tiers**. It also onboards application teams:
 each entry in `teams` creates that team's path prefix, delegation label, and
 tier policy.
 
 ## What it renders
 
-- `Gateway` — the shared entry point, plus its `EnterpriseAgentgatewayParameters`
+- `Gateway`: the shared entry point, plus its `EnterpriseAgentgatewayParameters`
   (replicas, resources, service type, pod disruption budget, graceful drain)
 - `EnterpriseAgentgatewayPolicy` for access logging and tracing, attached to
   the `Gateway`
@@ -23,7 +23,7 @@ tier policy.
 - Per team whose tier sets `rateLimit.toolCallsPerMinute`: a
   `RateLimitConfig` and an attaching `EnterpriseAgentgatewayPolicy`
   (`entRateLimit`) that budget MCP `tools/call` requests on the team's
-  parent route — a global counter, so it holds across proxy replicas.
+  parent route: a global counter, so it holds across proxy replicas.
   Other MCP operations (`initialize`, `tools/list`) are not counted
 
 ## The contract with agentgateway-developer
@@ -40,7 +40,7 @@ endpoints actually receive traffic. The two charts meet at this contract:
 | Cost tier           | platform (at onboarding)        | e.g. `gold`             |
 
 The parent route delegates only to child routes that carry the `team=<name>`
-label **and** live in the assigned namespace — both halves are required.
+label **and** live in the assigned namespace; both halves are required.
 
 ## Install
 
@@ -87,7 +87,7 @@ remote endpoint (`security.jwt.jwks.host`/`port`/`path`) or a `secretRef`-style
 reference resolved by the gateway; TLS for the HTTPS listener is a
 pre-provisioned `kubernetes.io/tls` Secret named by
 `gateway.listeners.https.tls.secretRef`. The chart only ever points at
-secrets that already exist in the cluster — it does not create or accept
+secrets that already exist in the cluster: it does not create or accept
 raw key material as a value.
 
 ## Learn more

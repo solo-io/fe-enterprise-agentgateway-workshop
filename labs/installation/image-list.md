@@ -95,7 +95,7 @@ clickhouse:
 
 ## Air-Gap Mirror Reference (`docker.io/ably7`)
 
-Mirrored copies of every image above, used by the [air-gap install lab](airgap/001-airgap.md). Every image name and tag is unchanged from the list above — only the registry prefix changes to `docker.io/ably7`.
+Mirrored copies of every image above, used by the [air-gap install lab](airgap/001-airgap.md). Every image name and tag is unchanged from the list above; only the registry prefix changes to `docker.io/ably7`.
 
 ### Enterprise Agentgateway (v2026.8.2)
 

@@ -1,6 +1,6 @@
 # Validating Zero Downtime During In-Place Rolling Upgrades
 
-In this lab you'll configure Enterprise Agentgateway for zero-downtime in-place upgrades, then validate it by driving continuous traffic through a proxy rollout and measuring the result. You'll test three traffic patterns — short completions, long-lived streaming, and MCP/SSE sessions — to see what is zero-downtime, what is bounded by the drain window, and what is not.
+In this lab you'll configure Enterprise Agentgateway for zero-downtime in-place upgrades, then validate it by driving continuous traffic through a proxy rollout and measuring the result. You'll test three traffic patterns (short completions, long-lived streaming, and MCP/SSE sessions) to see what is zero-downtime, what is bounded by the drain window, and what is not.
 
 This lab focuses on validating upgrade behavior. The configuration reference for graceful shutdown, Pod Disruption Budgets, and topology spread lives in the [Production Observability, Alerting & Scaling](../observability/production-observability-alerting-and-scaling.md) lab; here we apply a minimal subset and measure the outcome.
 
@@ -9,7 +9,7 @@ To take an entire cluster out of service for an upgrade while a peer keeps servi
 ## Pre-requisites
 - [001 — Install Enterprise Agentgateway](../../001-install-enterprise-agentgateway.md)
 - [002 — Set Up UI and Monitoring Tools](../../002-set-up-ui-and-monitoring-tools.md)
-- [Configure Mock OpenAI Server](../routing/configure-mock-openai-server.md) — provides the `mock-gpt-4o` backend on the `/openai` route
+- [Configure Mock OpenAI Server](../routing/configure-mock-openai-server.md): provides the `mock-gpt-4o` backend on the `/openai` route
 - A cluster with **at least 2 proxy replicas** (this lab configures that in the first section)
 
 ## Lab Objectives
@@ -22,10 +22,10 @@ To take an entire cluster out of service for an upgrade while a peer keeps servi
 
 When a proxy pod is replaced during a rollout, Kubernetes sends it `SIGTERM`. Agentgateway then drains gracefully:
 
-1. Minimum drain period (`spec.shutdown.min`, default `10s`) — the proxy keeps accepting connections but signals clients to migrate: `Connection: close` for HTTP/1 and `GOAWAY` for HTTP/2. Load balancers and clients shift new traffic to the other healthy pod.
-2. Drain in-flight requests — after the minimum period, the proxy stops accepting new connections and waits for active request handlers to finish.
-3. Maximum drain period (`spec.shutdown.max`, default `60s`) — a hard deadline. Connections still active after this are forcibly closed.
-4. SIGKILL — sent by Kubernetes at `terminationGracePeriodSeconds`, which must be greater than or equal to `spec.shutdown.max`. The operator derives this value automatically from `shutdown.max`, so you do not set it by hand.
+1. Minimum drain period (`spec.shutdown.min`, default `10s`). The proxy keeps accepting connections but signals clients to migrate: `Connection: close` for HTTP/1 and `GOAWAY` for HTTP/2. Load balancers and clients shift new traffic to the other healthy pod.
+2. Drain in-flight requests. After the minimum period, the proxy stops accepting new connections and waits for active request handlers to finish.
+3. Maximum drain period (`spec.shutdown.max`, default `60s`), a hard deadline. Connections still active after this are forcibly closed.
+4. SIGKILL, sent by Kubernetes at `terminationGracePeriodSeconds`, which must be greater than or equal to `spec.shutdown.max`. The operator derives this value automatically from `shutdown.max`, so you do not set it by hand.
 
 ```
   Kubernetes sends SIGTERM ──▶ graceful drain begins
@@ -184,7 +184,7 @@ kubectl rollout restart deploy/agentgateway-proxy -n agentgateway-system
 kubectl rollout status deploy/agentgateway-proxy -n agentgateway-system --timeout=300s
 ```
 
-Watch the pods cycle one at a time — the PDB keeps one pod serving throughout:
+Watch the pods cycle one at a time; the PDB keeps one pod serving throughout:
 
 ```bash
 kubectl get pods -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy -w
@@ -487,7 +487,7 @@ EOF
 kubectl rollout status deploy/fast-mcp -n agentgateway-system --timeout=120s
 ```
 
-The `EnterpriseAgentgatewayBackend` for MCP uses `spec.mcp.targets` with namespace and service label selectors, not `static: {host, port}` (the working shape confirmed in the [MCP load-testing lab](../load-testing/mcp-load-testing-k6.md)). The gateway also enforces a proper MCP initialize handshake — a bare `params:{}` returns 400, so send `protocolVersion`, `capabilities`, and `clientInfo` in the initialize request.
+The `EnterpriseAgentgatewayBackend` for MCP uses `spec.mcp.targets` with namespace and service label selectors, not `static: {host, port}` (the working shape confirmed in the [MCP load-testing lab](../load-testing/mcp-load-testing-k6.md)). The gateway also enforces a proper MCP initialize handshake: a bare `params:{}` returns 400, so send `protocolVersion`, `capabilities`, and `clientInfo` in the initialize request.
 
 Smoke test that `/mcp` initialize returns 200 and an `mcp-session-id` header:
 
@@ -577,7 +577,7 @@ Observed result (v2026.6.1):
 
 The discrete-POST MCP session pattern survived the rollout with near-zero errors: 1 `mcp_session_error` out of 378,185 iterations (0.00% failure rate, `http_req_failed: 0.00%`). The gateway's `mcp-session-id` is a stateless token that encodes backend routing information, so the proxy forwards it across replicas and a rolling restart does not break in-flight sessions for this request pattern.
 
-This pattern uses discrete HTTP POSTs: each call is an independent request that carries the session token in a header, so the proxy routes it statelessly and does not pin the VU to a specific replica. A persistent SSE MCP session — a long-lived `GET` stream that holds a connection open while the server pushes events — is pinned to one proxy replica, and rolling that replica closes the stream. Demonstrating that failure mode requires a persistent-SSE MCP client, not the discrete-POST mock used here, which exercises the stateless request layer rather than the persistent connection layer.
+This pattern uses discrete HTTP POSTs: each call is an independent request that carries the session token in a header, so the proxy routes it statelessly and does not pin the VU to a specific replica. A persistent SSE MCP session, a long-lived `GET` stream that holds a connection open while the server pushes events, is pinned to one proxy replica, and rolling that replica closes the stream. Demonstrating that failure mode requires a persistent-SSE MCP client, not the discrete-POST mock used here, which exercises the stateless request layer rather than the persistent connection layer.
 
 The fix is the transport, not more replicas:
 
@@ -603,7 +603,7 @@ kubectl rollout status deployment/enterprise-agentgateway -n agentgateway-system
 kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system --timeout=300s
 ```
 
-> Pass your values with `-f`, not `--reuse-values`: `--reuse-values` does not merge the new chart's defaults and can fail to template across a version bump (`<.Values.externalSecrets.stores>: nil pointer`). For a cross-minor upgrade, also reconcile image settings — see the [migration guide](migrate-v2026.5.x-to-v2026.7.x.md).
+> Pass your values with `-f`, not `--reuse-values`: `--reuse-values` does not merge the new chart's defaults and can fail to template across a version bump (`<.Values.externalSecrets.stores>: nil pointer`). For a cross-minor upgrade, also reconcile image settings; see the [migration guide](migrate-v2026.5.x-to-v2026.7.x.md).
 
 Run any of the k6 Jobs above during the upgrade to confirm the same zero-downtime behavior end-to-end.
 
@@ -611,9 +611,9 @@ Run any of the k6 Jobs above during the upgrade to confirm the same zero-downtim
 
 Watch these in the Grafana stack from [lab 002](../../002-set-up-ui-and-monitoring-tools.md) (see the [scaling lab](../observability/production-observability-alerting-and-scaling.md#rolling-upgrades) for the full list):
 
-- `agentgateway_build_info` — shows old and new versions during the rollout, then only the new one.
-- `agentgateway_requests_total{status=~"5.."}` — error rate must not spike.
-- `agentgateway_xds_connection_terminations` — expect `Reconnect` reasons as proxies restart, **not** `ConnectionError`.
+- `agentgateway_build_info`: shows old and new versions during the rollout, then only the new one.
+- `agentgateway_requests_total{status=~"5.."}`: error rate must not spike.
+- `agentgateway_xds_connection_terminations`: expect `Reconnect` reasons as proxies restart, not `ConnectionError`.
 
 ## Interpreting the Results
 
@@ -622,7 +622,7 @@ Watch these in the Grafana stack from [lab 002](../../002-set-up-ui-and-monitori
 | Short completions | Zero downtime | 12,000 requests, 0.00% failed, 100% checks through the rollout. Requests finish inside the drain window; new traffic routes to the healthy pod. |
 | Long-lived streaming | Zero downtime for new traffic; in-flight bounded by `shutdown.max` | 157 of 160 streams completed; 3 in-flight streams were reset at the drain deadline (status-0). All failures were in-flight-only, with no new-request failures. |
 | Stateless/StreamableHTTP MCP (discrete POSTs) | Effectively zero downtime | 1 error in 378,185 iterations (0.00% failed). Session tokens are stateless; the proxy routes them across replicas without pinning. |
-| Long-lived persistent SSE MCP | Not zero-downtime | A persistent `GET` stream is pinned to one proxy replica; rolling that replica closes the stream, and adding replicas does not help. Treat upgrades as a maintenance event, or migrate to a stateless transport. (Not demonstrated in this lab — the mock uses discrete POSTs.) |
+| Long-lived persistent SSE MCP | Not zero-downtime | A persistent `GET` stream is pinned to one proxy replica; rolling that replica closes the stream, and adding replicas does not help. Treat upgrades as a maintenance event, or migrate to a stateless transport. (Not demonstrated in this lab; the mock uses discrete POSTs.) |
 
 The minimum recipe for zero-downtime in-place upgrades: two or more replicas, a PDB, and graceful shutdown sized to your longest acceptable in-flight request.
 

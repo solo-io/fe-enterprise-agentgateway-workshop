@@ -147,8 +147,8 @@ Set up an SNI Gateway that serves multiple hosts on the same port.
 > [!NOTE]
 > This creates a **separate** `agentgateway-sni` Gateway rather than editing the
 > `agentgateway-proxy` Gateway from `001`. Applying a full Gateway manifest over
-> the shared one would replace its listener list — dropping the HTTP `8080`
-> listener the other labs route through — and detach its
+> the shared one would replace its listener list, dropping the HTTP `8080`
+> listener the other labs route through, and detach its
 > `infrastructure.parametersRef`. A dedicated Gateway also gets its own
 > LoadBalancer address, which is what the SNI checks below resolve against.
 

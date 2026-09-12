@@ -48,7 +48,7 @@ EOF
 
 ## Create the EnterpriseAgentgatewayBackend
 
-Create an `EnterpriseAgentgatewayBackend` for the Titan Embed v2 model. The `policies.ai.routes` block marks the InvokeModel endpoint as `Passthrough` — this is required for embedding models because they do not use the OpenAI-compatible Chat Completions format.
+Create an `EnterpriseAgentgatewayBackend` for the Titan Embed v2 model. The `policies.ai.routes` block marks the InvokeModel endpoint as `Passthrough`. This is required for embedding models because they do not use the OpenAI-compatible Chat Completions format.
 
 ```bash
 kubectl apply -f - <<EOF

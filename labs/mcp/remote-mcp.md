@@ -22,11 +22,11 @@ Unlike the [in-cluster MCP lab](in-cluster-mcp.md) which deployed an MCP server 
 
 Routing external MCP servers through AgentGateway provides several benefits:
 
-1. **Centralized Observability**: View metrics, logs, and traces for all MCP calls in one place
-2. **Security Policies**: Add authentication, authorization, and rate limiting
-3. **Unified Access**: Single gateway endpoint for multiple MCP servers
-4. **Traffic Management**: Apply retry policies, timeouts, and circuit breaking
-5. **Corporate Compliance**: Route external traffic through your approved gateway infrastructure
+1. View metrics, logs, and traces for all MCP calls in one place
+2. Add authentication, authorization, and rate limiting
+3. Expose multiple MCP servers behind a single gateway endpoint
+4. Apply retry policies, timeouts, and circuit breaking
+5. Route external traffic through your approved gateway infrastructure
 
 ### Create Backend and HTTPRoute
 
@@ -166,7 +166,7 @@ soloio-docs-mcp - get_chunks (MCP)(collection: "docs-solo-io_agentgateway_2-1-x"
      ...
 ```
 
-The fact that you see `soloio-docs-mcp` as the tool source confirms that Claude Code is successfully using the MCP server through AgentGateway!
+Seeing `soloio-docs-mcp` as the tool source confirms that Claude Code is using the MCP server through AgentGateway.
 
 ## Observability
 
@@ -188,9 +188,9 @@ done
 ```
 
 You should see MCP-specific metrics like:
-- `agentgateway_mcp_requests_total` — per-call MCP counter, labeled by `method` (`initialize`, `tools/call`, …), `resource_type`, `server` (the MCP target), and `resource` (the tool name)
-- `agentgateway_requests_total{protocol="mcp"}` — HTTP-level request counter for MCP traffic, labeled by `backend`, `route`, and `status`
-- `agentgateway_request_duration_seconds{protocol="mcp"}` — request latency histogram for MCP traffic
+- `agentgateway_mcp_requests_total`: per-call MCP counter, labeled by `method` (`initialize`, `tools/call`, …), `resource_type`, `server` (the MCP target), and `resource` (the tool name)
+- `agentgateway_requests_total{protocol="mcp"}`: HTTP-level request counter for MCP traffic, labeled by `backend`, `route`, and `status`
+- `agentgateway_request_duration_seconds{protocol="mcp"}`: request latency histogram for MCP traffic
 
 ### View Metrics and Traces in Grafana
 
@@ -307,7 +307,7 @@ Go back to the MCP Inspector tool and expand the **Authentication** section. In 
 
 - **Header Name**: Enter `Authorization`
 - **Header Value**: Enter `Bearer ` followed by the JWT token below. The MCP Inspector sends this value as-is in the Authorization header, so the `Bearer ` prefix is required.
-- **Toggle the header on** using the switch to the left of the row. Headers are disabled by default and are only sent when enabled — if you skip this, the connection still fails with `no bearer token found`.
+- **Toggle the header on** using the switch to the left of the row. Headers are disabled by default and are only sent when enabled; if you skip this, the connection still fails with `no bearer token found`.
 
 ```
 eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw
@@ -347,7 +347,7 @@ spec:
 EOF
 ```
 
-Our token carries `org=solo.io`, not `org=admin`, so access is now denied. In the MCP Inspector, click **Reconnect**, then from the **Tools** tab click **Clear** and **List Tools** — the list comes back empty.
+Our token carries `org=solo.io`, not `org=admin`, so access is now denied. In the MCP Inspector, click **Reconnect**, then from the **Tools** tab click **Clear** and **List Tools**: the list comes back empty.
 
 Unauthorized tools are filtered out of the catalog rather than merely blocked on call, so a denied caller sees an MCP server with no tools at all. Attempting a call anyway is rejected as an unknown tool:
 
@@ -402,7 +402,7 @@ spec:
 EOF
 ```
 
-Reconnect and list tools again. All three tools are back, and running `search` returns **Tool Result: Success** — the expression authorizes the caller but says nothing about *which* tools they may use, so it grants the full catalog.
+Reconnect and list tools again. All three tools are back, and running `search` returns **Tool Result: Success**. The expression authorizes the caller but says nothing about *which* tools they may use, so it grants the full catalog.
 
 You can create complex authorization rules based on any JWT claim:
 - `jwt.org == "admin"` - Require specific organization
@@ -441,14 +441,14 @@ EOF
 
 **Key configuration details:**
 
-- `targetRefs` points at the `EnterpriseAgentgatewayBackend`, not the Gateway — tool authorization is evaluated by the MCP backend, so a Gateway-scoped `traffic.authorization` policy can gate the server as a whole but cannot filter individual tools
+- `targetRefs` points at the `EnterpriseAgentgatewayBackend`, not the Gateway: tool authorization is evaluated by the MCP backend, so a Gateway-scoped `traffic.authorization` policy can gate the server as a whole but cannot filter individual tools
 - `matchExpressions` entries are OR'd together; use `&&` within a single expression to require both a claim and a tool name
 - Omitting a `mcp.tool.name` condition grants access to all tools, which is why the previous step returned the full catalog
 - An invalid CEL expression fails closed. If the catalog comes back empty unexpectedly, check the policy status: `kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-rbac -o jsonpath='{.status.ancestors[*].conditions[*].message}'`
 
 Verify the restriction in the MCP Inspector:
 
-1. Click **Reconnect**, then from the **Tools** tab click **Clear** and **List Tools**. Only **search** is listed — `get_chunks` and `get_full_page` are filtered out.
+1. Click **Reconnect**, then from the **Tools** tab click **Clear** and **List Tools**. Only **search** is listed; `get_chunks` and `get_full_page` are filtered out.
 2. Run **search** again. It still returns **Tool Result: Success**.
 3. Because the other tools are no longer advertised, a call to `get_chunks` is rejected as an unknown tool:
 

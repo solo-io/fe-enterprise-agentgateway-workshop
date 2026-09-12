@@ -13,7 +13,7 @@ You should also have a working MCP route configured. If not, complete the [In-Cl
 
 ## How ext-authz works with MCP
 
-MCP traffic flows over HTTP (POST requests to your MCP endpoint), so all standard HTTP policies — including ext-authz — apply to MCP traffic automatically. Your ext-authz server sees the HTTP-layer details:
+MCP traffic flows over HTTP (POST requests to your MCP endpoint), so all standard HTTP policies, including ext-authz, apply to MCP traffic automatically. Your ext-authz server sees the HTTP-layer details:
 
 | Field | What the ext-authz server sees |
 |---|---|
@@ -222,7 +222,7 @@ You should get a response from the MCP server.
 
 ## Create the ext-authz policy
 
-Create an `EnterpriseAgentgatewayPolicy` that applies ext-authz to the MCP HTTPRoute. By targeting the HTTPRoute instead of the Gateway, only MCP traffic requires ext-authz — other routes (like LLM routes) remain unaffected.
+Create an `EnterpriseAgentgatewayPolicy` that applies ext-authz to the MCP HTTPRoute. By targeting the HTTPRoute instead of the Gateway, only MCP traffic requires ext-authz; other routes (like LLM routes) remain unaffected.
 
 ```bash
 kubectl apply -f - <<EOF

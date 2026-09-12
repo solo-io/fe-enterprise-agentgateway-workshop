@@ -6,8 +6,8 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 Additional requirements:
 
-- **FRED API key** (required — the `fred` pod won't start without it). Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html
-- **BLS API key** (optional — raises rate limits). Get a free key at https://data.bls.gov/registrationEngine/
+- **FRED API key** (required; the `fred` pod won't start without it). Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html
+- **BLS API key** (optional; raises rate limits). Get a free key at https://data.bls.gov/registrationEngine/
 - `openssl`, `base64`, and `bash` on your local machine (used by the `lib/jwt/generate-jwt.sh` helper)
 - `npx` available locally (for MCP Inspector)
 
@@ -15,26 +15,26 @@ Additional requirements:
 
 - Federate four independent MCP servers behind a single `EnterpriseAgentgatewayBackend` using multiple `spec.mcp.targets`
 - Understand tool-name prefixing for selector-based targets (`<service-name>-<port>_<tool-name>`)
-- Demonstrate `failureMode: FailOpen` — one backend can fail without taking down the federated endpoint
+- Demonstrate `failureMode: FailOpen`: one backend can fail without taking down the federated endpoint
 - Apply a single JWT authentication policy that gates the entire union of tools
-- Use **persona-based tool filtering** to expose a different slice of the federated tool surface per JWT claim — without changing the federation topology
+- Use persona-based tool filtering to expose a different slice of the federated tool surface per JWT claim, without changing the federation topology
 
 ## Overview
 
 ### Why federation?
 
-The MCP labs you've worked through so far ([In-Cluster MCP](in-cluster-mcp.md)) each route to a single backend. In a real platform, you'll have many MCP servers — domain-specific, language-specific, or owned by different teams — and consumers want **one endpoint** that aggregates them all, **one auth policy** that gates them all, and **one observability surface** that attributes traffic across them all.
+The MCP labs you've worked through so far ([In-Cluster MCP](in-cluster-mcp.md)) each route to a single backend. In a real platform, you'll have many MCP servers (domain-specific, language-specific, or owned by different teams), and consumers want one endpoint that aggregates them all, one auth policy that gates them all, and one observability surface that attributes traffic across them all.
 
 A **multiplexed** (a.k.a. "Virtual MCP") backend does exactly that: one `EnterpriseAgentgatewayBackend` with multiple `spec.mcp.targets`. Clients open one MCP connection and see the union of every backend's tools. The gateway prefixes tool names so they don't collide and uses the prefix to route `tools/call` back to the right backend.
 
-This lab federates four real-world financial-research MCP servers — written in different languages, owned by different sources — under one endpoint:
+This lab federates four real-world financial-research MCP servers, written in different languages and owned by different sources, under one endpoint:
 
 | Target | Image | Tools | What it does |
 |---|---|---|---|
 | `arxiv` | `ably7/airxiv-mcp:0.1.0` | 5 | arXiv academic paper search & PDF text extraction (Python) |
-| `fred` | `ably7/fred-mcp-server:1.1.0` | 3 | Federal Reserve Economic Data — 800k+ time series (Node) |
+| `fred` | `ably7/fred-mcp-server:1.1.0` | 3 | Federal Reserve Economic Data, 800k+ time series (Node) |
 | `secedgar` | `ably7/sec-edgar-mcp:1.0.8` | 21 | SEC EDGAR filings, XBRL financials, insider trading (Python) |
-| `bls` | `ably7/mcp-bls:1.0.0` | 5 | U.S. Bureau of Labor Statistics — employment, CPI, wages (Node) |
+| `bls` | `ably7/mcp-bls:1.0.0` | 5 | U.S. Bureau of Labor Statistics: employment, CPI, wages (Node) |
 
 Result: one MCP endpoint exposing ~34 tools across academic papers, monetary policy data, public-company filings, and U.S. labor statistics. Clients can't tell which tool comes from a Python pod and which comes from Node.
 
@@ -62,7 +62,7 @@ Result: one MCP endpoint exposing ~34 tools across academic papers, monetary pol
 
 ### Tool-name prefixing
 
-When a target uses a **label selector** (this lab), AgentGateway prefixes each discovered tool with `<service-name>-<port>_`. So:
+When a target uses a label selector (this lab), AgentGateway prefixes each discovered tool with `<service-name>-<port>_`. So:
 
 | Backend service / port | Native tool | Federated tool name |
 |---|---|---|
@@ -99,7 +99,7 @@ kubectl create secret generic bls-api-key --namespace mcp \
 
 ## Step 2: Deploy the four MCP servers
 
-Each Service is labeled `app=mcp-<name>` — that's the label the federated backend will select on. The `appProtocol: agentgateway.dev/mcp` tells AgentGateway to speak MCP to the upstream.
+Each Service is labeled `app=mcp-<name>`; that's the label the federated backend will select on. The `appProtocol: agentgateway.dev/mcp` tells AgentGateway to speak MCP to the upstream.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -282,7 +282,7 @@ kubectl rollout status deployment/mcp-bls       -n mcp
 
 ## Step 3: Create the multiplexed backend and HTTPRoute
 
-One `EnterpriseAgentgatewayBackend` with four `targets` — each a selector matching one of the Service labels we just created. `failureMode: FailOpen` keeps the endpoint serving the healthy backends even if one of them dies; the default `FailClosed` would fail the whole session.
+One `EnterpriseAgentgatewayBackend` with four `targets`, each a selector matching one of the Service labels we just created. `failureMode: FailOpen` keeps the endpoint serving the healthy backends even if one of them dies; the default `FailClosed` would fail the whole session.
 
 `timeouts.request: "0s"` on the HTTPRoute disables the per-request timeout so long-running tool calls (e.g., large XBRL queries from SEC EDGAR) can complete.
 
@@ -381,7 +381,7 @@ Connect to your AgentGateway:
 
 1. Click the **Tools** tab
 2. Click **List Tools**
-3. You should see **~34 tools** across four prefixes — `mcp-airxiv-80_*`, `mcp-fred-80_*`, `mcp-sec-edgar-80_*`, `mcp-bls-80_*`
+3. You should see ~34 tools across four prefixes: `mcp-airxiv-80_*`, `mcp-fred-80_*`, `mcp-sec-edgar-80_*`, `mcp-bls-80_*`
 
 ### Run one tool from each backend
 
@@ -392,7 +392,7 @@ Connect to your AgentGateway:
 | `mcp-fred-80_fred_get_series` | `series_id: GDP`, `observation_start: 2024-01-01`, `observation_end: 2024-12-31` |
 | `mcp-airxiv-80_search_arxiv` | `keyword: quantitative finance`, `max_results: 3` |
 
-All four calls succeed through one MCP session — the federation is transparent to the client.
+All four calls succeed through one MCP session; the federation is transparent to the client.
 
 ---
 
@@ -404,7 +404,7 @@ Scale one backend to zero and watch the federation behavior:
 kubectl scale deployment mcp-bls -n mcp --replicas=0
 ```
 
-In MCP Inspector, click **Disconnect** then **Connect** again, then **List Tools**. The `mcp-bls-80_*` tools have **disappeared** from the list — but every other backend still works. Try a `mcp-sec-edgar-80_*` or `mcp-airxiv-80_*` tool to confirm.
+In MCP Inspector, click **Disconnect** then **Connect** again, then **List Tools**. The `mcp-bls-80_*` tools have disappeared from the list, but every other backend still works. Try a `mcp-sec-edgar-80_*` or `mcp-airxiv-80_*` tool to confirm.
 
 With the default `FailClosed`, the entire MCP session would fail at init because one target is unhealthy. `FailOpen` is the right call for a federated tool catalog where users probably don't care if one source is briefly down.
 
@@ -421,7 +421,7 @@ Reconnect in Inspector and the `mcp-bls-80_*` tools come back.
 
 ## Step 6: Apply JWT authentication across the federation
 
-Federation's first big payoff: **one auth policy gates every tool in the union**. Clients can't authenticate into one backend and be denied at another, because there is only one gateway-side check.
+Federation's first payoff: one auth policy gates every tool in the union. Clients can't authenticate into one backend and be denied at another, because there is only one gateway-side check.
 
 This lab uses a dedicated demo keypair under `lib/jwt/` (distinct from the `solo.io`-issuer JWTs used in other workshop labs) so that this lab's tokens don't accidentally validate against other labs' policies.
 
@@ -482,7 +482,7 @@ In MCP Inspector → **Authentication** → **API Token**:
 - **Header Name**: `Authorization`
 - **Bearer Token**: paste `Bearer <the token from $TOKEN>` (the literal word `Bearer ` followed by the token)
 
-Click **Reconnect**. Tool calls now succeed — for **all four backends** through the same auth check. No per-server JWKS config.
+Click **Reconnect**. Tool calls now succeed for all four backends through the same auth check, with no per-server JWKS config.
 
 ### Inspect the JWT claims
 
@@ -511,7 +511,7 @@ The `persona` claim is the one we'll use to carve different tool surfaces in the
 
 ## Step 7: Persona-based tool filtering
 
-Federation's second payoff: with all tools behind one endpoint, you can express **per-identity entitlements as a single policy**, then let the gateway filter the tool catalog automatically per caller. The same federated endpoint presents a different tool surface to a researcher than to an equity analyst.
+Federation's second payoff: with all tools behind one endpoint, you can express per-identity entitlements as a single policy, then let the gateway filter the tool catalog automatically per caller. The same federated endpoint presents a different tool surface to a researcher than to an equity analyst.
 
 We'll define four personas keyed off the `persona` JWT claim:
 
@@ -526,8 +526,8 @@ We'll define four personas keyed off the `persona` JWT claim:
 
 The policy attaches to the **backend** (not the HTTPRoute) and uses the `spec.backend.mcp.authorization` shape. The CEL context for MCP authorization exposes two key per-tool attributes that the gateway extracts from parsed MCP traffic, applied to both `tools/list` (catalog visibility) and `tools/call` (invocation):
 
-- `mcp.tool.name` — the **upstream-native** tool name (e.g., `search_arxiv`), not the federation-prefixed name the client sees
-- `mcp.tool.target` — the **federation target identifier** in the form `<service-name>-<port>` (e.g., `mcp-airxiv-80`), which is the same string used as the client-visible prefix
+- `mcp.tool.name`: the upstream-native tool name (e.g., `search_arxiv`), not the federation-prefixed name the client sees
+- `mcp.tool.target`: the federation target identifier in the form `<service-name>-<port>` (e.g., `mcp-airxiv-80`), which is the same string used as the client-visible prefix
 
 Since we want to filter by source backend, we'll match on `mcp.tool.target`:
 
@@ -557,7 +557,7 @@ spec:
 EOF
 ```
 
-> **Why `mcp.tool.target` and not `mcp.tool.name.startsWith(...)`?** In a multiplexed backend, `mcp.tool.name` evaluates to the upstream's *unprefixed* tool name (e.g., `search_arxiv`) — see [agentgateway-enterprise#398](https://github.com/solo-io/agentgateway-enterprise/issues/398). The `mcp.tool.target` attribute is the right hook for per-backend filtering in a federation.
+> **Why `mcp.tool.target` and not `mcp.tool.name.startsWith(...)`?** In a multiplexed backend, `mcp.tool.name` evaluates to the upstream's *unprefixed* tool name (e.g., `search_arxiv`); see [agentgateway-enterprise#398](https://github.com/solo-io/agentgateway-enterprise/issues/398). The `mcp.tool.target` attribute is the right hook for per-backend filtering in a federation.
 
 ### Cycle through the personas
 
@@ -583,13 +583,13 @@ TOKEN=$(./lib/jwt/generate-jwt.sh lib/jwt/claims/analyst.json) && echo "$TOKEN"
 TOKEN=$(./lib/jwt/generate-jwt.sh lib/jwt/claims/admin.json) && echo "$TOKEN"
 ```
 
-Same federated endpoint, same backend, same policy — four distinct tool surfaces, decided per-request from the JWT.
+The same federated endpoint, backend, and policy produce four distinct tool surfaces, decided per-request from the JWT.
 
-The policy gates both `tools/list` **and** `tools/call`, so clients can't bypass the catalog filter by sending a raw `tools/call` for a tool the filter would hide.
+The policy gates both `tools/list` and `tools/call`, so clients can't bypass the catalog filter by sending a raw `tools/call` for a tool the filter would hide.
 
 ### Want to add a persona?
 
-Mint a new claims file under `lib/jwt/claims/`, set `persona` to a new value, and add a clause to the CEL expression. No backend reconfiguration, no per-backend policies — the federation surface is the unit of governance.
+Mint a new claims file under `lib/jwt/claims/`, set `persona` to a new value, and add a clause to the CEL expression. You change no backend configuration and add no per-backend policies; the federation surface is the unit of governance.
 
 ---
 
@@ -620,7 +620,7 @@ for pod in $(kubectl get pods -n agentgateway-system \
 done
 ```
 
-You should see the `agentgateway_mcp_requests_total` counter broken down by the `server` label — the MCP target that served each call — so you can see which backend is hot, plus the `resource` label for the tool name. HTTP-level volume and latency for MCP traffic come from `agentgateway_requests_total{protocol="mcp"}` and `agentgateway_request_duration_seconds{protocol="mcp"}`.
+You should see the `agentgateway_mcp_requests_total` counter broken down by the `server` label (the MCP target that served each call), so you can see which backend is hot, plus the `resource` label for the tool name. HTTP-level volume and latency for MCP traffic come from `agentgateway_requests_total{protocol="mcp"}` and `agentgateway_request_duration_seconds{protocol="mcp"}`.
 
 ### View in Grafana
 
@@ -644,4 +644,4 @@ kubectl delete service    -n mcp mcp-airxiv mcp-fred mcp-sec-edgar mcp-bls --ign
 kubectl delete secret     -n mcp fred-api-key bls-api-key --ignore-not-found
 ```
 
-The `mcp` namespace is left in place — other workshop labs may share it.
+The `mcp` namespace is left in place; other workshop labs may share it.

@@ -87,7 +87,7 @@ ratelimitconfigs.ratelimit.solo.io
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> The top-level Helm `image.registry` and `image.tag` are the global default for every chart-managed image — the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, and `ext-cache`/`redis`). For a private-registry or air-gapped install, set `image.registry` to your mirror and ensure all images, extensions included, are mirrored there. See the [image list](../image-list.md) for the full set of charts and images to mirror, or the [air-gapped install guide](https://docs.solo.io/agentgateway/latest/install/airgap/) for more detail. The top-level Helm `imagePullSecrets` is likewise the global default and propagates to the proxy and every extension automatically — no per-CR pull-secret overrides are needed unless a specific extension uses a different secret than the rest.
+> The top-level Helm `image.registry` and `image.tag` are the global default for every chart-managed image: the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, and `ext-cache`/`redis`). For a private-registry or air-gapped install, set `image.registry` to your mirror and ensure all images, extensions included, are mirrored there. See the [image list](../image-list.md) for the full set of charts and images to mirror, or the [air-gapped install guide](https://docs.solo.io/agentgateway/latest/install/airgap/) for more detail. The top-level Helm `imagePullSecrets` is likewise the global default and propagates to the proxy and every extension automatically. Add a per-CR pull-secret override only when a specific extension uses a different secret than the rest.
 
 Using Helm:
 ```bash
@@ -146,7 +146,7 @@ enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
 
 ### Shared extensions (operator)
 
-Apply the GatewayClass-wide parameters the controller install referenced above. This is the operator's slice — it enables the shared extensions, sets their replica counts, and deletes their `securityContext` so OpenShift assigns one from its SCC. It is attached at the GatewayClass level, so every Gateway of the `enterprise-agentgateway` class inherits it.
+Apply the GatewayClass-wide parameters the controller install referenced above. This is the operator's slice: it enables the shared extensions, sets their replica counts, and deletes their `securityContext` so OpenShift assigns one from its SCC. It is attached at the GatewayClass level, so every Gateway of the `enterprise-agentgateway` class inherits it.
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -210,7 +210,7 @@ The configuration below shows the customizations exposed through `EnterpriseAgen
 
 This is the developer's slice: a per-Gateway `EnterpriseAgentgatewayParameters` (`agentgateway-config`) and the `Gateway` that consumes it. It carries the infrastructure settings the app team owns: deployment, service, logging, and the proxy's OpenShift `securityContext` deletion. It omits `sharedExtensions`, which the operator set at the GatewayClass level in the previous step. You configure metric labels, access logs, and tracing separately, with the `EnterpriseAgentgatewayPolicy` resources in the sections below. The two resources merge, with this per-Gateway config layering on top of the class default. The parameters attach to the `Gateway` via `spec.infrastructure.parametersRef`.
 
-For air-gapped or private-registry installs, set the registry once at the Helm chart level with the global `image.registry` value shown in the controller install step above — that value flows through to the proxy and all extension images automatically, so no per-image overrides are needed here. The same is true for pull secrets: the top-level Helm `imagePullSecrets` propagates to the proxy and every extension automatically, so nothing is needed here. (If a single component ever needs a different secret, registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` takes a per-component `imagePullSecrets` under `deployment.spec.template.spec` and a highest-precedence `spec.sharedExtensions.<name>.image` override.)
+For air-gapped or private-registry installs, set the registry once at the Helm chart level with the global `image.registry` value shown in the controller install step above; that value flows through to the proxy and all extension images automatically, so no per-image overrides are needed here. The same is true for pull secrets: the top-level Helm `imagePullSecrets` propagates to the proxy and every extension automatically. (If a single component ever needs a different secret, registry, repository, or tag than the global default, `EnterpriseAgentgatewayParameters` takes a per-component `imagePullSecrets` under `deployment.spec.template.spec` and a highest-precedence `spec.sharedExtensions.<name>.image` override.)
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -337,7 +337,7 @@ EOF
 
 ## Configure access logs (optional)
 
-Agentgateway emits access logs by default. This step is optional — the enrichment fields below are not required by any later lab, but are useful for debugging and observability. Apply an `EnterpriseAgentgatewayPolicy` to enrich the default access logs with additional metadata extracted from the request and response. Each attribute is a [CEL expression](https://docs.solo.io/agentgateway/latest/reference/cel/); wrap fields that are absent on some requests (for example `llm.*` on non-LLM routes, or `jwt.*` before a JWT policy is attached) in `default()` so the log field is always present:
+Agentgateway emits access logs by default. This step is optional: no later lab needs the enrichment fields below, though they help with debugging and observability. Apply an `EnterpriseAgentgatewayPolicy` to enrich the default access logs with additional metadata extracted from the request and response. Each attribute is a [CEL expression](https://docs.solo.io/agentgateway/latest/reference/cel/); wrap fields that are absent on some requests (for example `llm.*` on non-LLM routes, or `jwt.*` before a JWT policy is attached) in `default()` so the log field is always present:
 
 ```bash
 kubectl apply -f- <<'EOF'

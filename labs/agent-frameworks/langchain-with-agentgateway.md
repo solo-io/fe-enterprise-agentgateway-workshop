@@ -11,11 +11,11 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Overview
 
-This lab shows how to run a [LangChain](https://www.langchain.com/) multi-agent pipeline through Enterprise AgentGateway. Two LangChain chains — a **Researcher** and a **Writer** — run sequentially to produce a short blog post on a chosen topic. All OpenAI API calls are intercepted by agentgateway, which:
+This lab shows how to run a [LangChain](https://www.langchain.com/) multi-agent pipeline through Enterprise AgentGateway. Two LangChain chains, a Researcher and a Writer, run sequentially to produce a short blog post on a chosen topic. All OpenAI API calls are intercepted by agentgateway, which:
 
 - Injects the real OpenAI API key from a Kubernetes Secret
 - Emits OpenTelemetry traces, metrics, and access logs for every LLM call
-- Enables enforcement of rate limits, guardrails, and other policies — transparently, without any changes to the LangChain application
+- Enables enforcement of rate limits, guardrails, and other policies without changes to the LangChain application
 
 ## Configure Required Variables
 
@@ -120,7 +120,7 @@ AGENT_TOPIC="AI Gateway key patterns and concepts" \
 lib/langchain/multi-agent-researcher-writer/.venv/bin/python3 lib/langchain/multi-agent-researcher-writer/agent.py
 ```
 
-You should see the Researcher chain produce bullet-point findings, followed by the Writer chain turning them into a polished blog post. All LLM calls flow through agentgateway.
+You should see the Researcher chain produce bullet-point findings, followed by the Writer chain turning them into a blog post. All LLM calls flow through agentgateway.
 
 Try a different topic:
 ```bash
@@ -138,7 +138,7 @@ Tail agentgateway logs to see the proxied OpenAI calls:
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Each pipeline run generates two requests — one for the Researcher and one for the Writer — showing model name, token counts, and latency.
+Each pipeline run generates two requests, one for the Researcher and one for the Writer, showing model name, token counts, and latency.
 
 ### View Metrics and Traces in Grafana
 
@@ -183,10 +183,10 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ```
 
 Useful metrics:
-- `agentgateway_gen_ai_client_token_usage` — token usage per agent call
-- `agentgateway_gen_ai_client_cost_usd_total` — estimated cost per agent call
-- `agentgateway_gen_ai_server_request_duration` — latency per request
-- `agentgateway_requests_total` — total proxied requests
+- `agentgateway_gen_ai_client_token_usage`: token usage per agent call
+- `agentgateway_gen_ai_client_cost_usd_total`: estimated cost per agent call
+- `agentgateway_gen_ai_server_request_duration`: latency per request
+- `agentgateway_requests_total`: total proxied requests
 
 ## Cleanup
 

@@ -1,8 +1,8 @@
 # Configure JWT Auth Through a Corporate Forward Proxy
 
-Many enterprises don't allow direct egress to the internet — all outbound traffic, including calls to an external identity provider, has to go through a corporate forward proxy. This lab deploys a Squid proxy to stand in for that corporate boundary, then configures agentgateway to fetch a remote JWKS from Okta **through** that proxy using `BackendTunnel`, agentgateway's `HTTPS_PROXY`-style tunneling behavior.
+Many enterprises don't allow direct egress to the internet; all outbound traffic, including calls to an external identity provider, has to go through a corporate forward proxy. This lab deploys a Squid proxy to stand in for that corporate boundary, then configures agentgateway to fetch a remote JWKS from Okta through that proxy using `BackendTunnel`, agentgateway's `HTTPS_PROXY`-style tunneling behavior.
 
-This lab is focused purely on the tunnel mechanics — it configures JWT authentication only, with no authorization/RBAC rules. For CEL-based RBAC on top of JWT claims, see [Configure JWT Auth for our OpenAI Route](jwt-auth-with-rbac.md), whose Okta setup this lab reuses.
+This lab is focused on the tunnel mechanics: it configures JWT authentication only, with no authorization/RBAC rules. For CEL-based RBAC on top of JWT claims, see [Configure JWT Auth for our OpenAI Route](jwt-auth-with-rbac.md), whose Okta setup this lab reuses.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -12,12 +12,12 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - Deploy a Squid forward proxy to simulate a corporate network boundary
 - Create an `EnterpriseAgentgatewayBackend` for the proxy, and a second `EnterpriseAgentgatewayBackend` for Okta's JWKS endpoint that tunnels through it via `policies.tunnel`
 - Configure JWT authentication (no authorization) against the tunneled JWKS endpoint
-- Validate that the JWKS fetch — and JWT validation — succeeds even though Okta is only reachable through the proxy
+- Validate that the JWKS fetch and JWT validation succeed even though Okta is only reachable through the proxy
 - Confirm from the proxy's own access log that traffic actually transited the tunnel
 
 ## Overview
 
-`BackendTunnel` lets an `EnterpriseAgentgatewayBackend` reach its destination by issuing an HTTP `CONNECT` to an intermediary proxy first, then tunneling the real (typically TLS) connection through it — the same behavior `HTTPS_PROXY` gives you in a standard HTTP client. The backend being tunneled just needs a `policies.tunnel.backendRef` pointing at another `EnterpriseAgentgatewayBackend` that represents the proxy:
+`BackendTunnel` lets an `EnterpriseAgentgatewayBackend` reach its destination by issuing an HTTP `CONNECT` to an intermediary proxy first, then tunneling the real (typically TLS) connection through it, the same behavior `HTTPS_PROXY` gives you in a standard HTTP client. The backend being tunneled just needs a `policies.tunnel.backendRef` pointing at another `EnterpriseAgentgatewayBackend` that represents the proxy:
 
 ```
  client              agentgateway            corporate-proxy (squid)              Okta
@@ -30,7 +30,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
    |<-- 200 OK ------------|                           |                              |
 ```
 
-The gateway never talks to Okta directly — every byte of that JWKS fetch (and the eventual TLS handshake) passes through the Squid pod.
+The gateway never talks to Okta directly: every byte of that JWKS fetch (and the eventual TLS handshake) passes through the Squid pod.
 
 ## Deploy the Corporate Proxy (Squid)
 
@@ -111,7 +111,7 @@ spec:
 EOF
 ```
 
-> **Note — squid.conf, not conf.d:** Squid's `CONNECT` handling is mounted as a full `squid.conf` rather than a `conf.d/*.conf` snippet, so behavior doesn't depend on whatever default config ships in the base image. `SSL_ports` includes both `443` and `8443` so the same proxy can front any HTTPS-based IdP.
+> **Note: squid.conf, not conf.d.** Squid's `CONNECT` handling is mounted as a full `squid.conf` rather than a `conf.d/*.conf` snippet, so behavior doesn't depend on whatever default config ships in the base image. `SSL_ports` includes both `443` and `8443` so the same proxy can front any HTTPS-based IdP.
 
 Confirm the pod is running before moving on:
 
@@ -161,7 +161,7 @@ spec:
 EOF
 ```
 
-> **Why `tls: {}` alongside `tunnel`?** `tunnel` only handles the `CONNECT` to the proxy — it's the `tls` field that tells agentgateway to originate a real TLS connection to Okta *through* that tunnel, verifying Okta's certificate against system trusted CAs the same way it would for a direct connection.
+> **Why `tls: {}` alongside `tunnel`?** `tunnel` only handles the `CONNECT` to the proxy. It's the `tls` field that tells agentgateway to originate a real TLS connection to Okta through that tunnel, verifying Okta's certificate against system trusted CAs the same way it would for a direct connection.
 
 ## Configure Basic Routing
 
@@ -214,7 +214,7 @@ EOF
 
 ## Configure JWT Auth
 
-Create a policy that validates JWTs against the Okta issuer using the tunneled JWKS backend. This lab intentionally skips the `authorization` block — any request with a valid token from this issuer is authenticated, no claims-based RBAC is enforced:
+Create a policy that validates JWTs against the Okta issuer using the tunneled JWKS backend. This lab intentionally skips the `authorization` block: any request with a valid token from this issuer is authenticated, no claims-based RBAC is enforced:
 
 ```bash
 kubectl apply -f- <<EOF
@@ -266,7 +266,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-Expected output: the request fails with `authentication failure: no bearer token found`. Note this happens even before any JWKS fetch — agentgateway only needs to resolve the tunneled JWKS the first time it has to validate a token's signature.
+Expected output: the request fails with `authentication failure: no bearer token found`. This happens even before any JWKS fetch: agentgateway only needs to resolve the tunneled JWKS the first time it has to validate a token's signature.
 
 ### curl with a valid Okta token
 
@@ -287,7 +287,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-Expected output: `HTTP 200` with a completion from the OpenAI backend. Behind the scenes, this is the first request that forced agentgateway to resolve the Okta JWKS — and it did so entirely through the Squid tunnel.
+Expected output: `HTTP 200` with a completion from the OpenAI backend. This is the first request that forced agentgateway to resolve the Okta JWKS, and it did so entirely through the Squid tunnel.
 
 ## Verify the Tunnel Was Used
 

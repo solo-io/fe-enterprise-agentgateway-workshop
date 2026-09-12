@@ -24,14 +24,13 @@ This lab configures Enterprise Agentgateway to access Azure OpenAI through AKS W
 - No API keys to manage or rotate
 - Credentials are short-lived Entra ID tokens, automatically refreshed
 - Fine-grained RBAC scoped to a single service account via a dedicated managed identity
-- Follows Azure security best practices for AKS workloads
 
 | Approach | Credentials | Rotation | Scope |
 |---|---|---|---|
 | **Secret-based** ([Azure OpenAI lab](configure-routing-azure-openai.md)) | Static API key in K8s Secret | Manual | Any pod with secret access |
 | **Workload Identity** (this lab) | Federated Entra ID token | Automatic | Single service account |
 
-Workload Identity is the recommended approach for production AKS deployments accessing Azure services.
+Microsoft recommends Workload Identity for production AKS deployments that access Azure services.
 
 ### How Workload Identity Works
 1. You enable the AKS cluster's OIDC issuer

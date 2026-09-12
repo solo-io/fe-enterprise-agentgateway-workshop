@@ -42,7 +42,7 @@ Checks the dashboard JSON parses, `dash_prices.py validate` passes, and the dash
 
 Backfills ClickHouse with synthetic LLM spend so the Cost Management dashboard renders a full history instead of the single spike a few live requests produce.
 
-Rows are inserted into `platformdb.agw_spans_typed`; the built-in materialized views fire on insert and populate the 5-minute rollups the UI reads. The traffic covers four providers — OpenAI (the `gpt-5.6` family at the rates the cost lab's overlay catalog sets), Anthropic, Gemini, and AWS Bedrock — across five teams of one to three members each, keeping alice's and bob's virtual keys so seeded history lines up with live requests.
+Rows are inserted into `platformdb.agw_spans_typed`; the built-in materialized views fire on insert and populate the 5-minute rollups the UI reads. The traffic covers OpenAI (the `gpt-5.6` family at the rates the cost lab's overlay catalog sets), Anthropic, Gemini, and AWS Bedrock, across five teams of one to three members each, keeping alice's and bob's virtual keys so seeded history lines up with live requests.
 
 ```bash
 ./lib/observability/seed-cost-data.sh
@@ -64,8 +64,8 @@ Seeding fills the **Dashboard** tab only. The **Budgets** tab reads live rate-li
 
 ## Used by
 
-- [`labs/observability/llm-cost-management.md`](../../labs/observability/llm-cost-management.md) — `seed-cost-data.sh`
-- [`002-set-up-ui-and-monitoring-tools.md`](../../002-set-up-ui-and-monitoring-tools.md) — the Grafana dashboard JSON
+- [`labs/observability/llm-cost-management.md`](../../labs/observability/llm-cost-management.md): `seed-cost-data.sh`
+- [`002-set-up-ui-and-monitoring-tools.md`](../../002-set-up-ui-and-monitoring-tools.md): the Grafana dashboard JSON
 
 ## Downstream copies of the dashboard JSON
 

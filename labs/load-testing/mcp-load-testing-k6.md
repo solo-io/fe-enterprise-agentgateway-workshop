@@ -421,9 +421,9 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 Access at http://localhost:3000 (admin / prom-operator). Navigate to **Dashboards > AgentGateway Dashboard**.
 
 Key panels to watch:
-- **Request Rate** — total requests/sec through AgentGateway on the `/mcp` route
-- **Request Duration** — p50/p95 latency (target: p95 < 500ms)
-- **Error Rate** — should stay < 1%
+- **Request Rate**: total requests/sec through AgentGateway on the `/mcp` route
+- **Request Duration**: p50/p95 latency (target: p95 < 500ms)
+- **Error Rate**: should stay < 1%
 
 The k6 terminal output shows a summary table after the test completes:
 
@@ -605,9 +605,9 @@ kubectl logs -f job/k6-mcp-rps -n loadgenerator
 ```
 
 Watch Grafana (**Dashboards > AgentGateway Dashboard**) for:
-- **Request Rate** — should step from ~25 req/s to ~50 req/s matching the stage transitions
-- **Request Duration** — watch for p95 latency increase at 50 req/s
-- **`dropped_iterations`** in the k6 summary — if this exceeds 10, AgentGateway is at capacity
+- **Request Rate**: should step from ~25 req/s to ~50 req/s matching the stage transitions
+- **Request Duration**: watch for p95 latency increase at 50 req/s
+- **`dropped_iterations`** in the k6 summary: if this exceeds 10, AgentGateway is at capacity
 
 The k6 terminal output after the run:
 
@@ -635,10 +635,10 @@ A `dropped_iterations` count near zero at 50 req/s means the gateway is handling
 
 ### Reading k6 Output
 
-- **`http_req_duration{mcp_method:tools_call}`** — latency for actual MCP tool calls only (excludes session initialization). This is the number to compare across runs.
-- **`http_req_failed`** — any non-2xx response. Should stay < 1%.
-- **`dropped_iterations`** (RPS test only) — iterations k6 could not start because it ran out of VUs. A value > 10 means you've found the gateway's saturation point.
-- **`mcp_errors`** — custom counter for protocol-level failures (no session ID returned, etc.).
+- **`http_req_duration{mcp_method:tools_call}`**: latency for actual MCP tool calls only (excludes session initialization). This is the number to compare across runs.
+- **`http_req_failed`**: any non-2xx response. Should stay < 1%.
+- **`dropped_iterations`** (RPS test only): iterations k6 could not start because it ran out of VUs. A value > 10 means you've found the gateway's saturation point.
+- **`mcp_errors`**: custom counter for protocol-level failures (no session ID returned, etc.).
 
 ### Prometheus Metrics in Grafana
 

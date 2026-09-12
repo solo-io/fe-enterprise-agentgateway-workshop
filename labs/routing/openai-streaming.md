@@ -1,6 +1,6 @@
 # Test OpenAI Streaming Responses
 
-In this lab, you'll test streaming responses from OpenAI through AgentGateway. Streaming allows you to receive LLM responses incrementally as they're generated, providing a better user experience for real-time applications.
+In this lab, you'll test streaming responses from OpenAI through AgentGateway. Streaming allows you to receive LLM responses incrementally as they're generated.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -15,12 +15,12 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 Streaming responses allow LLM providers to send generated text incrementally as tokens are produced, rather than waiting for the complete response. This provides:
 
-- **Faster perceived response time**: Users see output immediately
-- **Better UX for long responses**: Progressive display of content
-- **Lower latency to first token**: Time to First Token (TTFT) metrics
-- **Token generation monitoring**: Tokens Per Output Token (TPOT) tracking
+- Faster perceived response time: Users see output immediately
+- Better UX for long responses: Progressive display of content
+- Lower latency to first token: Time to First Token (TTFT) metrics
+- Token generation monitoring: Tokens Per Output Token (TPOT) tracking
 
-AgentGateway automatically supports streaming for all LLM providers without special configuration.
+AgentGateway supports streaming for all LLM providers by default.
 
 ## Configure OpenAI Route
 
@@ -149,10 +149,10 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 3. Navigate to **Dashboards > AgentGateway Dashboard**
 
 4. Look for streaming metrics:
-   - **TTFT (Time to First Token)**: How quickly the first token was received
-   - **TPOT (Time Per Output Token)**: Average time per token generation
-   - **Streaming request rates**: Percentage of requests using streaming
-   - **Token generation throughput**: Tokens generated per second
+   - TTFT (Time to First Token): How quickly the first token was received
+   - TPOT (Time Per Output Token): Average time per token generation
+   - Streaming request rates: Percentage of requests using streaming
+   - Token generation throughput: Tokens generated per second
 
 ### View Access Logs
 
@@ -168,7 +168,7 @@ For streaming requests, you'll see:
 - `"gen_ai.usage.input_tokens"` and `"gen_ai.usage.output_tokens"`
 - Streaming-specific timing metrics
 
-**Note**: OpenAI omits token usage from a stream unless the client asks for it with `stream_options.include_usage`. AgentGateway sets that option on your behalf so it can record token metrics, so you get the usage chunk shown above without changing your request — and the same figures appear in the access logs and metrics.
+**Note**: OpenAI omits token usage from a stream unless the client asks for it with `stream_options.include_usage`. AgentGateway sets that option on your behalf so it can record token metrics, so you get the usage chunk shown above without changing your request, and the same figures appear in the access logs and metrics.
 
 ### View Traces in the Solo UI
 

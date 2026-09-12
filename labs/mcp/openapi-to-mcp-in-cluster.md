@@ -1,11 +1,11 @@
 # OpenAPI to MCP — In-Cluster Deployment
 
-Expose a service you already run in your cluster as MCP tools by handing agentgateway its OpenAPI schema — no custom MCP server required.
+Expose a service you already run in your cluster as MCP tools by handing agentgateway its OpenAPI schema: no custom MCP server required.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
-This lab deploys the **[Stripe mock server](https://github.com/stripe/stripe-mock)** (`stripe/stripe-mock`) into your cluster. It is a stateless mock that returns realistic, hardcoded Stripe API responses — **no Stripe account, real keys, or internet egress required**.
+This lab deploys the **[Stripe mock server](https://github.com/stripe/stripe-mock)** (`stripe/stripe-mock`) into your cluster. It is a stateless mock that returns realistic, hardcoded Stripe API responses: **no Stripe account, real keys, or internet egress required**.
 
 > **Related lab:** The [OpenAPI to MCP — External API](openapi-to-mcp-external-api.md) lab fronts an *external, public* HTTPS API (Open-Meteo) and originates TLS to it. This lab covers the more common enterprise case: a service **you deploy and own**, reached over plain in-cluster HTTP, that requires an upstream credential.
 
@@ -85,13 +85,13 @@ Verify that the pod is ready:
 kubectl wait --for=condition=available deployment/stripe-mock -n stripe-mcp --timeout=60s
 ```
 
-> `stripe-mock` is **stateless**: it validates requests against the embedded Stripe OpenAPI spec and returns hardcoded sample objects. It does not persist anything you send, and it does not validate the *value* of your API key — but it does require an `Authorization` header to be present (see Step 3).
+> `stripe-mock` is **stateless**: it validates requests against the embedded Stripe OpenAPI spec and returns hardcoded sample objects. It does not persist anything you send, and it does not validate the *value* of your API key, but it does require an `Authorization` header to be present (see Step 3).
 
 ---
 
 ## Step 2: Store the OpenAPI schema in a ConfigMap
 
-The full Stripe spec describes hundreds of operations, which would generate hundreds of MCP tools. Here we curate a small subset — four read-only operations (`listProducts`, `listPrices`, `listCustomers`, `listCharges`) — so the generated tools stay focused and the ConfigMap stays small. These were chosen because stripe-mock returns recognizable, non-empty sample data for them (a "T-shirt" product priced at $20.00/month, a sample customer, and a $1.00 charge), which makes the generated tools satisfying to call.
+The full Stripe spec describes hundreds of operations, which would generate hundreds of MCP tools. Here we curate a small subset, four read-only operations (`listProducts`, `listPrices`, `listCustomers`, `listCharges`), so the generated tools stay focused and the ConfigMap stays small. These were chosen because stripe-mock returns recognizable, non-empty sample data for them (a "T-shirt" product priced at $20.00/month, a sample customer, and a $1.00 charge), which makes the generated tools satisfying to call.
 
 > The `servers.url` is left as `/` on purpose: the actual host and port come from the `EnterpriseAgentgatewayBackend` in the next step, not from the schema.
 
@@ -271,7 +271,7 @@ Review the following table to understand this configuration.
 | `targets[].static.protocol` | Set to `OpenAPI` to expose REST API operations as MCP tools. |
 | `targets[].static.host` / `port` | The in-cluster service, addressed as `<service>.<namespace>.svc.cluster.local` on its plain-HTTP port `12111`. No TLS origination is needed. |
 | `targets[].static.openAPI.schemaRef.name` | The ConfigMap that holds the OpenAPI 3.0 JSON schema. The ConfigMap must have a `data.schema` key. |
-| `policies.auth.secretRef` | A `Secret` whose `Authorization` key value is injected as the `Authorization` header on every upstream request — this is what satisfies stripe-mock's auth requirement. |
+| `policies.auth.secretRef` | A `Secret` whose `Authorization` key value is injected as the `Authorization` header on every upstream request; this satisfies stripe-mock's auth requirement. |
 
 > **Contrast with the public-API lab:** that lab adds `policies.tls` to originate TLS to an HTTPS upstream and needs no upstream credential. This lab drops `tls` (in-cluster HTTP) and adds `policies.auth` (the API requires a token).
 
@@ -281,7 +281,7 @@ kubectl get httproute openapi-mcp-stripe -n agentgateway-system \
   -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}{"\n"}'
 ```
 
-Also verify that the backend itself is accepted. This is where the most likely misconfigurations surface — a wrong `schemaRef.name` or a ConfigMap missing the `data.schema` key — and they would otherwise show up only as an empty tool list later:
+Also verify that the backend itself is accepted. This is where the most likely misconfigurations surface (a wrong `schemaRef.name` or a ConfigMap missing the `data.schema` key), and they would otherwise show up only as an empty tool list later:
 ```bash
 kubectl get enterpriseagentgatewaybackend stripe-mock-openapi -n agentgateway-system \
   -o jsonpath='{.status.conditions[?(@.type=="Accepted")].status}{"\n"}'
@@ -299,7 +299,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 echo $GATEWAY_IP
 ```
 
-If you are running locally without a LoadBalancer address, port-forward the proxy instead. Forward to the Gateway's HTTP listener port (`8080` in this workshop — confirm with `kubectl get gateway agentgateway-proxy -n agentgateway-system -o jsonpath='{.spec.listeners[*].port}'`):
+If you are running locally without a LoadBalancer address, port-forward the proxy instead. Forward to the Gateway's HTTP listener port (`8080` in this workshop; confirm with `kubectl get gateway agentgateway-proxy -n agentgateway-system -o jsonpath='{.spec.listeners[*].port}'`):
 ```bash
 kubectl port-forward -n agentgateway-system svc/agentgateway-proxy 8080:8080
 ```
@@ -315,10 +315,10 @@ Connect to your AgentGateway:
 - Click **Connect**
 
 ### List and run a tool
-1. Click the **Tools** tab, then **List Tools**. You should see four tools — `listProducts`, `listPrices`, `listCustomers`, and `listCharges` — each with an input schema derived from the OpenAPI spec.
-2. Select **listProducts** and click **Run Tool** (leave the optional `limit` blank). It returns a Stripe list object (`"object": "list"`) whose `data` contains a sample product — a `"T-shirt"` described as `"Comfortable gray cotton t-shirt"`.
-3. Run **listPrices** the same way and confirm you get a price with `"unit_amount": 2000` and a monthly `recurring` interval — i.e. $20.00/month. (Stripe amounts are in the smallest currency unit, so `2000` = $20.00 USD.)
-4. (Optional) Run **listCharges** with `limit` = `3` (the parameter is nested under a `query` object — see the **Tool input shape** note in Step 5) and confirm you get a charge with `"amount": 100` ($1.00) and `"status": "succeeded"`.
+1. Click the **Tools** tab, then **List Tools**. You should see four tools (`listProducts`, `listPrices`, `listCustomers`, and `listCharges`), each with an input schema derived from the OpenAPI spec.
+2. Select **listProducts** and click **Run Tool** (leave the optional `limit` blank). It returns a Stripe list object (`"object": "list"`) whose `data` contains a sample product: a `"T-shirt"` described as `"Comfortable gray cotton t-shirt"`.
+3. Run **listPrices** the same way and confirm you get a price with `"unit_amount": 2000` and a monthly `recurring` interval, i.e. $20.00/month. (Stripe amounts are in the smallest currency unit, so `2000` = $20.00 USD.)
+4. (Optional) Run **listCharges** with `limit` = `3` (the parameter is nested under a `query` object; see the **Tool input shape** note in Step 5) and confirm you get a charge with `"amount": 100` ($1.00) and `"status": "succeeded"`.
 
 ---
 
@@ -364,7 +364,7 @@ These steps assume the proxy is reachable at `http://localhost:8080` (via port-f
 
    You should get back a Stripe list object (`"object": "list"`) containing a sample `"T-shirt"` product, wrapped in an MCP `tools/call` result.
 
-> **Tool input shape:** every operation here takes an optional `limit` query parameter, and the generated `inputSchema` groups query parameters under a top-level `query` object. Inspect the `inputSchema` in the `tools/list` output and nest the arguments accordingly — for example, `"arguments":{"query":{"limit":3}}` for `listCharges`.
+> **Tool input shape:** every operation here takes an optional `limit` query parameter, and the generated `inputSchema` groups query parameters under a top-level `query` object. Inspect the `inputSchema` in the `tools/list` output and nest the arguments accordingly: for example, `"arguments":{"query":{"limit":3}}` for `listCharges`.
 
 ---
 
@@ -397,11 +397,11 @@ done
 ```
 
 You should see MCP request counters, including:
-- `agentgateway_mcp_requests_total` — total MCP requests handled
-- `agentgateway_requests_total{...protocol="mcp"...}` — overall request counter, labeled with `protocol="mcp"` for this backend
-- `agentgateway_request_duration_seconds_*` — request latency histogram (also carries the `protocol="mcp"` label)
+- `agentgateway_mcp_requests_total`: total MCP requests handled
+- `agentgateway_requests_total{...protocol="mcp"...}`: overall request counter, labeled with `protocol="mcp"` for this backend
+- `agentgateway_request_duration_seconds_*`: request latency histogram (also carries the `protocol="mcp"` label)
 
-> **Multiple replicas:** `/metrics` is scraped **per pod**. If your gateway runs more than one replica, the `port-forward` above lands on a single pod, and because OpenAPI-to-MCP is stateless the tool calls load-balance across replicas — so the counts you see reflect only that one pod's share and will likely be lower than the number of calls you made. For an aggregate across all replicas, use the Grafana/Prometheus view below.
+> **Multiple replicas:** `/metrics` is scraped **per pod**. If your gateway runs more than one replica, the `port-forward` above lands on a single pod, and because OpenAPI-to-MCP is stateless the tool calls load-balance across replicas, so the counts you see reflect only that one pod's share and will likely be lower than the number of calls you made. For an aggregate across all replicas, use the Grafana/Prometheus view below.
 
 ### View in Grafana
 1. Port-forward Grafana:

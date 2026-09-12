@@ -2,9 +2,9 @@
 
 ## Introduction
 
-The MCP Track focuses on deploying Enterprise Agentgateway as a secure, policy-enforced aggregation layer for [Model Context Protocol (MCP)](https://spec.modelcontextprotocol.io/) traffic. Where the LLM Track is about controlling model access, this track is about controlling **tool access** — the capabilities AI agents call to read data, trigger actions, and interact with your systems.
+The MCP Track focuses on deploying Enterprise Agentgateway as a secure, policy-enforced aggregation layer for [Model Context Protocol (MCP)](https://spec.modelcontextprotocol.io/) traffic. Where the LLM Track is about controlling model access, this track is about controlling **tool access**: the capabilities AI agents call to read data, trigger actions, and interact with your systems.
 
-MCP is the emerging standard for how agents discover and invoke tools. Without a gateway in front of your MCP servers, every agent framework talks directly to every tool backend, with no central place to enforce auth, rate limits, or audit who called what. Enterprise Agentgateway solves this: it becomes the single entry point for all MCP traffic, federating multiple backends, translating REST APIs into MCP tools on the fly, and enforcing OAuth, RBAC, and per-tool quotas before any agent ever touches a tool.
+MCP is the emerging standard for how agents discover and invoke tools. Without a gateway in front of your MCP servers, every agent framework talks directly to every tool backend, with no central place to enforce auth, rate limits, or audit who called what. Enterprise Agentgateway solves this: it becomes the single entry point for all MCP traffic, federating multiple backends, translating REST APIs into MCP tools on the fly, and enforcing OAuth, RBAC, and per-tool quotas before any agent touches a tool.
 
 ---
 
@@ -12,16 +12,16 @@ MCP is the emerging standard for how agents discover and invoke tools. Without a
 
 After completing this track you should be able to:
 
-- **Connect MCP servers** — route agent traffic to in-cluster and remote MCP backends through a single stable endpoint
-- **Expose REST APIs as MCP tools** — wrap any OpenAPI-documented service as a tool set without writing MCP server code
-- **Federate multiple backends** — aggregate tools from many servers behind one endpoint, with per-persona filtering and prefixed tool names
-- **Specialize tool exposure** — use Search mode (`get_tool` / `invoke_tool` meta-tools) and Code mode (`run_code` in a sandboxed JS runtime)
-- **Enforce OAuth at the gateway** — configure Eager OAuth with Auth0 or Okta so the gateway is the OAuth Authorization Server visible to MCP clients
-- **Gate entitlements pre-issuance** — block unauthorized users from receiving tokens before they're ever issued
-- **Apply per-tool rate limits** — prevent individual tools from being hammered by a single agent or user
-- **Propagate user identity with OBO** — carry the end-user's identity through the agent chain so tools act on behalf of the real person
-- **Connect real agent frameworks** — wire CrewAI, LangChain, Claude Code, and Claude Desktop to the gateway end-to-end
-- **Load test and observe** — validate tool throughput and set up production-grade dashboards
+- **Connect MCP servers**: route agent traffic to in-cluster and remote MCP backends through a single stable endpoint
+- **Expose REST APIs as MCP tools**: wrap any OpenAPI-documented service as a tool set without writing MCP server code
+- **Federate multiple backends**: aggregate tools from many servers behind one endpoint, with per-persona filtering and prefixed tool names
+- **Specialize tool exposure**: use Search mode (`get_tool` / `invoke_tool` meta-tools) and Code mode (`run_code` in a sandboxed JS runtime)
+- **Enforce OAuth at the gateway**: configure Eager OAuth with Auth0 or Okta so the gateway is the OAuth Authorization Server visible to MCP clients
+- **Gate entitlements pre-issuance**: block unauthorized users from receiving tokens before they're issued
+- **Apply per-tool rate limits**: prevent individual tools from being hammered by a single agent or user
+- **Propagate user identity with OBO**: carry the end-user's identity through the agent chain so tools act on behalf of the real person
+- **Connect real agent frameworks**: wire CrewAI, LangChain, Claude Code, and Claude Desktop to the gateway end-to-end
+- **Load test and observe**: validate tool throughput and set up production-grade dashboards
 
 ---
 
@@ -44,7 +44,7 @@ After completing this track you should be able to:
 
 ### Use Case 1 — MCP Server Connectivity
 
-**Value:** Give agents a single, stable gateway endpoint to call regardless of where MCP tool servers physically run — in the cluster, in a remote data center, or dynamically scaled.
+**Value:** Give agents a single, stable gateway endpoint to call regardless of where MCP tool servers physically run: in the cluster, in a remote data center, or dynamically scaled.
 
 | Lab | What you'll learn |
 |---|---|
@@ -55,7 +55,7 @@ After completing this track you should be able to:
 
 ### Use Case 2 — Wrap Existing REST APIs as MCP Tools
 
-**Value:** Instantly expose any documented REST API as an MCP tool set. Your agents get structured tool definitions; you get centralized auth and rate limiting — no MCP server code required.
+**Value:** Expose any documented REST API as an MCP tool set. Your agents get structured tool definitions; you get centralized auth and rate limiting, with no MCP server code to write.
 
 | Lab | What you'll learn |
 |---|---|
@@ -78,21 +78,21 @@ After completing this track you should be able to:
 
 ### Use Case 4 — MCP Security & Authorization
 
-**Value:** Enforce zero-trust access at the tool level. Agents must present valid credentials before the gateway forwards any tool call — and you can gate access down to individual tool names.
+**Value:** Enforce zero-trust access at the tool level. Agents must present valid credentials before the gateway forwards any tool call, and you can gate access down to individual tool names.
 
 | Lab | What you'll learn |
 |---|---|
 | [MCP BYO gRPC External Authorization](../labs/mcp/mcp-byo-grpc-ext-authz.md) | Integrate your own ext-authz gRPC service for custom tool-level policy |
 | [MCP Eager OAuth with Auth0](../labs/mcp/mcp-eager-auth-auth0.md) | Configure the gateway as the OAuth Authorization Server for Auth0; agents get tokens directly from the gateway |
 | [MCP Eager OAuth with Okta](../labs/mcp/mcp-eager-auth-okta.md) | Same pattern with Okta as the backing IdP |
-| [MCP Pre-Issuance Entitlement Gating with Auth0](../labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) | Add a gRPC ext-authz hook that checks entitlements before issuing OAuth tokens — denied users are redirected before they get any credentials |
-| [Web Application Firewall (WAF) for Agentic Traffic](../labs/security/WAF.md) | Attach a `WAFPolicy` to harden the HTTP surface and block tool-call payload abuse (command-exec, file-exfil signatures) and credential leakage — the deterministic layer beneath semantic guardrails |
+| [MCP Pre-Issuance Entitlement Gating with Auth0](../labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) | Add a gRPC ext-authz hook that checks entitlements before issuing OAuth tokens; denied users are redirected before they get any credentials |
+| [Web Application Firewall (WAF) for Agentic Traffic](../labs/security/WAF.md) | Attach a `WAFPolicy` to harden the HTTP surface and block tool-call payload abuse (command-exec, file-exfil signatures) and credential leakage, the deterministic layer beneath semantic guardrails |
 
 ---
 
 ### Use Case 5 — Per-Tool Rate Limiting
 
-**Value:** Prevent tool abuse and enforce fair-use quotas per agent, user, or group — at the individual tool level, not just the connection level.
+**Value:** Prevent tool abuse and enforce fair-use quotas per agent, user, or group, at the individual tool level, not just the connection level.
 
 | Lab | What you'll learn |
 |---|---|
@@ -102,7 +102,7 @@ After completing this track you should be able to:
 
 ### Use Case 6 — Identity Delegation (On-Behalf-Of)
 
-**Value:** When an AI agent calls a tool, the tool should know *which human* initiated the request — not just which service account. OBO token exchange carries the end user's identity through the agent chain so you get real attribution, not service-level attribution.
+**Value:** When an AI agent calls a tool, the tool should know *which human* initiated the request, not just which service account. OBO token exchange carries the end user's identity through the agent chain so you get real attribution, not service-level attribution.
 
 | Lab | What you'll learn |
 |---|---|
@@ -114,7 +114,7 @@ After completing this track you should be able to:
 
 ### Use Case 7 — Agent Framework & Client Integrations
 
-**Value:** Validate that real-world frameworks and developer tools connect cleanly through the gateway — and that policy enforcement works end-to-end from the client to the tool.
+**Value:** Validate that real-world frameworks and developer tools connect cleanly through the gateway, and that policy enforcement works end-to-end from the client to the tool.
 
 | Lab | What you'll learn |
 |---|---|
@@ -157,4 +157,4 @@ The Security (Use Case 4) and Identity Delegation (Use Case 6) sections have int
 
 ## How MCP and LLM Tracks Relate
 
-These tracks share the same gateway and monitoring stack. Labs in the MCP Track that involve authentication (JWT, OAuth) build on concepts from the LLM Track's Security section — but they are self-contained and include all necessary configuration steps. You do not need to complete the full LLM Track before starting the MCP Track; only the Installation labs are required.
+These tracks share the same gateway and monitoring stack. Labs in the MCP Track that involve authentication (JWT, OAuth) build on concepts from the LLM Track's Security section, but they are self-contained and include all necessary configuration steps. You do not need to complete the full LLM Track before starting the MCP Track; only the Installation labs are required.

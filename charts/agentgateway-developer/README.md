@@ -3,7 +3,7 @@
 Installed per application team, once the platform team has onboarded that
 team in [`agentgateway-platform`](../agentgateway-platform/README.md). A team
 uses it to self-serve MCP endpoints under the path prefix the platform
-assigned it — configuring only what it owns.
+assigned it, configuring only what it owns.
 
 Its `values.schema.json` deliberately has no field for rate limits, auth
 policy, WAF, or logging. Those are platform-owned and attached to the
@@ -18,9 +18,9 @@ automatically. A team cannot express a traffic policy here even if it tries.
 
 - One `HTTPRoute` per entry in `endpoints`, labeled `team: <name>` and
   path-prefixed `/teams/<team><path>`
-- One `EnterpriseAgentgatewayBackend` per endpoint — an MCP backend
+- One `EnterpriseAgentgatewayBackend` per endpoint: an MCP backend
   proxying the endpoint's `targets`
-- No `HTTPRoute` ever sets `parentRefs` — routes attach to the gateway only
+- No `HTTPRoute` ever sets `parentRefs`: routes attach to the gateway only
   through the platform's delegation, never directly
 - One `ReferenceGrant` authorizing the platform namespace
   (`platformNamespace`, default `agentgateway-system`) to delegate into this
@@ -36,7 +36,7 @@ automatically. A team cannot express a traffic policy here even if it tries.
 | Path prefix         | this chart, from `team` value      | `/teams/team-alpha`     |
 | Namespace           | wherever this release is installed | `team-alpha`            |
 | Delegation grant    | this chart, from `platformNamespace` | `ReferenceGrant` in `team-alpha` |
-| Cost tier           | inherited from the platform — not settable here | e.g. `gold` |
+| Cost tier           | inherited from the platform (not settable here) | e.g. `gold` |
 
 ## Install
 
@@ -62,7 +62,7 @@ endpoints:
 ```
 
 Because `team` is mandatory with no default, bare `helm lint` or
-`helm template` on this chart fails by design — pass `--set team=<name>`
+`helm template` on this chart fails by design; pass `--set team=<name>`
 (or a values file) to lint or render it.
 
 ## Learn more

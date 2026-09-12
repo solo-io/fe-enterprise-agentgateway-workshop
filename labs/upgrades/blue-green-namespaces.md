@@ -1,16 +1,16 @@
 # Blue/Green Upgrades Across Namespaces
 
-In this lab you'll run two independent Agentgateway proxies side by side — a live **blue** proxy and a new **green** proxy, each in its own namespace — and shift traffic between them using [route delegation](https://docs.solo.io/agentgateway/latest/traffic-management/route-delegation/) with weighted backend references. You'll cut over from blue to green under continuous traffic with zero dropped requests, then roll back instantly by flipping a weight.
+In this lab you'll run two independent Agentgateway proxies side by side, a live **blue** proxy and a new **green** proxy, each in its own namespace, and shift traffic between them using [route delegation](https://docs.solo.io/agentgateway/latest/traffic-management/route-delegation/) with weighted backend references. You'll cut over from blue to green under continuous traffic with zero dropped requests, then roll back instantly by flipping a weight.
 
-This is the side-by-side alternative to the [In-Place Rolling Upgrades](in-place-rolling-upgrades.md) lab. In-place drains and replaces the pods of one proxy; blue/green stands up a second, independent proxy and moves traffic at a routing tier in front of both — so rollback is a traffic flip, not a redeploy.
+This is the side-by-side alternative to the [In-Place Rolling Upgrades](in-place-rolling-upgrades.md) lab. In-place drains and replaces the pods of one proxy; blue/green stands up a second, independent proxy and moves traffic at a routing tier in front of both, so rollback is a traffic flip, not a redeploy.
 
-> **Simulated version delta:** both proxies run the same pinned version (`v2026.6.1`); we identify them with an `x-gateway-color` response header. In production, "green" is the proxy you install at the new `--version` (or with new config). This lab proves the **cutover path** is zero-downtime; the thing being cut over to is yours to choose.
+> **Simulated version delta:** both proxies run the same pinned version (`v2026.6.1`); we identify them with an `x-gateway-color` response header. In production, "green" is the proxy you install at the new `--version` (or with new config). This lab proves the cutover path is zero-downtime; the thing being cut over to is yours to choose.
 
 ## Pre-requisites
 - [001 — Install Enterprise Agentgateway](../../001-install-enterprise-agentgateway.md)
 - [002 — Set Up UI and Monitoring Tools](../../002-set-up-ui-and-monitoring-tools.md)
-- [Configure Mock OpenAI Server](../routing/configure-mock-openai-server.md) — provides the shared `mock-gpt-4o-svc` LLM backend reused by both colors
-- [In-Place Rolling Upgrades](in-place-rolling-upgrades.md) — the in-place counterpart
+- [Configure Mock OpenAI Server](../routing/configure-mock-openai-server.md): provides the shared `mock-gpt-4o-svc` LLM backend reused by both colors
+- [In-Place Rolling Upgrades](in-place-rolling-upgrades.md): the in-place counterpart
 
 ## Lab Objectives
 - Stand up a second, independent Agentgateway proxy (`green`) alongside the live one (`blue`), each in its own namespace
@@ -23,7 +23,7 @@ Three `Gateway`s, all programmed by the one shared controller you installed in `
 
 | Tier | What it is | Role |
 |---|---|---|
-| **Edge** (`bluegreen-edge`, `agentgateway-system`) | A thin proxy with one **parent** `HTTPRoute` | The stable client entrypoint. Its parent route *delegates* `/openai` to the blue and green namespaces with **weights** — this is the cutover control. |
+| **Edge** (`bluegreen-edge`, `agentgateway-system`) | A thin proxy with one parent `HTTPRoute` | The stable client entrypoint. Its parent route *delegates* `/openai` to the blue and green namespaces with weights: this is the cutover control. |
 | **Blue** (`agentgateway-blue` namespace) | A full proxy + its own route to the LLM | The currently-live data plane. Stamps `x-gateway-color: blue`. |
 | **Green** (`agentgateway-green` namespace) | A full proxy + its own route to the LLM | The new data plane. Stamps `x-gateway-color: green`. |
 
@@ -60,9 +60,9 @@ The request path is **edge proxy → color proxy → shared LLM**. Route delegat
 ```
 
 
-> **Why two routes per color namespace:** route delegation *merges* a child route's backends into the **edge** proxy. To make the edge forward to a separate color *proxy* (rather than straight to the LLM), each color has a small **delegate** route (`blue-delegate` / `green-delegate`) that forwards to its proxy `Service`, plus the color proxy's **own** route (`blue-proxy-route` / `green-proxy-route`) that forwards to the LLM and stamps the color header. The edge delegates to the delegate route **by name**, so it never merges the proxy's LLM route.
+> **Why two routes per color namespace:** route delegation *merges* a child route's backends into the edge proxy. To make the edge forward to a separate color *proxy* (rather than straight to the LLM), each color has a small delegate route (`blue-delegate` / `green-delegate`) that forwards to its proxy `Service`, plus the color proxy's own route (`blue-proxy-route` / `green-proxy-route`) that forwards to the LLM and stamps the color header. The edge delegates to the delegate route by name, so it never merges the proxy's LLM route.
 
-Only the **gateway** is blue/green — both colors call the same shared mock LLM (`mock-gpt-4o-svc`). You don't blue/green the model.
+Only the gateway is blue/green: both colors call the same shared mock LLM (`mock-gpt-4o-svc`). You don't blue/green the model.
 
 ## Step 1 — Stand up the edge proxy
 
@@ -114,11 +114,11 @@ export EDGE_IP=$(kubectl get svc bluegreen-edge -n agentgateway-system \
 echo "Edge: ${EDGE_IP}:8080"
 ```
 
-Expected: `condition met`, and `EDGE_IP` is a non-empty LoadBalancer address. The edge has no routes yet — you add them in Step 3.
+Expected: `condition met`, and `EDGE_IP` is a non-empty LoadBalancer address. The edge has no routes yet; you add them in Step 3.
 
 ## Step 2 — Stand up the blue and green proxies
 
-Each color is a full, independent proxy in its own namespace, with its own route to the **shared** mock LLM. The route stamps an `x-gateway-color` header so we can see which proxy served a request.
+Each color is a full, independent proxy in its own namespace, with its own route to the shared mock LLM. The route stamps an `x-gateway-color` header so we can see which proxy served a request.
 
 ```bash
 kubectl create namespace agentgateway-blue --dry-run=client -o yaml | kubectl apply -f -
@@ -222,11 +222,11 @@ for color in blue green; do
 done
 ```
 
-Expected: each prints `HTTP/1.1 200` and `x-gateway-color: <color>`. Both proxies are now live and independent — neither is fronted yet.
+Expected: each prints `HTTP/1.1 200` and `x-gateway-color: <color>`. Both proxies are now live and independent; neither is fronted yet.
 
 ## Step 3 — Wire delegation and the weighted parent route
 
-Give each color a small **delegate** route that forwards to its proxy `Service`, then attach a **parent** route to the edge that delegates `/openai` to those two delegates — starting at **100% blue, 0% green**:
+Give each color a small delegate route that forwards to its proxy `Service`, then attach a parent route to the edge that delegates `/openai` to those two delegates, starting at 100% blue, 0% green:
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -284,7 +284,7 @@ spec:
 EOF
 ```
 
-The edge delegates **by name** to `blue-delegate` / `green-delegate` (not `"*"`), so it forwards to each color *proxy* and never merges the proxies' own LLM routes. Note the delegate routes intentionally have **no `parentRefs`** — a delegation child is attached by the parent's `backendRef`, not by binding itself to a Gateway. Confirm the parent resolved, then smoke-test through the edge — all traffic should be blue:
+The edge delegates by name to `blue-delegate` / `green-delegate` (not `"*"`), so it forwards to each color *proxy* and never merges the proxies' own LLM routes. Note the delegate routes intentionally have no `parentRefs`: a delegation child is attached by the parent's `backendRef`, not by binding itself to a Gateway. Confirm the parent resolved, then smoke-test through the edge. All traffic should be blue:
 
 ```bash
 kubectl get httproute bluegreen-parent -n agentgateway-system \
@@ -302,7 +302,7 @@ Expected: `ResolvedRefs` is `True`, and the edge request returns `HTTP/1.1 200` 
 
 ## Step 4 — Validate the cutover (and rollback) under load
 
-Now prove the cutover is zero-downtime. k6 drives a steady stream of short completions at the **edge**, reads the `x-gateway-color` header on each response, and counts blue vs. green. We flip the parent weights mid-run, then flip them back — no request should fail through either flip.
+Now prove the cutover is zero-downtime. k6 drives a steady stream of short completions at the edge, reads the `x-gateway-color` header on each response, and counts blue vs. green. We flip the parent weights mid-run, then flip them back; no request should fail through either flip.
 
 Create the load namespace and the k6 script:
 
@@ -397,23 +397,23 @@ When the Job finishes, read the summary:
 kubectl logs job/k6-zdt-bluegreen -n loadgenerator | grep -E 'http_req_failed|checks|http_reqs|blue_responses|green_responses'
 ```
 
-**Success criteria:** `http_req_failed` is `0.00%` and `checks` is `100.00%` — zero dropped requests across **both** the cutover and the rollback — and both `blue_responses` and `green_responses` are non-zero, proving traffic actually moved between the two proxies. Stop the curl loop with `Ctrl-C`.
+**Success criteria:** `http_req_failed` is `0.00%` and `checks` is `100.00%`, zero dropped requests across both the cutover and the rollback. Both `blue_responses` and `green_responses` must be non-zero, which proves traffic moved between the two proxies. Stop the curl loop with `Ctrl-C`.
 
-**Observed result (v2026.6.1):** 9,001 requests, 0.00% failed, 100% checks across both the cutover and the rollback; blue_responses 7,495 / green_responses 1,506 — traffic moved blue→green→blue with zero dropped requests.
+**Observed result (v2026.6.1):** 9,001 requests, 0.00% failed, 100% checks across both the cutover and the rollback; blue_responses 7,495 / green_responses 1,506. Traffic moved blue→green→blue with zero dropped requests.
 
 ## Interpreting the results
 
 | What | Result | Why |
 |---|---|---|
 | Cutover blue→green | **Zero downtime** | Weights are applied per request at the edge; flipping `100/0`→`0/100` routes new requests to the green proxy. A request already dispatched completes on its proxy. |
-| Rollback green→blue | **Instant, zero downtime** | Rollback is the same weight flip in reverse — no redeploy, no drain. Blue was never torn down, so it resumes immediately. |
+| Rollback green→blue | **Instant, zero downtime** | Rollback is the same weight flip in reverse: no redeploy, no drain. Blue was never torn down, so it resumes immediately. |
 | Traffic moved | `blue_responses` and `green_responses` both > 0 | The `x-gateway-color` header proves requests were served by two different proxies across the run. |
 
-The blue/green advantage over in-place: **green is validated as a real, running proxy before it takes traffic, and rollback is a traffic flip rather than a second rollout.** The cost is running two data planes at once.
+The blue/green advantage over in-place: green is validated as a real, running proxy before it takes traffic, and rollback is a traffic flip rather than a second rollout. The cost is running two data planes at once.
 
-Both this lab and in-place keep the upgrade within a single cluster. To move the boundary up a level — taking a whole cluster out of service while a peer cluster serves the same global LLM — see [Multi-Cluster Upgrades](multi-cluster-upgrades.md).
+Both this lab and in-place keep the upgrade within a single cluster. To move the boundary up a level, taking a whole cluster out of service while a peer cluster serves the same global LLM, see [Multi-Cluster Upgrades](multi-cluster-upgrades.md).
 
-> **Sessions across a cutover:** weights are evaluated per request, so stateless completions cut over cleanly. A sticky or long-lived SSE session that is pinned to one proxy will treat a cutover as a session boundary unless you add session persistence (consistent hashing / `sessionPersistence`). For long-lived MCP/SSE specifics, see the [In-Place Rolling Upgrades](in-place-rolling-upgrades.md) lab's MCP section — the same single-replica session caveat applies.
+> **Sessions across a cutover:** weights are evaluated per request, so stateless completions cut over cleanly. A sticky or long-lived SSE session that is pinned to one proxy will treat a cutover as a session boundary unless you add session persistence (consistent hashing / `sessionPersistence`). For long-lived MCP/SSE specifics, see the [In-Place Rolling Upgrades](in-place-rolling-upgrades.md) lab's MCP section; the same single-replica session caveat applies.
 
 > **In production**, green is the proxy you install at the new `--version` (or with new config/policies). The mechanism is identical: stand green up, validate it, shift weight, and keep blue as instant rollback until you're confident.
 

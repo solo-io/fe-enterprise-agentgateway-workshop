@@ -76,7 +76,7 @@ The `policies.ai.routes` configuration allows you to route different OpenAI Batc
 
 ## Understanding OpenAI Batches API
 
-The Batches API allows you to send asynchronous groups of requests with 50% lower costs and a separate pool of significantly higher rate limits. The workflow involves:
+The Batches API allows you to send asynchronous groups of requests with 50% lower costs and a separate pool of higher rate limits. The workflow involves:
 
 1. Creating a JSONL file with your batch requests
 2. Uploading the file using `/v1/files`
@@ -344,12 +344,12 @@ Example output for batch creation:
 ## Use Cases for Batches API
 
 The Batches API is ideal for:
-- **Bulk processing**: Running evaluations across large datasets
-- **Cost optimization**: 50% discount compared to synchronous API calls
-- **Higher throughput**: Separate rate limits from synchronous requests
-- **Overnight jobs**: 24-hour completion window for non-urgent tasks
-- **A/B testing**: Testing multiple prompts or models at scale
-- **Data analysis**: Processing large amounts of text for embeddings or completions
+- Bulk processing: Running evaluations across large datasets
+- Cost optimization: 50% discount compared to synchronous API calls
+- Higher throughput: Separate rate limits from synchronous requests
+- Overnight jobs: 24-hour completion window for non-urgent tasks
+- A/B testing: Testing multiple prompts or models at scale
+- Data analysis: Processing large amounts of text for embeddings or completions
 
 ## Observability
 

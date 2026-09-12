@@ -12,7 +12,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Overview
 
-Every MCP operation — whether it's `tools/list`, `tools/call`, `resources/read`, or any other JSON-RPC method — is a single HTTP POST to the MCP endpoint. From the gateway's perspective, there is no distinction between listing tools and actually calling one.
+Every MCP operation, whether `tools/list`, `tools/call`, `resources/read`, or any other JSON-RPC method, is a single HTTP POST to the MCP endpoint. From the gateway's perspective, there is no distinction between listing tools and calling one.
 
 A typical MCP client session produces approximately 3–5 HTTP POSTs:
 
@@ -23,9 +23,9 @@ A typical MCP client session produces approximately 3–5 HTTP POSTs:
 | Call a tool once | `tools/call` → 1 POST |
 | **Total per tool call session** | **~3–5 POSTs** |
 
-This means a limit of "5 requests per minute" translates to roughly 1 tool call session per minute — not 5 individual calls. Size your limits in sessions, not raw HTTP requests.
+This means a limit of "5 requests per minute" translates to roughly 1 tool call session per minute, not 5 individual calls. Size your limits in sessions, not raw HTTP requests.
 
-To target a specific tool, use a CEL descriptor to inspect the JSON-RPC request body and extract the tool name from `params.name`. Only requests matching the configured tool name are counted — all other tools and MCP operations like `initialize` and `tools/list` pass through without restriction.
+To target a specific tool, use a CEL descriptor to inspect the JSON-RPC request body and extract the tool name from `params.name`. Only requests matching the configured tool name are counted; all other tools and MCP operations like `initialize` and `tools/list` pass through without restriction.
 
 ## Deploy the MCP Server
 
@@ -174,9 +174,9 @@ In the MCP Inspector menu, connect to your AgentGateway:
 - Click **Connect**
 
 From the **Tools** tab, click **List Tools** and verify the `mcp-server-everything` tools are available:
-- `echo` — returns a message back to the caller
-- `get-sum` — adds two numbers
-- `get-env` — returns server environment variables
+- `echo`: returns a message back to the caller
+- `get-sum`: adds two numbers
+- `get-env`: returns server environment variables
 
 ## Configure Per-Tool Rate Limiting
 
@@ -206,7 +206,7 @@ spec:
 EOF
 ```
 
-The CEL expression extracts the tool name from the JSON-RPC body for `tools/call` requests. For `initialize`, `tools/list`, and other MCP operations where `params.name` doesn't exist, it returns `"none"` — which matches no descriptor and is never rate limited. Only requests where `tool_name=get-env` are counted against the 3/min limit.
+The CEL expression extracts the tool name from the JSON-RPC body for `tools/call` requests. For `initialize`, `tools/list`, and other MCP operations where `params.name` doesn't exist, it returns `"none"`, which matches no descriptor and is never rate limited. Only requests where `tool_name=get-env` are counted against the 3/min limit.
 
 Apply the rate limit by referencing the `RateLimitConfig` in an `EnterpriseAgentgatewayPolicy` that targets the MCP HTTPRoute:
 
@@ -242,7 +242,7 @@ Both `Accepted` and `Attached` conditions must be `True` before testing.
 
 ### Hit the limit on a rate-limited tool
 
-> **Note:** `get-env` is not actually an expensive tool, but imagine it as one that returns sensitive environment data you want to tightly control — for example, a tool that reads secrets, calls a paid external API, or triggers a long-running backend job.
+> **Note:** `get-env` is not an expensive tool, but imagine it as one that returns sensitive environment data you want to tightly control: for example, a tool that reads secrets, calls a paid external API, or triggers a long-running backend job.
 
 In the MCP Inspector, call the `get-env` tool 4 times:
 
