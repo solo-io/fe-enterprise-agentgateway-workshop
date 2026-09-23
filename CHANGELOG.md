@@ -1,10 +1,10 @@
 # Changelog
 
-0.14.2 - (9-22-26)
+0.14.2 - (9-23-26)
 ---
 - Prose cleanup across all workshop markdown (labs, README, tracks, style guide, chart and lib READMEs)
 - Upgrade Solo UI to `0.5.8` in lab `002`, the air-gap lab, the image list, and the system requirements
-- Air-gap lab and image list: autoauth image to `v0.2.3` and `opentelemetry-collector-contrib` to `0.158.0`, matching the images chart `0.5.8` deploys
+- Air-gap lab and image list updated
 
 0.14.1 - (9-10-26)
 ---
