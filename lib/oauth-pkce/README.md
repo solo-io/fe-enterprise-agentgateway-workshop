@@ -1,13 +1,13 @@
 # OAuth 2.0 Authorization Code + PKCE helpers
 
-Two small, dependency-free Python scripts that let a **public** OAuth client (a CLI —
+Two small, dependency-free Python scripts that let a **public** OAuth client (a CLI with
 no client secret) obtain and maintain an access token from an OIDC identity provider.
 They are IdP-agnostic; the labs that use them configure Auth0.
 
 | File | Role | Interactive? |
 |---|---|---|
-| `pkce-login.py` | Runs the Authorization Code + PKCE flow in a browser and caches the tokens | Yes — run once per token lifetime |
-| `pkce-token.py` | Prints a valid access token on stdout, refreshing it silently when expired | **No** — safe to invoke repeatedly from a harness |
+| `pkce-login.py` | Runs the Authorization Code + PKCE flow in a browser and caches the tokens | Yes; run once per token lifetime |
+| `pkce-token.py` | Prints a valid access token on stdout, refreshing it silently when expired | **No**; safe to invoke repeatedly from a harness |
 
 The split exists because credential helpers are invoked automatically and repeatedly.
 A helper that opened a browser or bound a listening port on every call would be
@@ -26,7 +26,7 @@ unusable, so all interactivity lives in `pkce-login.py`.
 | `OIDC_SCOPES` | no | Default `openid profile email offline_access`. `offline_access` is what yields a refresh token |
 | `OIDC_CACHE` | no | Cache path, default `~/.agentgateway/pkce-token.json` |
 
-`pkce-token.py` deliberately reads **only the cache** — the IdP issuer, client ID and
+`pkce-token.py` deliberately reads **only the cache**: the IdP issuer, client ID and
 audience are written into it at login. A harness that invokes the helper may not
 inherit your shell environment, so depending on env vars there would be fragile.
 It honours `OIDC_CACHE` and `OIDC_SKEW_SECONDS` (default `120`, how early to renew).
@@ -69,8 +69,8 @@ can neither shadow nor disable it.
 
 Credential helpers have a narrow contract, and this script honours it:
 
-- **stdout carries only the token** — every message goes to stderr
-- **never interactive** — it will not open a browser or wait for input
+- **stdout carries only the token**: every message goes to stderr
+- **never interactive**: it will not open a browser or wait for input
 - **exits non-zero with an explanation** when it cannot produce a token, rather than
   hanging or printing something unusable
 
@@ -85,4 +85,4 @@ Credential helpers have a narrow contract, and this script honours it:
 
 ## Used by
 
-- [`labs/agent-harnesses/claude-code-auth0-pkce.md`](../../labs/agent-harnesses/claude-code-auth0-pkce.md) — keeps Claude Code authenticated to an Anthropic route through the gateway
+- [`labs/agent-harnesses/claude-code-auth0-pkce.md`](../../labs/agent-harnesses/claude-code-auth0-pkce.md): keeps Claude Code authenticated to an Anthropic route through the gateway

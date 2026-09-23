@@ -6,19 +6,19 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ### Keycloak requirements
 
-You do **not** need an external IdP account or dashboard for this lab. It deploys its own Keycloak **in-cluster** (Step 0), importing a realm, a confidential `mcp-gateway` client, its audience mapper, and a test user declaratively on first boot. All the values below are fixed by that import — you set them as shell variables in Step 1; there is no admin UI to click through.
+You do **not** need an external IdP account or dashboard for this lab. It deploys its own Keycloak **in-cluster** (Step 0), importing a realm, a confidential `mcp-gateway` client, its audience mapper, and a test user declaratively on first boot. All the values below are fixed by that import: you set them as shell variables in Step 1; there is no admin UI to click through.
 
 | Variable | Description |
 |---|---|
-| `KC_REALM` | Realm imported by this lab — `mcp-enterprise` |
-| `KC_CLIENT_ID` | Confidential client id — `mcp-gateway` |
-| `KC_CLIENT_SECRET` | Client secret baked into the realm import — `mcpGatewayWorkshopSecret` |
-| `KC_AUDIENCE` | Audience the client's mapper stamps on issued tokens — `mcp-gateway` — must match the `aud` claim |
-| `KC_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-keycloak.try-solo.io` |
+| `KC_REALM` | Realm imported by this lab: `mcp-enterprise` |
+| `KC_CLIENT_ID` | Confidential client id: `mcp-gateway` |
+| `KC_CLIENT_SECRET` | Client secret baked into the realm import: `mcpGatewayWorkshopSecret` |
+| `KC_AUDIENCE` | Audience the client's mapper stamps on issued tokens: `mcp-gateway`; must match the `aud` claim |
+| `KC_GATEWAY_HOST` | Public hostname for the gateway (no scheme); this lab uses `mcp-keycloak.try-solo.io` |
 | `KC_IP` | LoadBalancer address of the in-cluster Keycloak Service (captured in Step 0) |
-| `KC_ISSUER` | `http://<KC_IP>:8080/realms/<KC_REALM>` — **no trailing slash** (Keycloak emits `iss` without one) |
+| `KC_ISSUER` | `http://<KC_IP>:8080/realms/<KC_REALM>`; **no trailing slash** (Keycloak emits `iss` without one) |
 
-The `mcp-gateway` client is imported with `redirectUris: ["*"]`, so there is **no** per-callback registration to do — the two-callback gotcha some IdPs impose does not apply to Keycloak.
+The `mcp-gateway` client is imported with `redirectUris: ["*"]`, so there is **no** per-callback registration to do; the two-callback gotcha some IdPs impose does not apply to Keycloak.
 
 ### Required tools
 
@@ -26,7 +26,7 @@ The `mcp-gateway` client is imported with `redirectUris: ["*"]`, so there is **n
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Step 9)
 - `jq` for inspecting JSON responses
-- A way to resolve `mcp-keycloak.try-solo.io` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo). Note the `/etc/hosts` entry maps the **gateway** host only; Keycloak is reached directly at its LoadBalancer IP.
+- A way to resolve `mcp-keycloak.try-solo.io` from your workstation to the gateway LoadBalancer: either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo). Note the `/etc/hosts` entry maps the **gateway** host only; Keycloak is reached directly at its LoadBalancer IP.
 
 ---
 
@@ -51,7 +51,7 @@ Keycloak supports Dynamic Client Registration (RFC 7591) natively, but it has pr
 - DCR requires an initial access token or an open registration policy that some orgs don't want to expose to gateway components.
 - Operationally, most teams want a single "MCP Gateway" client registered in Keycloak, not one per client.
 
-**Eager OAuth** with pre-registered client_ids fixes this. agentgateway becomes the OAuth Authorization Server that MCP clients see, and Keycloak sits downstream of the gateway. MCP clients DCR against the gateway and get a single pre-registered Keycloak `client_id` / `client_secret` pair — no realm churn, no registration API needed at runtime.
+**Eager OAuth** with pre-registered client_ids fixes this. agentgateway becomes the OAuth Authorization Server that MCP clients see, and Keycloak sits downstream of the gateway. MCP clients DCR against the gateway and get a single pre-registered Keycloak `client_id` / `client_secret` pair: no realm churn, no registration API needed at runtime.
 
 Keycloak runs in-cluster over plain HTTP and is reached by the browser, the controller, and the proxy at one shared LoadBalancer address, so the issuer it derives (`http://<KC_IP>:8080/realms/<realm>`) stays consistent across every party in the flow.
 
@@ -200,7 +200,7 @@ kubectl create secret tls -n agentgateway-system mcp-keycloak-tls \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Update the `agentgateway-proxy` Gateway to expose both listeners — the original HTTP on 8080 (preserved so other labs continue to work) and a new HTTPS listener on 443. Patch it rather than applying a full replacement manifest, so the `spec.infrastructure.parametersRef` from Lab 001 (which carries the proxy's replica count, resources, and, after Step 4, its `STS_URI`/`STS_AUTH_TOKEN` env vars) stays intact:
+Update the `agentgateway-proxy` Gateway to expose both listeners: the original HTTP on 8080 (preserved so other labs continue to work) and a new HTTPS listener on 443. Patch it rather than applying a full replacement manifest, so the `spec.infrastructure.parametersRef` from Lab 001 (which carries the proxy's replica count, resources, and, after Step 4, its `STS_URI`/`STS_AUTH_TOKEN` env vars) stays intact:
 
 ```bash
 kubectl patch gateway -n agentgateway-system agentgateway-proxy --type=merge -p='
@@ -250,7 +250,7 @@ https	True
 
 ## Step 3 — Deploy Postgres for OAuth State
 
-The eager-OAuth feature stores token-exchange / authorization-code state in a database. This lab uses Postgres (production-realistic). For quick iteration you can skip Postgres and use SQLite in-memory — see the callout below.
+The eager-OAuth feature stores token-exchange / authorization-code state in a database. This lab uses Postgres (production-realistic). For quick iteration you can skip Postgres and use SQLite in-memory; see the callout below.
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -340,13 +340,13 @@ Expected Output:
 deployment "postgres" successfully rolled out
 ```
 
-> **Skip Postgres? Use SQLite in-memory.** Omit Step 3 entirely, then in Step 5 omit the `database:` block from the values. The gateway will use SQLite in-memory. State is lost on pod restart — fine for a lab, not for production.
+> **Skip Postgres? Use SQLite in-memory.** Omit Step 3 entirely, then in Step 5 omit the `database:` block from the values. The gateway will use SQLite in-memory. State is lost on pod restart: fine for a lab, not for production.
 
 ---
 
 ## Step 4 — Add STS Env Vars to the Gateway Config
 
-The eager-OAuth flow needs two env vars on the agentgateway proxy pod so it knows where the in-cluster STS endpoint lives. Patch the existing `agentgateway-config` `EnterpriseAgentgatewayParameters` from Lab 001 — do not recreate it; the patch preserves all other settings.
+The eager-OAuth flow needs two env vars on the agentgateway proxy pod so it knows where the in-cluster STS endpoint lives. Patch the existing `agentgateway-config` `EnterpriseAgentgatewayParameters` from Lab 001. Do not recreate it; the patch preserves all other settings.
 
 ```bash
 kubectl patch enterpriseagentgatewayparameters agentgateway-config \
@@ -449,10 +449,10 @@ What each piece does:
 | Setting | Purpose |
 |---|---|
 | `tokenExchange.enabled: true` | Turns the eager-OAuth feature on at the controller level (and starts the controller's port-7777 server that hosts both the AS endpoints and the STS) |
-| `tokenExchange.subjectValidator` / `apiValidator` / `actorValidator` | All three required at boot — the controller refuses to start without them, even though only the eager-OAuth issuer (not RFC 8693 token exchange) is being used here. Crash signature if missing: `error creating actor validator: unsupported validator type:` |
+| `tokenExchange.subjectValidator` / `apiValidator` / `actorValidator` | All three required at boot: the controller refuses to start without them, even though only the eager-OAuth issuer (not RFC 8693 token exchange) is being used here. Crash signature if missing: `error creating actor validator: unsupported validator type:` |
 | `tokenExchange.database.postgres.url` | Postgres connection string from Step 3; omit for SQLite in-memory |
 | `gateway_config.base_url` | Public URL clients use to reach the gateway's AS endpoints (must include `/oauth-issuer`) |
-| `client_config.clients` | Pre-registered `client_id`/`client_secret` table — `/oauth-issuer/register` returns one of these |
+| `client_config.clients` | Pre-registered `client_id`/`client_secret` table; `/oauth-issuer/register` returns one of these |
 | `downstream_server` | Credentials and URLs for the gateway to talk to Keycloak during the authorization code flow; `redirect_uri` must match an entry in the Keycloak client's "Valid redirect URIs" |
 
 Wait for the controller and proxy pods to restart cleanly:
@@ -702,8 +702,8 @@ The policy ties everything together:
 
 | Field | Purpose |
 |---|---|
-| `issuer` | Keycloak is the JWT issuer (`${KC_ISSUER}` — **no** trailing slash) |
-| `jwks` | Points at the `keycloak-jwks` backend created in Step 7. **`jwksPath` must be written without a leading slash** (`realms/${KC_REALM}/protocol/openid-connect/certs`) — the controller appends `/` between the backend URL and `jwksPath`, so a leading slash produces `http://$KC_IP//realms/...`, which returns 404. The controller log signature is `failed resolving jwks ... 404` and the policy goes `PartiallyValid`; `/mcp` then bypasses auth entirely (`GET /mcp` returns 406 instead of 401). |
+| `issuer` | Keycloak is the JWT issuer (`${KC_ISSUER}`; **no** trailing slash) |
+| `jwks` | Points at the `keycloak-jwks` backend created in Step 7. **`jwksPath` must be written without a leading slash** (`realms/${KC_REALM}/protocol/openid-connect/certs`): the controller appends `/` between the backend URL and `jwksPath`, so a leading slash produces `http://$KC_IP//realms/...`, which returns 404. The controller log signature is `failed resolving jwks ... 404` and the policy goes `PartiallyValid`; `/mcp` then bypasses auth entirely (`GET /mcp` returns 406 instead of 401). |
 | `audiences` | `mcp-gateway`, injected by the client's audience mapper |
 | `resourceMetadata.agentgateway.dev/issuer-proxy` | Tells the gateway to serve its own AS metadata (from the in-cluster eager-OAuth issuer at `:7777/oauth-issuer`) when an MCP client fetches `.well-known/oauth-authorization-server/mcp`. Without this, the gateway would proxy Keycloak's metadata directly. |
 | `resourceMetadata.authorizationServers` / `resource` | What shows up in the protected-resource discovery document for clients |
@@ -781,7 +781,7 @@ In the Inspector UI:
 
 Inspector follows the protected-resource discovery automatically. You should see:
 
-1. A redirect to the **Keycloak** login page at `http://${KC_IP}:8080` (plain HTTP — expected for this lab). **Verify the URL bar shows the Keycloak host `${KC_IP}:8080`, not the gateway hostname** — this confirms the eager-OAuth issuer correctly delegated downstream. Sign in as `mcp-user` / `mcp-user`.
+1. A redirect to the **Keycloak** login page at `http://${KC_IP}:8080` (plain HTTP, expected for this lab). **Verify the URL bar shows the Keycloak host `${KC_IP}:8080`, not the gateway hostname**: this confirms the eager-OAuth issuer correctly delegated downstream. Sign in as `mcp-user` / `mcp-user`.
 
    ![Keycloak "Sign in to mcp-enterprise" login page, reached via the LoadBalancer IP](../../images/keycloak/03-keycloak-login.png)
 
@@ -792,7 +792,7 @@ Inspector follows the protected-resource discovery automatically. You should see
 
 ### Confirm tools are reachable
 
-In the Inspector left panel, click **Tools → List Tools**. The `mcp-server-everything` tools should render (`echo`, `get-sum`, `get-env`, `get-tiny-image`, `trigger-long-running-operation`, …). Run one (`echo` with `{"message":"hi"}`) — you should get `Echo: hi` back, not a 401.
+In the Inspector left panel, click **Tools → List Tools**. The `mcp-server-everything` tools should render (`echo`, `get-sum`, `get-env`, `get-tiny-image`, `trigger-long-running-operation`, …). Run one (`echo` with `{"message":"hi"}`): you should get `Echo: hi` back, not a 401.
 
 ![Inspector Tools tab listing the mcp-server-everything tool set](../../images/keycloak/05-tools-list.png)
 
@@ -803,13 +803,13 @@ In the Inspector left panel, click **Tools → List Tools**. The `mcp-server-eve
 | Observation in Inspector | What it proves |
 |---|---|
 | Redirect lands on the Keycloak host `${KC_IP}:8080` | Eager-OAuth issuer is serving its own AS metadata; `registration_endpoint` was rewritten to point at the gateway |
-| Login completes and Inspector shows "Connected" | The pre-registered `client_id`/`client_secret` from `client_config.clients` matched the Keycloak `mcp-gateway` client — fake-DCR worked end-to-end |
+| Login completes and Inspector shows "Connected" | The pre-registered `client_id`/`client_secret` from `client_config.clients` matched the Keycloak `mcp-gateway` client: fake-DCR worked end-to-end |
 | Tool list renders without 401 | Keycloak-issued JWT validated against Keycloak JWKS at the MCP backend; `mcp.authentication` is configured correctly |
 | Tool execution succeeds | Full request path through the gateway works; the downstream MCP server received the bearer token |
 
 ### (Optional) Verify Postgres-backed state survives a restart
 
-Skip if you opted into SQLite in Step 3 — state is in-memory and **will not** survive restart.
+Skip if you opted into SQLite in Step 3: state is in-memory and **will not** survive restart.
 
 ```bash
 kubectl rollout restart -n agentgateway-system deployment/enterprise-agentgateway
@@ -828,9 +828,9 @@ This step uses Claude Code as the MCP client in place of MCP Inspector. Claude C
 
 ### Trust the self-signed cert
 
-This lab uses a self-signed certificate. If your gateway is using a certificate from a trusted CA, skip this section — `NODE_TLS_REJECT_UNAUTHORIZED=0` is not needed.
+This lab uses a self-signed certificate. If your gateway is using a certificate from a trusted CA, skip this section; `NODE_TLS_REJECT_UNAUTHORIZED=0` is not needed.
 
-Claude Code is a Node.js process and won't accept the self-signed gateway cert by default. Prefix the launch command with `NODE_TLS_REJECT_UNAUTHORIZED=0` as shown in the next section — do **not** add it to your shell rc file, as it disables TLS verification for all Node processes in that shell.
+Claude Code is a Node.js process and won't accept the self-signed gateway cert by default. Prefix the launch command with `NODE_TLS_REJECT_UNAUTHORIZED=0` as shown in the next section; do **not** add it to your shell rc file, as it disables TLS verification for all Node processes in that shell.
 
 ### Register the MCP server with Claude Code
 
@@ -871,9 +871,9 @@ NODE_TLS_REJECT_UNAUTHORIZED=0 claude
 On the first prompt that triggers MCP tool discovery, Claude Code initiates the OAuth flow automatically:
 
 1. Claude Code fetches `/.well-known/oauth-protected-resource/mcp` to discover the authorization server.
-2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-keycloak.try-solo.io/oauth-issuer/register`), not the Keycloak host — this confirms the eager-OAuth issuer is serving its own AS metadata.
+2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-keycloak.try-solo.io/oauth-issuer/register`), not the Keycloak host: this confirms the eager-OAuth issuer is serving its own AS metadata.
 3. Claude Code POSTs to `/oauth-issuer/register` and receives the pre-registered Keycloak `client_id`.
-4. A browser window opens to the **Keycloak login page** at `http://${KC_IP}:8080` (plain HTTP — expected for this lab). **Verify the URL bar shows the Keycloak host `${KC_IP}:8080`**, not the gateway hostname — this confirms the eager-OAuth issuer correctly delegated downstream.
+4. A browser window opens to the **Keycloak login page** at `http://${KC_IP}:8080` (plain HTTP, expected for this lab). **Verify the URL bar shows the Keycloak host `${KC_IP}:8080`**, not the gateway hostname: this confirms the eager-OAuth issuer correctly delegated downstream.
 5. Complete the Keycloak login as `mcp-user` / `mcp-user`.
 6. The browser redirects back; Claude Code captures the authorization code via a local PKCE callback server and exchanges it for a token.
 7. Claude Code resumes. The token is stored in Claude Code's local config and reused on subsequent runs.
@@ -895,7 +895,7 @@ Expected: Claude Code calls the `echo` tool and returns the echoed message witho
 | Observation in Claude Code | What it proves |
 |---|---|
 | Browser opens to the Keycloak host `${KC_IP}:8080`, not the gateway | Eager-OAuth AS is serving its own AS metadata; `registration_endpoint` was rewritten to point at the gateway |
-| Login completes and Claude Code resumes tool calls | Pre-registered `client_id`/`client_secret` from `client_config.clients` matched the Keycloak `mcp-gateway` client — fake-DCR worked end-to-end |
+| Login completes and Claude Code resumes tool calls | Pre-registered `client_id`/`client_secret` from `client_config.clients` matched the Keycloak `mcp-gateway` client: fake-DCR worked end-to-end |
 | Tool call returns a result without a 401 | Keycloak-issued JWT validated against Keycloak JWKS at the MCP backend; `mcp.authentication` is configured correctly |
 | Subsequent `claude` invocations skip the browser | Token stored in Claude Code's local config and reused automatically |
 
@@ -950,7 +950,7 @@ kubectl logs -n agentgateway-system deployment/agentgateway-proxy -f
 
 ## Cleanup
 
-Fully revert to the Lab 001 baseline. Run these in order — the helm revert is **required**, not optional. Skipping it leaves the controller running with `tokenExchange.enabled` and a postgres URL pointing at a deleted DB; a future re-run of this lab will hit `relation "oauth_flow_states" does not exist` because the controller pod never restarts to migrate against a fresh postgres.
+Fully revert to the Lab 001 baseline. Run these in order; the helm revert is required. Skipping it leaves the controller running with `tokenExchange.enabled` and a postgres URL pointing at a deleted DB; a future re-run of this lab will hit `relation "oauth_flow_states" does not exist` because the controller pod never restarts to migrate against a fresh postgres.
 
 ```bash
 # 1. Delete lab-specific resources

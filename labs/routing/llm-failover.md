@@ -277,9 +277,9 @@ Note that the default response from the mock openai server will always be
 ```
 
 **Expected response pattern (with single replica):**
-- **Request 1**: `429 Too Many Requests` from mock-gpt-4o
-- **Request 2**: `200 OK` from OpenAI (failover successful)
-- **Request 3**: `200 OK` from OpenAI (continues using failover)
+- Request 1: `429 Too Many Requests` from mock-gpt-4o
+- Request 2: `200 OK` from OpenAI (failover successful)
+- Request 3: `200 OK` from OpenAI (continues using failover)
 
 **What's happening:**
 1. The first request hits the mock server and receives a 429 error
@@ -337,7 +337,7 @@ In the access logs (entries with `"scope": "request"`), you can observe:
 - `"gen_ai.response.model"`, `"gen_ai.usage.input_tokens"`, `"gen_ai.usage.output_tokens"` showing successful OpenAI response
 - `"response.body"` containing the actual LLM completion
 
-The change in `endpoint` field between requests clearly shows the failover from the mock server to OpenAI.
+The change in `endpoint` field between requests shows the failover from the mock server to OpenAI.
 
 ### View Traces in the Solo UI
 
@@ -353,37 +353,35 @@ kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
 3. Click **Tracing** in the left navigation
 
 4. Compare traces from your two requests:
-   - **First trace**: Shows attempt to mock-gpt-4o with 429 error span
-   - **Second trace**: Shows successful routing to OpenAI backend with 200 response
+   - First trace: Shows attempt to mock-gpt-4o with 429 error span
+   - Second trace: Shows successful routing to OpenAI backend with 200 response
 5. You can see how the backend selection changes based on provider health
 
 ## Understanding Priority Group Failover
 
-The priority group failover configuration demonstrates several key concepts:
-
 ### How Priority Groups Work
 
-1. **Priority Ordering**: The gateway prefers providers in higher priority groups (group 1 over group 2, etc.)
-2. **Health Policy (EnterpriseAgentgatewayPolicy)**: An `EnterpriseAgentgatewayPolicy` with `backend.health` defines what constitutes an unhealthy response and how eviction works. **Without a health policy, backends are never evicted and failover will not trigger.**
+1. Priority Ordering: The gateway prefers providers in higher priority groups (group 1 over group 2, etc.)
+2. Health Policy (EnterpriseAgentgatewayPolicy): An `EnterpriseAgentgatewayPolicy` with `backend.health` defines what constitutes an unhealthy response and how eviction works. **Without a health policy, backends are never evicted and failover will not trigger.**
    - `unhealthyCondition` is a CEL expression evaluated against each response. If it returns `true`, the response counts toward eviction
    - `eviction.consecutiveFailures` sets how many consecutive unhealthy responses are required before eviction (use `1` for immediate eviction, `3` to tolerate transient errors)
    - `eviction.duration` sets the base removal time from the priority group. Duration increases with multiplicative backoff on repeated evictions
-3. **Health-Based Eviction**: When a provider's responses match the `unhealthyCondition` and thresholds are met, it's evicted from the pool
-   - The **first request** that encounters an error will fail with that error code
+3. Health-Based Eviction: When a provider's responses match the `unhealthyCondition` and thresholds are met, it's evicted from the pool
+   - The first request that encounters an error will fail with that error code
    - The provider is evicted after processing the error response
-   - **Subsequent requests** will skip evicted providers and use the next priority group
+   - Subsequent requests will skip evicted providers and use the next priority group
    - **Important**: Health state is local to each AgentGateway pod. With multiple replicas, you may see 1-2 failed requests before failover as different pods learn about the unhealthy state
-4. **Eviction Duration**: The `eviction.duration` in the `EnterpriseAgentgatewayPolicy` controls how long a backend is removed from the pool. After the period expires, the gateway will retry the primary backend to check if it has recovered. Duration increases with multiplicative backoff on repeated evictions, preventing rapid cycling on persistently failing backends
-5. **Across-Request Failover**: Unlike retry policies that work within a single request, priority group failover works across multiple requests based on provider health state
+4. Eviction Duration: The `eviction.duration` in the `EnterpriseAgentgatewayPolicy` controls how long a backend is removed from the pool. After the period expires, the gateway will retry the primary backend to check if it has recovered. Duration increases with multiplicative backoff on repeated evictions, preventing rapid cycling on persistently failing backends
+5. Across-Request Failover: Unlike retry policies that work within a single request, priority group failover works across multiple requests based on provider health state
    - With a single replica: expect 1 failed request, then failover to the next priority group
    - With multiple replicas: expect 1-2 failed requests before all pods mark the provider as unhealthy
    - Once a provider is evicted, all subsequent requests use the failover backend until the eviction period expires
-6. **CEL Expression Examples**: The `unhealthyCondition` field supports flexible CEL expressions:
-   - `"response.code >= 500 || response.code == 429"` — evict on server errors and rate limits
-   - `"response.code >= 500"` — evict on server errors only
-   - `"response.code >= 400"` — evict on any client or server error
-   - `"true"` — evict on every response (testing only)
-7. **Production Use Case**: This pattern is ideal for scenarios where you have:
+6. CEL Expression Examples: The `unhealthyCondition` field supports flexible CEL expressions:
+   - `"response.code >= 500 || response.code == 429"`: evict on server errors and rate limits
+   - `"response.code >= 500"`: evict on server errors only
+   - `"response.code >= 400"`: evict on any client or server error
+   - `"true"`: evict on every response (testing only)
+7. Production Use Case: This pattern is ideal for scenarios where you have:
    - Primary backends that may experience temporary rate limiting or server errors
    - Fallback backends as safety nets for subsequent requests
    - Different cost tiers (prefer cheaper model, fall back to more expensive when primary is unavailable)
@@ -391,7 +389,7 @@ The priority group failover configuration demonstrates several key concepts:
 
 ## Next Steps: Advanced Failover Patterns
 
-The basic lab above demonstrates one failover from a single failing backend to a healthy fallback. For more advanced patterns — load balancing across multiple providers within a priority group, eviction on 5XX server errors, and proving the full intra-group LB + per-provider eviction + inter-group failover behavior end-to-end — see [Advanced LLM Failover Patterns](llm-failover-advanced.md).
+The basic lab above demonstrates one failover from a single failing backend to a healthy fallback. For more advanced patterns (load balancing across multiple providers within a priority group, eviction on 5XX server errors, and proving the full intra-group LB + per-provider eviction + inter-group failover behavior end-to-end), see [Advanced LLM Failover Patterns](llm-failover-advanced.md).
 
 ## Cleanup
 

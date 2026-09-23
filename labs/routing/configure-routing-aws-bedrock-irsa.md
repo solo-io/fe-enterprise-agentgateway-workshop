@@ -19,13 +19,12 @@ Additionally, this lab requires:
 
 ## Overview
 
-This lab configures Enterprise Agentgateway to access AWS Bedrock **without storing AWS credentials as Kubernetes secrets**. Instead, we use EKS IAM Roles for Service Accounts (IRSA) to let the agentgateway pod assume an IAM role natively.
+This lab configures Enterprise Agentgateway to access AWS Bedrock without storing AWS credentials as Kubernetes secrets. Instead, we use EKS IAM Roles for Service Accounts (IRSA) to let the agentgateway pod assume an IAM role natively.
 
 ### Why IRSA?
 - No long-lived AWS access keys to manage or rotate
 - Credentials are short-lived and automatically refreshed
 - Fine-grained IAM permissions scoped to a single service account
-- Follows AWS security best practices for EKS workloads
 
 | Approach | Credentials | Rotation | Scope |
 |---|---|---|---|
@@ -33,7 +32,7 @@ This lab configures Enterprise Agentgateway to access AWS Bedrock **without stor
 | **API Key** ([Bedrock API Key lab](configure-routing-aws-bedrock-apikey.md)) | Bearer token in K8s Secret | Manual (short-term: 12h, long-term: configurable) | Any pod with secret access |
 | **IRSA** (this lab) | Temporary STS credentials | Automatic | Single service account |
 
-IRSA is the recommended approach for production EKS deployments accessing AWS services.
+AWS recommends IRSA for production EKS deployments that access AWS services.
 
 ### How IRSA Works
 1. The EKS cluster's OIDC issuer is associated with AWS IAM

@@ -66,10 +66,10 @@ EOF
 ```
 
 The `policies.ai.routes` configuration routes each endpoint:
-- `/v1/chat/completions`: `"Completions"` — standard chat with full AI gateway processing (metrics, guardrails)
-- `/v1/audio/speech`: `"Passthrough"` — proxies TTS requests to OpenAI
-- `/v1/audio/transcriptions`: `"Passthrough"` — proxies STT requests to OpenAI
-- `*`: `"Passthrough"` — default passthrough for any other paths
+- `/v1/chat/completions`: `"Completions"`, standard chat with full AI gateway processing (metrics, guardrails)
+- `/v1/audio/speech`: `"Passthrough"`, proxies TTS requests to OpenAI
+- `/v1/audio/transcriptions`: `"Passthrough"`, proxies STT requests to OpenAI
+- `*`: `"Passthrough"`, default passthrough for any other paths
 
 Get the Gateway IP:
 ```bash

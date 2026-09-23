@@ -44,11 +44,11 @@ You will also need:
   +---------------------------------------------------------------------+
 ```
 
-Solo Enterprise for AgentGateway includes an embedded OPA engine in the ext-auth service. You write a Rego policy as a ConfigMap, reference it from an `AuthConfig`, and attach it to any HTTPRoute via an `EnterpriseAgentgatewayPolicy`. No standalone OPA deployment required.
+Solo Enterprise for AgentGateway includes an embedded OPA engine in the ext-auth service. You write a Rego policy as a ConfigMap, reference it from an `AuthConfig`, and attach it to any HTTPRoute via an `EnterpriseAgentgatewayPolicy`, with no standalone OPA deployment to run.
 
 ### When to use CEL vs OPA
 
-For most authorization scenarios, **CEL-based RBAC rules** built directly into `EnterpriseAgentgatewayPolicy` are the recommended approach. CEL rules evaluate inside the proxy with no external call, and cover common cases like header matching, JWT claim checks, and MCP tool-level access control:
+For most authorization scenarios, CEL-based RBAC rules built directly into `EnterpriseAgentgatewayPolicy` are the recommended approach. CEL rules evaluate inside the proxy with no external call, and cover common cases like header matching, JWT claim checks, and MCP tool-level access control:
 
 ```yaml
 # CEL example -- allow only requests with a specific header
@@ -243,7 +243,7 @@ spec:
 EOF
 ```
 
-No `backendRef` is needed -- it defaults to the provisioned ext-auth service.
+No `backendRef` is needed: it defaults to the provisioned ext-auth service.
 
 ### Step 5: Test LLM authorization
 
@@ -304,7 +304,7 @@ The `api-key` header is stripped before it reaches OpenAI, and `x-validated-by: 
 
 ## Part 2: MCP Route with OPA
 
-The same OPA policy can protect MCP tool servers. This demonstrates that one `AuthConfig` can be shared across multiple routes. We'll route to the external Solo.io docs MCP server (`https://search.solo.io/mcp`) -- no in-cluster MCP deployment required.
+The same OPA policy can protect MCP tool servers. This demonstrates that one `AuthConfig` can be shared across multiple routes. We'll route to the external Solo.io docs MCP server (`https://search.solo.io/mcp`), so there is no MCP server to deploy in-cluster.
 
 ### Step 1: Create the MCP backend and route
 
@@ -352,7 +352,7 @@ EOF
 
 ### Step 2: Attach the OPA policy to the MCP route
 
-Reuse the same `AuthConfig` -- just create a new policy targeting the MCP HTTPRoute:
+Reuse the same `AuthConfig` by creating a new policy targeting the MCP HTTPRoute:
 
 ```bash
 kubectl apply -f - <<EOF

@@ -18,7 +18,7 @@ The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-teleme
 Export your Solo license key (same key used in lab 001):
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export AGW_UI_VERSION=0.5.5
+export AGW_UI_VERSION=0.5.8
 ```
 
 ### Step 1: Install/upgrade CRDs
@@ -179,7 +179,7 @@ EOF
 
 ## Install AgentGateway Grafana Dashboard
 
-Install the AgentGateway dashboard that provides comprehensive metrics visualization including:
+Install the AgentGateway dashboard that provides metrics visualization including:
 - Core GenAI metrics (request rates, token usage, model breakdown)
 - Cost Tracking (by model, organization, team, route, and provider)
 - Infrastructure Performance (data plane and control plane)
@@ -259,11 +259,11 @@ Note:
 
 ## Agentgateway Dashboard Overview
 
-The AgentGateway dashboard provides comprehensive observability into your AI gateway operations. As you progress through these labs and send requests through the gateway, the dashboard panels will populate with real-time metrics. This section showcases what you can expect to visualize out-of-the-box.
+The AgentGateway dashboard provides observability into your AI gateway operations. As you progress through these labs and send requests through the gateway, the dashboard panels will populate with real-time metrics. This section shows what you can expect to visualize out-of-the-box.
 
 ### Dashboard Capabilities
 
-The dashboard is organized into several key metric categories:
+The dashboard is organized into the following metric categories:
 
 **Overview**
 - Total Requests, Request Rate, Input/Output Token counts, MCP Requests, and average tokens per request
@@ -313,15 +313,15 @@ The dashboard is organized into several key metric categories:
 ![core-genai-metrics-v2-2.png](images/grafana-dashboard/core-genai-metrics-v2-2.png)
 
 **Context Size**
-- Cache Read Tokens Per Request (context size) — p50, p95, p99 percentiles
-- Cache Write Tokens Per Request (cache churn) — p50, p95, p99 percentiles
-- Cache Read Tokens Per Request — p95 breakdown by model
+- Cache Read Tokens Per Request (context size): p50, p95, p99 percentiles
+- Cache Write Tokens Per Request (cache churn): p50, p95, p99 percentiles
+- Cache Read Tokens Per Request: p95 breakdown by model
 
 ![context-size-v2-1.png](images/grafana-dashboard/context-size-v2-1.png)
 
 **Streaming and Request Metrics**
-- Time per Output Token (TPOT) — measures streaming throughput
-- Time to First Token (TTFT) — measures latency before streaming begins
+- Time per Output Token (TPOT): measures streaming throughput
+- Time to First Token (TTFT): measures latency before streaming begins
 - Request rate by route and by status code
 - Request latency by route
 - Response throughput by route

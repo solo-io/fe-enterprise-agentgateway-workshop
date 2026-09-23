@@ -1,5 +1,11 @@
 # Changelog
 
+0.14.2 - (9-23-26)
+---
+- Prose cleanup across all workshop markdown (labs, README, tracks, style guide, chart and lib READMEs)
+- Upgrade Solo UI to `0.5.8` in lab `002`, the air-gap lab, the image list, and the system requirements
+- Air-gap lab and image list updated
+
 0.14.1 - (9-10-26)
 ---
 - Updates in /e2e
@@ -28,7 +34,7 @@
 ---
 - Enable the Solo UI `cost-management` feature flag by default
 - Updates to `labs/observability/llm-cost-management.md`
-- Add `lib/observability/seed-cost-data.sh`: backfills ClickHouse with synthetic LLM spend so the Cost Management dashboard renders a full history — four providers (OpenAI, Anthropic, Gemini, Bedrock), five teams of 1-3 users
+- Add `lib/observability/seed-cost-data.sh`: backfills ClickHouse with synthetic LLM spend so the Cost Management dashboard renders a full history: four providers (OpenAI, Anthropic, Gemini, Bedrock), five teams of 1-3 users
 - Add `lib/observability/README.md` documenting the observability shared assets
 
 0.13.7 - (8-27-26)
@@ -62,7 +68,7 @@
 - Minor update in `openai-streaming.md` lab
 - Fix three labs still pinning `ENTERPRISE_AGW_VERSION=v2026.5.2` in their controller-upgrade steps
 - Add `labs/agent-harnesses/claude-code-auth0-pkce.md`: route Claude Code through Agentgateway to Anthropic with a per-user Auth0 JWT instead of a shared/virtual API key
-- Add `lib/oauth-pkce/`: IdP-agnostic Authorization Code + PKCE helpers — `pkce-login.py` (interactive, caches tokens `0600`) and `pkce-token.py` (non-interactive credential helper: stdout-only token, silent refresh, fails closed)
+- Add `lib/oauth-pkce/`: IdP-agnostic Authorization Code + PKCE helpers: `pkce-login.py` (interactive, caches tokens `0600`) and `pkce-token.py` (non-interactive credential helper: stdout-only token, silent refresh, fails closed)
 
 0.13.2 - (7-31-26)
 ---
@@ -129,7 +135,7 @@
 
 0.12.3 - (7-16-26)
 ---
-- Add `labs/agent-harnesses/claude-desktop-sso-entra.md`: Claude Desktop SSO via Microsoft Entra ID — per-user interactive sign-in validated at the gateway (issuer + audience), with MDM rollout guidance and screenshots
+- Add `labs/agent-harnesses/claude-desktop-sso-entra.md`: Claude Desktop SSO via Microsoft Entra ID: per-user interactive sign-in validated at the gateway (issuer + audience), with MDM rollout guidance and screenshots
 
 0.12.2 - (7-16-26)
 ---
@@ -144,8 +150,8 @@
 - Add `labs/platform-engineering/` category: platform/developer separation of concerns via two Helm charts
 - Add `charts/agentgateway-platform`: platform-team chart owning the `Gateway`, cost tiers, security baseline (JWT/WAF), observability, and URL space; onboards teams via route delegation (label + namespace + prefix contract)
 - Add `charts/agentgateway-developer`: app-team chart for self-serving LLM/MCP endpoints under an assigned path prefix; strict `values.schema.json` has no vocabulary for rate limits, auth, WAF, or logging
-- Add `labs/platform-engineering/platform-and-developer-helm-charts-llm.md`: full separation-of-concerns lab — LLM endpoints, escape attempts, one-line team re-tiering, gateway-wide JWT enablement without touching team releases
-- Add `labs/platform-engineering/platform-and-developer-helm-charts-mcp.md`: standalone MCP variant — a `type: mcp` endpoint renders an `entMcp` backend, and tier budgets, JWT, and access logging cover MCP tool calls through the parent route
+- Add `labs/platform-engineering/platform-and-developer-helm-charts-llm.md`: full separation-of-concerns lab: LLM endpoints, escape attempts, one-line team re-tiering, gateway-wide JWT enablement without touching team releases
+- Add `labs/platform-engineering/platform-and-developer-helm-charts-mcp.md`: standalone MCP variant: a `type: mcp` endpoint renders an `entMcp` backend, and tier budgets, JWT, and access logging cover MCP tool calls through the parent route
 - Add Platform Engineering section to `README.md` (TOC, lab listing, use cases)
 - Add "Negative Test: Deny Entra at the Proxy" section to `labs/security/jwt-auth-through-corporate-proxy-entra.md`: block the IdP in Squid and confirm the JWKS fetch fails (`Forbidden` / `TCP_DENIED/403`) instead of falling back to direct egress
 
@@ -157,7 +163,7 @@
 ---
 - Add `labs/security/jwt-auth-through-corporate-proxy-okta.md`: routes an external JWKS fetch (Okta) through a corporate forward proxy using agentgateway's `BackendTunnel` (`policies.tunnel.backendRef`)
 - Add `labs/security/jwt-auth-through-corporate-proxy-entra.md`: routes an external JWKS fetch (Entra) through a corporate forward proxy using agentgateway's `BackendTunnel` (`policies.tunnel.backendRef`)
-- Add `labs/mcp/composable-mcp.md`: Composable MCP lab — one composite MCP tool (`account-brief`) fans a single call out to distinct MCP + HTTP backends and merges the responses into one result
+- Add `labs/mcp/composable-mcp.md`: Composable MCP lab: one composite MCP tool (`account-brief`) fans a single call out to distinct MCP + HTTP backends and merges the responses into one result
 - Updates to the `style-guide.md`
 - Complete migration of `AgentgatewayBackend` to `EnterpriseAgentgatewayBackend` across all labs
 
@@ -178,7 +184,7 @@
 - Live-verified on v2026.6.3: both `appProtocol: kgateway.dev/mcp` and `agentgateway.dev/mcp` route MCP through selector-based backends; a Service port with **no** MCP appProtocol is silently not discovered (documented in `style-guide.md` §16)
 - Sync agentgateway Grafana dashboard
 - Add `labs/upgrades/migrate-v2026.5.x-to-v2026.6.x.md`: version migration guide (v2026.5.x → v2026.6.x) covering the image-registry consolidation, Kubernetes floor bump, prerequisites, downtime, and the exact upgrade commands; validated live on a v2026.5.2 → v2026.6.3 upgrade
-- Fix `labs/upgrades/in-place-rolling-upgrades.md` Step 5: replace `helm upgrade --reuse-values` (fails to template the 6.x chart — `.Values.externalSecrets.stores` nil pointer) with an explicit `-f` values file on the OCI chart
+- Fix `labs/upgrades/in-place-rolling-upgrades.md` Step 5: replace `helm upgrade --reuse-values` (fails to template the 6.x chart: `.Values.externalSecrets.stores` nil pointer) with an explicit `-f` values file on the OCI chart
 - Add the migration guide to the `README.md` Upgrades & Lifecycle section
 
 0.11.7 - (7-6-26)
@@ -204,7 +210,7 @@
 - Cross-link the rolling-upgrade section of `production-observability-alerting-and-scaling.md` to the new validation lab
 - Add "Upgrades & Lifecycle" section to `README.md`
 - Update image paths in `claude-code.md` and `claude-desktop.md`
-- Implement `blue-green-namespaces.md`: blue/green upgrades via route delegation — a thin edge proxy delegates `/openai` with weighted backendRefs to independent blue and green proxies in separate namespaces; validates zero-downtime cutover and instant rollback under continuous k6 traffic
+- Implement `blue-green-namespaces.md`: blue/green upgrades via route delegation: a thin edge proxy delegates `/openai` with weighted backendRefs to independent blue and green proxies in separate namespaces; validates zero-downtime cutover and instant rollback under continuous k6 traffic
 - Implement `multi-cluster-upgrades.md`: upgrade Enterprise Agentgateway in one cluster while a peer serves the same global LLM over a Solo ambient multicluster mesh
 
 0.11.4 - (6-24-26)
@@ -233,10 +239,10 @@
 
 0.11.1 - (6-16-26)
 ---
-- Bump to `v2026.6.0` (Kubernetes prereq now `> 1.31`). **Breaking:** the top-level Helm `image.registry`/`image.tag` is now the global default for every chart-managed image — controller, proxy, and auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `ext-cache`/`redis`); per-image override blocks are removed and `image-list.md` updated to match
+- Bump to `v2026.6.0` (Kubernetes prereq now `> 1.31`). **Breaking:** the top-level Helm `image.registry`/`image.tag` is now the global default for every chart-managed image: controller, proxy, and auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `ext-cache`/`redis`); per-image override blocks are removed and `image-list.md` updated to match
 - Added `v2026.5.2` branch as an archive of the previous installation setup for airgapped environments
 - Add a new air-gap install lab (`airgap/001-airgap.md` + `airgap/ably7-image-list.md`) demonstrating a single-registry private install, linked from the `README`; cross-link the image lists across the `001`, OpenShift, and air-gap labs
-- Split parameters by owner across the `001`, OpenShift, and air-gap labs — an operator `agentgateway-shared-extensions` registered as the GatewayClass default (`gatewayClassParametersRefs`, holds `sharedExtensions`) and a developer `agentgateway-config` attached per-Gateway via `spec.infrastructure.parametersRef`; the two merge
+- Split parameters by owner across the `001`, OpenShift, and air-gap labs: an operator `agentgateway-shared-extensions` registered as the GatewayClass default (`gatewayClassParametersRefs`, holds `sharedExtensions`) and a developer `agentgateway-config` attached per-Gateway via `spec.infrastructure.parametersRef`; the two merge
 - Add an **Uninstall** section to all three labs (reverse-order teardown, including a GatewayClass cleanup step that `helm uninstall` leaves behind)
 - Doc cleanup: clarify `parametersRef` apply ordering, drop the stale experimental-CRD note, and harmonize the controller-install image/pull-secret comments across the labs
 - Update `SOLO_MANAGEMENT_UI_VERSION` to `0.4.5`
@@ -246,31 +252,31 @@
 - Update wording around experimental channel usage for K8s gateway api, no longer required since previous experimental features graduated to standard in v1.5.0
 - Update Grafana dashboard screenshots and descriptions in `002`
 - Add `llm.prompt` and `llm.completion` to the tracing config example in `001` as a reference, commented out by default due to performance implications for large prompts or completions
-- Add `tracks/llm-track.md` and `tracks/mcp-track.md` — structured learning tracks that map business use cases and value to specific labs; each covers introduction, goals, prerequisites, and a curriculum table organized by use case with links to relevant lab files
+- Add `tracks/llm-track.md` and `tracks/mcp-track.md`: structured learning tracks that map business use cases and value to specific labs; each covers introduction, goals, prerequisites, and a curriculum table organized by use case with links to relevant lab files
 
 0.10.10 - (6-9-26)
 ---
-- Update scenario in `openapi-to-mcp-in-cluster.md` to query known working stripe-mock endpoints to showcase a realistic use case.
+- Update scenario in `openapi-to-mcp-in-cluster.md` to query known working stripe-mock endpoints to demonstrate a realistic use case.
 
 0.10.9 - (6-9-26)
 ---
-- Add new lab: `openapi-to-mcp-external-api.md` — expose a live public REST API (Open-Meteo) as MCP tools via `entMcp` + `protocol: OpenAPI` with an OpenAPI 3.0 schema in a ConfigMap; covers target-level `static.policies.tls.sni` to the HTTPS upstream and MCP Inspector + curl validation
-- Add new lab: `openapi-to-mcp-in-cluster.md` — expose an in-cluster deployment's OpenAPI spec as MCP tools using the Stripe mock server (`stripe/stripe-mock`); `entMcp` + `protocol: OpenAPI` over plain in-cluster HTTP (no TLS), with `policies.auth.secretRef` injecting the upstream `Authorization: Bearer` header that stripe-mock requires; curated three-operation schema (`listCustomers`, `listCharges`, `retrieveBalance`), MCP Inspector + curl validation; generated tools nest query params under a `query` object
+- Add new lab: `openapi-to-mcp-external-api.md`: expose a live public REST API (Open-Meteo) as MCP tools via `entMcp` + `protocol: OpenAPI` with an OpenAPI 3.0 schema in a ConfigMap; covers target-level `static.policies.tls.sni` to the HTTPS upstream and MCP Inspector + curl validation
+- Add new lab: `openapi-to-mcp-in-cluster.md`: expose an in-cluster deployment's OpenAPI spec as MCP tools using the Stripe mock server (`stripe/stripe-mock`); `entMcp` + `protocol: OpenAPI` over plain in-cluster HTTP (no TLS), with `policies.auth.secretRef` injecting the upstream `Authorization: Bearer` header that stripe-mock requires; curated three-operation schema (`listCustomers`, `listCharges`, `retrieveBalance`), MCP Inspector + curl validation; generated tools nest query params under a `query` object
 - Update README.md
 
 
 0.10.8 - (6-9-26)
 ---
 - Updates to agentgateway grafana dashboard
-- `byo-opa-grpc-ext-authz.md`: add Part 3 — body-aware OPA policy
+- `byo-opa-grpc-ext-authz.md`: add Part 3: body-aware OPA policy
 
 0.10.7 - (6-8-26)
 ---
 - `mcp-eager-auth-okta.md` / `mcp-eager-auth-auth0.md` / `mcp-eager-auth-auth0-pre-issuance-authz.md`: add CORS filter on `.well-known/oauth-*/mcp` rules so MCP Inspector's browser-side OAuth discovery preflight passes; troubleshooting row added
-- Add new lab: `mcp-tool-federation.md` — federates four real-world MCP servers (arXiv, FRED, SEC EDGAR, BLS) behind one `EnterpriseAgentgatewayBackend` with four label-selector `spec.mcp.targets` and `failureMode: FailOpen`; covers tool-name prefixing (`<service>-<port>_<tool>`), FailOpen drop-one-backend demo, single JWT auth gating the whole union, and a four-persona tool-filtering policy attached to the backend via `spec.backend.mcp.authorization` that uses `mcp.tool.target == "<service>-<port>"` + `jwt.persona` to carve a different `tools/list` per identity (academic / economist / analyst / admin)
-- Add `lib/jwt/`: a non-interactive RS256 JWT signer for workshop labs that need to mint tokens with arbitrary claims — `generate-jwt.sh` (reads claims from file or stdin, prints JWT to stdout), committed demo keypair (`private.pem` / `public.pem`) with matching `jwks.json` (kid `workshop-jwt-key-001`, issuer `workshop.solo.io` — deliberately distinct from the `solo.io` issuer used elsewhere so this lab's JWTs don't cross-validate against other labs' policies), four persona claims files under `claims/`, and a usage README
+- Add new lab: `mcp-tool-federation.md`: federates four real-world MCP servers (arXiv, FRED, SEC EDGAR, BLS) behind one `EnterpriseAgentgatewayBackend` with four label-selector `spec.mcp.targets` and `failureMode: FailOpen`; covers tool-name prefixing (`<service>-<port>_<tool>`), FailOpen drop-one-backend demo, single JWT auth gating the whole union, and a four-persona tool-filtering policy attached to the backend via `spec.backend.mcp.authorization` that uses `mcp.tool.target == "<service>-<port>"` + `jwt.persona` to carve a different `tools/list` per identity (academic / economist / analyst / admin)
+- Add `lib/jwt/`: a non-interactive RS256 JWT signer for workshop labs that need to mint tokens with arbitrary claims: `generate-jwt.sh` (reads claims from file or stdin, prints JWT to stdout), committed demo keypair (`private.pem` / `public.pem`) with matching `jwks.json` (kid `workshop-jwt-key-001`, issuer `workshop.solo.io`, deliberately distinct from the `solo.io` issuer used elsewhere so this lab's JWTs don't cross-validate against other labs' policies), four persona claims files under `claims/`, and a usage README
 - `README.md`: add "MCP Tool Federation" entry to the MCP (Model Context Protocol) section
-- Add new lab: `byo-opa-grpc-ext-authz.md` — standalone OPA as gRPC ext-authz backend, protects LLM + MCP routes; appendix shows OPA bundle alternative
+- Add new lab: `byo-opa-grpc-ext-authz.md`: standalone OPA as gRPC ext-authz backend, protects LLM + MCP routes; appendix shows OPA bundle alternative
 
 0.10.6 - (6-5-26)
 ---
@@ -285,7 +291,7 @@
 
 0.10.4 - (6-3-26)
 ---
-- Add new lab: `llm-failover-advanced.md` — standalone lab with three failover patterns: intra-priority-group failover (per-provider eviction with P2C load balancing inside a group), 5XX server error failover via a CEL `unhealthyCondition`, and a combined end-to-end demo proving intra-group LB + per-provider eviction + inter-group failover work together
+- Add new lab: `llm-failover-advanced.md`: standalone lab with three failover patterns: intra-priority-group failover (per-provider eviction with P2C load balancing inside a group), 5XX server error failover via a CEL `unhealthyCondition`, and a combined end-to-end demo proving intra-group LB + per-provider eviction + inter-group failover work together
 - `README.md`: add "Advanced LLM Failover Patterns" entry under the LLM section
 
 0.10.3 - (6-3-26)
@@ -298,8 +304,8 @@
 - Updates to agentgateway grafana dashboard
 - Update `ENTERPRISE_AGW_VERSION` to `v2026.5.2`
 - `image-list.md`: bump Enterprise Agentgateway header and controller/proxy image tags from `2026.5.0` to `2026.5.2`
-- Add new lab: `mcp-tool-mode-search.md` — Enterprise MCP Search tool mode on `EnterpriseAgentgatewayBackend` (`entMcp.toolMode: Search`, `sessionRouting: Stateless`, static target with `host`/`port`/`path: /`); HTTPRoute uses URLRewrite to strip `/mcp/search` to `/`; deploys `mcp-server-everything`, walks the reader through the `get_tool` / `invoke_tool` meta-tools via MCP Inspector + raw JSON-RPC curl; demonstrates backend-scoped per-tool RBAC via `EnterpriseAgentgatewayPolicy.spec.backend.entMcp.authorization` with the gateway-native `mcp.tool.name` CEL attribute
-- Add new lab: `mcp-tool-mode-code.md` — Enterprise MCP Code tool mode (`entMcp.toolMode: Code`, `codeMode.timeout: 60s`); single `run_code` tool exposing a typed JS API for upstream MCP tools, executed in a QuickJS sandbox (4 MiB memory / 20 tool calls / 60s wall-clock / 256 KiB stack); raw JSON-RPC walkthrough composes two upstream tools in one script plus a deliberate timeout demo (120s busy-loop exceeding the 60s ceiling); same backend-scoped `mcp.tool.name` RBAC pattern as the search lab
+- Add new lab: `mcp-tool-mode-search.md`: Enterprise MCP Search tool mode on `EnterpriseAgentgatewayBackend` (`entMcp.toolMode: Search`, `sessionRouting: Stateless`, static target with `host`/`port`/`path: /`); HTTPRoute uses URLRewrite to strip `/mcp/search` to `/`; deploys `mcp-server-everything`, walks the reader through the `get_tool` / `invoke_tool` meta-tools via MCP Inspector + raw JSON-RPC curl; demonstrates backend-scoped per-tool RBAC via `EnterpriseAgentgatewayPolicy.spec.backend.entMcp.authorization` with the gateway-native `mcp.tool.name` CEL attribute
+- Add new lab: `mcp-tool-mode-code.md`: Enterprise MCP Code tool mode (`entMcp.toolMode: Code`, `codeMode.timeout: 60s`); single `run_code` tool exposing a typed JS API for upstream MCP tools, executed in a QuickJS sandbox (4 MiB memory / 20 tool calls / 60s wall-clock / 256 KiB stack); raw JSON-RPC walkthrough composes two upstream tools in one script plus a deliberate timeout demo (120s busy-loop exceeding the 60s ceiling); same backend-scoped `mcp.tool.name` RBAC pattern as the search lab
 - `README.md`: add "MCP Tool Mode — Search" and "MCP Tool Mode — Code" entries to the MCP (Model Context Protocol) section
 
 0.10.1 - (5-28-26)
@@ -313,7 +319,7 @@
 ---
 - Update `image-list.md` with helm pull commands for the various Helm charts
 - Rename `load-testing-k6s.md` → `llm-load-testing-k6.md`; update link text in `README.md` to "LLM Load Testing with k6"
-- Add new lab: `mcp-load-testing-k6.md` — k6 load testing of MCP traffic through Enterprise AgentGateway; deploys a Python-based multi-arch MCP echo server (`python:3.12-alpine` + ConfigMap); VU test ramps 5→25 concurrent sessions; RPS test ramps 25→50 req/s; both run in 2m; includes smoke test, optional Grafana/Prometheus observation, and cleanup
+- Add new lab: `mcp-load-testing-k6.md`: k6 load testing of MCP traffic through Enterprise AgentGateway; deploys a Python-based multi-arch MCP echo server (`python:3.12-alpine` + ConfigMap); VU test ramps 5→25 concurrent sessions; RPS test ramps 25→50 req/s; both run in 2m; includes smoke test, optional Grafana/Prometheus observation, and cleanup
 
 0.9.9 - (5-26-26)
 ---
@@ -335,7 +341,7 @@
 
 0.9.5 - (5-19-26)
 ---
-- Add new doc: `system-requirements.md` — cloud-agnostic system requirements (Kubernetes/Helm/Gateway API/Istio versions, POC and Prod cluster sizing, control-plane and proxy pod resource recommendations, `EnterpriseAgentgatewayParameters` + `Gateway` examples, shared extension server footprint) aligned to `v2026.5.0`
+- Add new doc: `system-requirements.md`: cloud-agnostic system requirements (Kubernetes/Helm/Gateway API/Istio versions, POC and Prod cluster sizing, control-plane and proxy pod resource recommendations, `EnterpriseAgentgatewayParameters` + `Gateway` examples, shared extension server footprint) aligned to `v2026.5.0`
 - `README.md`: link `system-requirements.md` from the Prerequisites section
 
 
@@ -345,7 +351,7 @@
 
 0.9.3 - (5-19-26)
 ---
-- Add new lab: `mcp-eager-auth-auth0-pre-issuance-authz.md` — eager-OAuth with Auth0 + new pre-issuance ext_authz hook (`KGW_OAUTH_ISSUER_CONFIG.pre_issuance`, requires `v2026.5.0`); gates token issuance by Auth0 `sub` via gRPC ext-authz, redirects denied users to a configurable URL; multiplexed backend across in-cluster + remote MCP targets
+- Add new lab: `mcp-eager-auth-auth0-pre-issuance-authz.md`: eager-OAuth with Auth0 + new pre-issuance ext_authz hook (`KGW_OAUTH_ISSUER_CONFIG.pre_issuance`, requires `v2026.5.0`); gates token issuance by Auth0 `sub` via gRPC ext-authz, redirects denied users to a configurable URL; multiplexed backend across in-cluster + remote MCP targets
 - Minor wording fixes and enhancements to existing eager auth labs
 - `README.md`: add new lab to MCP, Security, and Identity & Delegation sections; add pre-issuance bullet to MCP use cases
 
@@ -356,7 +362,7 @@
 
 0.9.1 - (5-18-26)
 ---
-- Add new lab: `configure-inference-routing-with-vllm.md` — Enterprise Agentgateway routing to an in-cluster vLLM pod serving `Qwen/Qwen2.5-0.5B-Instruct` via the Gateway API Inference Extension (`InferencePool` + `llm-d` Endpoint Picker)
+- Add new lab: `configure-inference-routing-with-vllm.md`: Enterprise Agentgateway routing to an in-cluster vLLM pod serving `Qwen/Qwen2.5-0.5B-Instruct` via the Gateway API Inference Extension (`InferencePool` + `llm-d` Endpoint Picker)
 - `README.md`: add new top-level **Inference** section to TOC and body between Routing and Security; add inference-routing bullet to Use Cases
 
 0.9.0 - (5-13-26)
@@ -374,21 +380,21 @@
 
 0.8.7 - (5-6-26)
 ---
-- Add new lab: `mcp-eager-auth-auth0.md` — MCP eager-OAuth with Auth0; gateway acts as the OAuth Authorization Server (fake DCR with a pre-registered `client_id`/`client_secret`), brokers Auth0's authorization code flow via `/oauth-issuer`, validates Auth0-issued JWTs against Auth0 JWKS at the MCP backend, terminates TLS on a self-signed cert, tests end-to-end against `@modelcontextprotocol/server-everything` in Streamable HTTP mode
-- Add new lab: `mcp-eager-auth-okta.md` — Okta equivalent of the eager-OAuth lab against an Okta custom authorization server (`/oauth2/<authz-server-id>/v1/keys`, no trailing slash on issuer)
+- Add new lab: `mcp-eager-auth-auth0.md`: MCP eager-OAuth with Auth0; gateway acts as the OAuth Authorization Server (fake DCR with a pre-registered `client_id`/`client_secret`), brokers Auth0's authorization code flow via `/oauth-issuer`, validates Auth0-issued JWTs against Auth0 JWKS at the MCP backend, terminates TLS on a self-signed cert, tests end-to-end against `@modelcontextprotocol/server-everything` in Streamable HTTP mode
+- Add new lab: `mcp-eager-auth-okta.md`: Okta equivalent of the eager-OAuth lab against an Okta custom authorization server (`/oauth2/<authz-server-id>/v1/keys`, no trailing slash on issuer)
 - `README.md`: add both eager-OAuth labs to MCP (primary), Security, and Identity & Delegation sections with mutual cross-references; add eager-OAuth bullet to MCP use cases
 
 0.8.6 - (5-2-26)
 ---
 - Update `AGW_UI_VERSION` to `0.3.18`
-- Add new lab: `openai-audio.md` — proxies OpenAI Audio API (Text-to-Speech and Speech-to-Text) through AgentGateway using `Passthrough` route type; covers TTS with voice/format selection, STT with Whisper transcription, and a round-trip demo (text → audio → text)
+- Add new lab: `openai-audio.md`: proxies OpenAI Audio API (Text-to-Speech and Speech-to-Text) through AgentGateway using `Passthrough` route type; covers TTS with voice/format selection, STT with Whisper transcription, and a round-trip demo (text → audio → text)
 - `README.md`: add `openai-audio.md` to Routing section and Use Cases list
-- Add new lab: `openai-video.md` — proxies OpenAI Video API (Sora) through AgentGateway using `Passthrough` route type; covers async video generation, polling for completion, and downloading the result
+- Add new lab: `openai-video.md`: proxies OpenAI Video API (Sora) through AgentGateway using `Passthrough` route type; covers async video generation, polling for completion, and downloading the result
 - `README.md`: add `openai-video.md` to Routing section and Use Cases list
 
 0.8.5 - (4-29-26)
 ---
-- Add new lab: `opa-authorization.md` — OPA authorization for LLM and MCP routes using ext-auth with Rego policies stored in ConfigMaps; covers AuthConfig, EnterpriseAgentgatewayPolicy with `entExtAuth`, custom deny bodies/headers, upstream header injection, and shared AuthConfig across multiple HTTPRoutes
+- Add new lab: `opa-authorization.md`: OPA authorization for LLM and MCP routes using ext-auth with Rego policies stored in ConfigMaps; covers AuthConfig, EnterpriseAgentgatewayPolicy with `entExtAuth`, custom deny bodies/headers, upstream header injection, and shared AuthConfig across multiple HTTPRoutes
 - `README.md`: add `opa-authorization.md` to Security section and Use Cases list
 
 0.8.4 - (4-29-26)
@@ -403,14 +409,14 @@
 0.8.2 - (4-23-26)
 ---
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.2`
-- Add new lab: `configure-routing-aws-bedrock-irsa.md` — configures AWS Bedrock access via EKS IRSA (IAM Roles for Service Accounts) instead of static credentials; covers OIDC provider association, IAM role with scoped trust policy, `EnterpriseAgentgatewayBackend` without `policies.auth`, and `EnterpriseAgentgatewayParameters` service account annotation for automatic credential injection
+- Add new lab: `configure-routing-aws-bedrock-irsa.md`: configures AWS Bedrock access via EKS IRSA (IAM Roles for Service Accounts) instead of static credentials; covers OIDC provider association, IAM role with scoped trust policy, `EnterpriseAgentgatewayBackend` without `policies.auth`, and `EnterpriseAgentgatewayParameters` service account annotation for automatic credential injection
 - `README.md`: add `configure-routing-aws-bedrock-irsa.md` to Routing section under AWS Bedrock entries
 - `configure-routing-aws-bedrock-apikey.md`: normalize resource names from `bedrock-*-apikey` to `bedrock-*` and paths from `/bedrock-apikey/*` to `/bedrock/*` to match the other Bedrock labs (secret name `bedrock-apikey-secret` kept distinct)
 
 0.8.1 - (4-21-26)
 ---
-- Add new lab: `llm-byo-grpc-ext-authz.md` — BYO gRPC ext-authz for LLM routes, targeting HTTPRoute-level policy with OpenAI backend
-- Add new lab: `mcp-byo-grpc-ext-authz.md` — BYO gRPC ext-authz for MCP routes, targeting HTTPRoute instead of Gateway, with SSE Accept headers and note on combining with `mcpAuthorization` CEL rules
+- Add new lab: `llm-byo-grpc-ext-authz.md`: BYO gRPC ext-authz for LLM routes, targeting HTTPRoute-level policy with OpenAI backend
+- Add new lab: `mcp-byo-grpc-ext-authz.md`: BYO gRPC ext-authz for MCP routes, targeting HTTPRoute instead of Gateway, with SSE Accept headers and note on combining with `mcpAuthorization` CEL rules
 
 0.8.0 - (4-13-26)
 ---
@@ -429,12 +435,12 @@
 0.7.8 - (4-6-26)
 ---
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0-rc.1`
-- Add new lab: `virtual-keys.md` — per-user API key auth with independent token budgets, budget isolation testing, and advanced patterns: multi-tenant virtual keys, tiered budgets via `headersFromMetadataEntry`, and per-user Prometheus observability
+- Add new lab: `virtual-keys.md`: per-user API key auth with independent token budgets, budget isolation testing, and advanced patterns: multi-tenant virtual keys, tiered budgets via `headersFromMetadataEntry`, and per-user Prometheus observability
 - `001-install-enterprise-agentgateway.md`: enable `metrics.fields.add.user_id` from `request.headers["x-user-id"]` in `EnterpriseAgentgatewayParameters` rawConfig to populate `user_id` label on `agentgateway_gen_ai_client_token_usage` metrics
 - `README.md`: add `virtual-keys.md` to Security (after API Key Masking) and Rate Limiting (after Global Token-Based Rate Limiting) with mutual cross-references
-- Add new lab: `llm-cost-tracking.md` — per-user token usage via access logs and Prometheus PromQL queries for consumption and cumulative cost
+- Add new lab: `llm-cost-tracking.md`: per-user token usage via access logs and Prometheus PromQL queries for consumption and cumulative cost
 - `README.md`: add `llm-cost-tracking.md` to Observability section with `_(see also: Security, Rate Limiting)_` cross-reference
-- Add new lab: `mcp-tool-rate-limiting.md` — per-tool rate limiting for MCP traffic using `RateLimitConfig` with a CEL descriptor that extracts the tool name from the JSON-RPC body; limits `get-env` (Print Environment Tool) to 3 calls/min while all other tools are unrestricted; validation via MCP Inspector GUI
+- Add new lab: `mcp-tool-rate-limiting.md`: per-tool rate limiting for MCP traffic using `RateLimitConfig` with a CEL descriptor that extracts the tool name from the JSON-RPC body; limits `get-env` (Print Environment Tool) to 3 calls/min while all other tools are unrestricted; validation via MCP Inspector GUI
 - `README.md`: add `mcp-tool-rate-limiting.md` to Rate Limiting and MCP sections with mutual cross-references
 
 0.7.7 - (4-1-26)
@@ -444,7 +450,7 @@
 0.7.6 - (4-1-26)
 ---
 - `README.md`: add `configure-body-based-routing.md` to Transformations section; add `_(see also: Routing)_` / `_(see also: Transformations)_` cross-references on both entries
-- Add new lab: `configure-bedrock-titan-embeddings.md` — routes embedding requests to Amazon Titan Embed Text v2 via `Passthrough` route type; `HTTPRoute` rewrites `/bedrock/titan-embed` to `bedrock-runtime.us-east-1.amazonaws.com/model/amazon.titan-embed-text-v2:0/invoke`
+- Add new lab: `configure-bedrock-titan-embeddings.md`: routes embedding requests to Amazon Titan Embed Text v2 via `Passthrough` route type; `HTTPRoute` rewrites `/bedrock/titan-embed` to `bedrock-runtime.us-east-1.amazonaws.com/model/amazon.titan-embed-text-v2:0/invoke`
 - `README.md`: add `configure-bedrock-titan-embeddings.md` to Routing section under AWS Bedrock entries
 
 0.7.5 - (4-1-26)
@@ -454,7 +460,7 @@
 
 0.7.4 - (3-31-26)
 ---
-- Add new lab: `configure-body-based-routing.md` — routes requests to OpenAI (`gpt-4o-mini`) or mock LLM (`mock-gpt-4o`) based on the `model` field in the JSON request body; uses `AgentgatewayPolicy` with `phase: PreRouting` to extract `x-gateway-model-name` and `x-gateway-model-status` headers via CEL expressions; `HTTPRoute` header-matches on those headers with a fallback rule for `x-gateway-model-status: unspecified`
+- Add new lab: `configure-body-based-routing.md`: routes requests to OpenAI (`gpt-4o-mini`) or mock LLM (`mock-gpt-4o`) based on the `model` field in the JSON request body; uses `AgentgatewayPolicy` with `phase: PreRouting` to extract `x-gateway-model-name` and `x-gateway-model-status` headers via CEL expressions; `HTTPRoute` header-matches on those headers with a fallback rule for `x-gateway-model-status: unspecified`
 - `README.md`: add `configure-body-based-routing.md` to Routing section
 - `001-install-enterprise-agentgateway.md`: bump `ENTERPRISE_AGW_VERSION` to `v2.3.0-beta.8`; update tracing `otlpEndpoint` to `solo-enterprise-telemetry-collector.agentgateway-system.svc.cluster.local:4317`
 - Rename `002-set-up-monitoring-tools.md` → `002-set-up-ui-and-monitoring-tools.md`; replace Tempo install with Gloo UI (`management` Helm chart, `AGW_UI_VERSION=0.3.18`); remove Tempo datasource from Grafana values; remove Tempo pods from expected output; add "Access Gloo UI" section (port-forward to `solo-enterprise-ui 4000:80`); add `global.image` override comments for Solo-owned images (UI, OTEL collector); move `imagePullSecrets` under `global.imagePullSecrets` (propagates to subcharts); add ClickHouse image override comments with note on missing registry key; update H1 and `README.md` link text; update all cross-references across all lab files
@@ -474,7 +480,7 @@
 0.7.2 - (3-31-26)
 ---
 - Add new lab: `dynamic-mcp.md` which covers dynamic MCP backends using label selectors, deploying `mcp-server-everything` to a dedicated `mcp` namespace, scaling example without modifying the `EnterpriseAgentgatewayBackend`
-- `in-cluster-mcp.md`: add SSE session affinity limitation callout — explains why AGW proxy must run at 1 replica with SSE transport and links to `dynamic-mcp.md` (Streamable HTTP) as the solution
+- `in-cluster-mcp.md`: add SSE session affinity limitation callout: explains why AGW proxy must run at 1 replica with SSE transport and links to `dynamic-mcp.md` (Streamable HTTP) as the solution
 
 0.7.1 - (3-30-26)
 ---
@@ -494,15 +500,15 @@
 
 0.6.8 - (3-13-26)
 ---
-- `035-obo-crewai-agent-with-mcp.md`: Update lab to reflect agent-performed OBO exchange — login now stores only the Keycloak JWT, agent calls STS at the start of each run
+- `035-obo-crewai-agent-with-mcp.md`: Update lab to reflect agent-performed OBO exchange: login now stores only the Keycloak JWT, agent calls STS at the start of each run
 - Update demo walkthrough (Step 11) to match new UI flow: sidebar shows "awaiting agent exchange", live steps log shows STS call, inline token comparison with `iat`/`exp`/`ttl` and raw JWT appears in main area
-- Remove data plane proxy restart from Step 5 — replaced with `kubectl rollout status` on control plane only
+- Remove data plane proxy restart from Step 5, replaced with `kubectl rollout status` on control plane only
 - Sync `lib/crewai/agentgateway-copilot-with-obo/app.py` with all UI changes: agent STS exchange, `obo_placeholder` separate from `final_placeholder`, timestamp on OBO token, raw JWT display, `timeout=10` on Keycloak and STS requests
 
 0.6.7 - (3-12-26)
 ---
 - Add new lab: `034-obo-token-exchange-fundamentals.md` which demonstrates OBO token exchange using a self-managed keycloak instance
-- Add new lab: `035-obo-crewai-agent-with-mcp.md` — CrewAI agent with DeepWiki + Solo.io Docs MCP tools, secured end-to-end with OBO delegation (Keycloak login → agentgateway STS → delegated OBO token, JWT policy on `/openai` and `/agw-copilot/mcp`)
+- Add new lab: `035-obo-crewai-agent-with-mcp.md`: CrewAI agent with DeepWiki + Solo.io Docs MCP tools, secured end-to-end with OBO delegation (Keycloak login → agentgateway STS → delegated OBO token, JWT policy on `/openai` and `/agw-copilot/mcp`)
 - Add keycloak deployment example in `/lib/keycloak`
 - Restructure `lib/`: `lib/crewai/` → `lib/crewai/multi-agent-researcher-writer/`, `lib/langchain/` → `lib/langchain/multi-agent-researcher-writer/`, add `lib/crewai/agentgateway-copilot-with-obo/`
 - Update `README.md` with new lab entries and Identity & Delegation use case section
@@ -544,7 +550,7 @@
 
 0.6.1 - (3-3-26)
 ---
-- Update `013-advanced-guardrails-webhook.md` lab with more sophisticated scenarios to showcase the value of an LLM-based guardrail over static rules. Use cases now include:
+- Update `013-advanced-guardrails-webhook.md` lab with more sophisticated scenarios to demonstrate the value of an LLM-based guardrail over static rules. Use cases now include:
   - Existing innocent request, harassment, jailbreak (regex), PII masking (credit cards), PII masking (email) use cases now fed through an LLM-as-a-judge
   - False positive avoidance - LLM understands context
   - Indirect jailbreak - catches what regex misses
@@ -694,7 +700,7 @@
 - Set `replicas: 2` for agentgateway proxy deployment
 - Add CPU/MEM resource requests for agentgateway proxy deployment
 - Update `006-configure-routing-to-aws-bedrock.md` to replace titan models with mistral due to EOL of titan models
-- New `006a-configure-routing-to-aws-bedrock-apikey.md` to showcase use of short-term and long-term API keys for AWS Bedrock
+- New `006a-configure-routing-to-aws-bedrock-apikey.md` to demonstrate use of short-term and long-term API keys for AWS Bedrock
 - Update README.md
 
 0.3.6 - (12-31-25)
@@ -776,13 +782,13 @@
 - agentgateway: Added example of capturing full request body in access logs (commented out for now until a later release)
 - agentgateway: Added example of capturing `modelId` field from request body in access logs, as an example filtering on specific fields of the request body (commented out for now until a later release)
 - agentgateway: add comments in the configmap to describe the behavior above
-- Added new lab: `019-configure-direct-response.md` to showcase direct response capabilities
+- Added new lab: `019-configure-direct-response.md` to demonstrate direct response capabilities
 
 
 0.2.1 - (11-12-25)
 ---
 - Renamed lab: `017-mcp.md` to `018-mcp.md`
-- Added new lab: `017-transformations.md` to showcase transformation capabilities
+- Added new lab: `017-transformations.md` to demonstrate transformation capabilities
 - Simplify the Helm install values in `install-on-openshift/001`
 - Update README.md table of contents
 
@@ -819,7 +825,7 @@
 0.1.5 - (10-20-25)
 ---
 - Rename `015` lab to `016-global-token-based-rate-limiting.md`
-- Add new lab: `015-local-token-based-rate-limiting.md` to showcase OSS local token-based rate limiting before moving on to Enterprise global rate limiting
+- Add new lab: `015-local-token-based-rate-limiting.md` to demonstrate OSS local token-based rate limiting before moving on to Enterprise global rate limiting
 
 0.1.4 - (10-13-25)
 ---

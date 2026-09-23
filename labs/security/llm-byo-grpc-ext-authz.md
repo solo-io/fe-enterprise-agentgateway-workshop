@@ -161,7 +161,7 @@ You should get a 200 response with a completion from OpenAI.
 
 Create an `EnterpriseAgentgatewayPolicy` that applies ext-authz to the OpenAI HTTPRoute. This policy references the ext-authz Service we deployed and uses the gRPC protocol.
 
-By targeting the HTTPRoute instead of the Gateway, only traffic to this specific route requires ext-authz — other routes remain unaffected.
+By targeting the HTTPRoute instead of the Gateway, only traffic to this specific route requires ext-authz. Other routes remain unaffected.
 
 ```bash
 kubectl apply -f - <<EOF

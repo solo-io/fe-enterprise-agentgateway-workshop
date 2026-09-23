@@ -1,6 +1,6 @@
 # OpenAPI to MCP — External API
 
-Expose an existing REST API as MCP tools by handing agentgateway an OpenAPI schema — no custom MCP server required.
+Expose an existing REST API as MCP tools by handing agentgateway an OpenAPI schema: no custom MCP server required.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -34,7 +34,7 @@ When `protocol: OpenAPI` is set, you must also provide `openAPI.schemaRef`, whic
 
 ## Step 1: Store the OpenAPI schema in a ConfigMap
 
-The gateway reads the OpenAPI 3.0 schema from the `data.schema` key of a ConfigMap. Below is a curated subset of the Open-Meteo Forecast API — a single `getWeatherForecast` operation with well-described parameters so the generated MCP tool has a meaningful input schema.
+The gateway reads the OpenAPI 3.0 schema from the `data.schema` key of a ConfigMap. Below is a curated subset of the Open-Meteo Forecast API: a single `getWeatherForecast` operation with well-described parameters so the generated MCP tool has a meaningful input schema.
 
 > The `servers.url` is left as `/` on purpose: the actual host, port, and TLS settings come from the `EnterpriseAgentgatewayBackend` in the next step, not from the schema. The schema only describes the *paths* and *operations*.
 
@@ -137,7 +137,7 @@ EOF
 
 ## Step 2: Create the OpenAPI backend and HTTPRoute
 
-Create an `EnterpriseAgentgatewayBackend` with the `entMcp` backend type. Set `protocol: OpenAPI`, reference the ConfigMap, and — because Open-Meteo is HTTPS-only on port `443` — originate TLS to the upstream with `static.policies.tls`.
+Create an `EnterpriseAgentgatewayBackend` with the `entMcp` backend type. Set `protocol: OpenAPI`, reference the ConfigMap, and, because Open-Meteo is HTTPS-only on port `443`, originate TLS to the upstream with `static.policies.tls`.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -191,7 +191,7 @@ Review the following table to understand this configuration.
 | `targets[].static.openAPI.schemaRef.name` | The ConfigMap that holds the OpenAPI 3.0 JSON schema. The ConfigMap must have a `data.schema` key. |
 | `targets[].static.policies.tls.sni` | Originates TLS to the upstream and sets the SNI server name. Required for HTTPS upstreams. Validates against the system trust store, which is correct for a public CA like Open-Meteo's. |
 
-> **Heads-up — the `/mcp` path is shared across the MCP labs.** Several labs in this workshop (in-cluster MCP, tool federation, the Stripe OpenAPI lab, etc.) all bind `PathPrefix: /mcp` on the same `agentgateway-proxy` gateway. They coexist because each is a separate `HTTPRoute` → backend, but if you have more than one applied at once the gateway matches `/mcp` to only one of them (most-specific / last-accepted wins), so MCP Inspector may connect to a different backend than you expect. If you plan to run multiple MCP labs simultaneously, give each route a distinct path (e.g. `/mcp/open-meteo`) or delete the others first. The Cleanup section at the bottom removes this lab's route.
+> **Heads-up: the `/mcp` path is shared across the MCP labs.** Several labs in this workshop (in-cluster MCP, tool federation, the Stripe OpenAPI lab, etc.) all bind `PathPrefix: /mcp` on the same `agentgateway-proxy` gateway. They coexist because each is a separate `HTTPRoute` → backend, but if you have more than one applied at once the gateway matches `/mcp` to only one of them (most-specific / last-accepted wins), so MCP Inspector may connect to a different backend than you expect. If you plan to run multiple MCP labs simultaneously, give each route a distinct path (e.g. `/mcp/open-meteo`) or delete the others first. The Cleanup section at the bottom removes this lab's route.
 
 Verify that the HTTPRoute is accepted:
 ```bash
@@ -210,7 +210,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 echo $GATEWAY_IP
 ```
 
-If you are running locally without a LoadBalancer address, port-forward the proxy instead. Forward to the Gateway's HTTP listener port (`8080` in this workshop — confirm with `kubectl get gateway agentgateway-proxy -n agentgateway-system -o jsonpath='{.spec.listeners[*].port}'`):
+If you are running locally without a LoadBalancer address, port-forward the proxy instead. Forward to the Gateway's HTTP listener port (`8080` in this workshop; confirm with `kubectl get gateway agentgateway-proxy -n agentgateway-system -o jsonpath='{.spec.listeners[*].port}'`):
 ```bash
 kubectl port-forward -n agentgateway-system svc/agentgateway-proxy 8080:8080
 ```
@@ -227,7 +227,7 @@ Connect to your AgentGateway:
 
 ### List and run the tool
 1. Click the **Tools** tab, then **List Tools**. You should see the `getWeatherForecast` tool, with the parameter schema derived directly from the OpenAPI spec.
-2. Select **getWeatherForecast**. The generated tool groups all OpenAPI query parameters under a single **`query`** object, so the Inspector form shows a `query` section — expand it and fill in the fields, for example:
+2. Select **getWeatherForecast**. The generated tool groups all OpenAPI query parameters under a single **`query`** object, so the Inspector form shows a `query` section. Expand it and fill in the fields, for example:
    - `latitude`: `51.5072`
    - `longitude`: `-0.1276`
    - `current`: `temperature_2m,wind_speed_10m`
@@ -265,7 +265,7 @@ You can exercise the same flow from the command line. These steps assume the pro
      -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
    ```
 
-   Confirm that `getWeatherForecast` appears in the tool list. Note that its `inputSchema` groups the OpenAPI query parameters under a top-level **`query`** object — your tool-call arguments must match that shape.
+   Confirm that `getWeatherForecast` appears in the tool list. Note that its `inputSchema` groups the OpenAPI query parameters under a top-level **`query`** object; your tool-call arguments must match that shape.
 
 3. Call the tool. The arguments are nested under `query` to match the generated input schema.
    ```bash
@@ -302,9 +302,9 @@ You can exercise the same flow from the command line. These steps assume the pro
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Look for MCP-specific fields in the structured log output. A `tools/call` against this backend logs `protocol=mcp`, `mcp.method.name=tools/call`, `mcp.target=open-meteo`, `mcp.resource.type=tool`, `gen_ai.tool.name=getWeatherForecast` (the specific tool invoked), `mcp.session.id=<id>`, and `http.status=200`. The `initialize`, `notifications/initialized`, and `tools/list` lines carry `protocol=mcp` and `mcp.method.name` but **not** `mcp.target` / `mcp.resource.type` — those only appear on `tools/call`.
+Look for MCP-specific fields in the structured log output. A `tools/call` against this backend logs `protocol=mcp`, `mcp.method.name=tools/call`, `mcp.target=open-meteo`, `mcp.resource.type=tool`, `gen_ai.tool.name=getWeatherForecast` (the specific tool invoked), `mcp.session.id=<id>`, and `http.status=200`. The `initialize`, `notifications/initialized`, and `tools/list` lines carry `protocol=mcp` and `mcp.method.name` but **not** `mcp.target` / `mcp.resource.type`; those only appear on `tools/call`.
 
-> **Multiple proxy replicas:** the gateway often runs more than one replica (`kubectl get deploy agentgateway-proxy -n agentgateway-system`), and an OpenAPI/StreamableHTTP MCP session is stateless (the `Mcp-Session-Id` token encodes the target, so successive requests can land on any replica). The `--prefix` flag above tags each line with its source pod, and the `-l` selector streams from all matching pods — keep both so you don't miss a request served by a different replica. If you ever filter to a single pod, grep by `mcp.session.id=<id>` instead to follow one session across replicas.
+> **Multiple proxy replicas:** the gateway often runs more than one replica (`kubectl get deploy agentgateway-proxy -n agentgateway-system`), and an OpenAPI/StreamableHTTP MCP session is stateless (the `Mcp-Session-Id` token encodes the target, so successive requests can land on any replica). The `--prefix` flag above tags each line with its source pod, and the `-l` selector streams from all matching pods; keep both so you don't miss a request served by a different replica. If you ever filter to a single pod, grep by `mcp.session.id=<id>` instead to follow one session across replicas.
 
 > Tip: if your gateway also fronts other traffic (for example LLM routes or other MCP labs), filter to this route to cut the noise:
 > ```bash
@@ -327,12 +327,12 @@ done
 
 > The grep is scoped to `open-meteo` and `protocol="mcp"` on purpose. A plain `grep -iE "mcp"` returns every MCP route on the gateway (federation, other labs, etc.), which is a lot of noise on a shared cluster.
 
-> **Single-pod scrape, multiple replicas:** `port-forward` to `deployment/agentgateway-proxy` connects to **one** pod, and these counters are per-pod (Prometheus normally scrapes every pod and sums them). So with multiple replicas the numbers below reflect only the replica you hit, not the cluster total — re-run the port-forward to land on a different pod, or use Grafana (next section), which aggregates across all replicas.
+> **Single-pod scrape, multiple replicas:** `port-forward` to `deployment/agentgateway-proxy` connects to **one** pod, and these counters are per-pod (Prometheus normally scrapes every pod and sums them). So with multiple replicas the numbers below reflect only the replica you hit, not the cluster total. Re-run the port-forward to land on a different pod, or use Grafana (next section), which aggregates across all replicas.
 
 You should see MCP request counters, including:
-- `agentgateway_mcp_requests_total{...server="open-meteo",resource="getWeatherForecast"...}` — per-tool MCP request counter (labeled by `method`, `resource_type`, `server`, and `resource`)
-- `agentgateway_requests_total{...protocol="mcp"...}` — overall request counter, labeled with `protocol="mcp"` and `backend="agentgateway-system/open-meteo-openapi"` for this backend
-- `agentgateway_request_duration_seconds_*` — request latency histogram (also carries the `protocol="mcp"` label)
+- `agentgateway_mcp_requests_total{...server="open-meteo",resource="getWeatherForecast"...}`: per-tool MCP request counter (labeled by `method`, `resource_type`, `server`, and `resource`)
+- `agentgateway_requests_total{...protocol="mcp"...}`: overall request counter, labeled with `protocol="mcp"` and `backend="agentgateway-system/open-meteo-openapi"` for this backend
+- `agentgateway_request_duration_seconds_*`: request latency histogram (also carries the `protocol="mcp"` label)
 
 ### View in Grafana
 1. Port-forward Grafana:
@@ -347,7 +347,7 @@ You should see MCP request counters, including:
 ## Next steps
 
 - **Secure the route**: Apply an `EnterpriseAgentgatewayPolicy` with JWT authentication and CEL-based RBAC, exactly as shown in the [Configure Route to MCP Server lab](in-cluster-mcp.md). Because the route path (`/mcp`) and gateway are the same, that policy applies unchanged.
-- **Federate multiple APIs**: Add more targets (each with its own OpenAPI schema) to one `entMcp` backend, or combine OpenAPI tools with native MCP servers — see [MCP Tool Federation](mcp-tool-federation.md).
+- **Federate multiple APIs**: Add more targets (each with its own OpenAPI schema) to one `entMcp` backend, or combine OpenAPI tools with native MCP servers; see [MCP Tool Federation](mcp-tool-federation.md).
 - **Reduce tool-context bloat**: For large OpenAPI specs that generate many tools, explore `toolMode: Search` or `Code` in the [MCP tool mode labs](mcp-tool-mode-search.md).
 
 ---
@@ -357,11 +357,11 @@ You should see MCP request counters, including:
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `tools/call` returns a TLS/connection error, or the upstream resets the connection | `policies.tls` was omitted, so the gateway tried plaintext against an HTTPS-only upstream on `443`. | Add `policies.tls.sni: api.open-meteo.com` to the target (Step 2). HTTPS upstreams **must** originate TLS; the SNI is required for servers that virtual-host by name. |
-| Upstream returns `404` / `400` even though `tools/list` works | The schema `paths` don't match the real API path, or the `servers.url` was set to a full host instead of `/`. | Keep `servers.url` as `/` — host/port/TLS come from the backend, not the schema. Make the `paths` key (`/v1/forecast`) exactly match the upstream route. |
+| Upstream returns `404` / `400` even though `tools/list` works | The schema `paths` don't match the real API path, or the `servers.url` was set to a full host instead of `/`. | Keep `servers.url` as `/`: host/port/TLS come from the backend, not the schema. Make the `paths` key (`/v1/forecast`) exactly match the upstream route. |
 | `tools/call` fails with a schema/validation error | Arguments weren't nested under the generated **`query`** object. agentgateway groups all OpenAPI query parameters under a single top-level `query` property. | Wrap the parameters: `"arguments":{"query":{"latitude":...,"longitude":...}}`. Inspect the exact shape with `tools/list` first. |
 | `tools/list` is empty or the tool name is wrong | The OpenAPI operation has no `operationId`, or the ConfigMap key isn't `data.schema`. | Every operation needs an `operationId` (it becomes the tool name). The ConfigMap must expose the JSON under `data.schema`. |
 | Backend status is not `Accepted`, or HTTPRoute `ResolvedRefs=False` | The `schemaRef` ConfigMap name is wrong/missing, or the backend `group`/`kind` on the `backendRef` is misspelled. | `kubectl get enterpriseagentgatewaybackend open-meteo-openapi -n agentgateway-system -o yaml` and check `.status.conditions`. Confirm the ConfigMap exists and the `backendRefs.group` is `enterpriseagentgateway.solo.io`. |
-| MCP Inspector connects to the wrong tools | Another MCP lab is also bound to `/mcp` on this gateway. | See the `/mcp` shared-path note in Step 2 — use a distinct path or remove the other routes. |
+| MCP Inspector connects to the wrong tools | Another MCP lab is also bound to `/mcp` on this gateway. | See the `/mcp` shared-path note in Step 2; use a distinct path or remove the other routes. |
 
 ---
 

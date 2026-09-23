@@ -17,7 +17,7 @@ You will also need:
 
 ## About BYO OPA ext-authz
 
-OPA ships an `envoy_ext_authz_grpc` plugin that lets the `openpolicyagent/opa` server speak the standard [Envoy External Authorization gRPC proto](https://github.com/envoyproxy/envoy/blob/main/api/envoy/service/auth/v3/external_auth.proto) directly — no custom code required. Enterprise Agentgateway calls OPA on every request, OPA evaluates Rego, and returns allow/deny.
+OPA ships an `envoy_ext_authz_grpc` plugin that lets the `openpolicyagent/opa` server speak the standard [Envoy External Authorization gRPC proto](https://github.com/envoyproxy/envoy/blob/main/api/envoy/service/auth/v3/external_auth.proto) directly. Enterprise Agentgateway calls OPA on every request, OPA evaluates Rego, and returns allow/deny.
 
 ```
 Client → Agentgateway → gRPC (Envoy ext-authz) → OPA pod → allow/deny
@@ -49,7 +49,7 @@ OPA is configured with three pieces:
 
 ### Step 1: Create the policy and OPA config
 
-Put both files in one ConfigMap. The Rego policy lives at `package envoy.authz` and is queried at the Rego path `envoy/authz/allow`. With the Envoy plugin, OPA receives the full Envoy `CheckRequest` as `input` — `input.attributes.request.http.headers` holds the request headers.
+Put both files in one ConfigMap. The Rego policy lives at `package envoy.authz` and is queried at the Rego path `envoy/authz/allow`. With the Envoy plugin, OPA receives the full Envoy `CheckRequest` as `input`; `input.attributes.request.http.headers` holds the request headers.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -88,11 +88,11 @@ EOF
 |---|---|
 | `plugins.envoy_ext_authz_grpc.addr` | TCP port OPA binds the gRPC ext-authz server on |
 | `plugins.envoy_ext_authz_grpc.path` | Rego path the gateway's `Check()` call is evaluated against |
-| `decision_logs.console` | Streams every authz decision to OPA's stdout — visible via `kubectl logs` |
+| `decision_logs.console` | Streams every authz decision to OPA's stdout, visible via `kubectl logs` |
 
 ### Step 2: Deploy OPA
 
-Use the `openpolicyagent/opa:latest-envoy-static` image — it bundles the Envoy ext-authz plugin and ships multi-arch (amd64 + arm64). The plain `:latest-envoy` tag is amd64-only and will fail to pull on arm64 nodes. The pod runs `opa run --server` pointed at the mounted config and policy.
+Use the `openpolicyagent/opa:latest-envoy-static` image: it bundles the Envoy ext-authz plugin and ships multi-arch (amd64 + arm64). The plain `:latest-envoy` tag is amd64-only and will fail to pull on arm64 nodes. The pod runs `opa run --server` pointed at the mounted config and policy.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -257,7 +257,7 @@ You should get a 200 response with a completion from OpenAI.
 
 ### Step 3: Attach OPA as the ext-authz backend
 
-By targeting the HTTPRoute instead of the Gateway, only the OpenAI route requires ext-authz — other routes remain unaffected.
+By targeting the HTTPRoute instead of the Gateway, only the OpenAI route requires ext-authz. Other routes remain unaffected.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -328,7 +328,7 @@ You should get a 200 response with a completion from OpenAI. The OPA decision lo
 
 ## Part 2: Reuse the same OPA service to protect an MCP route
 
-The same OPA service can protect any number of routes. We'll attach it to an MCP route that proxies to the external Solo.io docs MCP server — no in-cluster MCP deployment required.
+The same OPA service can protect any number of routes. We'll attach it to an MCP route that proxies to the external Solo.io docs MCP server, so there is no MCP server to deploy in-cluster.
 
 ### Step 1: Create the MCP backend and route
 
@@ -398,7 +398,7 @@ spec:
 EOF
 ```
 
-> **Note:** ext-authz operates at the HTTP transport layer — OPA sees the request method, path, and headers but does not inspect the MCP protocol payload (e.g., which tool is being called). For per-tool authorization, layer the built-in `mcpAuthorization` CEL policy on top of this ext-authz check.
+> **Note:** ext-authz operates at the HTTP transport layer: OPA sees the request method, path, and headers but does not inspect the MCP protocol payload (e.g., which tool is being called). For per-tool authorization, layer the built-in `mcpAuthorization` CEL policy on top of this ext-authz check.
 
 ### Step 3: Test — MCP request denied without required header
 
@@ -473,13 +473,13 @@ Expected:
 
 ## Part 3: Body-aware policy — gate by MCP JSON-RPC method
 
-ext-authz at the HTTP layer can't see MCP semantics from headers alone — `tools/call` looks identical to `tools/list` on the wire. To gate per-tool, the gateway has to forward the request body to OPA, and the Rego has to parse the JSON-RPC payload.
+ext-authz at the HTTP layer can't see MCP semantics from headers alone: `tools/call` looks identical to `tools/list` on the wire. To gate per-tool, the gateway has to forward the request body to OPA, and the Rego has to parse the JSON-RPC payload.
 
-By default the gateway sends an **empty body** in the `CheckRequest` — body forwarding is opt-in via the `forwardBody` field on the `extAuth` policy. Once enabled, the body is available in Rego at `input.attributes.request.http.body`.
+By default the gateway sends an empty body in the `CheckRequest`; body forwarding is opt-in via the `forwardBody` field on the `extAuth` policy. Once enabled, the body is available in Rego at `input.attributes.request.http.body`.
 
 ### Step 1: Enable body forwarding on the MCP policy
 
-Patch the MCP ext-authz policy from Part 2 to buffer up to 16 KiB of body and send it to OPA. Only the MCP policy needs this — the OpenAI policy in Part 1 stays header-only.
+Patch the MCP ext-authz policy from Part 2 to buffer up to 16 KiB of body and send it to OPA. Only the MCP policy needs this; the OpenAI policy in Part 1 stays header-only.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -507,13 +507,13 @@ spec:
 EOF
 ```
 
-> **Note:** `forwardBody.maxSize` is the per-request buffer ceiling. Bodies larger than `maxSize` are **truncated** to `maxSize` bytes and the partial body is forwarded to OPA — the gateway does not reject up front. A Rego policy that calls `json.unmarshal` on a truncated body will fail to parse, the rule body fails, and Rego falls through to `default allow := false`. The client sees a `403` (not a `413`). Size with enough headroom for real payloads so legitimate requests aren't silently denied as collateral.
+> **Note:** `forwardBody.maxSize` is the per-request buffer ceiling. Bodies larger than `maxSize` are truncated to `maxSize` bytes and the partial body is forwarded to OPA; the gateway does not reject up front. A Rego policy that calls `json.unmarshal` on a truncated body will fail to parse, the rule body fails, and Rego falls through to `default allow := false`. The client sees a `403` (not a `413`). Size with enough headroom for real payloads so legitimate requests aren't silently denied as collateral.
 
 ### Step 2: Update the Rego policy to read the JSON-RPC method
 
 Replace the ConfigMap with a policy that:
 - keeps the header-only check for `/openai` (body is not forwarded there, so don't try to parse it), and
-- adds an MCP-aware branch that unmarshals the body and decides based on the JSON-RPC `method` — for `tools/call`, also on `params.name`.
+- adds an MCP-aware branch that unmarshals the body and decides based on the JSON-RPC `method`, and for `tools/call` also on `params.name`.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -571,7 +571,7 @@ kubectl rollout restart deployment/opa-ext-authz -n agentgateway-system
 kubectl rollout status deployment/opa-ext-authz -n agentgateway-system --timeout=60s
 ```
 
-If `json.unmarshal` fails (empty or non-JSON body), the rule body fails and Rego falls through to `default allow := false` — fail-closed by construction.
+If `json.unmarshal` fails (empty or non-JSON body), the rule body fails and Rego falls through to `default allow := false`, so the policy fails closed.
 
 ### Step 3: Test — calling an allowed tool
 
@@ -621,7 +621,7 @@ Expected: `HTTP/1.1 200 OK` with a search result payload.
 
 ### Step 4: Test — calling a denied tool
 
-Call a tool that isn't on the allow-list (e.g. `get_full_page`) on the same session — the header is present and identical to Step 3, so any deny here is purely body-driven:
+Call a tool that isn't on the allow-list (e.g. `get_full_page`) on the same session: the header is present and identical to Step 3, so any deny here is purely body-driven.
 
 ```bash
 curl -i "$GATEWAY_IP:8080/mcp" \
@@ -637,15 +637,15 @@ curl -i "$GATEWAY_IP:8080/mcp" \
   }'
 ```
 
-Expected: `HTTP/1.1 403 Forbidden`. The OPA decision log will show `"result":false` and the full JSON-RPC payload in `input.attributes.request.http.body` — proof the decision was made off the body, not the header.
+Expected: `HTTP/1.1 403 Forbidden`. The OPA decision log will show `"result":false` and the full JSON-RPC payload in `input.attributes.request.http.body`.
 
 ### Caveats
 
-- **Per-request cost.** Body buffering adds latency and memory per request — keep `maxSize` as low as your real payloads tolerate.
-- **Oversize is silent.** As noted above, oversize bodies are truncated and the partial payload is sent to OPA. If your Rego depends on full-body inspection (e.g. `json.unmarshal`), oversize requests will be denied indirectly — not with `413`. Size `maxSize` accordingly.
-- **No streaming bodies.** `forwardBody` is request-side only and buffers to completion; chunked uploads or SSE responses are not exposed to OPA.
-- **Path-conditional Rego.** When one OPA service backs multiple routes with different forwarding settings, branch on `input.attributes.request.http.path` so rules don't try to parse a body that wasn't sent.
-- **Complement, not replace.** For richer per-tool authorization tied to MCP session state and tool metadata, layer the built-in `mcpAuthorization` CEL policy on top of this ext-authz check.
+- Body buffering adds latency and memory per request; keep `maxSize` as low as your real payloads tolerate.
+- Oversize bodies are truncated and the partial payload is sent to OPA. If your Rego depends on full-body inspection (e.g. `json.unmarshal`), oversize requests will be denied indirectly, not with `413`. Size `maxSize` accordingly.
+- `forwardBody` is request-side only and buffers to completion; chunked uploads or SSE responses are not exposed to OPA.
+- When one OPA service backs multiple routes with different forwarding settings, branch on `input.attributes.request.http.path` so rules don't try to parse a body that wasn't sent.
+- For richer per-tool authorization tied to MCP session state and tool metadata, layer the built-in `mcpAuthorization` CEL policy on top of this ext-authz check.
 
 ---
 
@@ -665,7 +665,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 
 ## Alternative: Serve the policy as an OPA bundle
 
-For production, most teams version-control their Rego and ship it to OPA as a **bundle** — a signed tarball OPA fetches over HTTP or OCI. The gateway-facing setup is identical; only OPA's config and volumes change.
+For production, most teams version-control their Rego and ship it to OPA as a **bundle**, a signed tarball OPA fetches over HTTP or OCI. The gateway-facing setup is identical; only OPA's config and volumes change.
 
 ### Step 1: Build and host the bundle
 
@@ -768,7 +768,7 @@ data:
 EOF
 ```
 
-Re-apply the Deployment without the `policy.rego` volume and arg — OPA now gets its policy from the bundle plugin instead of a mounted file. The readiness probe is updated to `/health?plugins&bundles` so it waits for both the Envoy plugin and a successful bundle activation before going Ready.
+Re-apply the Deployment without the `policy.rego` volume and arg: OPA now gets its policy from the bundle plugin instead of a mounted file. The readiness probe is updated to `/health?plugins&bundles` so it waits for both the Envoy plugin and a successful bundle activation before going Ready.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -827,7 +827,7 @@ kubectl rollout status deployment/opa-ext-authz -n agentgateway-system --timeout
 
 ### Step 3: Verify
 
-Re-run the deny/allow tests from Part 1 — they should behave identically, because the policy is the same; only its delivery channel changed.
+Re-run the deny/allow tests from Part 1. They should behave identically, because the policy is the same; only its delivery channel changed.
 
 ```bash
 # Should be 403
@@ -842,7 +842,7 @@ curl -sS -o /dev/null -w "with header: %{http_code}\n" "$GATEWAY_IP:8080/openai"
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}'
 ```
 
-To prove the policy came from the bundle, check the decision log — each entry now includes a `bundles` field naming the active bundle:
+To prove the policy came from the bundle, check the decision log. Each entry now includes a `bundles` field naming the active bundle:
 
 ```bash
 kubectl logs -n agentgateway-system -l app=opa-ext-authz --tail=5 | grep -o '"bundles":{[^}]*}' | head -3

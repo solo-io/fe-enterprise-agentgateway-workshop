@@ -385,11 +385,11 @@ spec:
 EOF
 ```
 
-- **`onBudgetExceeded`** decides what happens at the limit. `Block` rejects further requests with `429`, and `Audit` records the overage and forwards the request. Auditing the team budgets while blocking individuals caps one runaway caller and leaves the rest of the team serving traffic.
-- **A `"*"` subject value creates a separate allowance per value.** `user: "*"` gives each distinct user their own 100,000 tokens per day, so a new user gets the default the first time they call.
-- **An exact entry takes precedence over the wildcard** on the same dimension. `alice-daily-tokens` raises alice to 500,000 tokens and `bob-daily-tokens` drops bob to 2,000; both suppress the default for that user alone. Entries on other dimensions still stack, so bob's requests debit both his own cap and the engineering group budget.
-- **Entries compose across resources, and the most restrictive one wins.** Nothing about the split changes enforcement: a tight cap in one resource still overrides a generous one in another for the same subject. Separating them is an organizational choice, not a functional one.
-- **Token budgets are the practical way to demonstrate enforcement.** `amount` is a whole number, so the smallest USD budget is `$1` — thousands of requests at these rates. A token cap trips in a handful.
+- `onBudgetExceeded` decides what happens at the limit. `Block` rejects further requests with `429`, and `Audit` records the overage and forwards the request. Auditing the team budgets while blocking individuals caps one runaway caller and leaves the rest of the team serving traffic.
+- A `"*"` subject value creates a separate allowance per value. `user: "*"` gives each distinct user their own 100,000 tokens per day, so a new user gets the default the first time they call.
+- An exact entry takes precedence over the wildcard on the same dimension. `alice-daily-tokens` raises alice to 500,000 tokens and `bob-daily-tokens` drops bob to 2,000; both suppress the default for that user alone. Entries on other dimensions still stack, so bob's requests debit both his own cap and the engineering group budget.
+- Entries compose across resources, and the most restrictive one wins. Nothing about the split changes enforcement: a tight cap in one resource still overrides a generous one in another for the same subject. Separating them is an organizational choice, not a functional one.
+- Token budgets are the practical way to demonstrate enforcement. `amount` is a whole number, so the smallest USD budget is `$1`: thousands of requests at these rates. A token cap trips in a handful.
 
 Windows roll rather than align to the calendar: `Day` covers a rolling 24 hours and `Month` a rolling 30 days.
 
@@ -461,7 +461,7 @@ agentgateway-system   user-exceptions       True       True       3m
 team-research         research-team-quota   True       False      15s
 ```
 
-The resource is valid; the gateway simply isn't looking in that namespace. `discovery.namespaces.from: Same` restricts enforcement to the policy's own namespace. Widen it to `All`:
+The resource is valid; the gateway isn't looking in that namespace. `discovery.namespaces.from: Same` restricts enforcement to the policy's own namespace. Widen it to `All`:
 
 ```bash
 kubectl patch enterpriseagentgatewaypolicy api-key-auth -n agentgateway-system \
@@ -518,7 +518,7 @@ done
 
 Expected output: a run of `HTTP 200` followed by a single `HTTP 429`, typically on the 18th or 19th request at roughly 105 tokens apiece. Once bob is over his cap, every further request from that key is rejected until the rolling 24-hour window moves.
 
-Alice is unaffected — her own entry gives her a separate allowance, and the team budgets are set to `Audit`, so engineering keeps serving traffic while the one over-budget caller is cut off:
+Alice is unaffected: her own entry gives her a separate allowance, and the team budgets are set to `Audit`, so engineering keeps serving traffic while the one over-budget caller is cut off:
 
 ```bash
 curl -s -o /dev/null -w "alice: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
@@ -533,7 +533,7 @@ Expected output: `alice: HTTP 200`.
 
 The requests above prove attribution works, but they all land within a few minutes of each other, so the **Spend Over Time** panels draw a single spike and the 7d and 30d ranges sit nearly empty. To present the dashboard against a realistic history, seed ClickHouse with synthetic spend.
 
-The script writes spans straight into the table behind Cost Management, so every pivot has something to separate. It seeds a month of traffic across four providers — the `gpt-5.6` family priced at the overlay rates you just configured, plus Anthropic, Gemini, and AWS Bedrock models at their catalog rates — spread over five teams whose sizes deliberately differ:
+The script writes spans straight into the table behind Cost Management, so every pivot has something to separate. It seeds a month of traffic across four providers: the `gpt-5.6` family priced at the overlay rates you just configured, plus Anthropic, Gemini, and AWS Bedrock models at their catalog rates. The traffic is spread over five teams whose sizes deliberately differ:
 
 | Group | Members |
 | --- | --- |
@@ -565,7 +565,7 @@ Volume and window are tunable, so you can seed a smaller sample or a longer hist
 ROWS=50000 DAYS=7 ./lib/observability/seed-cost-data.sh
 ```
 
-Re-running adds more spend on top of what is already there. To start over, run it with `TRUNCATE=true`, which clears the spans table and the cost rollups first — including the real requests and traces from earlier in this lab.
+Re-running adds more spend on top of what is already there. To start over, run it with `TRUNCATE=true`, which clears the spans table and the cost rollups first, including the real requests and traces from earlier in this lab.
 
 > **Note:** Seeding populates the **Dashboard** tab and its pivots. The **Budgets** tab reads live counters from the rate limiter rather than ClickHouse, so budget usage continues to reflect only the real requests you sent through the gateway.
 
@@ -585,13 +585,13 @@ Open [http://localhost:4000/age/](http://localhost:4000/age/) and select **Cost 
 - **Model Cost Catalog**: the header names the base catalog, lists your overlay under **Overlay catalogs are applied in this order**, and reports `1 model entry is overridden by overlay sources`. Search the table to see both halves of the overlay:
   - `gpt-5.6` returns the three added models with the rates you supplied.
   - `gpt-5.5` shows `$2.50` input, `$15.00` output, and `$0.25` cache read instead of the list `$5.00`/`$30.00`/`$0.50`, tagged source `Override`.
-- **Budgets**: one row per `EnterpriseAgentgatewayBudget`, with a header counting `Within budget` against `Exceeding budget` — `4 Budgets`, `3 Within budget`, `1 Exceeding budget` after the steps above. Each row shows its **Scope**, so `research-team-quota` is visibly owned by `team-research` while the rest sit in `agentgateway-system`. Click a row to open its detail drawer, where each entry shows its subject, window, and usage against its limit:
+- **Budgets**: one row per `EnterpriseAgentgatewayBudget`, with a header counting `Within budget` against `Exceeding budget`: `4 Budgets`, `3 Within budget`, `1 Exceeding budget` after the steps above. Each row shows its **Scope**, so `research-team-quota` is visibly owned by `team-research` while the rest sit in `agentgateway-system`. Click a row to open its detail drawer, where each entry shows its subject, window, and usage against its limit:
   - `user-exceptions` is the one over budget: `bob-daily-tokens`, subject `user bob`, `2,000 tokens of 2,000 tokens`, flagged `Over budget` at `100%` after the blocking step. Its sibling `alice-daily-tokens` reads e.g. `694 tokens of 500,000 tokens`, `On track`
   - `platform-defaults`: `any-user-daily-tokens`, subject `user *`, e.g. `368 tokens of 100,000 tokens`, `On track`. Bob's traffic is absent here, because his exact entry takes precedence and debits his own cap instead of the shared default
   - `finance-guardrails`: `engineering-monthly-usd` and `research-monthly-usd`, e.g. `$0.01 of $50.00` and `$0.00 of $25.00`, both `On track`
   - `research-team-quota`: `research-daily-tokens`, subject `group research`, `On track`
 
-  > **Note:** Budget usage comes from the gateway's live rate-limiter counters rather than ClickHouse, so the optional seeding step above does not move these bars — only real requests through the gateway do.
+  > **Note:** Budget usage comes from the gateway's live rate-limiter counters rather than ClickHouse, so the optional seeding step above does not move these bars; only real requests through the gateway do.
 
 Treat spend as an estimate. The gateway multiplies token counts by the per-token prices in your catalog, so the totals won't reconcile line-for-line against your LLM provider's invoice.
 

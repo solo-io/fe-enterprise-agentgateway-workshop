@@ -1,10 +1,10 @@
 # Lab Style Guide
 
-This guide documents the conventions of this repo so that any author — human or agent — can create new labs that look and behave like the existing ones. It was produced by auditing the full lab corpus (~70 labs across `labs/`, the root install labs, `tracks/`, `lib/`, and the repo meta-files). Where the repo is internally inconsistent, this guide picks the dominant/best pattern and marks it **normative**.
+This guide documents the conventions of this repo so that any author, human or agent, can create new labs that look and behave like the existing ones. It was produced by auditing the full lab corpus (~70 labs across `labs/`, the root install labs, `tracks/`, `lib/`, and the repo meta-files). Where the repo is internally inconsistent, this guide picks the dominant/best pattern and marks it **normative**.
 
 **TL;DR:** clone the skeleton of `labs/routing/configure-routing-openai.md` for a simple lab, or `labs/mcp/mcp-eager-auth-auth0.md` / `labs/mcp/figma-mcp-auth0/` for a heavyweight runbook, then work through the [checklist](#checklist-when-adding-a-lab) at the bottom.
 
-> **If you're a human:** don't try to follow this document by hand — its precision is aimed at agents. Your workflow is three steps: (1) clone the closest existing lab per the TL;DR above, (2) write your content and skim the [checklist](#checklist-when-adding-a-lab), (3) before committing, ask Claude to run `/lab-conform labs/<category>/<your-lab>.md` — it normalizes the mechanical conventions against this guide and flags anything that needs your judgment. You own the content; the agent owns the conformance.
+> **If you're a human:** don't try to follow this document by hand; its precision is aimed at agents. Your workflow is three steps: (1) clone the closest existing lab per the TL;DR above, (2) write your content and skim the [checklist](#checklist-when-adding-a-lab), (3) before committing, ask Claude to run `/lab-conform labs/<category>/<your-lab>.md`: it normalizes the mechanical conventions against this guide and flags anything that needs your judgment. You own the content; the agent owns the conformance.
 
 ---
 
@@ -14,13 +14,13 @@ This guide documents the conventions of this repo so that any author — human o
 |---|---|
 | `001-install-enterprise-agentgateway.md`, `002-set-up-ui-and-monitoring-tools.md` | Foundational install labs. Top-level, everything depends on them. Only these live at the root. |
 | `labs/<category>/<name>.md` | All other labs. Categories: `routing`, `security`, `rate-limiting`, `guardrails`, `transformations`, `mcp`, `inference`, `identity-delegation`, `observability`, `upgrades`, `load-testing`, `evaluations`, `agent-frameworks`, `agent-harnesses`, `installation` |
-| `labs/<category>/<name>/` (subdirectory lab) | Only when the lab ships binary/large assets — screenshots, big OpenAPI specs, templated YAML bundles. The runbook is `README.md` inside the folder (see §4) |
-| `lib/<concern>/` | Shared, reusable cross-lab assets (`jwt/`, `keycloak/`, `crewai/`, `langchain/`, `observability/`) — see §11 |
+| `labs/<category>/<name>/` (subdirectory lab) | Only when the lab ships binary/large assets: screenshots, big OpenAPI specs, templated YAML bundles. The runbook is `README.md` inside the folder (see §4) |
+| `lib/<concern>/` | Shared, reusable cross-lab assets (`jwt/`, `keycloak/`, `crewai/`, `langchain/`, `observability/`); see §11 |
 | `tracks/` | Curated learning paths (`llm-track.md`, `mcp-track.md`) mapping use cases → lab sequences |
 | `images/` | Repo-level screenshots (Grafana dashboards, Claude Desktop), referenced with relative paths |
 | `docs/superpowers/{specs,plans}/` | Design docs and implementation plans for substantial labs (see §14) |
 | `scripts/` | Repo maintenance scripts, each with a colocated stdlib-`unittest` test file |
-| `labs/installation/image-list.md`, `labs/installation/system-requirements.md` | Canonical image/chart registry and cluster requirements — must be updated when a lab introduces new images or bumps versions |
+| `labs/installation/image-list.md`, `labs/installation/system-requirements.md` | Canonical image/chart registry and cluster requirements; must be updated when a lab introduces new images or bumps versions |
 
 Lab filenames are kebab-case and outcome-descriptive (`configure-routing-openai.md`, `mcp-eager-auth-auth0.md`). No numeric prefixes except the root `001`/`002` (and the installation-variant labs that mirror them).
 
@@ -65,7 +65,7 @@ Rules:
 - **Pre-requisites boilerplate** (use verbatim): *"This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces."* Reference labs `001`/`002` by bare backticked number in this sentence; reference all other labs with relative markdown links (`[Mock OpenAI Server lab](configure-mock-openai-server.md)`, `[001 — Install...](../../001-install-enterprise-agentgateway.md)` from two levels deep).
 - **Hard requirements** (architecture, sizing, version gates) go in bold-lead blockquotes right after Pre-requisites: `> **Node architecture (important):** ...`. Version-gated features state it plainly: *"available in **v2026.6.3 and later**"*.
 - **Lab Objectives**: always present, bulleted, verb-first, e.g. `- Create a route to OpenAI using an `EnterpriseAgentgatewayBackend` and `HTTPRoute``. Multi-part labs may use bold sub-labels: `- **Part A — Impersonation:** ...`.
-- **Step headings** (normative): for multi-step runbooks use `## Step N — Title` (em-dash — this is the dominant style; do **not** use `## Step N: Title`). Short labs skip numbering and use plain descriptive `##`/`###` Title Case headings. Use `---` horizontal rules between major sections in long labs.
+- **Step headings** (normative): for multi-step runbooks use `## Step N — Title` (em-dash; this is the dominant style; do **not** use `## Step N: Title`). Short labs skip numbering and use plain descriptive `##`/`###` Title Case headings. Use `---` horizontal rules between major sections in long labs.
 - **Runbooks** should state what they were validated against: *"This runbook was validated against controller **v2026.6.1** on a local KinD cluster."*
 - There is no "Next Steps" section convention; cross-link related labs inline instead. `## Key Takeaways` as a closing bullet list is optional.
 
@@ -84,7 +84,7 @@ labs/mcp/<lab-name>/
 
 - Include a **"Files in this folder"** table near the top of the README.
 - Templated YAML is applied/deleted symmetrically: `envsubst < figma-mcp.yaml | kubectl apply -f -` and `envsubst < figma-mcp.yaml | kubectl delete -f - --ignore-not-found`.
-- **Secrets**: credentials go in a gitignored, `source`-able env file (e.g. `.figma-creds.env` with a header comment "Source before running the runbook"). Never commit a populated one — commit nothing, or placeholders only. Generated certs go in a gitignored `example_certs/`.
+- **Secrets**: credentials go in a gitignored, `source`-able env file (e.g. `.figma-creds.env` with a header comment "Source before running the runbook"). Never commit a populated one: commit nothing, or placeholders only. Generated certs go in a gitignored `example_certs/`.
 - Manifests >256 KB must be applied with `kubectl apply --server-side` (dodges the last-applied-annotation size limit).
 - Anti-pattern to avoid: a flat `.md` with a sibling bare `images/`-only folder; if you need images, either put them in the repo-level `images/` (as the keycloak eager-auth lab does with `images/keycloak/`) or make it a full subdirectory lab.
 
@@ -92,12 +92,12 @@ labs/mcp/<lab-name>/
 
 - Second person, imperative, present tense: "Create one Secret per user...", "Send a request as alice:". Occasional "we"/"let's" in verification prose is fine ("We should see...").
 - **Why-first**: every non-trivial config gets a rationale *before* the command. Three established vehicles: a `### Why ...?` sub-header, a `> **Why ...?**` blockquote at the point of a surprising choice, or a comparison table. The strongest labs explain what the client *cannot* forge/override, what fails without the setting, and what error you'd see.
-- Be honest about limitations and report real observed numbers with versions: *"Observed result (v2026.6.1, `shutdown.max: 110`): `streams_completed`: 157, `streams_cut`: 3"* — including when the result is imperfect, with the explanation.
+- Be honest about limitations and report real observed numbers with versions: *"Observed result (v2026.6.1, `shutdown.max: 110`): `streams_completed`: 157, `streams_cut`: 3"*, including when the result is imperfect, with the explanation.
 - Call out gotchas at the exact step where they bite, including misleading error messages (*"a misleading 403 — it means 'malformed request', not 'no access'"*).
 
 ## 6. Command-block conventions
 
-All commands use ```` ```bash ```` fences. Manifests are applied inline via heredoc inside the bash fence — not separate `yaml` fences.
+All commands use ```` ```bash ```` fences. Manifests are applied inline via heredoc inside the bash fence, not separate `yaml` fences.
 
 **Heredoc quoting is semantic (normative):**
 
@@ -105,7 +105,7 @@ All commands use ```` ```bash ```` fences. Manifests are applied inline via here
 - Quoted `kubectl apply -f - <<'EOF'` when the body contains `$`, regexes, backticks, or script text that must NOT expand (guardrail regex policies, k6 scripts with `__ENV`, CEL with `$`). If you must mix, escape selectively (`\$VAR`) inside an unquoted heredoc.
 - Spell it `-f -` (with the space). Both `-f-` and `-f -` exist in the repo; standardize on the space for new labs.
 
-**The universal idioms — copy these verbatim:**
+**The universal idioms (copy these verbatim):**
 
 Gateway address (works for both LB IPs and hostnames):
 
@@ -172,13 +172,13 @@ Standard verification tools:
   ```
 
   Plain `#` lines for explanatory comments; numbered `# 1.` / `# 2.` comment headers to structure multi-part cleanup blocks.
-- MCP Services: use `appProtocol: agentgateway.dev/mcp` on the Service port — this is the standardized value across all labs (previously `kgateway.dev/mcp` also appeared; both worked, but the repo has since converged on `agentgateway.dev/mcp`). OpenAPI-protocol MCP backends must use the enterprise `spec.entMcp` (+ `openAPI.schemaRef`); OSS `spec.mcp` only supports `StreamableHTTP`/`SSE`.
+- MCP Services: use `appProtocol: agentgateway.dev/mcp` on the Service port: this is the standardized value across all labs (previously `kgateway.dev/mcp` also appeared; both worked, but the repo has since converged on `agentgateway.dev/mcp`). OpenAPI-protocol MCP backends must use the enterprise `spec.entMcp` (+ `openAPI.schemaRef`); OSS `spec.mcp` only supports `StreamableHTTP`/`SSE`.
 
 ## 9. Callouts, tables, diagrams, images
 
-- **Callouts (normative)**: bold-lead blockquotes — `> **Note:** ...`, `> **Tip:** ...`, `> **Why ...?** ...`, `> **Note — <specific topic>:** ...`. This is the dominant house style. GitHub alert syntax (`> [!NOTE]`) appears only in `001` and the newest labs (WAF); either is acceptable but don't mix both within one lab. Inline `**Bold:**` lead-ins (not blockquoted) are used for structured explanation lists (`**Key Configuration Points:**`, `**What's happening:**`).
-- **Diagrams**: ASCII art in fenced code blocks. **No mermaid anywhere in the repo** — keep it that way for consistency (renders everywhere, diffable). Two established shapes: boxed left-to-right flows with numbered arrows (OAuth flows), and fan-out topologies (federation).
-- **Tables**: GitHub pipe tables for decision matrices (X vs Y), variable references, tool-name mappings, metric references, results summaries, and — in runbooks — a **Troubleshooting table** (`| Symptom | Likely cause | Fix |`).
+- **Callouts (normative)**: bold-lead blockquotes such as `> **Note:** ...`, `> **Tip:** ...`, `> **Why ...?** ...`, `> **Note — <specific topic>:** ...`. This is the dominant house style. GitHub alert syntax (`> [!NOTE]`) appears only in `001` and the newest labs (WAF); either is acceptable but don't mix both within one lab. Inline `**Bold:**` lead-ins (not blockquoted) are used for structured explanation lists (`**Key Configuration Points:**`, `**What's happening:**`).
+- **Diagrams**: ASCII art in fenced code blocks. **No mermaid anywhere in the repo**; keep it that way for consistency (renders everywhere, diffable). Two established shapes: boxed left-to-right flows with numbered arrows (OAuth flows), and fan-out topologies (federation).
+- **Tables**: GitHub pipe tables for decision matrices (X vs Y), variable references, tool-name mappings, metric references, results summaries, and, in runbooks, a **Troubleshooting table** (`| Symptom | Likely cause | Fix |`).
 - **Images**: screenshots only for UI-heavy steps (IdP consoles, Grafana, Claude Desktop). Reference with relative paths (`../../images/claude-desktop/...` or `images/01-...png` in subdirectory labs). Zero-padded numbered kebab names.
 - Collapsible `<details><summary>` blocks for optional deep-dives.
 
@@ -187,8 +187,8 @@ Standard verification tools:
 Always the final section, `## Cleanup`, a single bash block (or numbered blocks in runbooks) that:
 
 1. Deletes resources in **reverse creation order**, fully namespaced, one per line.
-2. Uses `--ignore-not-found` on every delete (newer labs do; older ones error if a step was skipped — follow the newer style).
-3. **Restores any mutated global state** — this is the part most easily forgotten: patch replicas back (`kubectl patch ... '{"spec":{"deployment":{"spec":{"replicas":2}}}}'`), re-run `helm upgrade` to remove values you added, restore log levels, `rm -rf` venvs and generated certs, `unset` env vars, remove `/etc/hosts` entries.
+2. Uses `--ignore-not-found` on every delete (newer labs do; older ones error if a step was skipped; follow the newer style).
+3. **Restores any mutated global state**; this is the part most easily forgotten: patch replicas back (`kubectl patch ... '{"spec":{"deployment":{"spec":{"replicas":2}}}}'`), re-run `helm upgrade` to remove values you added, restore log levels, `rm -rf` venvs and generated certs, `unset` env vars, remove `/etc/hosts` entries.
 4. In runbooks, structure teardown with `# 1.` / `# 2.` ... comment headers reversing each step.
 
 ```bash
@@ -201,8 +201,8 @@ kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
 ## 11. Shared assets (`lib/`) and app-based labs
 
 - Reusable manifests/scripts/apps live under `lib/<concern>/`, **not** beside the lab. If reusable, give the asset a README with a `## Used by` section back-linking consuming labs (and keep those links current when labs move).
-- Labs reference lib assets with **repo-root-relative paths, run from the workshop root** — no `cd`, no `$REPO_ROOT`: `kubectl apply -n keycloak -f lib/keycloak/deploy.yaml`, `./lib/jwt/generate-jwt.sh lib/jwt/claims/admin.json`.
-- **Python apps** (crewai/langchain): code is a committed file in `lib/`, configured purely via env vars (`os.environ.get("GATEWAY_IP")`), with instructive comments in the source. venv lives *inside* the lib dir and binaries are invoked by full path — never `source activate`:
+- Labs reference lib assets with **repo-root-relative paths, run from the workshop root**; no `cd`, no `$REPO_ROOT`: `kubectl apply -n keycloak -f lib/keycloak/deploy.yaml`, `./lib/jwt/generate-jwt.sh lib/jwt/claims/admin.json`.
+- **Python apps** (crewai/langchain): code is a committed file in `lib/`, configured purely via env vars (`os.environ.get("GATEWAY_IP")`), with instructive comments in the source. venv lives *inside* the lib dir and binaries are invoked by full path, never `source activate`:
 
   ```bash
   python3.12 -m venv lib/crewai/multi-agent-researcher-writer/.venv
@@ -212,31 +212,31 @@ kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
   ```
 
 - **k6 load scripts** are the exception: embedded inline as ConfigMap heredocs (`<<'EOF'` to protect `__ENV`) and run as `batch/v1` Jobs mounting the ConfigMap. Pin the image version (`grafana/k6:0.54.0`, not `:latest`).
-- **JWT test identities**: prefer the shared helper — `lib/jwt/generate-jwt.sh` with persona claim files in `lib/jwt/claims/` (`kid: workshop-jwt-key-001`, issuer `workshop.solo.io` chosen deliberately so lab JWTs don't cross-validate against other labs' policies). Demo keypairs must be flagged "**Demo-only — do not use outside this workshop.**" (Be aware a second, older system exists: `jwt-auth-with-rbac.md` embeds static pre-signed tokens with inline JWKS `kid: solo-public-key-001`. Don't create a third.)
+- **JWT test identities**: prefer the shared helper, `lib/jwt/generate-jwt.sh` with persona claim files in `lib/jwt/claims/` (`kid: workshop-jwt-key-001`, issuer `workshop.solo.io` chosen deliberately so lab JWTs don't cross-validate against other labs' policies). Demo keypairs must be flagged "**Demo-only — do not use outside this workshop.**" (Be aware a second, older system exists: `jwt-auth-with-rbac.md` embeds static pre-signed tokens with inline JWKS `kid: solo-public-key-001`. Don't create a third.)
 - For live-IdP labs, mint tokens via the IdP API into env vars: `export USER_JWT=$(curl ... | jq -r '.access_token')`.
 
 ## 12. Observability section
 
-Most labs end feature work with a near-verbatim `## Observability` block — copy it wholesale from a sibling lab in the same family rather than rewriting:
+Most labs end feature work with a near-verbatim `## Observability` block; copy it wholesale from a sibling lab in the same family rather than rewriting:
 
 - Sub-headings: `### View Metrics Endpoint`, `### View Metrics and Traces in Grafana`, `### View Access Logs`, `### (Optional) View Traces in Jaeger`.
 - Grafana access: `kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000`, login `admin` / `prom-operator`.
 - Metrics endpoint: port-forward `15020` and curl `/metrics`.
 - Canonical MCP metric names: `agentgateway_mcp_requests_total` (labels `method`, `resource_type`, `server`, `resource`) is the only `agentgateway_mcp_*` series the proxy emits; MCP HTTP-level volume and latency come from `agentgateway_requests_total{protocol="mcp"}` and `agentgateway_request_duration_seconds{protocol="mcp"}`. Access-log/span fields are `mcp.method.name`, `mcp.resource.type`, `mcp.target`, `mcp.session.id`, `gen_ai.tool.name`, `http.status`.
 - PromQL goes in ```` ```promql ```` fences. Sum input/output token types separately to avoid label conflicts; note that `increase()` extrapolation can produce fractional tokens.
-- Don't re-document the monitoring stack — point at `002`.
+- Don't re-document the monitoring stack; point at `002`.
 
 ## 13. MCP-specific conventions
 
-- **Testing tiers** (pick per lab weight): (1) **MCP Inspector** — `npx @modelcontextprotocol/inspector@0.21.1` (pin the version), UI steps: Transport `Streamable HTTP`, URL `http://$GATEWAY_IP:8080/mcp`, Connect → Tools → List Tools → Run Tool; (2) **Claude Code** — `claude mcp add --transport http <name> http://$GATEWAY_IP:8080/mcp`, verify with `/mcp` and `claude mcp list`; (3) **raw curl JSON-RPC** for "under the hood" sections.
+- **Testing tiers** (pick per lab weight): (1) **MCP Inspector**: `npx @modelcontextprotocol/inspector@0.21.1` (pin the version), UI steps: Transport `Streamable HTTP`, URL `http://$GATEWAY_IP:8080/mcp`, Connect → Tools → List Tools → Run Tool; (2) **Claude Code**: `claude mcp add --transport http <name> http://$GATEWAY_IP:8080/mcp`, verify with `/mcp` and `claude mcp list`; (3) **raw curl JSON-RPC** for "under the hood" sections.
 - The canonical curl JSON-RPC sequence: `initialize` with `-i` to capture headers, extract `mcp-session-id` into `SID`, then pass `-H "Mcp-Session-Id: $SID"` on every call, always with the dual Accept header `application/json, text/event-stream`. Pipe responses to `python3 -m json.tool`. Note that with `sessionRouting: Stateless` no session id is emitted and the empty header is harmless.
-- **SSE requires single-replica session affinity** — if your lab uses `protocol: SSE`, include the replica patch and the note; StreamableHTTP/OpenAPI backends scale across replicas.
+- **SSE requires single-replica session affinity**: if your lab uses `protocol: SSE`, include the replica patch and the note; StreamableHTTP/OpenAPI backends scale across replicas.
 - External APIs used by MCP labs get prereq bullets with signup links and a required/optional label (*"**FRED API key** (required — the pod won't start without it)"*); prefer key-free APIs (Open-Meteo) where possible.
 - IdP console setup is documented as numbered steps under a dedicated `### <IdP> (Layer A)` heading with exact copy-paste callback URLs in fenced blocks, plus a variable reference table.
 
 ### Variant labs (multi-IdP)
 
-The established pattern is **clone-and-substitute, explicitly scoped**: copy the closest existing lab wholesale, swap the IdP-specific prereq block, env-var prefix, JWKS/issuer config, and callback URLs — and add a top-of-file blockquote declaring the delta:
+The established pattern is **clone-and-substitute, explicitly scoped**: copy the closest existing lab wholesale, swap the IdP-specific prereq block, env-var prefix, JWKS/issuer config, and callback URLs, and add a top-of-file blockquote declaring the delta:
 
 > **This is the Entra variant of [`../figma-mcp-auth0/`](../figma-mcp-auth0/README.md).** Only **Layer A** (the inbound MCP auth) changed — Auth0 → Entra. **Layer B is unchanged.**
 
@@ -246,13 +246,13 @@ Mark unchanged sections as *"Identical to the Auth0 lab."* rather than re-explai
 
 For a substantial new lab, the repo workflow is brainstorm → design → plan → implement:
 
-- `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` — opens with `**Date:**` / `**Status:**` / `**Author:**`, then `## Goal`, `## Decisions (from brainstorming)`, `## Deliverables`.
-- `docs/superpowers/plans/YYYY-MM-DD-<topic>.md` — an executable, checkbox-tracked (`- [ ]`) implementation plan (same date/topic slug as the spec).
+- `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`: opens with `**Date:**` / `**Status:**` / `**Author:**`, then `## Goal`, `## Decisions (from brainstorming)`, `## Deliverables`.
+- `docs/superpowers/plans/YYYY-MM-DD-<topic>.md`: an executable, checkbox-tracked (`- [ ]`) implementation plan (same date/topic slug as the spec).
 - Helper scripts in `scripts/` ship with a colocated stdlib-`unittest` test file (`test_<name>.py`, direct import, positive **and** negative cases per rule) and a docstring linking their design spec.
 
 ## 15. Repo maintenance when adding a lab
 
-**A README.md bullet and a CHANGELOG.md entry are required for every new lab — not optional cleanup.** A lab isn't done until both are updated in the same change. `tracks/` is the one exception: it's a curated, opt-in learning path, so only add a row there when the lab genuinely fits an existing `### Use Case` grouping; skip it otherwise without treating that as unfinished work.
+**A README.md bullet and a CHANGELOG.md entry are required for every new lab, not optional cleanup.** A lab isn't done until both are updated in the same change. `tracks/` is the one exception: it's a curated, opt-in learning path, so only add a row there when the lab genuinely fits an existing `### Use Case` grouping; skip it otherwise without treating that as unfinished work.
 
 **README.md** (the index):
 
@@ -262,7 +262,7 @@ For a substantial new lab, the repo workflow is brainstorm → design → plan �
 - Add capability bullets under `# Use Cases`.
 - Bump `## Validated on` if you validated on newer versions.
 
-**tracks/**: add a row (`| Lab | What you'll learn |`) to the relevant `### Use Case` table in `tracks/llm-track.md` and/or `tracks/mcp-track.md` — paths climb one level (`../labs/...`). New capability areas may warrant a new `### Use Case` block and a line in the completion-order diagram.
+**tracks/**: add a row (`| Lab | What you'll learn |`) to the relevant `### Use Case` table in `tracks/llm-track.md` and/or `tracks/mcp-track.md`; paths climb one level (`../labs/...`). New capability areas may warrant a new `### Use Case` block and a line in the completion-order diagram.
 
 **labs/installation/image-list.md**: any new chart-managed image → new `### <image>` block; version bump → update the `**vX.Y.Z**` header and every tag. Update `system-requirements.md` if version support or sizing changes.
 
@@ -270,7 +270,7 @@ For a substantial new lab, the repo workflow is brainstorm → design → plan �
 
 - Open a new version block at the top: `X.Y.Z - (M-D-YY)` followed by a `---` underline. Patch bump for a single lab/fix; minor bump for a batch of labs or structural change.
 - Bullets name touched files in backticks and lead with `Add`/`Update`/`Bump`: `- Add \`labs/security/WAF.md\`: WAF for agentic traffic ...`. Mark breaking changes inline with `**Breaking:**`.
-- Commit message is exactly `see CHANGELOG (X.Y.Z)` — one commit per changelog version; all descriptive detail lives in the CHANGELOG.
+- Commit message is exactly `see CHANGELOG (X.Y.Z)`: one commit per changelog version; all descriptive detail lives in the CHANGELOG.
 
 ## 16. Known inconsistencies (and what to do)
 

@@ -11,11 +11,11 @@ You need a registered application in Auth0 (Regular Web Application) with the **
 | Variable | Description |
 |---|---|
 | `AUTH0_ISSUER` | Auth0 issuer URL with **trailing slash** (Auth0 emits `iss` with the trailing `/`) |
-| `AUTH0_DOMAIN` | Host portion of the issuer (no scheme, no path) — used by the `auth0-jwks` backend |
+| `AUTH0_DOMAIN` | Host portion of the issuer (no scheme, no path); used by the `auth0-jwks` backend |
 | `AUTH0_CLIENT_ID` | Client ID of the Auth0 application |
 | `AUTH0_CLIENT_SECRET` | Client secret of the Auth0 application |
 | `AUTH0_AUDIENCE` | Auth0 API audience the JWT must carry |
-| `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-auth0.try-solo.io` |
+| `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme); this lab uses `mcp-auth0.try-solo.io` |
 
 ### Auth0 app callback URLs
 
@@ -26,7 +26,7 @@ https://mcp-auth0.try-solo.io/oauth-issuer/callback/downstream
 https://mcp-auth0.try-solo.io/oauth-issuer/callback/upstream
 ```
 
-The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback paths depending on the client. PKCE-capable MCP clients (e.g., MCP Inspector) trigger `/callback/upstream`; non-PKCE flows trigger `/callback/downstream`. Registering only one yields an Auth0 `invalid_request: callback url not allowed` error after login — even though the URI you configured for `downstream_server.redirect_uri` *is* in the allowlist.
+The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback paths depending on the client. PKCE-capable MCP clients (e.g., MCP Inspector) trigger `/callback/upstream`; non-PKCE flows trigger `/callback/downstream`. Registering only one yields an Auth0 `invalid_request: callback url not allowed` error after login, even though the URI you configured for `downstream_server.redirect_uri` *is* in the allowlist.
 
 ### Required tools
 
@@ -34,7 +34,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Step 9)
 - `jq` for inspecting JSON responses
-- A way to resolve `mcp-auth0.try-solo.io` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
+- A way to resolve `mcp-auth0.try-solo.io` from your workstation to the gateway LoadBalancer: either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
 
 ---
 
@@ -59,7 +59,7 @@ Auth0 supports Dynamic Client Registration (RFC 7591), but it has practical draw
 - Each DCR call creates a new application in the Auth0 dashboard. With many MCP clients (Claude Code, Cursor, VS Code, ChatGPT, Inspector, …) per developer, the dashboard fills up quickly.
 - Operationally, most teams want a single "MCP Gateway" app registered in Auth0, not one per client.
 
-**Eager OAuth** with pre-registered client_ids fixes this. agentgateway becomes the OAuth Authorization Server that MCP clients see, and Auth0 sits downstream of the gateway. MCP clients DCR against the gateway and get a single pre-registered Auth0 `client_id` / `client_secret` pair — no Auth0 dashboard churn, no Management API needed at runtime.
+**Eager OAuth** with pre-registered client_ids fixes this. agentgateway becomes the OAuth Authorization Server that MCP clients see, and Auth0 sits downstream of the gateway. MCP clients DCR against the gateway and get a single pre-registered Auth0 `client_id` / `client_secret` pair: no Auth0 dashboard churn, no Management API needed at runtime.
 
 ```
 ┌──────────────┐   1. discovery + DCR   ┌─────────────────┐  3. authorize/token  ┌───────┐
@@ -169,7 +169,7 @@ kubectl create secret tls -n agentgateway-system mcp-auth0-tls \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Update the `agentgateway-proxy` Gateway to expose **both** listeners — the original HTTP on 8080 (preserved so other labs continue to work) and a new HTTPS listener on 443:
+Update the `agentgateway-proxy` Gateway to expose **both** listeners: the original HTTP on 8080 (preserved so other labs continue to work) and a new HTTPS listener on 443:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -221,7 +221,7 @@ https	True
 
 ## Step 3 — Deploy Postgres for OAuth State
 
-The eager-OAuth feature stores token-exchange / authorization-code state in a database. This lab uses Postgres (production-realistic). For quick iteration you can skip Postgres and use SQLite in-memory — see the callout below.
+The eager-OAuth feature stores token-exchange / authorization-code state in a database. This lab uses Postgres (production-realistic). For quick iteration you can skip Postgres and use SQLite in-memory; see the callout below.
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -311,13 +311,13 @@ Expected Output:
 deployment "postgres" successfully rolled out
 ```
 
-> **Skip Postgres? Use SQLite in-memory.** Omit Step 3 entirely, then in Step 5 omit the `database:` block from the values. The gateway will use SQLite in-memory. State is lost on pod restart — fine for a lab, not for production.
+> **Skip Postgres? Use SQLite in-memory.** Omit Step 3 entirely, then in Step 5 omit the `database:` block from the values. The gateway will use SQLite in-memory. State is lost on pod restart: fine for a lab, not for production.
 
 ---
 
 ## Step 4 — Add STS Env Vars to the Gateway Config
 
-The eager-OAuth flow needs two env vars on the agentgateway proxy pod so it knows where the in-cluster STS endpoint lives. Patch the existing `agentgateway-config` `EnterpriseAgentgatewayParameters` from Lab 001 — do not recreate it; the patch preserves all other settings.
+The eager-OAuth flow needs two env vars on the agentgateway proxy pod so it knows where the in-cluster STS endpoint lives. Patch the existing `agentgateway-config` `EnterpriseAgentgatewayParameters` from Lab 001. Do not recreate it; the patch preserves all other settings.
 
 ```bash
 kubectl patch enterpriseagentgatewayparameters agentgateway-config \
@@ -418,10 +418,10 @@ What each piece does:
 | Setting | Purpose |
 |---|---|
 | `tokenExchange.enabled: true` | Turns the eager-OAuth feature on at the controller level (and starts the controller's port-7777 server that hosts both the AS endpoints and the STS) |
-| `tokenExchange.subjectValidator` / `apiValidator` / `actorValidator` | All three required at boot — the controller refuses to start without them, even though only the eager-OAuth issuer (not RFC 8693 token exchange) is being used here. Crash signature if missing: `error creating actor validator: unsupported validator type:` |
+| `tokenExchange.subjectValidator` / `apiValidator` / `actorValidator` | All three required at boot: the controller refuses to start without them, even though only the eager-OAuth issuer (not RFC 8693 token exchange) is being used here. Crash signature if missing: `error creating actor validator: unsupported validator type:` |
 | `tokenExchange.database.postgres.url` | Postgres connection string from Step 3; omit for SQLite in-memory |
 | `gateway_config.base_url` | Public URL clients use to reach the gateway's AS endpoints (must include `/oauth-issuer`) |
-| `client_config.clients` | Pre-registered `client_id`/`client_secret` table — `/oauth-issuer/register` returns one of these |
+| `client_config.clients` | Pre-registered `client_id`/`client_secret` table; `/oauth-issuer/register` returns one of these |
 | `downstream_server` | Credentials and URLs for the gateway to talk to Auth0 during the authorization code flow; `redirect_uri` must match an entry in the Auth0 app's "Allowed Callback URLs" |
 
 Wait for the controller and proxy pods to restart cleanly:
@@ -665,8 +665,8 @@ The policy ties everything together:
 
 | Field | Purpose |
 |---|---|
-| `issuer` | Auth0 is the JWT issuer (`${AUTH0_ISSUER}` — trailing slash matters) |
-| `jwks` | Points at the `auth0-jwks` backend created in Step 7. **`jwksPath` must be written without a leading slash** (`.well-known/jwks.json`) — the controller appends `/` between the backend URL and `jwksPath`, so a leading slash produces `https://$AUTH0_DOMAIN//.well-known/jwks.json`, which Auth0 returns 404 for. The controller log signature is `failed resolving jwks ... 404` and the policy goes `PartiallyValid`; `/mcp` then bypasses auth entirely. |
+| `issuer` | Auth0 is the JWT issuer (`${AUTH0_ISSUER}`; trailing slash matters) |
+| `jwks` | Points at the `auth0-jwks` backend created in Step 7. **`jwksPath` must be written without a leading slash** (`.well-known/jwks.json`): the controller appends `/` between the backend URL and `jwksPath`, so a leading slash produces `https://$AUTH0_DOMAIN//.well-known/jwks.json`, which Auth0 returns 404 for. The controller log signature is `failed resolving jwks ... 404` and the policy goes `PartiallyValid`; `/mcp` then bypasses auth entirely. |
 | `audiences` | The Auth0 API audience the JWT must carry |
 | `resourceMetadata.agentgateway.dev/issuer-proxy` | Tells the gateway to serve its own AS metadata (from the in-cluster eager-OAuth issuer at `:7777/oauth-issuer`) when an MCP client fetches `.well-known/oauth-authorization-server/mcp`. Without this, the gateway would proxy Auth0's metadata directly. |
 | `resourceMetadata.authorizationServers` / `resource` | What shows up in the protected-resource discovery document for clients |
@@ -740,26 +740,26 @@ In the Inspector UI:
 
 Inspector follows the protected-resource discovery automatically. You should see:
 
-1. A redirect to Auth0's Universal Login. **Verify the URL bar shows `${AUTH0_DOMAIN}`, not the gateway hostname** — this confirms the eager-OAuth issuer correctly delegated downstream.
+1. A redirect to Auth0's Universal Login. **Verify the URL bar shows `${AUTH0_DOMAIN}`, not the gateway hostname**: this confirms the eager-OAuth issuer correctly delegated downstream.
 2. After completing Auth0 login (with MFA if your tenant requires it), a redirect back to Inspector's local callback.
 3. Inspector status flips to **Connected**.
 
 ### Confirm tools are reachable
 
-In the Inspector left panel, click **Tools → List Tools**. The `mcp-website-fetcher` tools should render. Run one (`fetch` against any URL) — you should get a tool result, not a 401.
+In the Inspector left panel, click **Tools → List Tools**. The `mcp-website-fetcher` tools should render. Run one (`fetch` against any URL): you should get a tool result, not a 401.
 
 ### What proves what
 
 | Observation in Inspector | What it proves |
 |---|---|
 | Redirect lands on `${AUTH0_DOMAIN}` | Eager-OAuth issuer is serving its own AS metadata; `registration_endpoint` was rewritten to point at the gateway |
-| Login completes and Inspector shows "Connected" | The pre-registered `client_id`/`client_secret` from `client_config.clients` matched the Auth0 app — fake-DCR worked end-to-end |
+| Login completes and Inspector shows "Connected" | The pre-registered `client_id`/`client_secret` from `client_config.clients` matched the Auth0 app: fake-DCR worked end-to-end |
 | Tool list renders without 401 | Auth0-issued JWT validated against Auth0 JWKS at the MCP backend; `mcp.authentication` is configured correctly |
 | Tool execution succeeds | Full request path through the gateway works; the downstream MCP server received the bearer token |
 
 ### (Optional) Verify Postgres-backed state survives a restart
 
-Skip if you opted into SQLite in Step 3 — state is in-memory and **will not** survive restart.
+Skip if you opted into SQLite in Step 3: state is in-memory and **will not** survive restart.
 
 ```bash
 kubectl rollout restart -n agentgateway-system deployment/enterprise-agentgateway
@@ -778,9 +778,9 @@ This step uses Claude Code as the MCP client in place of MCP Inspector. Claude C
 
 ### Trust the self-signed cert
 
-This lab uses a self-signed certificate. If your gateway is using a certificate from a trusted CA, skip this section — `NODE_TLS_REJECT_UNAUTHORIZED=0` is not needed.
+This lab uses a self-signed certificate. If your gateway is using a certificate from a trusted CA, skip this section; `NODE_TLS_REJECT_UNAUTHORIZED=0` is not needed.
 
-Claude Code is a Node.js process and won't accept the self-signed gateway cert by default. Prefix the launch command with `NODE_TLS_REJECT_UNAUTHORIZED=0` as shown in the next section — do **not** add it to your shell rc file, as it disables TLS verification for all Node processes in that shell.
+Claude Code is a Node.js process and won't accept the self-signed gateway cert by default. Prefix the launch command with `NODE_TLS_REJECT_UNAUTHORIZED=0` as shown in the next section; do **not** add it to your shell rc file, as it disables TLS verification for all Node processes in that shell.
 
 ### Register the MCP server with Claude Code
 
@@ -811,9 +811,9 @@ NODE_TLS_REJECT_UNAUTHORIZED=0 claude
 On the first prompt that triggers MCP tool discovery, Claude Code initiates the OAuth flow automatically:
 
 1. Claude Code fetches `/.well-known/oauth-protected-resource/mcp` to discover the authorization server.
-2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-auth0.try-solo.io/oauth-issuer/register`), not Auth0 — this confirms the eager-OAuth issuer is serving its own AS metadata.
+2. It fetches `/.well-known/oauth-authorization-server/mcp` from the gateway. **Verify the `registration_endpoint` shows the gateway hostname** (`https://mcp-auth0.try-solo.io/oauth-issuer/register`), not Auth0: this confirms the eager-OAuth issuer is serving its own AS metadata.
 3. Claude Code POSTs to `/oauth-issuer/register` and receives the pre-registered Auth0 `client_id`.
-4. A browser window opens to **Auth0's Universal Login**. **Verify the URL bar shows `${AUTH0_DOMAIN}`**, not the gateway hostname — this confirms the eager-OAuth issuer correctly delegated downstream.
+4. A browser window opens to **Auth0's Universal Login**. **Verify the URL bar shows `${AUTH0_DOMAIN}`**, not the gateway hostname: this confirms the eager-OAuth issuer correctly delegated downstream.
 5. Complete the Auth0 login (with MFA if your tenant requires it).
 6. The browser redirects back; Claude Code captures the authorization code via a local PKCE callback server and exchanges it for a token.
 7. Claude Code resumes. The token is stored in Claude Code's local config and reused on subsequent runs.
@@ -833,7 +833,7 @@ Expected: Claude Code calls the `echo` tool and returns the echoed message witho
 | Observation in Claude Code | What it proves |
 |---|---|
 | Browser opens to `${AUTH0_DOMAIN}`, not the gateway | Eager-OAuth AS is serving its own AS metadata; `registration_endpoint` was rewritten to point at the gateway |
-| Login completes and Claude Code resumes tool calls | Pre-registered `client_id`/`client_secret` from `client_config.clients` matched the Auth0 app — fake-DCR worked end-to-end |
+| Login completes and Claude Code resumes tool calls | Pre-registered `client_id`/`client_secret` from `client_config.clients` matched the Auth0 app: fake-DCR worked end-to-end |
 | Tool call returns a result without a 401 | Auth0-issued JWT validated against Auth0 JWKS at the MCP backend; `mcp.authentication` is configured correctly |
 | Subsequent `claude` invocations skip the browser | Token stored in Claude Code's local config and reused automatically |
 
@@ -855,10 +855,10 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 
 | Symptom in Inspector | Likely Cause | Where to Look |
 |---|---|---|
-| `/.well-known/oauth-authorization-server/mcp` returns Auth0's metadata (registration endpoint = Auth0) | The `agentgateway.dev/issuer-proxy` annotation under `resourceMetadata` is missing, or the `oauth-issuer` HTTPRoute (Step 6) is misrouted | Step 8 — confirm `agentgateway.dev/issuer-proxy` is set; Step 6 — `kubectl get httproute -n agentgateway-system oauth-issuer` |
+| `/.well-known/oauth-authorization-server/mcp` returns Auth0's metadata (registration endpoint = Auth0) | The `agentgateway.dev/issuer-proxy` annotation under `resourceMetadata` is missing, or the `oauth-issuer` HTTPRoute (Step 6) is misrouted | Step 8: confirm `agentgateway.dev/issuer-proxy` is set; Step 6: `kubectl get httproute -n agentgateway-system oauth-issuer` |
 | `/oauth-issuer/register` returns 404 or 501 | Step 5 helm upgrade did not apply `tokenExchange.enabled` + the issuer config, or the `/oauth-issuer` HTTPRoute (Step 6) is missing | `kubectl get httproute -n agentgateway-system oauth-issuer`; gateway pod logs |
-| `GET /mcp` without a token returns **406** instead of 401, and `/.well-known/oauth-*-resource/mcp` returns 404 | The MCP authentication policy is `PartiallyValid` because the controller can't fetch JWKS. Most often caused by a leading slash on `jwksPath` (`/.well-known/jwks.json`), which produces `https://$AUTH0_DOMAIN//.well-known/jwks.json` (404 from Auth0) | `kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-auth0-eager -o jsonpath='{.status.ancestors[*].conditions[*].message}'` should say `Policy accepted Attached to all targets`. Controller logs: `kubectl logs -n agentgateway-system deployment/enterprise-agentgateway \| grep jwks`. Fix per Step 8 — `jwksPath: .well-known/jwks.json` (no leading slash) |
-| Controller pod CrashLoopBackOff with `error creating actor validator: unsupported validator type:` | Step 5 helm values are missing `tokenExchange.actorValidator` (and/or `apiValidator`) — all three validators are required at boot even though only the eager-OAuth issuer is being used | Re-run Step 5 with the validator block matching this lab |
+| `GET /mcp` without a token returns **406** instead of 401, and `/.well-known/oauth-*-resource/mcp` returns 404 | The MCP authentication policy is `PartiallyValid` because the controller can't fetch JWKS. Most often caused by a leading slash on `jwksPath` (`/.well-known/jwks.json`), which produces `https://$AUTH0_DOMAIN//.well-known/jwks.json` (404 from Auth0) | `kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-auth0-eager -o jsonpath='{.status.ancestors[*].conditions[*].message}'` should say `Policy accepted Attached to all targets`. Controller logs: `kubectl logs -n agentgateway-system deployment/enterprise-agentgateway \| grep jwks`. Fix per Step 8: `jwksPath: .well-known/jwks.json` (no leading slash) |
+| Controller pod CrashLoopBackOff with `error creating actor validator: unsupported validator type:` | Step 5 helm values are missing `tokenExchange.actorValidator` (and/or `apiValidator`): all three validators are required at boot even though only the eager-OAuth issuer is being used | Re-run Step 5 with the validator block matching this lab |
 | Inspector errors immediately (no Auth0 redirect) and controller logs show `failed to start auth flow ... secret not found: agentgateway-system/elicitation-secret` | The `elicitation-secret` Secret from Step 7 wasn't created or is in the wrong namespace | `kubectl get secret -n agentgateway-system elicitation-secret`; recreate per Step 7 |
 | Auth0 error page after login (`callback url not allowed` / `invalid redirect_uri`) **even though the URI is in the app's allowlist** | The eager-OAuth issuer uses two callback paths (`/callback/upstream` for PKCE/MCP-client flows, `/callback/downstream` otherwise). Registering only one yields a rejection on whichever flow the client triggers | Confirm **both** `https://${AUTH0_GATEWAY_HOST}/oauth-issuer/callback/upstream` and `.../callback/downstream` are present in the Auth0 app's "Allowed Callback URLs" |
 | Auth0 error page after login (`client not found` / `invalid_client`) | `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` don't match the Auth0 app, or the app is disabled / not assigned to the Auth0 connection | Auth0 admin → Applications → *your app* → Settings (Client ID, Client Secret), and Connections tab |
@@ -890,7 +890,7 @@ kubectl logs -n agentgateway-system deployment/agentgateway-proxy -f
 
 ## Cleanup
 
-Fully revert to the Lab 001 baseline. Run these in order — the helm revert is **required**, not optional. Skipping it leaves the controller running with `tokenExchange.enabled` and a postgres URL pointing at a deleted DB; a future re-run of this lab will hit `relation "oauth_flow_states" does not exist` because the controller pod never restarts to migrate against a fresh postgres.
+Fully revert to the Lab 001 baseline. Run these in order; the helm revert is required. Skipping it leaves the controller running with `tokenExchange.enabled` and a postgres URL pointing at a deleted DB; a future re-run of this lab will hit `relation "oauth_flow_states" does not exist` because the controller pod never restarts to migrate against a fresh postgres.
 
 ```bash
 # 1. Delete lab-specific resources

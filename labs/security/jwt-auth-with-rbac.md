@@ -180,7 +180,7 @@ authorization:
 
 ## Claims Based Routing using JWT Auth and Transformations
 
-EnterpriseAgentgatewayPolicy supports extracting JWT claims into request headers **before routing takes place**. Setting `phase: PreRouting` on the `traffic` block causes the transformation to run prior to route selection, which means HTTPRoutes can match on headers that were derived from JWT claims.
+EnterpriseAgentgatewayPolicy supports extracting JWT claims into request headers before routing takes place. Setting `phase: PreRouting` on the `traffic` block causes the transformation to run before route selection, which means HTTPRoutes can match on headers that were derived from JWT claims.
 
 This is useful for multi-tenant scenarios where you want to route different teams or projects to different backends based on what is encoded in their token, without requiring clients to pass those values explicitly.
 
@@ -346,7 +346,7 @@ EOF
 
 ## Dynamic JWT Auth Example
 
-This example requires a valid token from `https://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697/v1/token`. If you do not have access to generating a token from this auth server, then simply use this as a reference example or replace the config above with a valid OIDC endpoint
+This example requires a valid token from `https://integrator-5513662.okta.com/oauth2/ausxkvmeftgcdj6HA697/v1/token`. If you do not have access to generating a token from this auth server, then use this as a reference example or replace the config above with a valid OIDC endpoint
 
 Create an EnterpriseAgentgatewayBackend for the Okta JWKS endpoint
 ```bash

@@ -354,9 +354,9 @@ Use the **search spans** box at the top to filter, the time-range selector to sc
 
 The detail view gives you three coordinated panels:
 
-- **Execution Flow** — a visual `Start → POST /claude/* → End` graph of the request through the gateway
-- **Trace Tree** — the underlying span hierarchy
-- **Span Details** — the full OpenTelemetry attributes for the selected span, including the gen-AI semantic conventions emitted by AgentGateway: `operation: "chat"`, `provider: "anthropic"`, `request.model`, `request.max_tokens`, `response.model`, and `usage.input_tokens` / `usage.output_tokens` / `usage.cache_creation` / `usage.cache_read`
+- **Execution Flow**: a visual `Start → POST /claude/* → End` graph of the request through the gateway
+- **Trace Tree**: the underlying span hierarchy
+- **Span Details**: the full OpenTelemetry attributes for the selected span, including the gen-AI semantic conventions emitted by AgentGateway: `operation: "chat"`, `provider: "anthropic"`, `request.model`, `request.max_tokens`, `response.model`, and `usage.input_tokens` / `usage.output_tokens` / `usage.cache_creation` / `usage.cache_read`
 
 Cross-reference the **Trace ID** with the access logs (next section) to jump from a single log line directly to its full prompt/completion payload and span attributes.
 

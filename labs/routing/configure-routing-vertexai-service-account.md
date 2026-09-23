@@ -11,15 +11,15 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ### Benefits of Service Account Authentication
 
-- **Explicit and reproducible identity**: Authentication is tied to a specific service account, not a local user.
-- **CI/CD friendly**: Works consistently across machines, environments, and automation pipelines.
-- **Least-privilege access**: Permissions are controlled through IAM roles assigned to the service account.
-- **Production-aligned**: Mirrors how AI Gateways typically authenticate to cloud providers in real deployments.
-- **Auditable and predictable**: All requests are clearly attributable to a known service account.
+- Explicit and reproducible identity: Authentication is tied to a specific service account, not a local user.
+- CI/CD friendly: Works consistently across machines, environments, and automation pipelines.
+- Least-privilege access: Permissions are controlled through IAM roles assigned to the service account.
+- Production-aligned: Mirrors how AI Gateways typically authenticate to cloud providers in real deployments.
+- Auditable and predictable: All requests are attributable to a known service account.
 
 ### Caveats to Service Account Authentication
 
-- **Requires credential management**: Service account keys must be created, stored securely, and rotated, which adds operational overhead compared to user-based authentication.
+- Requires credential management: Service account keys must be created, stored securely, and rotated, which adds operational overhead compared to user-based authentication.
 
 ### Configure Required Variables
 

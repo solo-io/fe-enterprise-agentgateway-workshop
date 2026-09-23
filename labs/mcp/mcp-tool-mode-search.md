@@ -14,27 +14,27 @@ This lab assumes that you have completed the setup in `001`. Lab `002` is option
 
 ## Overview
 
-A normal MCP backend forwards `tools/list` directly to the upstream server. The client receives the entire catalog on every connection, and that catalog stays in the model's context window for the rest of the session. **For a catalog of 50 tools at ~500 tokens of JSON schema each, that's 25,000 tokens spent before the first user prompt; at 180 tools it's roughly 90,000 tokens.** Most of those schemas are never used in the conversation.
+A normal MCP backend forwards `tools/list` directly to the upstream server. The client receives the entire catalog on every connection, and that catalog stays in the model's context window for the rest of the session. For a catalog of 50 tools at ~500 tokens of JSON schema each, that's 25,000 tokens spent before the first user prompt; at 180 tools it's roughly 90,000 tokens. Most of those schemas are never used in the conversation.
 
 **Search mode** replaces the upstream catalog with two meta-tools:
 
-- `get_tool` — looks up an upstream tool by name or description fragment
-- `invoke_tool` — calls an upstream tool by name with its arguments
+- `get_tool`: looks up an upstream tool by name or description fragment
+- `invoke_tool`: calls an upstream tool by name with its arguments
 
-The client only sees these two tools. The model searches the catalog at runtime instead of carrying it as context. Authorization is enforced inside `get_tool` — tools the caller can't use never appear in lookup results.
+The client only sees these two tools. The model searches the catalog at runtime instead of carrying it as context. Authorization is enforced inside `get_tool`: tools the caller can't use never appear in lookup results.
 
-**Quantitatively:** the same 180-tool catalog through Search mode is two meta-tool schemas (~250 tokens) plus whichever single schema the model fetches at runtime (~140 tokens) — roughly **a 99% reduction in preloaded schema tokens.** Step 4 below measures this empirically on the lab's smaller upstream.
+The same 180-tool catalog through Search mode is two meta-tool schemas (~250 tokens) plus whichever single schema the model fetches at runtime (~140 tokens), roughly a 99% reduction in preloaded schema tokens. Step 4 below measures this empirically on the lab's smaller upstream.
 
 ### When to use which mode
 
-**Reach for Search mode when:**
-- **The catalog is large and most tools go unused in a typical session.** Example: an aggregator MCP server fronting Jira, Linear, Salesforce, and an internal warehouse — easily 80–200 tools combined, but any one conversation touches a handful at most.
-- **The catalog is dynamic.** Example: a tenant-scoped server where each customer gets a different tool set (per-integration connectors). The same client connection works across tenants because discovery happens at runtime — clients don't need to reconnect to refresh.
-- **RBAC heavily filters per user.** Example: an internal "kitchen-sink" server where the average user is authorized to use ~10 of 200 tools. `get_tool` never surfaces the rest and the model never sees them. (Step 5 below demonstrates this with a single tool, but the pattern scales.)
+Reach for Search mode when:
+- The catalog is large and most tools go unused in a typical session. Example: an aggregator MCP server fronting Jira, Linear, Salesforce, and an internal warehouse: easily 80–200 tools combined, but any one conversation touches a handful at most.
+- The catalog is dynamic. Example: a tenant-scoped server where each customer gets a different tool set (per-integration connectors). The same client connection works across tenants because discovery happens at runtime; clients don't need to reconnect to refresh.
+- RBAC heavily filters per user. Example: an internal "kitchen-sink" server where the average user is authorized to use ~10 of 200 tools. `get_tool` never surfaces the rest and the model never sees them. (Step 5 below demonstrates this with a single tool, but the pattern scales.)
 
-**Stay with Standard mode when** the catalog is small and stable (e.g., a website-fetcher with one `fetch_url` tool, or a calculator with `add`/`multiply`) — there's not enough catalog to compress and the meta-tool indirection adds latency for no benefit. You also need Standard mode if you want per-upstream-tool counters on `agentgateway_mcp_requests_total` without consulting traces; Search mode aggregates everything under the meta-tools.
+Stay with Standard mode when the catalog is small and stable (e.g., a website-fetcher with one `fetch_url` tool, or a calculator with `add`/`multiply`): there's not enough catalog to compress and the meta-tool indirection adds latency for no benefit. You also need Standard mode if you want per-upstream-tool counters on `agentgateway_mcp_requests_total` without consulting traces; Search mode aggregates everything under the meta-tools.
 
-**Reach for [Code mode](mcp-tool-mode-code.md) instead** when a workflow needs to chain tool calls or filter large intermediate results. Example: "find every open incident from `pagerduty.list_incidents`, fetch each one's logs via `loki.query_range`, return a 200-word summary." Search mode would round-trip each call and ferry every log blob through the model's context; Code mode keeps the intermediates inside the sandbox and returns only the summary. The two modes solve different problems — Search compresses the *catalog*, Code compresses the *results*.
+Reach for [Code mode](mcp-tool-mode-code.md) instead when a workflow needs to chain tool calls or filter large intermediate results. Example: "find every open incident from `pagerduty.list_incidents`, fetch each one's logs via `loki.query_range`, return a 200-word summary." Search mode would round-trip each call and ferry every log blob through the model's context; Code mode keeps the intermediates inside the sandbox and returns only the summary. The two modes solve different problems: Search compresses the *catalog*, Code compresses the *results*.
 
 ## Step 1: Deploy the MCP Server
 
@@ -194,7 +194,7 @@ Connect:
 
 ### List the tools
 
-From the **Tools** tab, click **List Tools**. You should see exactly **two** tools — `get_tool` and `invoke_tool` — not the dozen tools that `mcp-server-everything` actually exposes.
+From the **Tools** tab, click **List Tools**. You should see exactly two tools, `get_tool` and `invoke_tool`, not the dozen tools that `mcp-server-everything` exposes.
 
 ### Look up a tool by name
 
@@ -204,7 +204,7 @@ Select **get_tool** and enter:
 { "name": "get-sum" }
 ```
 
-Click **Run Tool**. The response contains a `results` array with one entry — the `get-sum` tool's name, description, and input schema. `get_tool`'s `name` argument is an **exact-match lookup**, not a fuzzy search, so the upstream tool name (`get-sum`) is what you pass here.
+Click **Run Tool**. The response contains a `results` array with one entry: the `get-sum` tool's name, description, and input schema. `get_tool`'s `name` argument is an exact-match lookup, not a fuzzy search, so the upstream tool name (`get-sum`) is what you pass here.
 
 ### Invoke the tool
 
@@ -214,7 +214,7 @@ Select **invoke_tool** and enter:
 { "name": "get-sum", "arguments": { "a": 2, "b": 3 } }
 ```
 
-The response's `content[0].text` is `"The sum of 2 and 3 is 5."` — `invoke_tool` returns the upstream tool's response unchanged, so the shape (`content` vs `structuredContent`) depends on the upstream tool. The headline is the value, not the envelope.
+The response's `content[0].text` is `"The sum of 2 and 3 is 5."`. `invoke_tool` returns the upstream tool's response unchanged, so the shape (`content` vs `structuredContent`) depends on the upstream tool.
 
 ### Discovery on a miss
 
@@ -224,11 +224,11 @@ Select **get_tool** again and enter:
 { "name": "nonexistent" }
 ```
 
-The response returns `status: "no_match"` and an `available_tools` array listing every tool the upstream exposes — that's how a model recovers when its initial exact-name guess misses. A search like `{ "name": "sum" }` also misses (no upstream tool is literally named `sum`); use the `available_tools` array to find the actual name (`get-sum`) and retry.
+The response returns `status: "no_match"` and an `available_tools` array listing every tool the upstream exposes; that's how a model recovers when its initial exact-name guess misses. A search like `{ "name": "sum" }` also misses (no upstream tool is literally named `sum`); use the `available_tools` array to find the actual name (`get-sum`) and retry.
 
 ## Step 4: Under the Hood — Raw JSON-RPC
 
-MCP Inspector is a nice UI but the protocol is plain HTTP. Walk through the same flow with `curl` to see the meta-tools' actual JSON-RPC shape.
+MCP Inspector is a nice UI but the protocol is plain HTTP. Walk through the same flow with `curl` to see the meta-tools' JSON-RPC shape.
 
 ### Initialize and capture the session ID
 
@@ -242,7 +242,7 @@ export SID=$(echo "$INIT" | grep -i '^mcp-session-id:' | awk '{print $2}' | tr -
 echo "Session: $SID"
 ```
 
-> **Note:** Because the backend uses `sessionRouting: Stateless`, the gateway does not emit an `mcp-session-id` header on initialize — `$SID` will be empty, and that's expected. Subsequent calls in this lab still pass `-H "Mcp-Session-Id: $SID"` (which becomes a harmless empty header) so the same snippet works unchanged if you later switch to a stateful routing mode that does return a session ID.
+> **Note:** Because the backend uses `sessionRouting: Stateless`, the gateway does not emit an `mcp-session-id` header on initialize: `$SID` will be empty, and that's expected. Subsequent calls in this lab still pass `-H "Mcp-Session-Id: $SID"` (which becomes a harmless empty header) so the same snippet works unchanged if you later switch to a stateful routing mode that does return a session ID.
 
 ### List tools — confirm only the two meta-tools come back
 
@@ -276,7 +276,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/search" \
   -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"invoke_tool","arguments":{"name":"get-sum","arguments":{"a":2,"b":3}}}}' | sed -n 's/^data: //p' | python3 -m json.tool
 ```
 
-The final response's `result.content[0].text` is `"The sum of 2 and 3 is 5."` — `invoke_tool` returns the upstream tool's reply verbatim, so the envelope shape (`content`, `structuredContent`, both, or neither) follows the upstream. Note the double-nested `arguments`: `invoke_tool` takes an `arguments` field whose value is itself the upstream tool's `arguments` payload.
+The final response's `result.content[0].text` is `"The sum of 2 and 3 is 5."`. `invoke_tool` returns the upstream tool's reply verbatim, so the envelope shape (`content`, `structuredContent`, both, or neither) follows the upstream. Note the double-nested `arguments`: `invoke_tool` takes an `arguments` field whose value is itself the upstream tool's `arguments` payload.
 
 ### Measure the savings
 
@@ -293,7 +293,7 @@ SEARCH_BYTES=$(curl -s -X POST "http://$GATEWAY_IP:8080/mcp/search" \
 echo "Search-mode tools/list: $SEARCH_BYTES bytes"
 ```
 
-Capture the upstream's raw `tools/list` response size by port-forwarding directly into the MCP server (bypassing the gateway). This is the closest equivalent to what Standard mode would surface — both forward the upstream catalog verbatim:
+Capture the upstream's raw `tools/list` response size by port-forwarding directly into the MCP server (bypassing the gateway). This is the closest equivalent to what Standard mode would surface; both forward the upstream catalog verbatim:
 
 ```bash
 # Open a port-forward to the upstream MCP server in another terminal
@@ -337,7 +337,7 @@ On `mcp-server-everything`'s ~12-tool catalog you'll typically see a meaningful 
 
 ## Step 5: RBAC — Filter a Tool Out of get_tool Results
 
-Authorization in Search mode is enforced inside `get_tool` — restricted tools never surface as lookup results. To demonstrate, apply a policy that requires a specific JWT claim to see `get-env`.
+Authorization in Search mode is enforced inside `get_tool`: restricted tools never surface as lookup results. To demonstrate, apply a policy that requires a specific JWT claim to see `get-env`.
 
 ### Apply JWT validation
 
@@ -377,7 +377,7 @@ EOF
 
 ### Apply per-tool authorization
 
-The gateway-native pattern targets the **backend** (not the HTTPRoute) and uses the gateway-parsed CEL attribute `mcp.tool.name`. This attribute is extracted from the parsed MCP traffic by the proxy itself — it applies to both `tools/list` (filtering catalog visibility) and `tools/call` (denying invocation). In Search mode that means a `get_tool` lookup for `get-env` returns `no_match` for callers who fail the expression. Because authorization is enforced on the gateway's parsed view (not raw HTTP), it works uniformly across Standard, Search, and Code modes — no special-casing for meta-tools is required.
+The gateway-native pattern targets the **backend** (not the HTTPRoute) and uses the gateway-parsed CEL attribute `mcp.tool.name`. This attribute is extracted from the parsed MCP traffic by the proxy itself: it applies to both `tools/list` (filtering catalog visibility) and `tools/call` (denying invocation). In Search mode that means a `get_tool` lookup for `get-env` returns `no_match` for callers who fail the expression. Because authorization is enforced on the gateway's parsed view (not raw HTTP), it works uniformly across Standard, Search, and Code modes; no special-casing for meta-tools is required.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -404,7 +404,7 @@ spec:
 EOF
 ```
 
-Note that `targetRefs.kind` is `EnterpriseAgentgatewayBackend` and `name` is `mcp-search-backend` — the policy attaches to the backend, not the HTTPRoute. The `mcp.tool.name` CEL attribute is a gateway-native value the proxy extracts from parsed MCP traffic.
+Note that `targetRefs.kind` is `EnterpriseAgentgatewayBackend` and `name` is `mcp-search-backend`: the policy attaches to the backend, not the HTTPRoute. The `mcp.tool.name` CEL attribute is a gateway-native value the proxy extracts from parsed MCP traffic.
 
 ### Test with the demo JWT
 
@@ -426,7 +426,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/search" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_tool","arguments":{"name":"env"}}}' | sed -n 's/^data: //p' | python3 -m json.tool
 ```
 
-Expected: `get_tool` with `{"name": "env"}` returns `status: "no_match"` and the `available_tools` array does not contain `get-env`. The CEL expression for tool name `get-env` evaluates as `mcp.tool.name != "get-env" || (has(jwt.roles) && jwt.roles.exists(r, r == "engineering"))` → `false || (false && ...)` → `false` — the tool is filtered. The same call without the policy would return the tool's metadata.
+Expected: `get_tool` with `{"name": "env"}` returns `status: "no_match"` and the `available_tools` array does not contain `get-env`. The CEL expression for tool name `get-env` evaluates as `mcp.tool.name != "get-env" || (has(jwt.roles) && jwt.roles.exists(r, r == "engineering"))` → `false || (false && ...)` → `false`, so the tool is filtered. The same call without the policy would return the tool's metadata.
 
 ## Step 6: Scale Up the Catalog (Optional)
 
@@ -659,7 +659,7 @@ EOF
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-The structured log's `gen_ai.tool.name` field shows the *meta-tool* name (`get_tool`, `invoke_tool`) — not the upstream tool — because that's what the client called. The gateway's call to the upstream is a separate trace span.
+The structured log's `gen_ai.tool.name` field shows the *meta-tool* name (`get_tool`, `invoke_tool`), not the upstream tool, because that's what the client called. The gateway's call to the upstream is a separate trace span.
 
 ### View MCP metrics
 
@@ -684,7 +684,7 @@ If you have Grafana from lab `002`:
 
 1. Port-forward: `kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000`
 2. Open http://localhost:3000 (admin / prom-operator)
-3. **Dashboards > AgentGateway Dashboard** — the MCP section shows tool-call rates for the meta-tools.
+3. **Dashboards > AgentGateway Dashboard**: the MCP section shows tool-call rates for the meta-tools.
 
 ## Cleanup
 

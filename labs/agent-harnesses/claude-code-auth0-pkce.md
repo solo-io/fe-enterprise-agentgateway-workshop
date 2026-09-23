@@ -467,7 +467,7 @@ Expected output:
 
 That subject is the Auth0 identity of the person who logged in during Step 5. A shared provider key produces no `jwt.sub` at all, so per-user tokens in front of the provider credential are what let you tie a request back to a person.
 
-Going back to normal takes nothing on the `--bare --settings` path: drop the flags and your usual login applies again. [Cleanup](#cleanup) handles the rest — the cached credential, the shell variables, and the `apiKeyHelper` key if you took the optional step in Step 6 — and cutting off one developer for good is the next section.
+Going back to normal takes nothing on the `--bare --settings` path: drop the flags and your usual login applies again. [Cleanup](#cleanup) handles the rest (the cached credential, the shell variables, and the `apiKeyHelper` key if you took the optional step in Step 6), and cutting off one developer for good is the next section.
 
 ---
 
@@ -477,7 +477,7 @@ A policy written against `jwt.sub` needs an edit every time someone joins or lea
 
 ### Put the team on the user record
 
-Store the team and the developer's handle on the user (User Management → Users → your user → Metadata → **App Metadata**). Use *App Metadata* rather than User Metadata, which the user can edit themselves — a value your policy trusts has to be admin-controlled.
+Store the team and the developer's handle on the user (User Management → Users → your user → Metadata → **App Metadata**). Use *App Metadata* rather than User Metadata, which the user can edit themselves: a value your policy trusts has to be admin-controlled.
 
 ```json
 {

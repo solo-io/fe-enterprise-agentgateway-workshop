@@ -4,9 +4,9 @@
 
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
-> ⚠ This lab requires enterprise-agentgateway **`v2026.7.0` or newer** — needed for the refresh token grant tested in Step 10.
+> ⚠ This lab requires enterprise-agentgateway **`v2026.7.0` or newer**, needed for the refresh token grant tested in Step 10.
 
-This lab uses the same gateway hostname (`mcp-auth0.try-solo.io`) as [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md). The two labs cannot run concurrently — clean up the other lab before starting this one. The Okta labs use `mcp-okta.try-solo.io` and do not collide.
+This lab uses the same gateway hostname (`mcp-auth0.try-solo.io`) as [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md). The two labs cannot run concurrently: clean up the other lab before starting this one. The Okta labs use `mcp-okta.try-solo.io` and do not collide.
 
 ### Auth0 requirements
 
@@ -15,13 +15,13 @@ You need a registered application in Auth0 (Regular Web Application) with the **
 | Variable | Description |
 |---|---|
 | `AUTH0_ISSUER` | Auth0 issuer URL with **trailing slash** (Auth0 emits `iss` with the trailing `/`) |
-| `AUTH0_DOMAIN` | Host portion of the issuer (no scheme, no path) — used by the `auth0-jwks` backend |
+| `AUTH0_DOMAIN` | Host portion of the issuer (no scheme, no path); used by the `auth0-jwks` backend |
 | `AUTH0_CLIENT_ID` | Client ID of the Auth0 application |
 | `AUTH0_CLIENT_SECRET` | Client secret of the Auth0 application |
 | `AUTH0_AUDIENCE` | Auth0 API audience the JWT must carry |
-| `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme) — this lab uses `mcp-auth0.try-solo.io` |
+| `AUTH0_GATEWAY_HOST` | Public hostname for the gateway (no scheme); this lab uses `mcp-auth0.try-solo.io` |
 
-> **Required:** this lab requests the `offline_access` scope so it can also test the refresh token grant. The Auth0 API behind `AUTH0_AUDIENCE` needs **Allow Offline Access** enabled — Auth0 Dashboard → Applications → APIs → *your API* → Settings → Access Settings → toggle "Allow Offline Access" → Save. Without this, Auth0 silently strips the `offline_access` scope and never issues a `refresh_token` — no error, the token response just omits it.
+> **Required:** this lab requests the `offline_access` scope so it can also test the refresh token grant. The Auth0 API behind `AUTH0_AUDIENCE` needs **Allow Offline Access** enabled: Auth0 Dashboard → Applications → APIs → *your API* → Settings → Access Settings → toggle "Allow Offline Access" → Save. Without this, Auth0 silently strips the `offline_access` scope and never issues a `refresh_token`: no error, the token response just omits it.
 
 ### Auth0 app callback URLs
 
@@ -36,7 +36,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 
 ### Two Auth0 users
 
-This lab demonstrates both the allow and deny paths of the pre-issuance hook, so you need credentials for **two Auth0 users** in the same tenant. By default the lab allowlists `jdoe@solo.io` (Solo demo tenant) — log in as `jdoe@solo.io` for the allow path, and as any other tenant user (e.g. `alex.ly@solo.io`) for the deny path. To use your own tenant, see the "Using your own Auth0 tenant" sub-section in Step 7.
+This lab demonstrates both the allow and deny paths of the pre-issuance hook, so you need credentials for **two Auth0 users** in the same tenant. By default the lab allowlists `jdoe@solo.io` (Solo demo tenant): log in as `jdoe@solo.io` for the allow path, and as any other tenant user (e.g. `alex.ly@solo.io`) for the deny path. To use your own tenant, see the "Using your own Auth0 tenant" sub-section in Step 7.
 
 ### Required tools
 
@@ -44,7 +44,7 @@ This lab demonstrates both the allow and deny paths of the pre-issuance hook, so
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Steps 10–11)
 - `jq` for inspecting JSON responses
-- A way to resolve `mcp-auth0.try-solo.io` from your workstation to the gateway LoadBalancer — either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
+- A way to resolve `mcp-auth0.try-solo.io` from your workstation to the gateway LoadBalancer: either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
 
 ---
 
@@ -53,9 +53,9 @@ This lab demonstrates both the allow and deny paths of the pre-issuance hook, so
 - Stand up the eager-OAuth feature so the gateway acts as the OAuth Authorization Server visible to MCP clients
 - Broker the Auth0 authorization code flow through the gateway (`/oauth-issuer/...`)
 - Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-auth0.try-solo.io`
-- **Multiplex two MCP upstreams (in-cluster `server-everything` + remote `search.solo.io`) behind one `EnterpriseAgentgatewayBackend`**
-- **Gate OAuth token issuance with a pre-issuance ext_authz hook so only allowlisted Auth0 users receive a token — others are redirected to a configurable deny page**
-- **Test both allow and deny paths end-to-end with MCP Inspector, including redeeming a `refresh_token` to renew an access token without a repeat interactive login**
+- Multiplex two MCP upstreams (in-cluster `server-everything` + remote `search.solo.io`) behind one `EnterpriseAgentgatewayBackend`
+- Gate OAuth token issuance with a pre-issuance ext_authz hook so only allowlisted Auth0 users receive a token; others are redirected to a configurable deny page
+- Test both allow and deny paths end-to-end with MCP Inspector, including redeeming a `refresh_token` to renew an access token without a repeat interactive login
 
 ---
 
@@ -63,7 +63,7 @@ This lab demonstrates both the allow and deny paths of the pre-issuance hook, so
 
 ### Recap: eager-OAuth with Auth0
 
-In the eager-OAuth pattern, agentgateway acts as the OAuth Authorization Server that MCP clients see, and Auth0 sits downstream of the gateway. MCP clients DCR against the gateway and get a single pre-registered Auth0 `client_id` / `client_secret` pair — no Auth0 dashboard churn, no Management API needed at runtime. See [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md) for the full walk-through of why this matters and how the fake-DCR mechanism works.
+In the eager-OAuth pattern, agentgateway acts as the OAuth Authorization Server that MCP clients see, and Auth0 sits downstream of the gateway. MCP clients DCR against the gateway and get a single pre-registered Auth0 `client_id` / `client_secret` pair: no Auth0 dashboard churn, no Management API needed at runtime. See [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md) for the full walk-through of why this matters and how the fake-DCR mechanism works.
 
 ```
 ┌──────────────┐   1. discovery + DCR   ┌─────────────────┐  3. authorize/token  ┌───────┐
@@ -84,7 +84,7 @@ In the eager-OAuth pattern, agentgateway acts as the OAuth Authorization Server 
 
 JWT claims alone often can't answer entitlement questions ("is *this* user allowed to use *this* MCP gateway right now?"). Many organizations keep that source of truth in a separate authorization system. The pre-issuance ext_authz hook lets the gateway consult that system **before** issuing its own token to the MCP client.
 
-After Auth0 authenticates the user but **before** the agentgateway-issued token reaches the MCP client, the controller calls a gRPC ext_authz service. On `PERMISSION_DENIED` the user's browser is redirected to a configurable URL with `client_id` and `resource` appended as query params — your branded "no access" page can use them to render context-aware copy. The MCP client never receives a token.
+After Auth0 authenticates the user but **before** the agentgateway-issued token reaches the MCP client, the controller calls a gRPC ext_authz service. On `PERMISSION_DENIED` the user's browser is redirected to a configurable URL with `client_id` and `resource` appended as query params; your branded "no access" page can use them to render context-aware copy. The MCP client never receives a token.
 
 ```
 ┌──────────────┐   1. discovery + DCR   ┌─────────────────┐  3. authorize/token  ┌───────┐
@@ -113,14 +113,14 @@ After Auth0 authenticates the user but **before** the agentgateway-issued token 
                             target: everything            target: soloio-docs
 ```
 
-The hook integrates with the existing `ably7/grpc-ext-authz` image in `AUTH_MODE=principal`. The same image is used in [`mcp-byo-grpc-ext-authz.md`](mcp-byo-grpc-ext-authz.md), but at a different integration point — that lab gates HTTP requests on the data plane (`x-ext-authz: allow` header); this lab gates **token issuance** on the control plane.
+The hook integrates with the existing `ably7/grpc-ext-authz` image in `AUTH_MODE=principal`. The same image is used in [`mcp-byo-grpc-ext-authz.md`](mcp-byo-grpc-ext-authz.md), but at a different integration point: that lab gates HTTP requests on the data plane (`x-ext-authz: allow` header); this lab gates **token issuance** on the control plane.
 
 ---
 
 ## Custom Gateway Features Covered
 
 - **OAuth 2.0 Authorization Server**: agentgateway acts as the AS at `/oauth-issuer/...` (recap)
-- **Multiplexed MCP backend**: one `EnterpriseAgentgatewayBackend` fronts two upstreams — an in-cluster `server-everything` and the remote `search.solo.io` — letting one OAuth-protected MCP endpoint expose tools from both
+- **Multiplexed MCP backend**: one `EnterpriseAgentgatewayBackend` fronts two upstreams (an in-cluster `server-everything` and the remote `search.solo.io`), so one OAuth-protected MCP endpoint exposes tools from both
 - **Pre-issuance ext_authz hook**: `KGW_OAUTH_ISSUER_CONFIG.pre_issuance` calls a gRPC service between Auth0 callback and gateway-issued token; allowlists by Auth0 `sub` via `source.principal`; on deny the browser is redirected to `denied_redirect`
 - **Frontend TLS termination**: HTTPS listener on `agentgateway-proxy` for `mcp-auth0.try-solo.io` (recap)
 - **Refresh token grant**: `/oauth-issuer/token` accepts `grant_type=refresh_token` and forwards it to Auth0 as a stateless passthrough, letting a client renew its access token without a repeat browser login
@@ -202,7 +202,7 @@ kubectl create secret tls -n agentgateway-system mcp-auth0-tls \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Update the `agentgateway-proxy` Gateway to expose **both** listeners — the original HTTP on 8080 (preserved so other labs continue to work) and a new HTTPS listener on 443:
+Update the `agentgateway-proxy` Gateway to expose **both** listeners: the original HTTP on 8080 (preserved so other labs continue to work) and a new HTTPS listener on 443:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -254,7 +254,7 @@ https	True
 
 ## Step 3 — Deploy Postgres for OAuth State
 
-The eager-OAuth feature stores token-exchange / authorization-code state in a database. This lab uses Postgres (production-realistic). For quick iteration you can skip Postgres and use SQLite in-memory — see the callout below.
+The eager-OAuth feature stores token-exchange / authorization-code state in a database. This lab uses Postgres (production-realistic). For quick iteration you can skip Postgres and use SQLite in-memory; see the callout below.
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -344,13 +344,13 @@ Expected Output:
 deployment "postgres" successfully rolled out
 ```
 
-> **Skip Postgres? Use SQLite in-memory.** Omit Step 3 entirely, then in Step 5 omit the `database:` block from the values. The gateway will use SQLite in-memory. State is lost on pod restart — fine for a lab, not for production.
+> **Skip Postgres? Use SQLite in-memory.** Omit Step 3 entirely, then in Step 5 omit the `database:` block from the values. The gateway will use SQLite in-memory. State is lost on pod restart: fine for a lab, not for production.
 
 ---
 
 ## Step 4 — Add STS Env Vars to the Gateway Config
 
-The eager-OAuth flow needs two env vars on the agentgateway proxy pod so it knows where the in-cluster STS endpoint lives. Patch the existing `agentgateway-config` `EnterpriseAgentgatewayParameters` from Lab 001 — do not recreate it; the patch preserves all other settings.
+The eager-OAuth flow needs two env vars on the agentgateway proxy pod so it knows where the in-cluster STS endpoint lives. Patch the existing `agentgateway-config` `EnterpriseAgentgatewayParameters` from Lab 001. Do not recreate it; the patch preserves all other settings.
 
 ```bash
 kubectl patch enterpriseagentgatewayparameters agentgateway-config \
@@ -392,7 +392,7 @@ Expected Output:
 
 ## Step 5 — Helm Upgrade with Eager-OAuth Values and the Pre-Issuance Hook
 
-Re-run `helm upgrade` to enable the eager-OAuth feature in the controller, point it at Postgres + Auth0 JWKS, inject the OAuth issuer config, **and wire the pre-issuance ext_authz hook**.
+Re-run `helm upgrade` to enable the eager-OAuth feature in the controller, point it at Postgres + Auth0 JWKS, inject the OAuth issuer config, and wire the pre-issuance ext_authz hook.
 
 ```bash
 helm upgrade -i -n agentgateway-system enterprise-agentgateway \
@@ -459,17 +459,17 @@ What each setting does:
 | Setting | Purpose |
 |---|---|
 | `tokenExchange.enabled: true` | Turns the eager-OAuth feature on at the controller level (and starts the controller's port-7777 server that hosts both the AS endpoints and the STS) |
-| `tokenExchange.subjectValidator` / `apiValidator` / `actorValidator` | All three required at boot — the controller refuses to start without them, even though only the eager-OAuth issuer (not RFC 8693 token exchange) is being used here. Crash signature if missing: `error creating actor validator: unsupported validator type:` |
+| `tokenExchange.subjectValidator` / `apiValidator` / `actorValidator` | All three required at boot: the controller refuses to start without them, even though only the eager-OAuth issuer (not RFC 8693 token exchange) is being used here. Crash signature if missing: `error creating actor validator: unsupported validator type:` |
 | `tokenExchange.database.postgres.url` | Postgres connection string from Step 3; omit for SQLite in-memory |
 | `gateway_config.base_url` | Public URL clients use to reach the gateway's AS endpoints (must include `/oauth-issuer`) |
-| `client_config.clients` | Pre-registered `client_id`/`client_secret` table — `/oauth-issuer/register` returns one of these |
+| `client_config.clients` | Pre-registered `client_id`/`client_secret` table; `/oauth-issuer/register` returns one of these |
 | `downstream_server` | Credentials and URLs for the gateway to talk to Auth0 during the authorization code flow; `redirect_uri` must match an entry in the Auth0 app's "Allowed Callback URLs" |
-| **`downstream_server.scopes` includes `offline_access`** | Tells Auth0 to also issue a `refresh_token` alongside the access token, so the OAuth flow can be redeemed for a fresh access token later without a repeat browser login (tested in Step 10). Requires "Allow Offline Access" enabled on the Auth0 API — see the Auth0 requirements section. |
-| **`pre_issuance.enabled: true`** | Turns the pre-issuance hook on. When `false` (or absent), the controller skips the gRPC Check entirely. |
-| **`pre_issuance.grpc.target`** | Cluster DNS + port of the gRPC ext_authz Service. This Service is created in Step 7 — until then, the controller's dial attempts will fail. Combined with `failure_policy: closed` below, that means OAuth flows attempted between Step 5 and Step 7 will fail with a 400 — that's expected. |
-| **`pre_issuance.grpc.insecure_disable_tls`** | Talk to the ext_authz Service over plain HTTP/2 (cleartext gRPC). Production deployments should run the ext_authz Service with TLS and remove this flag. |
-| **`pre_issuance.denied_redirect`** | URL the gateway 307s to when ext_authz returns `PERMISSION_DENIED`. The controller appends `?client_id=<...>&resource=<...>` so a branded deny page can render context-aware copy. |
-| **`pre_issuance.failure_policy`** | `closed` = on gRPC dial/timeout errors, fail the auth flow with 400 (does **not** trigger `denied_redirect`). `open` = silently allow on errors. Always use `closed` for demos and production. |
+| `downstream_server.scopes` includes `offline_access` | Tells Auth0 to also issue a `refresh_token` alongside the access token, so the OAuth flow can be redeemed for a fresh access token later without a repeat browser login (tested in Step 10). Requires "Allow Offline Access" enabled on the Auth0 API; see the Auth0 requirements section. |
+| `pre_issuance.enabled: true` | Turns the pre-issuance hook on. When `false` (or absent), the controller skips the gRPC Check entirely. |
+| `pre_issuance.grpc.target` | Cluster DNS + port of the gRPC ext_authz Service. This Service is created in Step 7; until then, the controller's dial attempts will fail. Combined with `failure_policy: closed` below, that means OAuth flows attempted between Step 5 and Step 7 will fail with a 400; that's expected. |
+| `pre_issuance.grpc.insecure_disable_tls` | Talk to the ext_authz Service over plain HTTP/2 (cleartext gRPC). Production deployments should run the ext_authz Service with TLS and remove this flag. |
+| `pre_issuance.denied_redirect` | URL the gateway 307s to when ext_authz returns `PERMISSION_DENIED`. The controller appends `?client_id=<...>&resource=<...>` so a branded deny page can render context-aware copy. |
+| `pre_issuance.failure_policy` | `closed` = on gRPC dial/timeout errors, fail the auth flow with 400 (does **not** trigger `denied_redirect`). `open` = silently allow on errors. Always use `closed` for demos and production. |
 
 Wait for the controller and proxy pods to restart cleanly:
 
@@ -535,7 +535,7 @@ True
 
 The pre-issuance hook configured in Step 5 dials a gRPC ext_authz Service at `grpc-ext-authz.agentgateway-system.svc.cluster.local:4444`. This step deploys that Service.
 
-The implementation is [`ably7/grpc-ext-authz`](https://github.com/ably77/grpc-ext-authz) — the same image used by [`mcp-byo-grpc-ext-authz.md`](mcp-byo-grpc-ext-authz.md), but here it runs in `AUTH_MODE=principal`. In principal mode the service allowlists by `source.principal`, which the controller sets to the downstream user_id (Auth0 `sub`, e.g. `auth0|6a0bec30059b1981ce4674f6`). Any user whose sub is not in `ALLOWED_PRINCIPALS` triggers a `PERMISSION_DENIED` response.
+The implementation is [`ably7/grpc-ext-authz`](https://github.com/ably77/grpc-ext-authz), the same image used by [`mcp-byo-grpc-ext-authz.md`](mcp-byo-grpc-ext-authz.md), but here it runs in `AUTH_MODE=principal`. In principal mode the service allowlists by `source.principal`, which the controller sets to the downstream user_id (Auth0 `sub`, e.g. `auth0|6a0bec30059b1981ce4674f6`). Any user whose sub is not in `ALLOWED_PRINCIPALS` triggers a `PERMISSION_DENIED` response.
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -614,7 +614,7 @@ You should see lines indicating `AUTH_MODE=principal` and the `ALLOWED_PRINCIPAL
 
 ### Using your own Auth0 tenant
 
-`ALLOWED_PRINCIPALS` ships set to the Auth0 `sub` of `jdoe@solo.io` — a UI-generated user in the Solo demo tenant. If you are running this lab against a different Auth0 tenant, you need to substitute the sub of a user **you** want to allow.
+`ALLOWED_PRINCIPALS` ships set to the Auth0 `sub` of `jdoe@solo.io`, a UI-generated user in the Solo demo tenant. If you are running this lab against a different Auth0 tenant, you need to substitute the sub of a user **you** want to allow.
 
 To find a user's Auth0 `sub`:
 
@@ -640,7 +640,7 @@ This step deploys five resources in `agentgateway-system`:
 | Resource | Kind | Description |
 |---|---|---|
 | `mcp-server` | Deployment + Service | `@modelcontextprotocol/server-everything` reference server in Streamable HTTP mode (run via `npx` on `node:20-alpine`). Streamable HTTP is per-request stateless, which lets Lab 001's `replicas: 2` proxy stay unchanged. |
-| `mcp-backend` | EnterpriseAgentgatewayBackend | **Multiplexed** — wraps two MCP targets behind one backend: the in-cluster `mcp-server` (named `everything`) and the remote `search.solo.io` MCP server (named `soloio-docs`, reached via HTTPS using `policies.tls: {}`). The gateway fans every MCP request out to both targets and merges their tool lists into one view. |
+| `mcp-backend` | EnterpriseAgentgatewayBackend | Multiplexed: wraps two MCP targets behind one backend, the in-cluster `mcp-server` (named `everything`) and the remote `search.solo.io` MCP server (named `soloio-docs`, reached via HTTPS using `policies.tls: {}`). The gateway fans every MCP request out to both targets and merges their tool lists into one view. |
 | `mcp-route` | HTTPRoute | Exposes `/mcp` plus the two `.well-known/oauth-*-resource/mcp` discovery paths on the `https` listener |
 | `auth0-jwks` | EnterpriseAgentgatewayBackend | Static backend pointing at Auth0 for JWKS lookups during request validation |
 | `elicitation-secret` | Secret | **Required** by the eager-OAuth issuer at the start of an auth flow. The controller looks for this exact name in its own namespace and 500s with `secret not found: agentgateway-system/elicitation-secret` on `/oauth-issuer/authorize` if it's missing. |
@@ -825,8 +825,8 @@ The policy ties everything together:
 
 | Field | Purpose |
 |---|---|
-| `issuer` | Auth0 is the JWT issuer (`${AUTH0_ISSUER}` — trailing slash matters) |
-| `jwks` | Points at the `auth0-jwks` backend created in Step 8. **`jwksPath` must be written without a leading slash** (`.well-known/jwks.json`) — the controller appends `/` between the backend URL and `jwksPath`, so a leading slash produces `https://$AUTH0_DOMAIN//.well-known/jwks.json`, which Auth0 returns 404 for. The controller log signature is `failed resolving jwks ... 404` and the policy goes `PartiallyValid`; `/mcp` then bypasses auth entirely. |
+| `issuer` | Auth0 is the JWT issuer (`${AUTH0_ISSUER}`; trailing slash matters) |
+| `jwks` | Points at the `auth0-jwks` backend created in Step 8. **`jwksPath` must be written without a leading slash** (`.well-known/jwks.json`): the controller appends `/` between the backend URL and `jwksPath`, so a leading slash produces `https://$AUTH0_DOMAIN//.well-known/jwks.json`, which Auth0 returns 404 for. The controller log signature is `failed resolving jwks ... 404` and the policy goes `PartiallyValid`; `/mcp` then bypasses auth entirely. |
 | `audiences` | The Auth0 API audience the JWT must carry |
 | `resourceMetadata.agentgateway.dev/issuer-proxy` | Tells the gateway to serve its own AS metadata (from the in-cluster eager-OAuth issuer at `:7777/oauth-issuer`) when an MCP client fetches `.well-known/oauth-authorization-server/mcp`. Without this, the gateway would proxy Auth0's metadata directly. |
 | `resourceMetadata.authorizationServers` / `resource` | What shows up in the protected-resource discovery document for clients |
@@ -900,7 +900,7 @@ In the Inspector UI:
 
 Inspector follows the protected-resource discovery automatically. **Log in as the user whose Auth0 sub IS in `ALLOWED_PRINCIPALS`** (default: `jdoe@solo.io`). You should see:
 
-1. A redirect to Auth0's Universal Login. **Verify the URL bar shows `${AUTH0_DOMAIN}`, not the gateway hostname** — this confirms the eager-OAuth issuer correctly delegated downstream.
+1. A redirect to Auth0's Universal Login. **Verify the URL bar shows `${AUTH0_DOMAIN}`, not the gateway hostname**: this confirms the eager-OAuth issuer correctly delegated downstream.
 2. After completing Auth0 login (with MFA if your tenant requires it), a redirect back to Inspector's local callback.
 3. Inspector status flips to **Connected**.
 
@@ -919,7 +919,7 @@ In the Inspector left panel, click **Tools → List Tools**. You should see tool
 - From `everything` (in-cluster `server-everything`): tools like `echo`, `add`, `printEnv`, `sampleLLM`, etc.
 - From `soloio-docs` (remote `search.solo.io`): tools for searching Solo.io documentation.
 
-Call one tool from each upstream — for example, `everything/echo` with a test string, and any `soloio-docs` search tool — to prove the multiplexed path works post-auth. Both should return a tool result, not a 401.
+Call one tool from each upstream (for example, `everything/echo` with a test string, and any `soloio-docs` search tool) to prove the multiplexed path works post-auth. Both should return a tool result, not a 401.
 
 ### Capture and redeem the refresh token
 
@@ -936,9 +936,9 @@ Step 5 already requested the `offline_access` scope, so the token response Inspe
 }
 ```
 
-> If `refresh_token` is missing and `scope` doesn't include `offline_access`, the Auth0 API's "Allow Offline Access" setting is off — see the Auth0 requirements section. This fails silently: no error, Auth0 just omits the scope.
+> If `refresh_token` is missing and `scope` doesn't include `offline_access`, the Auth0 API's "Allow Offline Access" setting is off; see the Auth0 requirements section. This fails silently: no error, Auth0 just omits the scope.
 
-Copy the `refresh_token` value and redeem it directly against the gateway's issuer — the refresh grant added in `v2026.7.0`:
+Copy the `refresh_token` value and redeem it directly against the gateway's issuer (the refresh grant added in `v2026.7.0`):
 
 ```bash
 curl -sk -X POST "https://${AUTH0_GATEWAY_HOST}/oauth-issuer/token" \
@@ -949,7 +949,7 @@ curl -sk -X POST "https://${AUTH0_GATEWAY_HOST}/oauth-issuer/token" \
   -d "client_secret=${AUTH0_CLIENT_SECRET}" | jq .
 ```
 
-Expected output — a fresh `access_token` with the same scope, `HTTP 200`:
+Expected output: a fresh `access_token` with the same scope, `HTTP 200`:
 
 ```json
 {
@@ -961,7 +961,7 @@ Expected output — a fresh `access_token` with the same scope, `HTTP 200`:
 }
 ```
 
-Auth0's default configuration does not rotate refresh tokens, so no new `refresh_token` appears in this response — the same one can be redeemed again. If your tenant has Refresh Token Rotation enabled, expect a new `refresh_token` on every redemption and the old one to become invalid.
+Auth0's default configuration does not rotate refresh tokens, so no new `refresh_token` appears in this response; the same one can be redeemed again. If your tenant has Refresh Token Rotation enabled, expect a new `refresh_token` on every redemption and the old one to become invalid.
 
 Confirm the new access token actually works against the multiplexed backend:
 
@@ -993,7 +993,7 @@ curl -sk -X POST "https://${AUTH0_GATEWAY_HOST}/mcp" \
 | `kubectl logs` shows `ALLOWED` line | Pre-issuance hook fired and returned OK |
 | Access Tokens JSON includes `refresh_token` and `scope` contains `offline_access` | `offline_access` reached Auth0 and the API allows offline access |
 | `curl .../oauth-issuer/token` with `grant_type=refresh_token` returns `200` with a new `access_token` | The eager-OAuth issuer's refresh grant (`v2026.7.0`+) is live and forwarding correctly to Auth0 |
-| Refreshed access token authenticates against `/mcp` with `200` | The refreshed token is a fully valid Auth0-issued JWT, not just an opaque success response |
+| Refreshed access token authenticates against `/mcp` with `200` | The refreshed token is a valid Auth0-issued JWT, not just an opaque success response |
 
 ---
 
@@ -1020,12 +1020,12 @@ In the (fresh) Inspector window:
 
 ### What you should see
 
-1. Auth0 login completes successfully — Auth0 doesn't know anything about your entitlement decision; it just authenticates the user.
+1. Auth0 login completes successfully: Auth0 doesn't know anything about your entitlement decision; it just authenticates the user.
 2. Auth0 redirects back to the gateway's `/oauth-issuer/callback/...`.
 3. The gateway calls `grpc-ext-authz` with `source.principal = auth0|<this user's sub>`. ext-authz returns `PERMISSION_DENIED`.
 4. **The gateway responds 307 Temporary Redirect** with `Location: https://example.com/no-access?client_id=<...>&resource=<...>`.
-5. **The browser lands on `https://example.com/no-access?...`** — the placeholder deny page. In production this would be your customer-branded "no access" UI; the `client_id` and `resource` query params let it render context-aware copy.
-6. Inspector shows a connection error in its terminal — no token was ever issued.
+5. **The browser lands on `https://example.com/no-access?...`**, the placeholder deny page. In production this would be your customer-branded "no access" UI; the `client_id` and `resource` query params let it render context-aware copy.
+6. Inspector shows a connection error in its terminal: no token was ever issued.
 
 ### Verify the decision in ext-authz logs
 
@@ -1037,7 +1037,7 @@ You should see a `DENIED` line that includes the principal of the user you just 
 
 ### Customizing the deny page
 
-The default `denied_redirect` is `https://example.com/no-access` — a placeholder. To point at your own branded page, re-run the Step 5 helm upgrade with a different `denied_redirect` value:
+The default `denied_redirect` is `https://example.com/no-access`, a placeholder. To point at your own branded page, re-run the Step 5 helm upgrade with a different `denied_redirect` value:
 
 ```yaml
 "pre_issuance": {
@@ -1054,7 +1054,7 @@ The change takes effect once the controller restarts (helm upgrade triggers a ro
 
 ## Step 12 (Optional) — Verify Postgres-Backed State Survives a Restart
 
-Skip if you opted into SQLite in Step 3 — state is in-memory and **will not** survive restart.
+Skip if you opted into SQLite in Step 3: state is in-memory and **will not** survive restart.
 
 ```bash
 kubectl rollout restart -n agentgateway-system deployment/enterprise-agentgateway
@@ -1073,10 +1073,10 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 
 | Symptom in Inspector | Likely Cause | Where to Look |
 |---|---|---|
-| `/.well-known/oauth-authorization-server/mcp` returns Auth0's metadata (registration endpoint = Auth0) | The `agentgateway.dev/issuer-proxy` annotation under `resourceMetadata` is missing, or the `oauth-issuer` HTTPRoute (Step 6) is misrouted | Step 9 — confirm `agentgateway.dev/issuer-proxy` is set; Step 6 — `kubectl get httproute -n agentgateway-system oauth-issuer` |
+| `/.well-known/oauth-authorization-server/mcp` returns Auth0's metadata (registration endpoint = Auth0) | The `agentgateway.dev/issuer-proxy` annotation under `resourceMetadata` is missing, or the `oauth-issuer` HTTPRoute (Step 6) is misrouted | Step 9: confirm `agentgateway.dev/issuer-proxy` is set; Step 6: `kubectl get httproute -n agentgateway-system oauth-issuer` |
 | `/oauth-issuer/register` returns 404 or 501 | Step 5 helm upgrade did not apply `tokenExchange.enabled` + the issuer config, or the `/oauth-issuer` HTTPRoute (Step 6) is missing | `kubectl get httproute -n agentgateway-system oauth-issuer`; gateway pod logs |
-| `GET /mcp` without a token returns **406** instead of 401, and `/.well-known/oauth-*-resource/mcp` returns 404 | The MCP authentication policy is `PartiallyValid` because the controller can't fetch JWKS. Most often caused by a leading slash on `jwksPath` (`/.well-known/jwks.json`), which produces `https://$AUTH0_DOMAIN//.well-known/jwks.json` (404 from Auth0) | `kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-auth0-eager -o jsonpath='{.status.ancestors[*].conditions[*].message}'` should say `Policy accepted Attached to all targets`. Controller logs: `kubectl logs -n agentgateway-system deployment/enterprise-agentgateway \| grep jwks`. Fix per Step 9 — `jwksPath: .well-known/jwks.json` (no leading slash) |
-| Controller pod CrashLoopBackOff with `error creating actor validator: unsupported validator type:` | Step 5 helm values are missing `tokenExchange.actorValidator` (and/or `apiValidator`) — all three validators are required at boot even though only the eager-OAuth issuer is being used | Re-run Step 5 with the validator block matching this lab |
+| `GET /mcp` without a token returns **406** instead of 401, and `/.well-known/oauth-*-resource/mcp` returns 404 | The MCP authentication policy is `PartiallyValid` because the controller can't fetch JWKS. Most often caused by a leading slash on `jwksPath` (`/.well-known/jwks.json`), which produces `https://$AUTH0_DOMAIN//.well-known/jwks.json` (404 from Auth0) | `kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-auth0-eager -o jsonpath='{.status.ancestors[*].conditions[*].message}'` should say `Policy accepted Attached to all targets`. Controller logs: `kubectl logs -n agentgateway-system deployment/enterprise-agentgateway \| grep jwks`. Fix per Step 9: `jwksPath: .well-known/jwks.json` (no leading slash) |
+| Controller pod CrashLoopBackOff with `error creating actor validator: unsupported validator type:` | Step 5 helm values are missing `tokenExchange.actorValidator` (and/or `apiValidator`): all three validators are required at boot even though only the eager-OAuth issuer is being used | Re-run Step 5 with the validator block matching this lab |
 | Inspector errors immediately (no Auth0 redirect) and controller logs show `failed to start auth flow ... secret not found: agentgateway-system/elicitation-secret` | The `elicitation-secret` Secret from Step 8 wasn't created or is in the wrong namespace | `kubectl get secret -n agentgateway-system elicitation-secret`; recreate per Step 8 |
 | Auth0 error page after login (`callback url not allowed` / `invalid redirect_uri`) **even though the URI is in the app's allowlist** | The eager-OAuth issuer uses two callback paths (`/callback/upstream` for PKCE/MCP-client flows, `/callback/downstream` otherwise). Registering only one yields a rejection on whichever flow the client triggers | Confirm **both** `https://${AUTH0_GATEWAY_HOST}/oauth-issuer/callback/upstream` and `.../callback/downstream` are present in the Auth0 app's "Allowed Callback URLs" |
 | Auth0 error page after login (`client not found` / `invalid_client`) | `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` don't match the Auth0 app, or the app is disabled / not assigned to the Auth0 connection | Auth0 admin → Applications → *your app* → Settings (Client ID, Client Secret), and Connections tab |
@@ -1085,11 +1085,11 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | Inspector loops on connect with no Auth0 redirect; browser DevTools console (F12) shows `Access to fetch at '.../.well-known/oauth-*-resource/mcp' has been blocked by CORS policy` or `mcp-protocol-version is not allowed by Access-Control-Allow-Headers` | OAuth metadata discovery runs in the **browser** (Inspector UI), not through Inspector's `localhost:6277` proxy. Inspector sends `mcp-protocol-version` on the preflight, but agentgateway's internal handler hardcodes `Access-Control-Allow-Headers: content-type` and rejects it | The Step 9 `mcp-route` HTTPRoute must attach a Gateway API `CORS` filter to both `/.well-known/oauth-*/mcp` rules that allows `mcp-protocol-version` (and `Authorization`). Confirm with `kubectl get httproute -n agentgateway-system mcp-route -o yaml \| grep -A6 'type: CORS'` |
 | Browser shows `ERR_CERT_AUTHORITY_INVALID` and the OAuth flow stops | Browser hasn't accepted the self-signed cert yet | Visit `https://mcp-auth0.try-solo.io/.well-known/oauth-protected-resource/mcp` and click through the warning |
 | `mcp-auth0.try-solo.io` doesn't resolve | `/etc/hosts` entry missing or DNS cache stale | Re-run the `echo "$GATEWAY_IP $AUTH0_GATEWAY_HOST" \| sudo tee -a /etc/hosts` step; on macOS flush DNS |
-| **Every login redirects to `https://example.com/no-access`** (or your custom deny page) | The Auth0 sub of the user you logged in as is not in `ALLOWED_PRINCIPALS`. This is the expected deny-path behavior — but if you meant to be on the allow path, the allowlist needs to be updated. | `kubectl logs -n agentgateway-system deployment/grpc-ext-authz --tail=20` — every Check prints one line including the `source.principal` it saw. Edit `ALLOWED_PRINCIPALS` per Step 7's BYO sub-section. |
-| **Inspector shows "failed to process downstream callback" 400 instead of redirecting** | The ext-authz pod is unreachable or timing out. With `failure_policy: closed`, gRPC dial/timeout errors do NOT trigger the deny redirect — the redirect only fires on an explicit `PERMISSION_DENIED`. | `kubectl get pods -n agentgateway-system -l app=grpc-ext-authz`; `kubectl get svc -n agentgateway-system grpc-ext-authz`; controller logs |
-| **Inspector connects despite the user being absent from `ALLOWED_PRINCIPALS`** | `pre_issuance.enabled` is not actually true in `KGW_OAUTH_ISSUER_CONFIG` in the running controller | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].env[?(@.name=="KGW_OAUTH_ISSUER_CONFIG")].value}' \| jq .pre_issuance` |
-| **(Step 10) Token response has no `refresh_token`, `scope` omits `offline_access`, no error anywhere** | The Auth0 API behind `AUTH0_AUDIENCE` has "Allow Offline Access" disabled. Auth0 silently drops the scope instead of erroring | Auth0 Dashboard → Applications → APIs → *your API* → Settings → Access Settings → enable "Allow Offline Access"; then **Clear OAuth State** in Inspector and reconnect |
-| **(Step 10) `curl .../oauth-issuer/token` with `grant_type=refresh_token` returns an error** | Controller is older than `v2026.7.0` — the refresh grant (PR #7537) isn't implemented yet | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].image}'` — verify the image tag is `v2026.7.0` or later |
+| Every login redirects to `https://example.com/no-access` (or your custom deny page) | The Auth0 sub of the user you logged in as is not in `ALLOWED_PRINCIPALS`. This is the expected deny-path behavior. If you meant to be on the allow path, update the allowlist. | `kubectl logs -n agentgateway-system deployment/grpc-ext-authz --tail=20`: every Check prints one line including the `source.principal` it saw. Edit `ALLOWED_PRINCIPALS` per Step 7's BYO sub-section. |
+| Inspector shows "failed to process downstream callback" 400 instead of redirecting | The ext-authz pod is unreachable or timing out. With `failure_policy: closed`, gRPC dial/timeout errors do NOT trigger the deny redirect; the redirect only fires on an explicit `PERMISSION_DENIED`. | `kubectl get pods -n agentgateway-system -l app=grpc-ext-authz`; `kubectl get svc -n agentgateway-system grpc-ext-authz`; controller logs |
+| Inspector connects despite the user being absent from `ALLOWED_PRINCIPALS` | `pre_issuance.enabled` is not actually true in `KGW_OAUTH_ISSUER_CONFIG` in the running controller | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].env[?(@.name=="KGW_OAUTH_ISSUER_CONFIG")].value}' \| jq .pre_issuance` |
+| (Step 10) Token response has no `refresh_token`, `scope` omits `offline_access`, no error anywhere | The Auth0 API behind `AUTH0_AUDIENCE` has "Allow Offline Access" disabled. Auth0 silently drops the scope instead of erroring | Auth0 Dashboard → Applications → APIs → *your API* → Settings → Access Settings → enable "Allow Offline Access"; then **Clear OAuth State** in Inspector and reconnect |
+| (Step 10) `curl .../oauth-issuer/token` with `grant_type=refresh_token` returns an error | Controller is older than `v2026.7.0`: the refresh grant isn't implemented yet | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].image}'`; verify the image tag is `v2026.7.0` or later |
 
 Useful commands:
 
@@ -1112,7 +1112,7 @@ kubectl logs -n agentgateway-system deployment/grpc-ext-authz -f
 
 ## Cleanup
 
-Fully revert to the Lab 001 baseline. Run these in order — the helm revert is **required**, not optional. Skipping it leaves the controller running with `tokenExchange.enabled` and a postgres URL pointing at a deleted DB; a future re-run of this lab will hit `relation "oauth_flow_states" does not exist` because the controller pod never restarts to migrate against a fresh postgres.
+Fully revert to the Lab 001 baseline. Run these in order; the helm revert is required. Skipping it leaves the controller running with `tokenExchange.enabled` and a postgres URL pointing at a deleted DB; a future re-run of this lab will hit `relation "oauth_flow_states" does not exist` because the controller pod never restarts to migrate against a fresh postgres.
 
 ```bash
 # 1. Delete lab-specific resources

@@ -1,6 +1,6 @@
 # Multi-Cluster Upgrades
 
-In this lab you'll upgrade Enterprise Agentgateway in one cluster while a **peer cluster keeps serving the same LLM** — with no loss of service for traffic that has somewhere healthy to go. Two clusters run a Solo Enterprise for Istio **ambient multicluster** mesh; the mock LLM is published as a **global service** (`*.mesh.internal`) backed by both clusters; and an Enterprise Agentgateway **ambient ingress** in each cluster routes to that global hostname. Draining a cluster's backend fails the global service over to the peer across the east-west gateway, so you can take a whole cluster down to upgrade it and the global service stays up.
+In this lab you'll upgrade Enterprise Agentgateway in one cluster while a peer cluster keeps serving the same LLM, with no loss of service for traffic that has somewhere healthy to go. Two clusters run a Solo Enterprise for Istio ambient multicluster mesh; the mock LLM is published as a global service (`*.mesh.internal`) backed by both clusters; and an Enterprise Agentgateway ambient ingress in each cluster routes to that global hostname. Draining a cluster's backend fails the global service over to the peer across the east-west gateway, so you can take a whole cluster down to upgrade it and the global service stays up.
 
 This is the cross-cluster counterpart to the other two upgrade labs:
 
@@ -10,14 +10,14 @@ This is the cross-cluster counterpart to the other two upgrade labs:
 | [Blue/Green Across Namespaces](blue-green-namespaces.md) | Two proxies, one cluster | Weighted route delegation | Flip weights |
 | **Multi-Cluster Upgrades** (this lab) | Two clusters | Scale local backend to 0 → mesh failover to peer | Restore the cluster |
 
-The per-cluster zero-downtime mechanism is the in-place recipe (≥2 replicas + PDB + graceful shutdown); the multi-cluster-specific part is **taking a whole cluster out of service while the global service continues from the peer.**
+The per-cluster zero-downtime mechanism is the in-place recipe (≥2 replicas + PDB + graceful shutdown); the multi-cluster-specific part is taking a whole cluster out of service while the global service continues from the peer.
 
 ## Pre-requisites
 - [001 — Install Enterprise Agentgateway](../../001-install-enterprise-agentgateway.md) and [002 — Set Up UI and Monitoring Tools](../../002-set-up-ui-and-monitoring-tools.md) for background; this lab installs its own two-cluster stack from scratch.
-- [In-Place Rolling Upgrades](in-place-rolling-upgrades.md) — the per-cluster zero-downtime posture reused here.
-- **Two clusters.** Locally: `vind-up-2` brings up `cluster1` (region `us-west`) and `cluster2` (region `us-east`) on a shared Docker network with LoadBalancer support.
-- **Licenses:** an Enterprise-level **Solo Enterprise for Istio** license (ambient) and a **Solo Enterprise for agentgateway** license. Both are provided here via `SOLO_TRIAL_LICENSE_KEY`.
-- **Solo distribution of Istio 1.30 or later** — the agentgateway ambient-ingress integration requires ≥1.30.
+- [In-Place Rolling Upgrades](in-place-rolling-upgrades.md): the per-cluster zero-downtime posture reused here.
+- Two clusters. Locally: `vind-up-2` brings up `cluster1` (region `us-west`) and `cluster2` (region `us-east`) on a shared Docker network with LoadBalancer support.
+- Licenses: an Enterprise-level Solo Enterprise for Istio license (ambient) and a Solo Enterprise for agentgateway license. Both are provided here via `SOLO_TRIAL_LICENSE_KEY`.
+- Solo distribution of Istio 1.30 or later: the agentgateway ambient-ingress integration requires ≥1.30.
 
 ## Lab Objectives
 - Stand up a Solo ambient multicluster mesh across two clusters and publish the LLM as a global service.
@@ -46,7 +46,7 @@ Two independent high-availability tiers:
 
 | Tier | Mechanism | How you drain a cluster |
 |---|---|---|
-| **Backend (LLM)** | Global service `solo.io/service-scope=global` → `*.mesh.internal`, mesh failover | **Scale the local backend to 0.** North-south failover triggers when the local service has no endpoints. |
+| **Backend (LLM)** | Global service `solo.io/service-scope=global` → `*.mesh.internal`, mesh failover | Scale the local backend to 0. North-south failover triggers when the local service has no endpoints. |
 | **Ingress (agentgateway)** | One agentgateway ingress per cluster + an external GSLB | Remove the cluster's ingress from DNS rotation (external tier, described at the end). |
 
 ## Set cluster contexts
@@ -234,7 +234,7 @@ done
   --contexts=$KUBECONTEXT_CLUSTER1,$KUBECONTEXT_CLUSTER2 --namespace istio-gateways
 ```
 
-Confirm the peering — each cluster gets an `istio-remote-peer-*` Gateway pointing at the other's east-west address:
+Confirm the peering: each cluster gets an `istio-remote-peer-*` Gateway pointing at the other's east-west address:
 
 ```bash
 for c in $KUBECONTEXT_CLUSTER1 $KUBECONTEXT_CLUSTER2; do echo "== $c =="; \
@@ -245,7 +245,7 @@ Expected: on each cluster, `istio-eastwest` and an `istio-remote-peer-<other>` G
 
 ## Step 2 — Publish the mock LLM as a global service
 
-Deploy the mock LLM in an ambient-enrolled namespace in **both** clusters, then mark the service global. The `solo.io/service-scope=global` label makes Istio generate a `ServiceEntry` publishing `mock-gpt-4o-svc.llm.mesh.internal`; `PreferNetwork` keeps traffic local while a local endpoint exists.
+Deploy the mock LLM in an ambient-enrolled namespace in both clusters, then mark the service global. The `solo.io/service-scope=global` label makes Istio generate a `ServiceEntry` publishing `mock-gpt-4o-svc.llm.mesh.internal`; `PreferNetwork` keeps traffic local while a local endpoint exists.
 
 ```bash
 for c in $KUBECONTEXT_CLUSTER1 $KUBECONTEXT_CLUSTER2; do
@@ -295,10 +295,10 @@ Expected: each cluster shows an autogenerated `ServiceEntry` for `mock-gpt-4o-sv
 
 Install agentgateway in each cluster with the Istio integration enabled. Two settings are required in a multicluster mesh:
 
-- `istio.autoEnabled=true` — runs the ingress pod outside the ambient data plane so it gets its own Istio certificate and opens HBONE connections into the mesh.
-- `istio.clusterId` and `istio.network` — must match this cluster's istiod `clusterName`/`network` (`cluster1` / `cluster2`). Without them the ingress sends the default cluster ID and istiod rejects its certificate request.
+- `istio.autoEnabled=true`: runs the ingress pod outside the ambient data plane so it gets its own Istio certificate and opens HBONE connections into the mesh.
+- `istio.clusterId` and `istio.network`: must match this cluster's istiod `clusterName`/`network` (`cluster1` / `cluster2`). Without them the ingress sends the default cluster ID and istiod rejects its certificate request.
 
-> **`istio.clusterId`/`istio.network` must equal the mesh/network name, not the kube-context name.** This loop reuses `$c` for the context, the cluster ID, *and* the network only because the contexts are deliberately named `cluster1` / `cluster2` to match `MESH_NAME_CLUSTER*`. If your contexts are named differently (e.g. `kind-cluster1`), set these flags to the istiod `clusterName`/`network` values (`cluster1` / `cluster2`) explicitly — otherwise istiod rejects the ingress's certificate request.
+> **`istio.clusterId`/`istio.network` must equal the mesh/network name, not the kube-context name.** This loop reuses `$c` for the context, the cluster ID, *and* the network only because the contexts are deliberately named `cluster1` / `cluster2` to match `MESH_NAME_CLUSTER*`. If your contexts are named differently (e.g. `kind-cluster1`), set these flags to the istiod `clusterName`/`network` values (`cluster1` / `cluster2`) explicitly; otherwise istiod rejects the ingress's certificate request.
 
 ```bash
 for c in $KUBECONTEXT_CLUSTER1 $KUBECONTEXT_CLUSTER2; do
@@ -318,7 +318,7 @@ done
 
 ## Step 4 — Deploy the ingress and route to the global hostname
 
-Create an `agentgateway-ingress` Gateway in each cluster, and an `HTTPRoute` to the global hostname. The route uses an **Istio `Hostname` backend** (`group: networking.istio.io`) and is placed in the **`llm` namespace** — the namespace named in `mock-gpt-4o-svc.llm.mesh.internal`. (agentgateway resolves a global-hostname backend from that namespace; a route for `*.<ns>.mesh.internal` must live in `<ns>`.) A `URLRewrite` maps `/openai` to the model's `/v1/chat/completions` path, and a response header stamps which cluster's ingress served the request.
+Create an `agentgateway-ingress` Gateway in each cluster, and an `HTTPRoute` to the global hostname. The route uses an Istio `Hostname` backend (`group: networking.istio.io`) and is placed in the `llm` namespace, the namespace named in `mock-gpt-4o-svc.llm.mesh.internal`. (agentgateway resolves a global-hostname backend from that namespace; a route for `*.<ns>.mesh.internal` must live in `<ns>`.) A `URLRewrite` maps `/openai` to the model's `/v1/chat/completions` path, and a response header stamps which cluster's ingress served the request.
 
 ```bash
 for c in $KUBECONTEXT_CLUSTER1 $KUBECONTEXT_CLUSTER2; do
@@ -387,13 +387,13 @@ for gw in "$GW1" "$GW2"; do echo "== $gw =="
 done
 ```
 
-Expected: each ingress returns `HTTP/1.1 200` with `x-cluster: cluster1` / `cluster2`. Each is serving from its **local** LLM (`PreferNetwork`).
+Expected: each ingress returns `HTTP/1.1 200` with `x-cluster: cluster1` / `cluster2`. Each is serving from its local LLM (`PreferNetwork`).
 
-> **First request may need a moment.** `gateway/agentgateway-ingress` reports `Programmed=True` before its route to the global hostname is fully warm, so the very first `curl` can return an empty response. The retry loop above absorbs that — a single one-shot `curl` piped to `grep` would silently print a blank line instead.
+> **First request may need a moment.** `gateway/agentgateway-ingress` reports `Programmed=True` before its route to the global hostname is fully warm, so the very first `curl` can return an empty response. The retry loop above absorbs that; a single one-shot `curl` piped to `grep` would silently print a blank line instead.
 
 ## Step 5 — Cross-cluster failover
 
-This is the heart of the lab: when a cluster's local LLM has no endpoints, its ingress serves the global hostname from the **peer** cluster over the east-west gateway.
+When a cluster's local LLM has no endpoints, its ingress serves the global hostname from the **peer** cluster over the east-west gateway.
 
 Tail ztunnel on cluster2 in a second terminal to watch cross-cluster traffic arrive:
 
@@ -414,11 +414,11 @@ for i in $(seq 1 8); do
 done
 ```
 
-Expected: all `200`. With cluster1's local LLM gone, the only way to a `200` is cross-cluster failover. The cluster2 ztunnel tail confirms it — inbound requests from `spiffe://cluster1.local/.../agentgateway-ingress` to `mock-gpt-4o-svc.llm.mesh.internal`, served by cluster2's LLM (`spiffe://cluster2.local/ns/llm/sa/default`).
+Expected: all `200`. With cluster1's local LLM gone, the only way to a `200` is cross-cluster failover. The cluster2 ztunnel tail confirms it: inbound requests from `spiffe://cluster1.local/.../agentgateway-ingress` to `mock-gpt-4o-svc.llm.mesh.internal`, served by cluster2's LLM (`spiffe://cluster2.local/ns/llm/sa/default`).
 
 **Observed result (v2026.6.1):** 8/8 requests returned `200`; cluster2 ztunnel logged the inbound cross-cluster requests, confirming cluster1's ingress reached cluster2's LLM over mutually-authenticated HBONE across the two trust domains.
 
-Restore cluster1's LLM before continuing (wait for it to be Ready — local serving resumes only once the endpoint is repopulated):
+Restore cluster1's LLM before continuing (wait for it to be Ready; local serving resumes only once the endpoint is repopulated):
 
 ```bash
 kubectl --context $KUBECONTEXT_CLUSTER1 -n llm scale deploy/mock-gpt-4o --replicas 1
@@ -493,7 +493,7 @@ kubectl --context $KUBECONTEXT_CLUSTER2 -n llm rollout status deploy/mock-gpt-4o
 
 When k6 finishes, read the summary (`http_req_failed`, `checks`, and the per-ingress counters).
 
-**Observed result (v2026.6.1):** 14,401 requests at 40 rps over 6m while both clusters' agentgateway was drained, rolled, and restored. `http_req_failed: 0.18%` (26 of 14,401); `checks: 99.81%`; `cluster1_ingress: 7,147`, `cluster2_ingress: 7,254` — both ingresses served throughout. The 26 failures land at the cutover instants, because this test points traffic **directly** at each ingress while that same ingress is rolling and its local backend is drained — there is no GSLB to take the cluster out of client rotation first. The backend cross-cluster failover on its own (Step 5) was clean.
+**Observed result (v2026.6.1):** 14,401 requests at 40 rps over 6m while both clusters' agentgateway was drained, rolled, and restored. `http_req_failed: 0.18%` (26 of 14,401); `checks: 99.81%`; `cluster1_ingress: 7,147`, `cluster2_ingress: 7,254`; both ingresses served throughout. The 26 failures land at the cutover instants, because this test points traffic **directly** at each ingress while that same ingress is rolling and its local backend is drained: there is no GSLB to take the cluster out of client rotation first. The backend cross-cluster failover on its own (Step 5) was clean.
 
 ## Interpreting the results
 
@@ -503,13 +503,13 @@ When k6 finishes, read the summary (`http_req_failed`, `checks`, and the per-ing
 | agentgateway upgraded in a cluster | **Bounded by the rollout window** | A 2-replica + PDB ingress rolls one pod at a time; the brief blips occur only because clients are pointed straight at the rolling ingress with no DNS layer to move them off it first. |
 | Two clusters, rolled in turn | **Global service stays up** | While one cluster is fully drained and upgraded, the other serves the global hostname. |
 
-The multi-cluster advantage over in-place and blue/green: you can take an **entire cluster** out of service — for an agentgateway upgrade, a Kubernetes upgrade, or any maintenance — and the global service continues from the peer. The cost is running and meshing two clusters.
+The multi-cluster advantage over in-place and blue/green: you can take an **entire cluster** out of service (for an agentgateway upgrade, a Kubernetes upgrade, or any maintenance) and the global service continues from the peer. The cost is running and meshing two clusters.
 
 ## The client entry tier (external)
 
-This lab points traffic directly at each cluster's ingress, so the only blips occur while rolling the very ingress under test. In production a global traffic manager (a health-checked DNS / global load balancer, e.g. Route53 latency routing, or Solo's multi-cluster routing) sits in front of the two ingresses. Before upgrading a cluster you remove it from that rotation, so clients are served entirely by the healthy cluster during the maintenance window and never touch the rolling ingress — making the client-visible result zero-downtime. The gateway does not perform cross-cluster client routing itself; that tier is external, and it is the one piece this single-environment lab describes rather than runs.
+This lab points traffic directly at each cluster's ingress, so the only blips occur while rolling the very ingress under test. In production a global traffic manager (a health-checked DNS / global load balancer, e.g. Route53 latency routing, or Solo's multi-cluster routing) sits in front of the two ingresses. Before upgrading a cluster you remove it from that rotation, so clients are served entirely by the healthy cluster during the maintenance window and never touch the rolling ingress, so the client-visible result is zero downtime. The gateway does not perform cross-cluster client routing itself; that tier is external, and it is the one piece this single-environment lab describes rather than runs.
 
-> **A note on what fails over where.** North-south failover (client → ingress → global service) triggers when the local backend has **no endpoints** — scaling to 0, as in Step 5. A rolling restart of the *backend* (pods briefly `NotReady`) does not trigger it on the north-south path, so drain a backend by scaling to 0 when you want a clean cluster handoff.
+> **A note on what fails over where.** North-south failover (client → ingress → global service) triggers when the local backend has **no endpoints**: scaling to 0, as in Step 5. A rolling restart of the *backend* (pods briefly `NotReady`) does not trigger it on the north-south path, so drain a backend by scaling to 0 when you want a clean cluster handoff.
 
 ## Cleanup
 

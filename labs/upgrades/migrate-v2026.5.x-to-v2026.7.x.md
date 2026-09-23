@@ -2,7 +2,7 @@
 
 Upgrade path, prerequisites, compatibility notes, downtime expectations, and best practices for moving an Enterprise Agentgateway install from the v2026.5.x line to v2026.7.x.
 
-Releases within v2026.5.x differ only by image-tag patches (no API, chart, or behavior change), so the starting patch version does not affect these steps. Where a concrete target is needed, this guide uses v2026.7.1-patch.0 (the latest v2026.7.x). The deltas below are cumulative — several were introduced at v2026.6.0 and carry forward unchanged into v2026.7.x; one (pull-secret consolidation) is new at v2026.7.0.
+Releases within v2026.5.x differ only by image-tag patches (no API, chart, or behavior change), so the starting patch version does not affect these steps. Where a concrete target is needed, this guide uses v2026.7.1-patch.0 (the latest v2026.7.x). The deltas below are cumulative: several were introduced at v2026.6.0 and carry forward unchanged into v2026.7.x; one (pull-secret consolidation) is new at v2026.7.0.
 
 The rollout mechanics are covered in three companion labs. Pick one; this guide covers the version-to-version deltas that apply regardless of strategy.
 
@@ -18,7 +18,7 @@ The rollout mechanics are covered in three companion labs. Pick one; this guide 
 
 ### v2026.6.0 — Image registry consolidation
 
-This is the change that affects private-registry / air-gapped installs. In v2026.5.x the images were published across **three registries**, so an air-gapped install pinned each component's registry, repository, and tag separately:
+This is the change that affects private-registry / air-gapped installs. In v2026.5.x the images were published across three registries, so an air-gapped install pinned each component's registry, repository, and tag separately:
 
 | Component | v2026.5.x image |
 |---|---|
@@ -28,7 +28,7 @@ This is the change that affects private-registry / air-gapped installs. In v2026
 | rate-limiter | `gcr.io/gloo-mesh/rate-limiter:0.18.6` |
 | ext-cache (redis) | `docker.io/redis:8.6.2-alpine` |
 
-Starting at v2026.6.0 every image is published under **one registry path**, and the chart exposes a top-level `image` block as the global default for all of them. That holds unchanged through v2026.7.1-patch.0:
+Starting at v2026.6.0 every image is published under one registry path, and the chart exposes a top-level `image` block as the global default for all of them. That holds unchanged through v2026.7.1-patch.0:
 
 | Component | v2026.7.1-patch.0 image |
 |---|---|
@@ -47,7 +47,7 @@ image:
   # tag defaults to the chart version — usually omit
 ```
 
-> **Migration hazard.** The v2026.5.x per-component image blocks (Helm `controller.image` and the CR's `spec.image` / `spec.sharedExtensions.<name>.image`) are **still honored** in v2026.6.x+ — they are not removed. So if you carry them forward (via `helm ... --reuse-values`, or by leaving them in the CR), the chart moves to v2026.7.1-patch.0 but the pinned `tag: 2026.5.2` keeps the pods on the **old** image: the controller Deployment ends up labeled `chart=enterprise-agentgateway-v2026.7.1-patch.0` while still running `image=…controller:2026.5.2`, and the proxy and extension pods do not roll at all. The version bump silently does nothing to the running images.
+> **Migration hazard.** The v2026.5.x per-component image blocks (Helm `controller.image` and the CR's `spec.image` / `spec.sharedExtensions.<name>.image`) are still honored in v2026.6.x+: they are not removed. So if you carry them forward (via `helm ... --reuse-values`, or by leaving them in the CR), the chart moves to v2026.7.1-patch.0 but the pinned `tag: 2026.5.2` keeps the pods on the old image: the controller Deployment ends up labeled `chart=enterprise-agentgateway-v2026.7.1-patch.0` while still running `image=…controller:2026.5.2`, and the proxy and extension pods do not roll at all. The version bump silently does nothing to the running images.
 
 To actually move to v2026.7.1-patch.0, drop the per-component pins and let everything inherit the global block:
 - **Controller Helm values:** delete the `controller.image` block; add the top-level `image` block above.
@@ -57,9 +57,9 @@ A per-image override is still available on the CR (`spec.sharedExtensions.<name>
 
 ### v2026.7.0 — imagePullSecrets consolidation
 
-Through v2026.6.x, pull secrets had to be set **per owner** — a single top-level Helm `imagePullSecrets` only reached the controller; the proxy and each extension needed their own `imagePullSecrets` set on the `EnterpriseAgentgatewayParameters` CR ([solo-io/agentgateway-enterprise#7562](https://github.com/solo-io/agentgateway-enterprise/pull/7562) was the tracking issue for this gap).
+Through v2026.6.x, pull secrets had to be set per owner: a single top-level Helm `imagePullSecrets` only reached the controller; the proxy and each extension needed their own `imagePullSecrets` set on the `EnterpriseAgentgatewayParameters` CR ([solo-io/agentgateway-enterprise#7562](https://github.com/solo-io/agentgateway-enterprise/pull/7562) was the tracking issue for this gap).
 
-**As of v2026.7.0, that gap is closed and live-verified:** a single top-level Helm `imagePullSecrets` on the controller release now propagates automatically to the proxy and every shared extension (ext-auth, rate-limiter, ext-cache, waf-server) — no CR-level pull-secret configuration is required. The CR-level override still works but is now optional, only needed if a specific component must use a *different* secret than the rest.
+As of v2026.7.0, that gap is closed: a single top-level Helm `imagePullSecrets` on the controller release now propagates automatically to the proxy and every shared extension (ext-auth, rate-limiter, ext-cache, waf-server); no CR-level pull-secret configuration is required. The CR-level override still works but is now optional, only needed if a specific component must use a *different* secret than the rest.
 
 ```yaml
 imagePullSecrets:
@@ -76,7 +76,7 @@ imagePullSecrets:
 | Istio (ambient/waypoint) | 1.26 – 1.29 | 1.26 – 1.29 |
 | Solo UI | 0.3.16 | 0.5.5 |
 
-The Kubernetes floor moved at v2026.6.0 and hasn't moved again since — the same 1.32–1.36 floor applies at v2026.7.1-patch.0. Kubernetes must be ≥ 1.32 before upgrading; this is the only prerequisite that blocks the upgrade. Gateway API CRDs at v1.5.0 remain valid.
+The Kubernetes floor moved at v2026.6.0 and hasn't moved again since: the same 1.32–1.36 floor applies at v2026.7.1-patch.0. Kubernetes must be ≥ 1.32 before upgrading; this is the only prerequisite that blocks the upgrade. Gateway API CRDs at v1.5.0 remain valid.
 
 ### No API-group migration in this window
 
@@ -107,7 +107,7 @@ Checklist:
 - [ ] Gateway API CRDs present (1.3–1.5; v1.5.0 is standard)
 - [ ] Current Helm values captured to a file
 - [ ] Per-component registry settings moved to the global `image` block (see §1)
-- [ ] Private-registry pull secret set once via the top-level Helm `imagePullSecrets` (see §1) — CR-level overrides only needed for a component using a different secret
+- [ ] Private-registry pull secret set once via the top-level Helm `imagePullSecrets` (see §1); CR-level overrides only needed for a component using a different secret
 - [ ] Zero-downtime posture in place: ≥2 replicas + PDB + graceful shutdown (see §4)
 
 ---
@@ -120,7 +120,7 @@ Two Helm releases, upgraded CRDs first, then the controller. Same OCI-chart flow
 export ENTERPRISE_AGW_VERSION=v2026.7.1-patch.0
 ```
 
-Step 1 — Upgrade the CRDs chart to apply any CRD schema changes for the target version.
+Step 1: Upgrade the CRDs chart to apply any CRD schema changes for the target version.
 
 ```bash
 helm upgrade -i --namespace agentgateway-system \
@@ -128,9 +128,9 @@ helm upgrade -i --namespace agentgateway-system \
     oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway-crds
 ```
 
-Step 2 — Upgrade the controller chart with an explicit values file.
+Step 2: Upgrade the controller chart with an explicit values file.
 
-> **Do not use `--reuse-values`.** It carries forward only your previously-supplied values and does **not** merge the new chart's defaults, so the v2026.7.1-patch.0 chart fails to template:
+> **Do not use `--reuse-values`.** It carries forward only your previously-supplied values and does not merge the new chart's defaults, so the v2026.7.1-patch.0 chart fails to template:
 > ```
 > Error: UPGRADE FAILED: .../config-configmap.yaml: <.Values.externalSecrets.stores>: nil pointer evaluating interface {}.stores
 > ```
@@ -155,7 +155,7 @@ image:
 EOF
 ```
 
-Step 3 — Remove the per-component image *registry/repository/tag* overrides from the `agentgateway-config` CR so the proxy and extensions inherit the global registry and the v2026.7.1-patch.0 tags. Delete the `registry`/`repository`/`tag` fields from `spec.image` (proxy) and every `spec.sharedExtensions.<name>.image` (extensions). Pull secrets no longer need to live here either — the top-level Helm `imagePullSecrets` from Step 2 now covers the proxy and extensions automatically; only set them here if a component needs a *different* secret than the rest:
+Step 3: Remove the per-component image *registry/repository/tag* overrides from the `agentgateway-config` CR so the proxy and extensions inherit the global registry and the v2026.7.1-patch.0 tags. Delete the `registry`/`repository`/`tag` fields from `spec.image` (proxy) and every `spec.sharedExtensions.<name>.image` (extensions). Pull secrets no longer need to live here either: the top-level Helm `imagePullSecrets` from Step 2 now covers the proxy and extensions automatically; only set them here if a component needs a *different* secret than the rest:
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -227,7 +227,7 @@ kubectl rollout status deployment/enterprise-agentgateway -n agentgateway-system
 kubectl rollout status deployment/agentgateway-proxy      -n agentgateway-system --timeout=300s
 ```
 
-> If your v2026.5.x install did **not** use per-component image overrides (public-registry install, images left at chart defaults), Steps 2–3 simplify to a single `helm upgrade --version $ENTERPRISE_AGW_VERSION` with your normal values — there are no image pins to unwind.
+> If your v2026.5.x install did not use per-component image overrides (public-registry install, images left at chart defaults), Steps 2–3 simplify to a single `helm upgrade --version $ENTERPRISE_AGW_VERSION` with your normal values: there are no image pins to unwind.
 
 Gateway edits: on v2026.6.x+ the per-Gateway parameters attach via `spec.infrastructure.parametersRef`. A full `kubectl apply` is fine as long as the manifest includes that ref:
 
@@ -302,9 +302,9 @@ The controller upgrade does not interrupt data-plane traffic; the proxy serves w
 
 During the rollout, watch these in the Grafana stack from [002](../../002-set-up-ui-and-monitoring-tools.md):
 
-- `agentgateway_build_info` — old and new versions during the roll, then only the new one.
-- `agentgateway_requests_total{status=~"5.."}` — error rate should not spike.
-- `agentgateway_xds_connection_terminations` — expect `Reconnect` reasons as proxies restart, not `ConnectionError`.
+- `agentgateway_build_info`: old and new versions during the roll, then only the new one.
+- `agentgateway_requests_total{status=~"5.."}`: error rate should not spike.
+- `agentgateway_xds_connection_terminations`: expect `Reconnect` reasons as proxies restart, not `ConnectionError`.
 
 Post-upgrade checks:
 
@@ -328,15 +328,15 @@ After Steps 2–3 all pods run `…/…:2026.7.1-patch.0` (redis `8.6.4-alpine`)
 ## 6. Rollback
 
 - In-place: re-run the controller `helm upgrade` at the previous `--version`, passing the saved `/tmp/agw-values-pre-upgrade.yaml` with `-f` (not `--reuse-values`), and re-apply the previous `agentgateway-config` CR. CRD downgrades are not automatic; leaving the newer CRDs in place is safe.
-- Blue/green: flip the weight back to the old (blue) proxy — no redeploy. Use this when rollback speed is a requirement. See [Blue/Green Across Namespaces](blue-green-namespaces.md).
+- Blue/green: flip the weight back to the old (blue) proxy; no redeploy. Use this when rollback speed is a requirement. See [Blue/Green Across Namespaces](blue-green-namespaces.md).
 
 ---
 
 ## 7. Best practices
 
-1. Confirm Kubernetes ≥ 1.32 first — the only hard blocker.
-2. Do not `helm upgrade --reuse-values` — it fails to template the v2026.7.1-patch.0 chart (§3). Pass an explicit values file.
-3. For a private registry, move the registry from the per-component settings to the global `image` block and remove the CR image overrides (§1), or the version pin silently keeps pods on v2026.5.x. Set the pull secret once via the top-level Helm `imagePullSecrets` — it now covers the controller, proxy, and every extension.
+1. Confirm Kubernetes ≥ 1.32 first: the only hard blocker.
+2. Do not `helm upgrade --reuse-values`: it fails to template the v2026.7.1-patch.0 chart (§3). Pass an explicit values file.
+3. For a private registry, move the registry from the per-component settings to the global `image` block and remove the CR image overrides (§1), or the version pin silently keeps pods on v2026.5.x. Set the pull secret once via the top-level Helm `imagePullSecrets`; it now covers the controller, proxy, and every extension.
 4. Apply the zero-downtime posture before upgrading: 2+ replicas, PDB, graceful shutdown sized to the longest in-flight request.
 5. Upgrade the CRDs chart first, then the controller chart.
 6. Keep `spec.infrastructure.parametersRef` in the Gateway manifest you apply so `kubectl apply` doesn't drop it.

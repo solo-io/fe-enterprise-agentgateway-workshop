@@ -15,22 +15,22 @@ This lab assumes that you have completed the setup in `001`. Lab `002` is option
 
 ## Overview
 
-In Standard mode, every upstream tool call is its own round trip: the model issues a `tools/call`, the gateway forwards, the upstream responds, and the **full response is appended to the model's context** before the next reasoning step. A workflow that filters 500 records then enriches 30 of them costs the model ~30+ round trips and pulls all 500 records through its context window. **Tool results — especially large ones like file contents, base64 images, or paged query responses — dominate the context budget faster than schemas do.**
+In Standard mode, every upstream tool call is its own round trip: the model issues a `tools/call`, the gateway forwards, the upstream responds, and the full response is appended to the model's context before the next reasoning step. A workflow that filters 500 records then enriches 30 of them costs the model ~30+ round trips and pulls all 500 records through its context window. Tool results, especially large ones like file contents, base64 images, or paged query responses, dominate the context budget faster than schemas do.
 
 **Code mode** replaces the catalog with a single tool: `run_code`. Clients submit JavaScript that calls upstream tools through an auto-generated typed API. The gateway executes the script in a sandbox and returns only the final value. Intermediate results never reach the model.
 
-**Quantitatively:** a script that calls three upstream tools and returns a 200-byte summary sends ~200 bytes back to the model regardless of how large the intermediate responses were. The same workflow in Standard mode would have sent the model every intermediate response in full. Step 4 measures both effects empirically.
+A script that calls three upstream tools and returns a 200-byte summary sends ~200 bytes back to the model regardless of how large the intermediate responses were. The same workflow in Standard mode would have sent the model every intermediate response in full. Step 4 measures both effects empirically.
 
 ### When to use which mode
 
-**Reach for Code mode when:**
-- **A workflow chains tool calls that depend on each other.** Example: "list every open incident from `pagerduty.list_incidents`, fetch each one's logs via `loki.query_range`, return a 200-word summary." In Code mode the 30 log blobs stay inside the sandbox; only the summary reaches the model.
-- **Intermediate results are large.** Example: an image pipeline that fetches a base64-encoded image (KB–MB per payload), passes it through OCR, and returns extracted text. Standard mode would land every intermediate base64 payload in the model's context; Code mode only emits the final text. Step 4 Part B below demonstrates this with `get-tiny-image`.
-- **The model needs to loop over tool calls rather than round-tripping each iteration.** Example: "for each of these 50 customer IDs, look up the open invoice total and sum them" — one `run_code` invocation vs. 50 sequential round trips. (Still bounded by the 20-tool-call ceiling — see Runtime limits above.)
+Reach for Code mode when:
+- A workflow chains tool calls that depend on each other. Example: "list every open incident from `pagerduty.list_incidents`, fetch each one's logs via `loki.query_range`, return a 200-word summary." In Code mode the 30 log blobs stay inside the sandbox; only the summary reaches the model.
+- Intermediate results are large. Example: an image pipeline that fetches a base64-encoded image (KB–MB per payload), passes it through OCR, and returns extracted text. Standard mode would land every intermediate base64 payload in the model's context; Code mode only emits the final text. Step 4 Part B below demonstrates this with `get-tiny-image`.
+- The model needs to loop over tool calls rather than round-tripping each iteration. Example: "for each of these 50 customer IDs, look up the open invoice total and sum them", one `run_code` invocation vs. 50 sequential round trips. (Still bounded by the 20-tool-call ceiling; see Runtime limits above.)
 
-**Stay with Standard mode when** workflows are one-shot and intermediate results are tiny (e.g., a calculator's `add(a,b)`, or a feature-flag service where each call is a self-contained lookup). Code mode buys you nothing if there's no chaining and no large intermediates to elide, and the sandbox indirection adds latency. You also need Standard mode if you want per-upstream-tool counters on `agentgateway_mcp_requests_total`; Code mode aggregates everything under `run_code`.
+Stay with Standard mode when workflows are one-shot and intermediate results are tiny (e.g., a calculator's `add(a,b)`, or a feature-flag service where each call is a self-contained lookup). Code mode buys you nothing if there's no chaining and no large intermediates to elide, and the sandbox indirection adds latency. You also need Standard mode if you want per-upstream-tool counters on `agentgateway_mcp_requests_total`; Code mode aggregates everything under `run_code`.
 
-**Reach for [Search mode](mcp-tool-mode-search.md) instead** when the catalog is large but calls don't depend on each other. Example: an aggregator MCP server with 200 tools where the model picks the right one per turn but rarely chains more than one — Search mode's `get_tool` is the lighter abstraction and you skip the sandbox altogether. The two modes solve different problems — Search compresses the *catalog*, Code compresses the *results*.
+Reach for [Search mode](mcp-tool-mode-search.md) instead when the catalog is large but calls don't depend on each other. Example: an aggregator MCP server with 200 tools where the model picks the right one per turn but rarely chains more than one; Search mode's `get_tool` is the lighter abstraction and you skip the sandbox altogether. The two modes solve different problems: Search compresses the *catalog*, Code compresses the *results*.
 
 ### Runtime limits
 
@@ -206,7 +206,7 @@ Connect:
 
 ### List the tools
 
-From the **Tools** tab, click **List Tools**. You should see exactly **one** tool — `run_code` — not the five tools that `mcp-server-everything` actually exposes.
+From the **Tools** tab, click **List Tools**. You should see exactly one tool, `run_code`, not the five tools that `mcp-server-everything` exposes.
 
 ### Inspect the typed API
 
@@ -236,7 +236,7 @@ In the `run_code` tool's argument form, paste:
 }
 ```
 
-Click **Run Tool**. The response's `structuredContent` is a single object containing both results — the model never sees the individual `echo` and `get_sum` responses. They stayed in the sandbox.
+Click **Run Tool**. The response's `structuredContent` is a single object containing both results; the model never sees the individual `echo` and `get_sum` responses, which stayed in the sandbox.
 
 ## Step 4: Under the Hood — Raw JSON-RPC
 
@@ -254,7 +254,7 @@ export SID=$(echo "$INIT" | grep -i '^mcp-session-id:' | awk '{print $2}' | tr -
 echo "Session: $SID"
 ```
 
-> **Note:** Because the backend uses `sessionRouting: Stateless`, the gateway does not emit an `mcp-session-id` header on initialize — `$SID` will be empty, and that's expected. Subsequent calls in this lab still pass `-H "Mcp-Session-Id: $SID"` (which becomes a harmless empty header) so the same snippet works unchanged if you later switch to a stateful routing mode that does return a session ID.
+> **Note:** Because the backend uses `sessionRouting: Stateless`, the gateway does not emit an `mcp-session-id` header on initialize: `$SID` will be empty, and that's expected. Subsequent calls in this lab still pass `-H "Mcp-Session-Id: $SID"` (which becomes a harmless empty header) so the same snippet works unchanged if you later switch to a stateful routing mode that does return a session ID.
 
 ### List tools — confirm only run_code comes back
 
@@ -298,13 +298,13 @@ Expected: after exactly 60 seconds, the response is a structured JSON-RPC error 
 
 JSON typically tokenizes at ~3-4 characters per token, so byte counts track tokens proportionally.
 
-> **Note on catalog size:** Unlike Search mode, Code mode's `tools/list` response is not dramatically smaller than the upstream's — the typed API is embedded inside `run_code`'s description, so on this 12-tool catalog you'd see only a modest reduction (~5%). Code mode optimizes a different axis: **intermediate-result elimination at call time**, measured below. If you're curious, you can verify the catalog size with `curl … tools/list | wc -c` against `/mcp/code` versus a port-forward to the upstream.
+> **Note on catalog size:** Unlike Search mode, Code mode's `tools/list` response is not dramatically smaller than the upstream's: the typed API is embedded inside `run_code`'s description, so on this 12-tool catalog you'd see only a modest reduction (~5%). Code mode optimizes a different axis, intermediate-result elimination at call time, measured below. If you're curious, you can verify the catalog size with `curl … tools/list | wc -c` against `/mcp/code` versus a port-forward to the upstream.
 
 #### Intermediate-result elimination
 
 > **Note on identifier shape:** The run_code script below uses snake_case (`get_tiny_image`, `get_sum`), which is what the gateway emits. If your cluster emits camelCase (`getTinyImage`) or hyphenated bracket-access (`tools['get-tiny-image']`) instead, substitute accordingly. The upstream tool names (used in the comparison block) are hyphenated regardless.
 
-This is the marquee Code-mode demonstration. A multi-step script calls `get_tiny_image()` — which returns a base64-encoded image that is KB of payload — then returns only a tiny summary. Compare what the model receives in Code mode to what it would have received with sequential standard calls:
+A multi-step script calls `get_tiny_image()` (which returns a base64-encoded image, KB of payload), then returns only a tiny summary. Compare what the model receives in Code mode to what it would have received with sequential standard calls:
 
 ```bash
 # Code mode: one round trip, large intermediate results stay in the sandbox.
@@ -359,7 +359,7 @@ print(f'Intermediate-result reduction:           {saved} bytes ({pct:.1f}%)')
 "
 ```
 
-The `get-tiny-image` response dominates the Standard total — that's the point. In Code mode the base64 image stayed inside the sandbox; only the script's final summary object (which contains `imageBytes: <length>` rather than the image itself) reached the model. In a production workflow that fetches dozens of records and computes a small summary, the absolute reduction scales with the size of the intermediate results being elided — easily 50-100× for image-heavy or large-document workflows.
+The `get-tiny-image` response dominates the Standard total. In Code mode the base64 image stayed inside the sandbox; only the script's final summary object (which contains `imageBytes: <length>` rather than the image itself) reached the model. In a production workflow that fetches dozens of records and computes a small summary, the absolute reduction scales with the size of the intermediate results being elided, easily 50-100× for image-heavy or large-document workflows.
 
 ## Step 5: RBAC — Filter a Tool Out of the Typed API
 
@@ -403,7 +403,7 @@ EOF
 
 ### Apply per-tool authorization
 
-The gateway-native pattern targets the **backend** (not the HTTPRoute) and uses the gateway-parsed CEL attribute `mcp.tool.name`. This attribute is extracted from the parsed MCP traffic by the proxy itself — it applies to both `tools/list` (filtering catalog visibility, i.e., which functions appear in the typed API) and `tools/call` (sandbox compilation/execution). In Code mode that means a restricted tool's `async function` entry is absent from `run_code`'s description, and a script that attempts to call it fails compilation before it runs. Because authorization is enforced on the gateway's parsed view (not raw HTTP), it works uniformly across Standard, Search, and Code modes — no special-casing for meta-tools is required.
+The gateway-native pattern targets the **backend** (not the HTTPRoute) and uses the gateway-parsed CEL attribute `mcp.tool.name`. This attribute is extracted from the parsed MCP traffic by the proxy itself: it applies to both `tools/list` (filtering catalog visibility, i.e., which functions appear in the typed API) and `tools/call` (sandbox compilation/execution). In Code mode that means a restricted tool's `async function` entry is absent from `run_code`'s description, and a script that attempts to call it fails compilation before it runs. Because authorization is enforced on the gateway's parsed view (not raw HTTP), it works uniformly across Standard, Search, and Code modes; no special-casing for meta-tools is required.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -429,7 +429,7 @@ spec:
 EOF
 ```
 
-Note that `targetRefs.kind` is `EnterpriseAgentgatewayBackend` and `name` is `mcp-code-backend` — the policy attaches to the backend, not the HTTPRoute. The `mcp.tool.name` CEL attribute is a gateway-native value the proxy extracts from parsed MCP traffic.
+Note that `targetRefs.kind` is `EnterpriseAgentgatewayBackend` and `name` is `mcp-code-backend`: the policy attaches to the backend, not the HTTPRoute. The `mcp.tool.name` CEL attribute is a gateway-native value the proxy extracts from parsed MCP traffic.
 
 ### Test with the demo JWT
 
@@ -451,7 +451,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | sed -n 's/^data: //p' | python3 -m json.tool | grep -E "function|get_env|getEnv|get-env"
 ```
 
-Expected: in Code mode, the `run_code` tool's description (returned by `tools/list`) no longer lists `get_env` (or whichever identifier shape your cluster emits) in the typed API. The CEL expression for tool name `get-env` evaluates as `mcp.tool.name != "get-env" || (has(jwt.roles) && jwt.roles.exists(r, r == "engineering"))` → `false || (false && ...)` → `false` — the function is filtered from the typed API.
+Expected: in Code mode, the `run_code` tool's description (returned by `tools/list`) no longer lists `get_env` (or whichever identifier shape your cluster emits) in the typed API. The CEL expression for tool name `get-env` evaluates as `mcp.tool.name != "get-env" || (has(jwt.roles) && jwt.roles.exists(r, r == "engineering"))` → `false || (false && ...)` → `false`, so the function is filtered from the typed API.
 
 ### Verify a script that calls the restricted tool fails
 
@@ -464,7 +464,7 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp/code" \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_code","arguments":{"code":"const env = await get_env({}); env"}}}' | sed -n 's/^data: //p' | python3 -m json.tool
 ```
 
-Expected: an error indicating `get_env` is not defined in the sandbox — the typed API didn't include it for this caller, so the function is not defined and the script fails compilation before it runs.
+Expected: an error indicating `get_env` is not defined in the sandbox. The typed API didn't include it for this caller, so the script fails compilation before it runs.
 
 ## Step 6: Scale Up the Catalog (Optional)
 
@@ -696,7 +696,7 @@ EOF
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-The `gen_ai.tool.name` field shows `run_code` (with `mcp.method.name=tools/call`) — each script execution is one MCP call to the gateway, regardless of how many upstream tool calls happen inside the sandbox.
+The `gen_ai.tool.name` field shows `run_code` (with `mcp.method.name=tools/call`): each script execution is one MCP call to the gateway, regardless of how many upstream tool calls happen inside the sandbox.
 
 ### View MCP metrics
 

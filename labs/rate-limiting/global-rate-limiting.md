@@ -79,9 +79,9 @@ curl -i "$GATEWAY_IP:8080/openai" \
 
 ## REQUEST vs TOKEN: two rate limit types
 
-`RateLimitConfig.spec.raw.rateLimits[].type` controls what the gateway actually counts against the budget:
-- `type: REQUEST` — a simple per-call counter. Every request costs 1 unit regardless of prompt size — good for a basic call-volume cap (e.g. "5 requests per hour").
-- `type: TOKEN` — the gateway parses the LLM request (and response, where applicable) to count input tokens, so a long prompt consumes more of the budget than a short one — good for cost-based quotas.
+`RateLimitConfig.spec.raw.rateLimits[].type` controls what the gateway counts against the budget:
+- `type: REQUEST`: a simple per-call counter. Every request costs 1 unit regardless of prompt size, good for a basic call-volume cap (e.g. "5 requests per hour").
+- `type: TOKEN`: the gateway parses the LLM request (and response, where applicable) to count input tokens, so a long prompt consumes more of the budget than a short one, good for cost-based quotas.
 
 Both types share the same `RateLimitConfig`/`EnterpriseAgentgatewayPolicy` shape; only the `type` field (and what gets weighed against the counter) differs. The rest of this lab uses `type: TOKEN`, but REQUEST is worth seeing on its own first since it's the simpler of the two.
 
@@ -150,7 +150,7 @@ for i in $(seq 1 6); do
     }'
 done
 ```
-The 6th request returns `HTTP 429`, regardless of how short or long each prompt was — REQUEST counts calls, not tokens.
+The 6th request returns `HTTP 429`, regardless of how short or long each prompt was: REQUEST counts calls, not tokens.
 
 Before moving on to the token-based examples below, clean up the REQUEST-based config and policy:
 ```bash
@@ -160,11 +160,11 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system global-reques
 
 ## CEL actions and the descriptor model
 
-Every rate limit scenario in this lab (except the baseline global counter) uses a **CEL action** to derive the descriptor value dynamically per request. Understanding the model makes every subsequent config self-explanatory.
+Every rate limit scenario in this lab (except the baseline global counter) uses a **CEL action** to derive the descriptor value dynamically per request.
 
 A `RateLimitConfig` defines two things:
-1. **`descriptors`** — a tree of key→value pairs, each leaf carrying a `rateLimit` (the budget). The rate limit service uses these to find the right counter bucket.
-2. **`rateLimits[].actions`** — instructions for how to build the descriptor from the request. A `cel` action evaluates an expression against the live request context and emits the result as the descriptor value.
+1. **`descriptors`**: a tree of key→value pairs, each leaf carrying a `rateLimit` (the budget). The rate limit service uses these to find the right counter bucket.
+2. **`rateLimits[].actions`**: instructions for how to build the descriptor from the request. A `cel` action evaluates an expression against the live request context and emits the result as the descriptor value.
 
 When a request arrives, the proxy evaluates the CEL expression, sends the resulting string to the rate limit service as a descriptor entry, and the service matches it against the configured tree to find the counter to decrement.
 
@@ -177,8 +177,8 @@ When a request arrives, the proxy evaluates the CEL expression, sends the result
 | Request method | `request.method` | HTTP method |
 | Header value | `request.headers["name"]` | Value of a specific header (case-insensitive) |
 | JWT standard claim | `jwt.sub` | `sub` claim from a validated JWT (requires JWT auth policy) |
-| JWT custom claim | `jwt.<claim_name>` | Any custom claim — e.g. `jwt.plan`, `jwt.org`, `jwt.team` |
-| Static value | `"constant"` | Fixed string — used for the global shared counter |
+| JWT custom claim | `jwt.<claim_name>` | Any custom claim, e.g. `jwt.plan`, `jwt.org`, `jwt.team` |
+| Static value | `"constant"` | Fixed string, used for the global shared counter |
 
 ## Configure global token-based rate limit of 10 input tokens per hour
 Create rate limit config, note that this policy uses `type: TOKEN`
@@ -247,7 +247,7 @@ done
 Once the 10 input tokens are spent, further requests in the same hour return `HTTP 429`.
 
 ## Configure header-based token rate limiting
-Now let's configure a rate limit based on a custom header (`X-User-ID`) instead of a generic counter. The `cel` action evaluates `request.headers["X-User-ID"]` per request — each distinct header value becomes its own counter bucket, giving each user their own quota.
+Now let's configure a rate limit based on a custom header (`X-User-ID`) instead of a generic counter. The `cel` action evaluates `request.headers["X-User-ID"]` per request: each distinct header value becomes its own counter bucket, giving each user their own quota.
 
 First, delete the previous rate limit config:
 ```bash
@@ -334,7 +334,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 
 ## Configure multi-header based token rate limiting
-Now let's configure rate limiting based on multiple headers using two `cel` actions. Each action contributes one dimension to a composite descriptor key — the rate limit applies to the **combination** of both values (e.g., `user-123` in `tenant-A` has a separate quota from `user-123` in `tenant-B`).
+Now let's configure rate limiting based on multiple headers using two `cel` actions. Each action contributes one dimension to a composite descriptor key: the rate limit applies to the **combination** of both values (e.g., `user-123` in `tenant-A` has a separate quota from `user-123` in `tenant-B`).
 
 First, delete the previous rate limit config:
 ```bash
@@ -430,7 +430,7 @@ The rate limit is enforced on the combination of both headers. Each user-tenant 
 
 ## Configure JWT claim-based token rate limiting
 
-The header-based approach above works, but `X-User-ID` is just a request header — **any client can set it to any value**. A user who exhausts their quota can simply send a different `X-User-ID` and get a fresh budget, so a header is not a trustworthy identity for billing or quotas.
+The header-based approach above works, but `X-User-ID` is just a request header: **any client can set it to any value**. A user who exhausts their quota can send a different `X-User-ID` and get a fresh budget, so a header is not a trustworthy identity for billing or quotas.
 
 For a quota a client cannot evade, key the rate limit off a claim inside a **validated JWT** instead. The gateway verifies the token's signature *before* the rate limit service ever sees the claim, so the descriptor value cannot be spoofed. This reuses the same `type: TOKEN` (input token) rate limiting from above; the only change is that the descriptor value comes from a CEL expression reading the JWT's `sub` claim (`jwt.sub`) rather than a header.
 
@@ -467,7 +467,7 @@ spec:
 EOF
 ```
 
-The CEL expression `jwt.sub` reads the `sub` claim from the validated token. Like the MCP tool rate limiting lab, the descriptor value is computed dynamically per request — but here it comes from a cryptographically verified claim instead of the request body or a header.
+The CEL expression `jwt.sub` reads the `sub` claim from the validated token. Like the MCP tool rate limiting lab, the descriptor value is computed dynamically per request, but here it comes from a cryptographically verified claim instead of the request body or a header.
 
 Now update the `EnterpriseAgentgatewayPolicy` to (1) validate incoming JWTs and (2) reference the new rate limit config. The `jwtAuthentication` block validates the token signature against the inline workshop JWKS; once validated, the `jwt.sub` claim is available to the rate limit CEL expression:
 ```bash
@@ -567,11 +567,11 @@ for i in $(seq 1 4); do
     }'
 done
 ```
-The later requests return `HTTP 429` — User A (`sub=analyst-user`) has exhausted their quota.
+The later requests return `HTTP 429`: User A (`sub=analyst-user`) has exhausted their quota.
 
 ### Verify independent per-user counters
 
-User B (`sub=economist-user`) has a completely separate counter. Even though User A is rate limited, User B's first requests still succeed:
+User B (`sub=economist-user`) has a separate counter. Even though User A is rate limited, User B's first requests still succeed:
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -586,11 +586,11 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-Each user (identified by their verified `sub` claim) gets their own quota of 10 input tokens per minute — just like the header-based example, but the identity is now cryptographically verified rather than self-asserted.
+Each user (identified by their verified `sub` claim) gets their own quota of 10 input tokens per minute, just like the header-based example, but the identity is now cryptographically verified rather than self-asserted.
 
 ### The claim cannot be spoofed
 
-With the header-based config, a client could change `X-User-ID` to escape their quota. Here the counter follows the verified `jwt.sub`, not any header the client sends. Send User A's (already rate-limited) token but add an arbitrary `X-User-ID` — it lands in the **same** counter, because the descriptor value comes from the signed claim:
+With the header-based config, a client could change `X-User-ID` to escape their quota. Here the counter follows the verified `jwt.sub`, not any header the client sends. Send User A's (already rate-limited) token but add an arbitrary `X-User-ID`: it lands in the **same** counter, because the descriptor value comes from the signed claim:
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -606,13 +606,13 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-User A stays rate limited. The only way to obtain a separate quota is to present a different validly-signed token with a different `sub` claim — which a client cannot forge without the issuer's private key.
+User A stays rate limited. The only way to obtain a separate quota is to present a different validly-signed token with a different `sub` claim, which a client cannot forge without the issuer's private key.
 
 > **Tip:** To rate limit per team or tenant instead of per user, point the CEL expression at a different claim, for example `expression: 'jwt.team'` (the analyst token's `team` claim is `fundamentals`).
 
 ### Composite keys: rate limit on multiple JWT claims
 
-Just like the multi-header example above, you can combine several JWT claims into one composite key by adding a second `cel` action and nesting the descriptors. The rate limit then applies to the **combination** of claim values — e.g. `org` + `team`, so `equity-research/fundamentals` has a separate quota from `equity-research/research`:
+Just like the multi-header example above, you can combine several JWT claims into one composite key by adding a second `cel` action and nesting the descriptors. The rate limit then applies to the **combination** of claim values, e.g. `org` + `team`, so `equity-research/fundamentals` has a separate quota from `equity-research/research`:
 
 ```bash
 kubectl apply -f- <<EOF
@@ -642,13 +642,13 @@ spec:
 EOF
 ```
 
-The two `cel` actions populate `jwt_org` and `jwt_team`, and the nested descriptor structure means the 10-token/minute budget is tracked per `(org, team)` pair. A request whose JWT carries `org=equity-research, team=fundamentals` is counted separately from one with `org=equity-research, team=research` — exhausting one combination leaves the other untouched. Add more `cel` actions and nesting levels to key on any number of claims.
+The two `cel` actions populate `jwt_org` and `jwt_team`, and the nested descriptor structure means the 10-token/minute budget is tracked per `(org, team)` pair. A request whose JWT carries `org=equity-research, team=fundamentals` is counted separately from one with `org=equity-research, team=research`: exhausting one combination leaves the other untouched. Add more `cel` actions and nesting levels to key on any number of claims.
 
 ## Configure tier-based token quotas
 
-The JWT claim examples above assign the same per-minute budget to every authenticated user. In practice, different consumers often have different entitlements — a **standard** plan might get 20 tokens/minute while a **premium** plan gets 200. Nest value descriptors in the `RateLimitConfig` to assign different limits per claim value, while a single `cel` action still keys the counter dynamically.
+The JWT claim examples above assign the same per-minute budget to every authenticated user. In practice, different consumers often have different entitlements: a **standard** plan might get 20 tokens/minute while a **premium** plan gets 200. Nest value descriptors in the `RateLimitConfig` to assign different limits per claim value, while a single `cel` action still keys the counter dynamically.
 
-The `jwt.plan` expression reads the `plan` claim from the validated token — the same dot-notation as `jwt.sub`, applicable to any claim in the token payload.
+The `jwt.plan` expression reads the `plan` claim from the validated token, the same dot-notation as `jwt.sub`, applicable to any claim in the token payload.
 
 First, delete the previous rate limit config:
 ```bash
@@ -757,7 +757,7 @@ done
 ```
 You will see `200` responses until the standard user's 20-token budget is exhausted, then `429 Too Many Requests`.
 
-While the standard user is rate limited, the premium user's counter is completely independent — switch tokens to confirm the premium budget is untouched:
+While the standard user is rate limited, the premium user's counter is independent; switch tokens to confirm the premium budget is untouched:
 ```bash
 curl -i "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
@@ -772,13 +772,13 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-The premium user receives `200`. Each descriptor value (`plan=standard`, `plan=premium`) maintains its own Redis counter — exhausting one plan tier leaves all others unaffected.
+The premium user receives `200`. Each descriptor value (`plan=standard`, `plan=premium`) maintains its own Redis counter: exhausting one plan tier leaves all others unaffected.
 
 ## Configure IP-based token limiting
 
-All previous sections required an `Authorization` header — unauthenticated requests were rejected by JWT validation before reaching the rate limiter. IP-based limiting is different: it fires at the network level **before** any identity check, so it applies to all traffic from a source address regardless of authentication status.
+All previous sections required an `Authorization` header: unauthenticated requests were rejected by JWT validation before reaching the rate limiter. IP-based limiting is different: it fires at the network level **before** any identity check, so it applies to all traffic from a source address regardless of authentication status.
 
-This is useful for protecting publicly-facing endpoints from unauthenticated token consumption (prompt injection scans, credential stuffing, etc.) — the gateway enforces the budget before it even knows who the caller is.
+This is useful for protecting publicly-facing endpoints from unauthenticated token consumption (prompt injection scans, credential stuffing, etc.): the gateway enforces the budget before it even knows who the caller is.
 
 First, delete the previous rate limit config:
 ```bash
@@ -809,7 +809,7 @@ spec:
 EOF
 ```
 
-Update the `EnterpriseAgentgatewayPolicy` — remove JWT authentication so unauthenticated requests can reach the rate limiter:
+Update the `EnterpriseAgentgatewayPolicy` to remove JWT authentication so unauthenticated requests can reach the rate limiter:
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
@@ -842,22 +842,22 @@ for i in $(seq 1 25); do
   echo "Request $i: HTTP $STATUS"
 done
 ```
-You will see `200` responses until the 20-token budget for your source IP is exhausted, then `429 Too Many Requests` — with no `Authorization` header in any request.
+You will see `200` responses until the 20-token budget for your source IP is exhausted, then `429 Too Many Requests`, with no `Authorization` header in any request.
 
-Adding an `Authorization` header to a subsequent request does not bypass the counter — the budget is tracked by source IP, not by identity. The IP limit and identity-based limits are independent: you can stack both in the same policy to enforce a network-level ceiling alongside per-user quotas.
+Adding an `Authorization` header to a subsequent request does not bypass the counter: the budget is tracked by source IP, not by identity. The IP limit and identity-based limits are independent: you can stack both in the same policy to enforce a network-level ceiling alongside per-user quotas.
 
 ## Configure mixed time windows (burst + sustained)
 
-A common quota pattern is a short-window burst limit (e.g. 20 tokens/minute) combined with a longer sustained limit (e.g. 50 tokens/hour). A user can burst up to the per-minute cap, but the hourly counter keeps accumulating — so even after the minute resets, they'll eventually hit the hourly ceiling and stay throttled until the hour rolls over.
+A common quota pattern is a short-window burst limit (e.g. 20 tokens/minute) combined with a longer sustained limit (e.g. 50 tokens/hour). A user can burst up to the per-minute cap, but the hourly counter keeps accumulating, so even after the minute resets, they'll eventually hit the hourly ceiling and stay throttled until the hour rolls over.
 
-The key implementation detail: this requires **two separate `RateLimitConfig` objects**, each listed in `rateLimitConfigRefs`. Both are checked independently on every request — a request is denied if either fires. Putting two `type: TOKEN` entries inside a single `RateLimitConfig` silently fails (neither limit fires), so the split-config approach is the correct pattern.
+This pattern requires **two separate `RateLimitConfig` objects**, each listed in `rateLimitConfigRefs`. Both are checked independently on every request: a request is denied if either fires. Putting two `type: TOKEN` entries inside a single `RateLimitConfig` silently fails (neither limit fires), so the split-config approach is the correct pattern.
 
 First, delete the previous rate limit config:
 ```bash
 kubectl delete rlc -n agentgateway-system ip-rate-limit
 ```
 
-Create two configs — one per time window:
+Create two configs, one per time window:
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: ratelimit.solo.io/v1alpha1
@@ -900,7 +900,7 @@ spec:
 EOF
 ```
 
-Update the `EnterpriseAgentgatewayPolicy` to reference both configs. Both are checked on every request — whichever fires first wins:
+Update the `EnterpriseAgentgatewayPolicy` to reference both configs. Both are checked on every request; whichever fires first wins:
 ```bash
 kubectl apply -f- <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
@@ -947,7 +947,7 @@ Reuse the analyst token from the JWT section:
 export USER_TOKEN=$(./lib/jwt/generate-jwt.sh lib/jwt/claims/analyst.json)
 ```
 
-Send requests until you hit `429` — the 20-token/minute bucket is exhausted:
+Send requests until the 20-token/minute bucket is exhausted and you hit `429`:
 ```bash
 for i in $(seq 1 25); do
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -958,7 +958,7 @@ for i in $(seq 1 25); do
   echo "Request $i: HTTP $STATUS"
 done
 ```
-After a few `200` responses you'll start seeing `429` — the per-minute limit fired. Note how many requests succeeded before the cutoff.
+After a few `200` responses you'll start seeing `429`: the per-minute limit fired. Note how many requests succeeded before the cutoff.
 
 ### Phase 2: minute resets, hour limit takes over
 
@@ -977,7 +977,7 @@ for i in $(seq 1 10); do
 done
 ```
 
-You'll see `200` responses again briefly — the minute bucket has reset. But the hourly counter never stopped: tokens from Phase 1 are still counted against the 50-token/hour budget, so you'll hit `429` again sooner than Phase 1 did. The two limits operate on independent Redis counters with independent windows; a request is denied when **either** fires.
+You'll see `200` responses again briefly: the minute bucket has reset. But the hourly counter never stopped: tokens from Phase 1 are still counted against the 50-token/hour budget, so you'll hit `429` again sooner than Phase 1 did. The two limits operate on independent Redis counters with independent windows; a request is denied when **either** fires.
 
 ## Cleanup
 ```bash

@@ -8,7 +8,7 @@
 | Helm | ≥ 3.12 |
 | Gateway API CRDs | 1.4 – 1.6 (Standard channel; 1.6 for Experimental) |
 | Istio (if using waypoint/ambient features) | 1.26 – 1.30 |
-| Solo UI | 0.5.5 |
+| Solo UI | 0.5.8 |
 
 Source: Version Support Matrix
 
@@ -85,15 +85,15 @@ spec:
 
 Enterprise AgentGateway automatically deploys shared extension servers for ext-auth, rate limiting, and caching. For a POC, these add the following pods to your cluster:
 
-- **ext-auth-service-enterprise-agentgateway** — 1 replica (typical: 100m–500m CPU, 128Mi–512Mi memory)
-- **rate-limiter-enterprise-agentgateway** — 1 replica (typical: 100m–500m CPU, 128Mi–512Mi memory)
-- **ext-cache-enterprise-agentgateway** (Redis) — 1 replica (typical: 100m CPU, 128Mi–256Mi memory)
+- **ext-auth-service-enterprise-agentgateway**: 1 replica (typical: 100m–500m CPU, 128Mi–512Mi memory)
+- **rate-limiter-enterprise-agentgateway**: 1 replica (typical: 100m–500m CPU, 128Mi–512Mi memory)
+- **ext-cache-enterprise-agentgateway** (Redis): 1 replica (typical: 100m CPU, 128Mi–256Mi memory)
 
 ## Other Prerequisites
 
-- **Solo Enterprise license key** — contact Sales if needed
+- **Solo Enterprise license key**: contact Sales if needed
 - **kubectl** configured for your Kubernetes cluster
-- **LoadBalancer support** — required for exposing the gateway (provided natively by most managed Kubernetes services; on-prem clusters may need MetalLB or similar)
+- **LoadBalancer support**: required for exposing the gateway (provided natively by most managed Kubernetes services; on-prem clusters may need MetalLB or similar)
 
 ## Reference Links
 

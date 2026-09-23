@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The LLM Track guides platform engineers through deploying Enterprise Agentgateway as a centralized, secure, and observable gateway for all LLM traffic in an organization. Rather than every team managing their own SDK configuration and provider credentials, you'll stand up a single control plane that abstracts OpenAI, AWS Bedrock, Anthropic, Azure OpenAI, and Google Vertex AI behind one endpoint — and then layer on policy, cost controls, and observability on top.
+The LLM Track guides platform engineers through deploying Enterprise Agentgateway as a centralized, secure, and observable gateway for all LLM traffic in an organization. Rather than every team managing their own SDK configuration and provider credentials, you'll stand up a single control plane that abstracts OpenAI, AWS Bedrock, Anthropic, Azure OpenAI, and Google Vertex AI behind one endpoint, and then layer on policy, cost controls, and observability.
 
 By the end of this track you'll have hands-on experience with the complete lifecycle of production LLM infrastructure: from first install through routing, security, guardrails, rate limiting, cost attribution, and resilience validation.
 
@@ -12,14 +12,14 @@ By the end of this track you'll have hands-on experience with the complete lifec
 
 After completing this track you should be able to:
 
-- **Unify LLM access** — route traffic to multiple providers from a single gateway endpoint without changing client code
-- **Enforce routing policies** — route by path, header, query parameter, or request body to control which model handles which request
-- **Secure the gateway** — apply virtual keys (with upstream credential masking), JWT-based RBAC, per-user OAuth tokens for developer tooling, TLS/mTLS, OPA, and BYO external authorization
-- **Control costs with rate limits** — enforce per-request, per-user, and global token quotas; reset them on a schedule
-- **Apply content guardrails** — block prompt injection, PII, and harmful content before requests reach the model
-- **Enrich and transform** — inject system prompts, rewrite headers, and shape request/response payloads
-- **Track spend and attribute costs** — generate per-user, per-key chargeback data via Prometheus and access logs
-- **Validate resilience** — configure failover across providers, health-based routing, and load-test under realistic traffic
+- **Unify LLM access**: route traffic to multiple providers from a single gateway endpoint without changing client code
+- **Enforce routing policies**: route by path, header, query parameter, or request body to control which model handles which request
+- **Secure the gateway**: apply virtual keys (with upstream credential masking), JWT-based RBAC, per-user OAuth tokens for developer tooling, TLS/mTLS, OPA, and BYO external authorization
+- **Control costs with rate limits**: enforce per-request, per-user, and global token quotas; reset them on a schedule
+- **Apply content guardrails**: block prompt injection, PII, and harmful content before requests reach the model
+- **Enrich and transform**: inject system prompts, rewrite headers, and shape request/response payloads
+- **Track spend and attribute costs**: generate per-user, per-key chargeback data via Prometheus and access logs
+- **Validate resilience**: configure failover across providers, health-based routing, and load-test under realistic traffic
 
 ---
 
@@ -60,7 +60,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 | Lab | Provider |
 |---|---|
-| [Configure Mock OpenAI Server](../labs/routing/configure-mock-openai-server.md) | Mock — safe sandbox for testing |
+| [Configure Mock OpenAI Server](../labs/routing/configure-mock-openai-server.md) | Mock (safe sandbox for testing) |
 | [Basic Routing to OpenAI](../labs/routing/configure-routing-openai.md) | OpenAI |
 | [Routing to AWS Bedrock](../labs/routing/configure-routing-aws-bedrock.md) | AWS Bedrock |
 | [Routing to AWS Bedrock via API Keys](../labs/routing/configure-routing-aws-bedrock-apikey.md) | AWS Bedrock |
@@ -74,7 +74,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 ### Use Case 3 — Advanced Routing Strategies
 
-**Value:** Route intelligently based on request content, headers, or path to optimize for cost, latency, or model capability — and keep traffic moving when providers go down.
+**Value:** Route based on request content, headers, or path to optimize for cost, latency, or model capability, and keep traffic moving when providers go down.
 
 | Lab | What you'll learn |
 |---|---|
@@ -89,7 +89,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 ### Use Case 4 — Security & Access Control
 
-**Value:** Enforce zero-trust access to LLM endpoints — from simple API key gating through full mTLS and policy-engine-driven authorization.
+**Value:** Enforce zero-trust access to LLM endpoints, from simple API key gating through full mTLS and policy-engine-driven authorization.
 
 | Lab | What you'll learn |
 |---|---|
@@ -119,7 +119,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 ### Use Case 6 — Content Safety & Guardrails
 
-**Value:** Stop prompt injection, jailbreaks, PII leakage, and harmful content before requests reach the model — or before responses reach the client.
+**Value:** Stop prompt injection, jailbreaks, PII leakage, and harmful content before requests reach the model, or before responses reach the client.
 
 | Lab | What you'll learn |
 |---|---|
@@ -133,7 +133,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 ### Use Case 7 — Embeddings, Batches & Multimodal
 
-**Value:** Extend the gateway beyond chat completions to cover the full API surface — embeddings, async batch processing, and audio — without provider-specific client changes.
+**Value:** Extend the gateway beyond chat completions to cover the full API surface (embeddings, async batch processing, and audio) without provider-specific client changes.
 
 | Lab | What you'll learn |
 |---|---|
@@ -147,7 +147,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 ### Use Case 8 — Inference Routing (In-Cluster Models)
 
-**Value:** Route to self-hosted LLMs running in the cluster using the Gateway API Inference Extension — ideal for teams that need data sovereignty or lower-latency inference.
+**Value:** Route to self-hosted LLMs running in the cluster using the Gateway API Inference Extension, ideal for teams that need data sovereignty or lower-latency inference.
 
 | Lab | What you'll learn |
 |---|---|

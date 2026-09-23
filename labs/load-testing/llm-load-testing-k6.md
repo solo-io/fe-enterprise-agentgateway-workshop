@@ -1,6 +1,6 @@
 # Load Testing with k6
 
-In this lab, you'll learn how to perform load testing on the AgentGateway using k6s, a modern load testing tool. You'll deploy mock OpenAI services, configure routing, and generate sustained load with ramping patterns to validate performance and observe metrics.
+In this lab, you'll learn how to perform load testing on the AgentGateway using k6s, a load testing tool. You'll deploy mock OpenAI services, configure routing, and generate sustained load with ramping patterns to validate performance and observe metrics.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -642,7 +642,7 @@ This lab deploys two different load generators with distinct patterns so you can
 - **Stage Duration**: 45 seconds per ramp up/down
 - **Pattern**: Faster, sharper oscillations between 17 RPS and 52 RPS every 45 seconds
 
-The different patterns create distinct lines in your Grafana dashboard, making it easy to distinguish between the two backends and observe how the system handles varying load profiles.
+The different patterns create distinct lines in your Grafana dashboard, so you can tell the two backends apart and observe how the system handles varying load profiles.
 
 ### How Long a Ramping Test Runs
 

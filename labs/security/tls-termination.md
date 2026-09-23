@@ -36,7 +36,7 @@ kubectl create secret tls -n agentgateway-system https \
 
 Add an HTTPS listener to the `agentgateway-proxy` Gateway from `001` so it terminates TLS on port 443 alongside the plaintext listener it already serves on 8080. This is how you would roll TLS out in front of an existing gateway.
 
-Append the listener with a **JSON patch** rather than `kubectl apply`. A full `apply` replaces the whole object, so it would drop any field `001` set that this manifest does not restate — including `infrastructure.parametersRef`, which supplies the proxy's replica count, logging, and model catalog. The patch below adds one list entry and touches nothing else.
+Append the listener with a **JSON patch** rather than `kubectl apply`. A full `apply` replaces the whole object, so it would drop any field `001` set that this manifest does not restate, including `infrastructure.parametersRef`, which supplies the proxy's replica count, logging, and model catalog. The patch below adds one list entry and touches nothing else.
 
 ```bash
 kubectl patch gateway agentgateway-proxy -n agentgateway-system --type=json -p '[
@@ -134,7 +134,7 @@ EOF
 
 ## Validate HTTP traffic is blocked
 
-Try to access the route over plaintext HTTP on port 80. This fails because the gateway has no listener there — TLS traffic is served on 443, and the plaintext listener from `001` is on 8080.
+Try to access the route over plaintext HTTP on port 80. This fails because the gateway has no listener there: TLS traffic is served on 443, and the plaintext listener from `001` is on 8080.
 
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')

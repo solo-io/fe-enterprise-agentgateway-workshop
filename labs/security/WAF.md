@@ -1,14 +1,14 @@
 # Web Application Firewall (WAF) for Agentic Traffic
 
-A WAF gives you a **deterministic, rule-driven perimeter** around your AI/LLM endpoints. Enterprise Agentgateway runs a ModSecurity/Coraza-based WAF as a shared extension (`waf-server`) that inspects HTTP requests and responses — headers, methods, paths, and JSON bodies — before and after they reach the model.
+A WAF gives you a deterministic, rule-driven perimeter around your AI/LLM endpoints. Enterprise Agentgateway runs a ModSecurity/Coraza-based WAF as a shared extension (`waf-server`) that inspects HTTP requests and responses (headers, methods, paths, and JSON bodies) before and after they reach the model.
 
-This lab focuses on the use cases that matter for **agentic** traffic: enforcing API shape and model governance, blocking tool-call abuse, hard-blocking credential leakage on both the request and the response, and layering WAF with AI guardrails for defense-in-depth.
+This lab focuses on the use cases that matter for agentic traffic: enforcing API shape and model governance, blocking tool-call abuse, hard-blocking credential leakage on both the request and the response, and layering WAF with AI guardrails for defense-in-depth.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces. It also assumes you have an `OPENAI_API_KEY` available.
 
 > [!NOTE]
-> WAF for Enterprise Agentgateway is available in **v2026.6.3 and later** (the version installed in `001`). Earlier releases such as `v2026.6.1` do not ship the `WAFPolicy` CRD or the `entWAF` policy field — upgrade first if you are on one.
+> WAF for Enterprise Agentgateway is available in **v2026.6.3 and later** (the version installed in `001`). Earlier releases such as `v2026.6.1` do not ship the `WAFPolicy` CRD or the `entWAF` policy field; upgrade first if you are on one.
 
 ## Lab Objectives
 - Understand where WAF fits versus AI guardrails, and which threats each is best suited for
@@ -23,7 +23,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## WAF vs. AI Guardrails: which threat goes where
 
-Both protect AI traffic, but they operate at different layers and are good at different things. They are complementary, not competing.
+Both protect AI traffic, but they operate at different layers and are good at different things. They are complementary.
 
 | | **WAF** (`WAFPolicy`, ModSecurity/Coraza) | **AI Guardrails** (`promptGuard`, moderation) |
 |---|---|---|
@@ -36,7 +36,7 @@ Both protect AI traffic, but they operate at different layers and are good at di
 
 | Threat | Best served by | Why |
 |---|---|---|
-| Bad user-agent / IP / method / path, non-JSON, protocol abuse | **WAF** | Guardrails never see the HTTP surface — only the AI message |
+| Bad user-agent / IP / method / path, non-JSON, protocol abuse | **WAF** | Guardrails never see the HTTP surface, only the AI message |
 | API-shape enforcement + model allow-list (governance) | **WAF** | Pure deterministic policy at the edge; guardrails don't do this |
 | Tool-call shell/file-exfil signatures (`rm -rf`, `/etc/passwd`) | **WAF** (agentic) | Known-bad signatures are exactly what a WAF is for |
 | Prompt injection / jailbreak (semantic / paraphrased) | **Guardrails** | Paraphrase-resistant; WAF only catches literal strings. WAF is a cheap first pass |
@@ -73,8 +73,8 @@ waf-server-enterprise-agentgateway   1/1     1            1           ...
 
 Enterprise Agentgateway WAF uses two resources:
 
-- **`WAFPolicy`** (`waf.solo.io/v1alpha1`) — defines the rule engine settings, ModSecurity directives, body-processing mode, and the custom block response.
-- **`EnterpriseAgentgatewayPolicy`** with `spec.traffic.entWAF` — attaches a `WAFPolicy` to a `Gateway`, `HTTPRoute`, or a single route rule via `wafPolicyRef`.
+- **`WAFPolicy`** (`waf.solo.io/v1alpha1`): defines the rule engine settings, ModSecurity directives, body-processing mode, and the custom block response.
+- **`EnterpriseAgentgatewayPolicy`** with `spec.traffic.entWAF`: attaches a `WAFPolicy` to a `Gateway`, `HTTPRoute`, or a single route rule via `wafPolicyRef`.
 
 ---
 
@@ -139,13 +139,13 @@ curl -s -o /dev/null -w "HTTP %{http_code}\n" "http://${GATEWAY_IP}:8080/openai"
 
 Expected behavior: `HTTP 200`. With no WAF attached yet, the request reaches OpenAI.
 
-> **How WAF inspects JSON bodies.** To match fields inside the request body, a `WAFPolicy` sets `processingConfig.request.mode: HeadersAndBody` and turns on the ModSecurity JSON body processor. Once enabled, a top-level field such as `{"model": "..."}` is addressable as `ARGS:json.model`, and `SecRule ARGS` scans **all** fields, including nested `messages[].content`. Response-body inspection works the same way with `processingConfig.response.mode: HeadersAndBody` and a `phase:4` rule on `RESPONSE_BODY`.
+> **How WAF inspects JSON bodies.** To match fields inside the request body, a `WAFPolicy` sets `processingConfig.request.mode: HeadersAndBody` and turns on the ModSecurity JSON body processor. Once enabled, a top-level field such as `{"model": "..."}` is addressable as `ARGS:json.model`, and `SecRule ARGS` scans all fields, including nested `messages[].content`. Response-body inspection works the same way with `processingConfig.response.mode: HeadersAndBody` and a `phase:4` rule on `RESPONSE_BODY`.
 
 ---
 
 ## Use Case A — Enforce API shape and a model allow-list
 
-This is pure governance: require JSON, and only allow an approved set of models to reach any provider. Guardrails don't do this; a WAF does it deterministically at the edge, before any model call.
+This is pure governance: require JSON, and only allow an approved set of models to reach any provider. A WAF enforces this deterministically at the edge, before any model call.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -189,7 +189,7 @@ EOF
 ```
 
 > [!NOTE]
-> Target the specific `ARGS:json.model` field, **not** the bare `ARGS` collection. A rule like `SecRule ARGS "!@rx (models...)"` applies the negation to *every* field — message content will never match a model name, so it would false-positive-block every request.
+> Target the specific `ARGS:json.model` field, **not** the bare `ARGS` collection. A rule like `SecRule ARGS "!@rx (models...)"` applies the negation to *every* field: message content will never match a model name, so it would false-positive-block every request.
 
 Test all three paths:
 
@@ -271,7 +271,7 @@ spec:
 EOF
 ```
 
-> **`customInterventionResponse` unifies the block response.** When set, its `statusCode` **overrides** each rule's own `status:` and its headers (like `x-waf-action`) are added to every block. Omit it if you want distinct per-rule status codes (as in Use Case A) to surface to the client.
+> **`customInterventionResponse` unifies the block response.** When set, its `statusCode` overrides each rule's own `status:` and its headers (like `x-waf-action`) are added to every block. Omit it if you want distinct per-rule status codes (as in Use Case A) to surface to the client.
 
 Test:
 
@@ -302,7 +302,7 @@ Expected behavior:
 
 ## Use Case C — Hard-block credentials in the request and the response
 
-Credentials and secrets are high-entropy, deterministic patterns — a WAF matches them with near-zero false positives and, crucially, can inspect the **response** as well as the request. This is the cheap outer perimeter that stops obvious secret leakage before it costs a guardrail or model call.
+Credentials and secrets are high-entropy, deterministic patterns: a WAF matches them with near-zero false positives and can inspect the response as well as the request. This is the cheap outer perimeter that stops obvious secret leakage before it costs a guardrail or model call.
 
 This policy inspects both directions: a `phase:2` rule on the request body and a `phase:4` rule on the response body.
 
@@ -383,10 +383,10 @@ curl -s -o /dev/null -w "benign: HTTP %{http_code}\n" "http://${GATEWAY_IP}:8080
 Expected behavior:
 
 - The request containing an AWS key returns `403` with `x-waf-action: credential-block` (caught on the way in).
-- The request that induces the model to emit `EXFIL-1234` also returns `403` — the response body was inspected and blocked on the way out, even though the request itself was clean.
+- The request that induces the model to emit `EXFIL-1234` also returns `403`: the response body was inspected and blocked on the way out, even though the request itself was clean.
 - The benign request returns `200`.
 
-> The `EXFIL-####` marker makes the response test deterministic. In production, the `RESPONSE_BODY` rule catches the real patterns (`AKIA…`, private keys, `ghp_…`). For **masking** secrets in the response instead of blocking the whole call, use guardrail response masking (see the built-in guardrails lab) — a good example of layering the two.
+> The `EXFIL-####` marker makes the response test deterministic. In production, the `RESPONSE_BODY` rule catches the real patterns (`AKIA…`, private keys, `ghp_…`). For masking secrets in the response instead of blocking the whole call, use guardrail response masking (see the built-in guardrails lab).
 
 ---
 
@@ -489,11 +489,11 @@ curl -s -o /dev/null -w "benign: HTTP %{http_code}\n" "http://${GATEWAY_IP}:8080
 
 Expected behavior:
 
-- **D1** returns `403` with `x-waf-action: injection-block` — the WAF matched the literal string before the request ever reached the model.
-- **D2** returns `403` with the body `"Request blocked: prompt injection detected (semantic guard)."` and **no** `x-waf-action` header — the paraphrase slipped past the WAF and `promptGuard` caught it semantically.
+- **D1** returns `403` with `x-waf-action: injection-block`: the WAF matched the literal string before the request ever reached the model.
+- **D2** returns `403` with the body `"Request blocked: prompt injection detected (semantic guard)."` and no `x-waf-action` header: the paraphrase slipped past the WAF and `promptGuard` caught it semantically.
 - **D3** returns `200`.
 
-This is the core lesson: neither layer is sufficient alone. The WAF is the cheap, deterministic perimeter; the guardrail understands meaning.
+Neither layer is sufficient alone: the WAF is the cheap, deterministic perimeter; the guardrail understands meaning.
 
 ---
 
@@ -501,7 +501,7 @@ This is the core lesson: neither layer is sufficient alone. The WAF is the cheap
 
 A `WAFPolicy` is inert until an `EnterpriseAgentgatewayPolicy` references it through `traffic.entWAF.wafPolicyRef`. The target determines scope.
 
-**Attach at the Gateway** — every compatible route on the Gateway inherits the policy:
+**Attach at the Gateway**: every compatible route on the Gateway inherits the policy.
 
 ```yaml
 spec:
@@ -515,7 +515,7 @@ spec:
         name: ai-cred-waf
 ```
 
-**Attach to a single route rule** — use `sectionName` to target one named `HTTPRoute` rule:
+**Attach to a single route rule**: use `sectionName` to target one named `HTTPRoute` rule.
 
 ```yaml
 spec:
@@ -530,7 +530,7 @@ spec:
         name: ai-cred-waf
 ```
 
-**Disable for a more specific target** — override inherited WAF (e.g. a trusted internal route) with `disable: {}`:
+**Disable for a more specific target**: override inherited WAF (e.g. a trusted internal route) with `disable: {}`.
 
 ```yaml
 spec:

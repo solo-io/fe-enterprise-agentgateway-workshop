@@ -3,9 +3,9 @@
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
-> **Node architecture (important):** this lab requires `linux/amd64` nodes. The upstream Endpoint Picker image (`registry.k8s.io/gateway-api-inference-extension/epp:v1.1.0`) is published as a single-platform `linux/amd64` image. On `arm64` clusters — e.g., kind on Apple Silicon Macs — the EPP pod will fail with `exec /epp: exec format error`. Run this lab on a cloud cluster (GKE/EKS/AKS) or an x86 VM. The vLLM CPU image also fails inside Docker Desktop on Mac with `AssertionError: Not enough allowed NUMA nodes`, even on amd64 Docker Desktop.
+> **Node architecture (important):** this lab requires `linux/amd64` nodes. The upstream Endpoint Picker image (`registry.k8s.io/gateway-api-inference-extension/epp:v1.1.0`) is published as a single-platform `linux/amd64` image. On `arm64` clusters (e.g., kind on Apple Silicon Macs), the EPP pod will fail with `exec /epp: exec format error`. Run this lab on a cloud cluster (GKE/EKS/AKS) or an x86 VM. The vLLM CPU image also fails inside Docker Desktop on Mac with `AssertionError: Not enough allowed NUMA nodes`, even on amd64 Docker Desktop.
 
-> **Cluster sizing:** the vLLM pod in this lab requests `cpu: 1500m` / `memory: 6Gi` — tuned to fit on a 4-vCPU node (e.g., GKE `n2-standard-4`) alongside the ~1.3 vCPU that GKE system pods (kube-proxy, fluent-bit, gke-metrics, etc.) typically consume. Memory is the binding dimension here — Qwen2.5-0.5B with `VLLM_CPU_KVCACHE_SPACE=2` needs ~5 GiB of resident memory and will be OOMKilled below 6 GiB. First-run model download plus the readiness probe's 180s initial delay means the pod typically takes 3–4 minutes to become ready.
+> **Cluster sizing:** the vLLM pod in this lab requests `cpu: 1500m` / `memory: 6Gi`, tuned to fit on a 4-vCPU node (e.g., GKE `n2-standard-4`) alongside the ~1.3 vCPU that GKE system pods (kube-proxy, fluent-bit, gke-metrics, etc.) typically consume. Memory is the binding dimension here: Qwen2.5-0.5B with `VLLM_CPU_KVCACHE_SPACE=2` needs ~5 GiB of resident memory and will be OOMKilled below 6 GiB. First-run model download plus the readiness probe's 180s initial delay means the pod typically takes 3–4 minutes to become ready.
 
 ## Lab Objectives
 - Enable the Gateway API Inference Extension on the existing Enterprise Agentgateway install
@@ -116,7 +116,7 @@ spec:
 EOF
 ```
 
-Wait for the pod to be Ready (this typically takes 3–5 minutes — model download plus the readiness probe's 180s initial delay):
+Wait for the pod to be Ready (this typically takes 3–5 minutes: model download plus the readiness probe's 180s initial delay):
 
 ```bash
 kubectl rollout status -n agentgateway-system deployment/vllm-qwen25-05b-instruct --timeout=10m
@@ -144,7 +144,7 @@ inferencepools.inference.networking.k8s.io      ...
 
 ## Deploy the InferencePool and Endpoint Picker (EPP)
 
-The upstream GAIE `inferencepool` Helm chart creates an `InferencePool` resource and deploys the `llm-d` Endpoint Picker (EPP). The EPP is the component that actually picks which vLLM pod a given request goes to, based on real-time load. We pass `provider.name=none` because we already installed our own Gateway provider (Enterprise Agentgateway) in lab `001`.
+The upstream GAIE `inferencepool` Helm chart creates an `InferencePool` resource and deploys the `llm-d` Endpoint Picker (EPP). The EPP is the component that picks which vLLM pod a given request goes to, based on real-time load. We pass `provider.name=none` because we already installed our own Gateway provider (Enterprise Agentgateway) in lab `001`.
 
 ```bash
 export IGW_CHART_VERSION=v1.1.0
@@ -239,7 +239,7 @@ content-type: application/json
    kubectl get httproute -n agentgateway-system inference-vllm -o jsonpath='{.status.parents[*].conditions[*].type}={.status.parents[*].conditions[*].status}{"\n"}'
    ```
 4. The curl above returns HTTP 200 with a `choices[].text` body.
-5. The agentgateway access log for the request carries an `inferencepool.selected_endpoint=<podIP>:<port>` field — proof that the EPP picked a specific pod for the request, not a Service VIP (see Observability below).
+5. The agentgateway access log for the request carries an `inferencepool.selected_endpoint=<podIP>:<port>` field: proof that the EPP picked a specific pod for the request, not a Service VIP (see Observability below).
 
 ## Observability
 
@@ -263,7 +263,7 @@ info request gateway=agentgateway-system/agentgateway-proxy listener=http
   inferencepool.selected_endpoint=10.112.3.4:8000 duration=8540ms
 ```
 
-The `inferencepool.selected_endpoint` value matches a vLLM pod IP, confirming the EPP chose that endpoint rather than agentgateway round-robin'ing against a Service.
+The `inferencepool.selected_endpoint` value matches a vLLM pod IP: the EPP chose that endpoint rather than agentgateway round-robin'ing against a Service.
 
 ### Gateway request metrics with inference backend label
 
@@ -283,7 +283,7 @@ for pod in $(kubectl get pods -n agentgateway-system \
 done
 ```
 
-If this returns empty, retry — the agentgateway proxy runs with multiple replicas and `port-forward` connects to one of them. Send another inference request and rerun.
+If this returns empty, retry: the agentgateway proxy runs with multiple replicas and `port-forward` connects to one of them. Send another inference request and rerun.
 
 ### EPP startup logs
 
@@ -293,7 +293,7 @@ At default verbosity (`--v 1`), the EPP logs cover startup (controller registrat
 kubectl logs -n agentgateway-system -l inferencepool=vllm-qwen25-05b-instruct-epp --tail 50
 ```
 
-Look for `gRPC server listening` on port `9002` — this is the ext-proc endpoint that agentgateway calls into for endpoint selection.
+Look for `gRPC server listening` on port `9002`: this is the ext-proc endpoint that agentgateway calls into for endpoint selection.
 
 > **Note on EPP metrics:** the EPP exposes Prometheus metrics on container port `9090`, but the endpoint is gated by Kubernetes TokenReview authentication by default and returns `401 Unauthorized` without a valid ServiceAccount token. To scrape it, configure Prometheus with the appropriate token or run a custom scraper inside the cluster. Out of scope for this lab.
 

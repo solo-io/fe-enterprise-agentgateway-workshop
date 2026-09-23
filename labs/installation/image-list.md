@@ -56,7 +56,7 @@ us-docker.pkg.dev/solo-public/enterprise-agentgateway/waf-server:2026.8.2
 
 ### Image list for Solo UI
 
-**0.5.5**
+**0.5.8**
 
 Helm chart:
 
@@ -67,10 +67,10 @@ oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management
 Images:
 
 ```bash
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-frontend:0.5.5
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-backend:0.5.5
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-autoauth:v0.2.2
-docker.io/otel/opentelemetry-collector-contrib:0.153.0
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-frontend:0.5.8
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-backend:0.5.8
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-autoauth:v0.2.3
+docker.io/otel/opentelemetry-collector-contrib:0.158.0
 docker.io/clickhouse/clickhouse-server:26.3.17-alpine
 ```
 
@@ -85,7 +85,7 @@ global:
   #image:
   #  registry: my-registry.example.com
   #  repository: solo-enterprise
-  #  tag: "0.5.5"
+  #  tag: "0.5.8"
 clickhouse:
   #--- Image override for ClickHouse (embed registry in repository if using private registry) ---
   #image:
@@ -95,7 +95,7 @@ clickhouse:
 
 ## Air-Gap Mirror Reference (`docker.io/ably7`)
 
-Mirrored copies of every image above, used by the [air-gap install lab](airgap/001-airgap.md). Every image name and tag is unchanged from the list above — only the registry prefix changes to `docker.io/ably7`.
+Mirrored copies of every image above, used by the [air-gap install lab](airgap/001-airgap.md). Every image name and tag is unchanged from the list above; only the registry prefix changes to `docker.io/ably7`.
 
 ### Enterprise Agentgateway (v2026.8.2)
 
@@ -108,12 +108,12 @@ docker.io/ably7/rate-limiter:2026.8.2
 docker.io/ably7/waf-server:2026.8.2
 ```
 
-### Solo UI (0.5.5)
+### Solo UI (0.5.8)
 
 ```
-docker.io/ably7/solo-enterprise-ui-frontend:0.5.5
-docker.io/ably7/solo-enterprise-ui-backend:0.5.5
-docker.io/ably7/solo-enterprise-autoauth:v0.2.2
-docker.io/ably7/opentelemetry-collector-contrib:0.153.0
+docker.io/ably7/solo-enterprise-ui-frontend:0.5.8
+docker.io/ably7/solo-enterprise-ui-backend:0.5.8
+docker.io/ably7/solo-enterprise-autoauth:v0.2.3
+docker.io/ably7/opentelemetry-collector-contrib:0.158.0
 docker.io/ably7/clickhouse-server:26.3.17-alpine
 ```

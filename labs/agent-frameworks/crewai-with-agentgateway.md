@@ -11,11 +11,11 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Overview
 
-This lab shows how to run a [CrewAI](https://www.crewai.com/) multi-agent workflow through Enterprise AgentGateway. A two-agent crew — a **Researcher** and a **Writer** — collaborate sequentially to produce a short blog post on a chosen topic. All OpenAI API calls are intercepted by agentgateway, which:
+This lab shows how to run a [CrewAI](https://www.crewai.com/) multi-agent workflow through Enterprise AgentGateway. A two-agent crew, a Researcher and a Writer, collaborates sequentially to produce a short blog post on a chosen topic. All OpenAI API calls are intercepted by agentgateway, which:
 
 - Injects the real OpenAI API key from a Kubernetes Secret
 - Emits OpenTelemetry traces, metrics, and access logs for every LLM call
-- Enables enforcement of rate limits, guardrails, and other policies — transparently, without any changes to the CrewAI application
+- Enables enforcement of rate limits, guardrails, and other policies without changes to the CrewAI application
 
 ## Configure Required Variables
 
@@ -73,7 +73,7 @@ spec:
 EOF
 ```
 
-The `HTTPRoute` matches requests on the `/openai` path prefix. The `EnterpriseAgentgatewayBackend` then forwards them to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret, normalizing the path to the provider's `/v1/chat/completions` endpoint. Because the backend handles that normalization, any sub-path under the prefix works — so CrewAI's `base_url` can point at `/openai` directly.
+The `HTTPRoute` matches requests on the `/openai` path prefix. The `EnterpriseAgentgatewayBackend` then forwards them to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret, normalizing the path to the provider's `/v1/chat/completions` endpoint. Because the backend handles that normalization, any sub-path under the prefix works, so CrewAI's `base_url` can point at `/openai` directly.
 
 ## Get the Gateway IP
 
@@ -107,7 +107,7 @@ You should receive a `200 OK` response with a JSON body containing a `choices` a
 
 The crew script and its dependencies live in `lib/crewai/multi-agent-researcher-writer/`. Install them in a local virtual environment.
 
-> **Note:** `crewai` depends on `tiktoken`, which requires Python ≤3.12 for pre-built wheels. Use `python3.12` or `python3.11` — Python 3.13+ will attempt to compile `tiktoken` from source and fail without a Rust toolchain.
+> **Note:** `crewai` depends on `tiktoken`, which requires Python ≤3.12 for pre-built wheels. Use `python3.12` or `python3.11`; Python 3.13+ will attempt to compile `tiktoken` from source and fail without a Rust toolchain.
 
 ```bash
 python3.12 -m venv lib/crewai/multi-agent-researcher-writer/.venv
@@ -127,7 +127,7 @@ CREW_TOPIC="AI Gateway key patterns and concepts" \
 lib/crewai/multi-agent-researcher-writer/.venv/bin/python3 lib/crewai/multi-agent-researcher-writer/crew.py
 ```
 
-You should see both agents work sequentially — the Researcher produces bullet-point findings, then the Writer turns them into a polished blog post. All LLM calls flow through agentgateway.
+You should see both agents work sequentially: the Researcher produces bullet-point findings, then the Writer turns them into a blog post. All LLM calls flow through agentgateway.
 
 Try a different topic:
 ```bash
@@ -145,7 +145,7 @@ Tail agentgateway logs to see the proxied OpenAI calls:
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Each CrewAI agent generates at least one request. You should see two sets of entries — one for the Researcher and one for the Writer — showing model name, token counts, and latency.
+Each CrewAI agent generates at least one request. You should see two sets of entries, one for the Researcher and one for the Writer, showing model name, token counts, and latency.
 
 ### View Metrics and Traces in Grafana
 
@@ -190,10 +190,10 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 ```
 
 Useful metrics:
-- `agentgateway_gen_ai_client_token_usage` — token usage per agent call
-- `agentgateway_gen_ai_client_cost_usd_total` — estimated cost per agent call
-- `agentgateway_gen_ai_server_request_duration` — latency per request
-- `agentgateway_requests_total` — total proxied requests
+- `agentgateway_gen_ai_client_token_usage`: token usage per agent call
+- `agentgateway_gen_ai_client_cost_usd_total`: estimated cost per agent call
+- `agentgateway_gen_ai_server_request_duration`: latency per request
+- `agentgateway_requests_total`: total proxied requests
 
 ## Cleanup
 

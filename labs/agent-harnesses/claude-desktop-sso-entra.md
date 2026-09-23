@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 You will also need:
 - A Microsoft Entra ID tenant where you can register applications
 - Claude Desktop version `1.6889.0` or later (single sign-on for the Gateway connector requires it)
-- An Anthropic credential for the gateway to inject upstream — either a `sk-ant-oat01...` OAuth token from your Claude subscription (`claude setup-token`) or a `sk-ant-api...` API key from console.anthropic.com
+- An Anthropic credential for the gateway to inject upstream: either a `sk-ant-oat01...` OAuth token from your Claude subscription (`claude setup-token`) or a `sk-ant-api...` API key from console.anthropic.com
 
 ## Lab Objectives
 - Register a public client application in Microsoft Entra ID for Claude Desktop's browser-based sign-in
@@ -37,11 +37,11 @@ This lab replaces the static key with single sign-on. Each developer signs in to
 
 There is no long-lived secret on developer machines: MFA and conditional access are enforced by Entra at sign-in, and offboarding a developer in Entra revokes their gateway access with it.
 
-> **Note on localhost requirement**: Claude Desktop's third-party inference connector enforces TLS for any non-loopback endpoint — the gateway base URL must be either `https://...` or `http://localhost...` / `http://127.0.0.1...`. To keep this workshop simple, without provisioning a TLS cert for the gateway, we port-forward the `agentgateway-proxy` Service to `localhost:8080` and point Claude Desktop at `http://localhost:8080/claude`, which satisfies the loopback exception. In a real deployment you would terminate TLS on the gateway and use the `https://` URL directly. This only affects the gateway base URL — the Entra sign-in flow is independent of it.
+> **Note on localhost requirement**: Claude Desktop's third-party inference connector enforces TLS for any non-loopback endpoint: the gateway base URL must be either `https://...` or `http://localhost...` / `http://127.0.0.1...`. To keep this workshop simple, without provisioning a TLS cert for the gateway, we port-forward the `agentgateway-proxy` Service to `localhost:8080` and point Claude Desktop at `http://localhost:8080/claude`, which satisfies the loopback exception. In a real deployment you would terminate TLS on the gateway and use the `https://` URL directly. This only affects the gateway base URL; the Entra sign-in flow is independent of it.
 
 ## Register the Entra Application
 
-Claude Desktop signs users in with an OIDC authorization-code-with-PKCE flow in the system browser, returning to the app on a loopback redirect. That flow needs a **public client** registration in your tenant — no client secret, no API permissions.
+Claude Desktop signs users in with an OIDC authorization-code-with-PKCE flow in the system browser, returning to the app on a loopback redirect. That flow needs a **public client** registration in your tenant: no client secret, no API permissions.
 
 1. In the [Microsoft Entra admin center](https://entra.microsoft.com), go to **Identity > Applications > App registrations** and select **New registration**
 
@@ -58,7 +58,7 @@ Claude Desktop signs users in with an OIDC authorization-code-with-PKCE flow in 
 
 ![entra-2-register-form.png](../../images/claude-desktop-sso/entra-2-register-form.png)
 
-> **Two details that matter here.** Use `127.0.0.1`, not `localhost` — Entra does not treat them as interchangeable, and Claude Desktop binds its callback to `127.0.0.1`. And the platform must be **Public client/native (mobile & desktop)**: it is the only platform type Entra allows to use *any* local port, which the app needs because it picks a free port at sign-in time. The `/callback` path is required — `http://127.0.0.1` alone fails at sign-in with `AADSTS50011`.
+> Use `127.0.0.1`, not `localhost`: Entra does not treat them as interchangeable, and Claude Desktop binds its callback to `127.0.0.1`. The platform must be **Public client/native (mobile & desktop)**: it is the only platform type Entra allows to use *any* local port, which the app needs because it picks a free port at sign-in time. The `/callback` path is required; `http://127.0.0.1` alone fails at sign-in with `AADSTS50011`.
 
 3. Click **Register**. On the app's **Overview** page, copy the **Application (client) ID** and **Directory (tenant) ID**:
 
@@ -75,11 +75,11 @@ export ENTRA_CLIENT_ID=<your-application-client-id>    # e.g. "22222222-3333-444
 
 ![entra-4-authentication.png](../../images/claude-desktop-sso/entra-4-authentication.png)
 
-That's the whole registration — a public PKCE client needs no client secret and no additional API permissions.
+That's the whole registration: a public PKCE client needs no client secret and no additional API permissions.
 
 ## Create the Gateway Resources
 
-Use the Claude Code CLI to generate a long-lived OAuth token from your Claude subscription — this is the credential the gateway injects upstream:
+Use the Claude Code CLI to generate a long-lived OAuth token from your Claude subscription; this is the credential the gateway injects upstream:
 
 ```bash
 claude setup-token
@@ -91,7 +91,7 @@ This will open a browser-based authentication flow. Once complete, the CLI will 
 export CLAUDE_CODE_OAUTH_TOKEN=<token-printed-by-setup-token>
 ```
 
-> **Using a direct API key instead?** A `sk-ant-api...` key from console.anthropic.com works identically — put it in the same secret in place of the OAuth token.
+> **Using a direct API key instead?** A `sk-ant-api...` key from console.anthropic.com works identically; put it in the same secret in place of the OAuth token.
 
 Create the credential secret:
 
@@ -197,15 +197,13 @@ spec:
 EOF
 ```
 
-A few things worth calling out:
-
-> **The policy validates `iss` AND `aud`, not just the signature.** Claude Desktop sends the OIDC ID token it received from Entra, whose audience is your application's client ID. Without the `audiences` check, the gateway would accept *any* valid token from your tenant — including tokens issued to unrelated applications. With it, only tokens minted for the `Claude Desktop gateway` app pass.
+> **The policy validates `iss` AND `aud`, not just the signature.** Claude Desktop sends the OIDC ID token it received from Entra, whose audience is your application's client ID. Without the `audiences` check, the gateway would accept *any* valid token from your tenant, including tokens issued to unrelated applications. With it, only tokens minted for the `Claude Desktop gateway` app pass.
 
 > **Why the v2.0 issuer?** Claude Desktop discovers Entra's endpoints from `https://login.microsoftonline.com/<tenant>/v2.0/.well-known/openid-configuration` and runs the v2 flow, so the ID tokens it obtains carry `iss: https://login.microsoftonline.com/<tenant>/v2.0`. The policy's `issuer` must match that claim exactly.
 
 > **No leading slash on `jwksPath`.** The controller joins the JWKS backend's URL and `jwksPath` with a `/`; a leading slash produces a double slash and a 404 from Entra.
 
-> **`jwtAuthentication` strips the JWT after validating it.** The ID token never reaches Anthropic — the backend's `auth.secretRef` injects the real Anthropic credential in its place. The route filter also removes any `x-api-key` a client might send.
+> **`jwtAuthentication` strips the JWT after validating it.** The ID token never reaches Anthropic: the backend's `auth.secretRef` injects the real Anthropic credential in its place. The route filter also removes any `x-api-key` a client might send.
 
 ## Verify the Gateway Requires Authentication
 
@@ -233,7 +231,7 @@ curl -i "http://localhost:8080/claude/v1/messages" \
   }'
 ```
 
-Expected output: `401 Unauthorized` with `authentication failure: no bearer token found`. Unlike the static-key setup, the route no longer serves anonymous callers — a valid token from your Entra tenant is the only way through, and the first client to present one is Claude Desktop itself in the next section.
+Expected output: `401 Unauthorized` with `authentication failure: no bearer token found`. Unlike the static-key setup, the route no longer serves anonymous callers: a valid token from your Entra tenant is the only way through, and the first client to present one is Claude Desktop itself in the next section.
 
 Leave the port-forward running for the Claude Desktop steps below.
 
@@ -259,19 +257,19 @@ The **Configure third-party inference** panel is gated behind Claude Desktop's d
 | **Gateway SSO IdP (OIDC) > Client ID** | your `$ENTRA_CLIENT_ID` |
 | **Gateway SSO IdP (OIDC) > Issuer URL** | `https://login.microsoftonline.com/<your-tenant-id>/v2.0` |
 | **Gateway SSO IdP (OIDC) > Scopes** | *leave empty for the default* |
-| **Gateway SSO IdP (OIDC) > Redirect port** | *leave empty — Entra allows any loopback port* |
+| **Gateway SSO IdP (OIDC) > Redirect port** | *leave empty; Entra allows any loopback port* |
 
-Leave the remaining OIDC fields (**Bearer token**, **Additional redirect referrer hosts**) at their defaults — the gateway policy validates the default ID token directly:
+Leave the remaining OIDC fields (**Bearer token**, **Additional redirect referrer hosts**) at their defaults; the gateway policy validates the default ID token directly:
 
 ![claude-sso-1-config.png](../../images/claude-desktop-sso/claude-sso-1-config.png)
 
-> **Issuer URL is the base URL only.** Enter `https://login.microsoftonline.com/<tenant>/v2.0` without the `/.well-known/openid-configuration` suffix — the app appends that path itself to discover the authorization and token endpoints.
+> **Issuer URL is the base URL only.** Enter `https://login.microsoftonline.com/<tenant>/v2.0` without the `/.well-known/openid-configuration` suffix; the app appends that path itself to discover the authorization and token endpoints.
 
-4. Click **Apply Changes**. Claude Desktop now runs against your gateway configuration and presents a **Sign in with your organization** button — no Claude.ai account involved:
+4. Click **Apply Changes**. Claude Desktop now runs against your gateway configuration and presents a **Sign in with your organization** button; no Claude.ai account is involved:
 
 ![claude-sso-2-signin.png](../../images/claude-desktop-sso/claude-sso-2-signin.png)
 
-5. Click **Sign in with your organization**. Your browser opens to your tenant's normal Entra sign-in page — complete it, including MFA if your tenant enforces it. The first sign-in shows a one-time consent prompt for the app's OIDC scopes (basic profile, plus offline access for silent token refresh). Click **Accept**:
+5. Click **Sign in with your organization**. Your browser opens to your tenant's normal Entra sign-in page. Complete it, including MFA if your tenant enforces it. The first sign-in shows a one-time consent prompt for the app's OIDC scopes (basic profile, plus offline access for silent token refresh). Click **Accept**:
 
 ![claude-sso-3-consent.png](../../images/claude-desktop-sso/claude-sso-3-consent.png)
 
@@ -279,13 +277,13 @@ You're then returned to the app. Use **Test connection** in the third-party infe
 
 ### Try It Out
 
-Start a new conversation in Claude Desktop — note the **Gateway** indicator in the corner of the app:
+Start a new conversation in Claude Desktop and note the **Gateway** indicator in the corner of the app:
 
 ![claude-sso-4-chat.png](../../images/claude-desktop-sso/claude-sso-4-chat.png)
 
 Every prompt now flows through the gateway carrying your personal Entra ID token, which the gateway validates and swaps for the centrally-managed Anthropic credential. The app refreshes the token silently in the background; if your session is revoked or expires under your tenant's policy, Claude Desktop shows a **Sign in again** prompt instead of failing silently.
 
-For metrics, traces, and access logs on this traffic, use the observability tooling from the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md) — the same dashboards and trace views shown in the [Claude Desktop lab](claude-desktop.md) apply unchanged.
+For metrics, traces, and access logs on this traffic, use the observability tooling from the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md); the same dashboards and trace views shown in the [Claude Desktop lab](claude-desktop.md) apply unchanged.
 
 ## Deploy at Scale with MDM
 
@@ -293,7 +291,7 @@ Everything you just configured by hand is a managed setting. Claude Desktop read
 
 1. In the **Configure third-party inference** panel, click **Export**. Claude Desktop produces a `.mobileconfig` (macOS) or `.reg` (Windows) file containing exactly the settings you validated above
 2. Push that profile through your MDM (Jamf, Intune, and similar)
-3. Each developer opens Claude Desktop, sees the same **Sign in with your organization** screen shown above, and authenticates with their own work account — nothing else to distribute
+3. Each developer opens Claude Desktop, sees the same **Sign in with your organization** screen shown above, and authenticates with their own work account; there is nothing else to distribute
 
 The exported macOS payload contains these keys:
 
@@ -308,9 +306,9 @@ The exported macOS payload contains these keys:
 <string>{"issuer":"https://login.microsoftonline.com/11111111-2222-3333-4444-555555555555/v2.0","clientId":"22222222-3333-4444-5555-666666666666"}</string>
 ```
 
-> **`inferenceGatewayOidc` is one key whose value is a JSON string** — not separate dotted keys, and not a plist `<dict>`. If the app can't parse it, sign-in fails with `gateway SSO: server does not advertise device_authorization_endpoint`. The in-app **Export** always produces the correct format, so prefer it over hand-writing the profile.
+> **`inferenceGatewayOidc` is one key whose value is a JSON string**, not separate dotted keys and not a plist `<dict>`. If the app can't parse it, sign-in fails with `gateway SSO: server does not advertise device_authorization_endpoint`. The in-app **Export** always produces the correct format, so prefer it over hand-writing the profile.
 
-> **Use `https://` in the deployed profile.** The `localhost` base URL in this lab only works because of the loopback exception and the port-forward. For a real rollout, terminate TLS on the gateway and export the profile with the `https://` URL — the connector rejects plain `http://` for any non-loopback host. The Entra redirect URI is unaffected by this change: it stays `http://127.0.0.1/callback` no matter what the gateway's address is, because it's where the browser hands the sign-in result back to the Claude Desktop app on the developer's own machine — the gateway is never part of that hop. Do not register the gateway's DNS name as a redirect URI.
+> **Use `https://` in the deployed profile.** The `localhost` base URL in this lab only works because of the loopback exception and the port-forward. For a real rollout, terminate TLS on the gateway and export the profile with the `https://` URL; the connector rejects plain `http://` for any non-loopback host. The Entra redirect URI is unaffected by this change: it stays `http://127.0.0.1/callback` no matter what the gateway's address is, because it's where the browser hands the sign-in result back to the Claude Desktop app on the developer's own machine; the gateway is never part of that hop. Do not register the gateway's DNS name as a redirect URI.
 
 ## Cleanup
 

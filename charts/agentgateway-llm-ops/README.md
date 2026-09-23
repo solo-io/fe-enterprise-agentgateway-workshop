@@ -2,7 +2,7 @@
 
 Two install modes share one chart. **Infra mode** (installed once by the LLM
 operations team) owns the `Gateway`, the catalog of AI-model aliases (OpenAI,
-Anthropic, Bedrock, etc.), and — per grant — a team's API key and token
+Anthropic, Bedrock, etc.), and, per grant, a team's API key and token
 budget. **Grant-only mode** lets a team install just its own key and budget
 into the same namespace as the infra release, without touching the Gateway
 or catalog.
@@ -27,8 +27,8 @@ the release's grants touch, named
 `llm-budget-<alias>-<sha256(releaseName)[:8]>`, with a single `targetRef`
 (that alias's `HTTPRoute llm-<alias>`) and a `rateLimitConfigRefs` list
 naming every one of this release's teams granted that alias. Budgets stay
-independent per team — each ref resolves against its own team's
-`RateLimitConfig` descriptor — only the attachment point is shared. The
+independent per team (each ref resolves against its own team's
+`RateLimitConfig` descriptor); only the attachment point is shared. The
 8-hex release-name hash keeps policy names unique across releases granting
 the same alias (plain concatenation is ambiguous: release `grant-team-beta`
 + alias `chat-mock` would collide with release `grant-team-beta-chat` +
@@ -47,7 +47,7 @@ inconsistently **per replica**: one replica permanently enforced team A's
 policy for every request on the route, the other permanently enforced team
 B's, regardless of which team's key authenticated the request. One team's
 budget therefore silently never applied to whichever share of its traffic
-landed on the "wrong" replica — no error, warning, or log line pointed at
+landed on the "wrong" replica: no error, warning, or log line pointed at
 it. Regrouping so that every rendered policy targets exactly one route (per
 alias, refs listing the granted teams) eliminated the inconsistency in every
 retest, including the cross-release case where a grant-only release and the
@@ -56,7 +56,7 @@ alias route.
 
 ## Grant-only mode
 
-Set only `grants` — `gateway` explicitly `null`, `modelCatalog` unset:
+Set only `grants`: `gateway` explicitly `null`, `modelCatalog` unset:
 
 ```yaml
 gateway: null
@@ -69,13 +69,13 @@ grants:
     tokensPerMinute: 2000
 ```
 
-`gateway: null` is required, not optional: a values file with only `grants:`
+`gateway: null` is required: a values file with only `grants:`
 makes helm merge the chart's default `gateway` block back in, rendering a
 second Gateway/parameters/access-log set that fails with `AlreadyExists`
 next to an existing infra release.
 
-This release can't see `modelCatalog`, so an unmatched alias is not an error
-— its label is inert until an infra release with that alias lands in the
+This release can't see `modelCatalog`, so an unmatched alias is not an error:
+its label is inert until an infra release with that alias lands in the
 same namespace. Install as a second, team-scoped release there:
 
 ```bash
@@ -84,7 +84,7 @@ helm install llm-team-gamma charts/agentgateway-llm-ops \
 ```
 
 A team already granted elsewhere in the same namespace surfaces as a Helm
-ownership conflict at install — its per-team `Secret llm-key-<team>` and
+ownership conflict at install: its per-team `Secret llm-key-<team>` and
 `RateLimitConfig llm-budget-<team>` names collide with the release that
 already grants it (the per-alias budget policies never collide across
 releases; their names carry a release-name hash). Offboard with
@@ -120,7 +120,7 @@ grants:
 | `team` / `key`                      | `grants[*]`       | Team identifier (API key entry id); API key value (min 8 chars, workshop-grade) |
 | `aliases` / `tokensPerMinute`        | `grants[*]`       | Aliases this team can access and is budgeted for; per-team tokens-per-minute limit |
 
-Keys are inline in `grants[*].key` — fine for workshops, but **production
+Keys are inline in `grants[*].key`: fine for workshops, but **production
 deployments should source API keys from an external secret manager** (e.g.
 External Secrets Operator) instead of passing them as chart values.
 

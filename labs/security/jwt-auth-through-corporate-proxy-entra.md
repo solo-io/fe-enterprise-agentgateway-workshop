@@ -2,7 +2,7 @@
 
 Many enterprises don't allow direct egress to the internet; all outbound traffic, including calls to an external identity provider, has to go through a corporate forward proxy. This lab deploys a Squid proxy to stand in for that corporate boundary, then configures agentgateway to fetch a remote JWKS from Microsoft Entra ID through that proxy using `BackendTunnel`, agentgateway's `HTTPS_PROXY`-style tunneling behavior.
 
-This lab is focused purely on the tunnel mechanics: it configures JWT authentication only, with no authorization/RBAC rules. For an Entra-backed lab with token exchange, see [Microsoft Entra On-Behalf-Of Token Exchange](../identity-delegation/msft-entra-obo.md), whose Entra JWKS setup this lab reuses.
+This lab is focused on the tunnel mechanics: it configures JWT authentication only, with no authorization/RBAC rules. For an Entra-backed lab with token exchange, see [Microsoft Entra On-Behalf-Of Token Exchange](../identity-delegation/msft-entra-obo.md), whose Entra JWKS setup this lab reuses.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -253,7 +253,7 @@ EOF
 
 > **Why `sts.windows.net` and not `login.microsoftonline.com` in the issuer?** Entra's v1 access tokens carry `iss: https://sts.windows.net/<tenant>/`, not the `login.microsoftonline.com` host you fetch the JWKS from. The JWKS backend targets the host that actually serves the keys; the policy's `issuer` must match the `iss` claim in the token being validated.
 
-> **Why target the `openai` `HTTPRoute` and not the `Gateway`?** `jwtAuthentication` validates and strips the JWT before it reaches any backend. If this policy targeted the `Gateway`, it would apply to *every* route on it — including an MCP backend that carries its own `mcp.authentication` (see [MCP Backend Variant](#mcp-backend-variant) below), whose auth plugin would then reject the request because the token was already stripped upstream. Scoping to the specific `HTTPRoute` keeps gateway-level and MCP-level JWT auth from colliding when both are in play on the same gateway.
+> **Why target the `openai` `HTTPRoute` and not the `Gateway`?** `jwtAuthentication` validates and strips the JWT before it reaches any backend. If this policy targeted the `Gateway`, it would apply to *every* route on it, including an MCP backend that carries its own `mcp.authentication` (see [MCP Backend Variant](#mcp-backend-variant) below), whose auth plugin would then reject the request because the token was already stripped upstream. Scoping to the specific `HTTPRoute` keeps gateway-level and MCP-level JWT auth from colliding when both are in play on the same gateway.
 
 ## Test
 
@@ -364,7 +364,7 @@ data:
 EOF
 ```
 
-> **Restart required.** `squid.conf` is mounted with `subPath`, and subPath mounts never pick up ConfigMap updates — roll the pod to load the deny rule:
+> **Restart required.** `squid.conf` is mounted with `subPath`, and subPath mounts never pick up ConfigMap updates. Roll the pod to load the deny rule:
 
 ```bash
 kubectl -n corporate-proxy rollout restart deploy/corporate-proxy
@@ -427,7 +427,7 @@ Expected output:
 
 Together the two tests prove the tunnel is the only path the fetch will take: with the proxy open it transits Squid, and with the proxy closed it fails outright instead of falling back to direct egress.
 
-> **Reading the failure mode.** A blocked proxy path always surfaces as a transport-level error — `Forbidden` here, or a `dial tcp ... i/o timeout` / `proxyconnect` error when egress is black-holed. If you instead see `unexpected status code from jwks endpoint ... 404`, the request completed against *some* HTTP server: that response came from whatever answered the connection (perhaps a TLS-intercepting appliance on the egress path), not from a blocked proxy, so investigate what's terminating the connection rather than the tunnel config.
+> **Reading the failure mode.** A blocked proxy path always surfaces as a transport-level error: `Forbidden` here, or a `dial tcp ... i/o timeout` / `proxyconnect` error when egress is black-holed. If you instead see `unexpected status code from jwks endpoint ... 404`, the request completed against *some* HTTP server: that response came from whatever answered the connection (perhaps a TLS-intercepting appliance on the egress path), not from a blocked proxy, so investigate what's terminating the connection rather than the tunnel config.
 
 ### Restore the Proxy
 
@@ -448,9 +448,9 @@ Finally, re-apply the policy from [Configure JWT Auth](#configure-jwt-auth) to r
 
 ## MCP Backend Variant
 
-The tunnel mechanics above apply just as well when the thing behind JWT auth is an MCP server rather than an LLM backend. Instead of validating the JWT at the `HTTPRoute` level like `agentgateway-jwt-auth-tunnel` does above, an MCP backend can carry its own `policies.mcp.authentication` block directly on its `EnterpriseAgentgatewayBackend` — same tunneled `entra-jwks` backend, same Entra issuer, just wired into the MCP auth plugin instead of the gateway auth plugin.
+The tunnel mechanics above apply just as well when the thing behind JWT auth is an MCP server rather than an LLM backend. Instead of validating the JWT at the `HTTPRoute` level like `agentgateway-jwt-auth-tunnel` does above, an MCP backend can carry its own `policies.mcp.authentication` block directly on its `EnterpriseAgentgatewayBackend`: same tunneled `entra-jwks` backend, same Entra issuer, just wired into the MCP auth plugin instead of the gateway auth plugin.
 
-This wraps [Solo.io's docs MCP server](https://search.solo.io) — the same remote server used in [Connect to a Remote MCP Server](../mcp/remote-mcp.md), here protected by JWT auth validated against the tunneled Entra JWKS:
+This wraps [Solo.io's docs MCP server](https://search.solo.io), the same remote server used in [Connect to a Remote MCP Server](../mcp/remote-mcp.md), here protected by JWT auth validated against the tunneled Entra JWKS:
 
 ```bash
 kubectl apply -f- <<EOF
@@ -515,7 +515,7 @@ curl -i "$GATEWAY_IP:8080/soloio-docs-mcp" \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl-test","version":"1.0"}}}'
 ```
 
-Expected output: `401 Unauthorized` with a `WWW-Authenticate: Bearer resource_metadata="..."` header — MCP auth failures return an OAuth protected-resource discovery pointer, unlike the plain-text `authentication failure: no bearer token found` from the gateway-level auth above.
+Expected output: `401 Unauthorized` with a `WWW-Authenticate: Bearer resource_metadata="..."` header. MCP auth failures return an OAuth protected-resource discovery pointer, unlike the plain-text `authentication failure: no bearer token found` from the gateway-level auth above.
 
 ```bash
 export SESSION_ID=$(curl -s -D - "$GATEWAY_IP:8080/soloio-docs-mcp" \
@@ -533,7 +533,7 @@ curl -s "$GATEWAY_IP:8080/soloio-docs-mcp" \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
 ```
 
-Expected output: `200 OK` with the MCP server's tool list (`search`, `get_chunks`, `get_full_page`) — the JWT was validated against Entra's JWKS, fetched entirely through the Squid tunnel, exactly like the LLM backend above.
+Expected output: `200 OK` with the MCP server's tool list (`search`, `get_chunks`, `get_full_page`). The JWT was validated against Entra's JWKS, fetched entirely through the Squid tunnel, exactly like the LLM backend above.
 
 ## Cleanup
 
