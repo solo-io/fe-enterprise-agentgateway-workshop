@@ -277,43 +277,53 @@ kubectl create secret tls -n agentgateway-system mcp-entra-tls \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Update the existing Gateway, preserving its HTTP listener:
+Append the listener with a **JSON patch** rather than `kubectl apply`. A full `apply` replaces
+the whole object, so it drops any field `001` set that the manifest does not restate, including
+`infrastructure.parametersRef`, which supplies the proxy's replica count, logging and model
+catalog. Losing it silently halves the proxy from two replicas to one. The patch below adds one
+list entry and touches nothing else.
 
 ```bash
-kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: agentgateway-proxy
-  namespace: agentgateway-system
-spec:
-  gatewayClassName: enterprise-agentgateway
-  listeners:
-    - name: http
-      port: 8080
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-    - name: https
-      port: 443
-      protocol: HTTPS
-      hostname: ${ENTRA_GATEWAY_HOST}
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - name: mcp-entra-tls
-            kind: Secret
-      allowedRoutes:
-        namespaces:
-          from: All
-EOF
-
-kubectl get gateway -n agentgateway-system agentgateway-proxy \
-  -o jsonpath='{range .status.listeners[*]}{.name}{"\t"}{.conditions[?(@.type=="Programmed")].status}{"\n"}{end}'
+kubectl patch gateway agentgateway-proxy -n agentgateway-system --type=json -p '[
+  {
+    "op": "add",
+    "path": "/spec/listeners/-",
+    "value": {
+      "name": "https",
+      "port": 443,
+      "protocol": "HTTPS",
+      "hostname": "'"${ENTRA_GATEWAY_HOST}"'",
+      "tls": {
+        "mode": "Terminate",
+        "certificateRefs": [
+          {
+            "name": "mcp-entra-tls",
+            "kind": "Secret"
+          }
+        ]
+      },
+      "allowedRoutes": {
+        "namespaces": {
+          "from": "All"
+        }
+      }
+    }
+  }
+]'
 ```
 
-Both `http` and `https` should report `True`.
+Confirm both listeners are programmed **and** the parameters reference survived:
+
+```bash
+kubectl get gateway -n agentgateway-system agentgateway-proxy \
+  -o jsonpath='{range .status.listeners[*]}{.name}{"\t"}{.conditions[?(@.type=="Programmed")].status}{"\n"}{end}'
+
+kubectl get gateway agentgateway-proxy -n agentgateway-system \
+  -o jsonpath='params={.spec.infrastructure.parametersRef.name}{"\n"}'
+```
+
+Both `http` and `https` should report `True`, and `params=` must not be empty. An empty value
+means the reference was dropped; re-run `001`'s Gateway step before continuing.
 
 ---
 
