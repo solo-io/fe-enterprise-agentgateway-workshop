@@ -559,7 +559,7 @@ kubectl rollout status -n agentgateway-system deployment/agentgateway-proxy --ti
 Expose the gateway's eager-OAuth endpoints (`/oauth-issuer/register`, `/oauth-issuer/authorize`, `/oauth-issuer/token`, `/oauth-issuer/callback/...`) by routing the `/oauth-issuer` path prefix to the `enterprise-agentgateway` controller service on port 7777. The route attaches to the `https` listener on `agentgateway-proxy` via `sectionName`.
 
 ```bash
-kubectl apply -f - <<'EOF'
+kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -571,7 +571,7 @@ spec:
       namespace: agentgateway-system
       sectionName: https
   hostnames:
-    - mcp-entra.try-solo.io
+    - ${ENTRA_GATEWAY_HOST}
   rules:
     - backendRefs:
         - name: enterprise-agentgateway
@@ -586,17 +586,17 @@ EOF
 
 Both the route and the backend service live in `agentgateway-system`, so no `ReferenceGrant` is required.
 
-Verify the route attached cleanly:
+Wait for the route to be accepted. The controller restarted in Step 5, and the new pod writes route status only after it takes the leader lease, which can take about 20 seconds:
 
 ```bash
-kubectl get httproute -n agentgateway-system oauth-issuer \
-  -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}'
+kubectl wait httproute/oauth-issuer -n agentgateway-system --timeout=60s \
+  --for=jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}'=True
 ```
 
 Expected Output:
 
 ```
-True
+httproute.gateway.networking.k8s.io/oauth-issuer condition met
 ```
 
 ---
@@ -975,6 +975,9 @@ Return to the Lab 001 baseline. Remove the Entra resources, revert the proxy env
 Gateway, then reset the controller's eager-OAuth Helm values before deleting Postgres. If you used
 Claude Code in Step 10, remove its local MCP entry too.
 
+As in Step 2, the Gateway change is a JSON patch so `infrastructure.parametersRef` survives. It
+removes the second listener, and its `test` operation stops the patch unless that listener is `https`.
+
 ```bash
 claude mcp remove mcp-entra-gateway  # only if you completed Step 10
 
@@ -990,22 +993,17 @@ kubectl patch enterpriseagentgatewayparameters agentgateway-config \
   --type=json \
   -p='[{"op":"remove","path":"/spec/env"}]' || true
 
-kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: agentgateway-proxy
-  namespace: agentgateway-system
-spec:
-  gatewayClassName: enterprise-agentgateway
-  listeners:
-    - name: http
-      port: 8080
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-EOF
+kubectl patch gateway agentgateway-proxy -n agentgateway-system --type=json -p '[
+  {
+    "op": "test",
+    "path": "/spec/listeners/1/name",
+    "value": "https"
+  },
+  {
+    "op": "remove",
+    "path": "/spec/listeners/1"
+  }
+]'
 
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
 helm upgrade -i -n agentgateway-system enterprise-agentgateway \
