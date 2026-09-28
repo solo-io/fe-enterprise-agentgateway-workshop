@@ -85,6 +85,7 @@ After completing this track you should be able to:
 | [MCP BYO gRPC External Authorization](../labs/mcp/mcp-byo-grpc-ext-authz.md) | Integrate your own ext-authz gRPC service for custom tool-level policy |
 | [MCP Eager OAuth with Auth0](../labs/mcp/mcp-eager-auth-auth0.md) | Configure the gateway as the OAuth Authorization Server for Auth0; agents get tokens directly from the gateway |
 | [MCP Eager OAuth with Okta](../labs/mcp/mcp-eager-auth-okta.md) | Same pattern with Okta as the backing IdP |
+| [MCP Eager OAuth with Microsoft Entra ID](../labs/mcp/mcp-eager-auth-entra.md) | Same pattern with Entra, which has no DCR endpoint at all, so the gateway acting as the AS is the only way a client can register |
 | [MCP Pre-Issuance Entitlement Gating with Auth0](../labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) | Add a gRPC ext-authz hook that checks entitlements before issuing OAuth tokens; denied users are redirected before they get any credentials |
 | [Web Application Firewall (WAF) for Agentic Traffic](../labs/security/WAF.md) | Attach a `WAFPolicy` to harden the HTTP surface and block tool-call payload abuse (command-exec, file-exfil signatures) and credential leakage, the deterministic layer beneath semantic guardrails |
 
@@ -124,6 +125,7 @@ After completing this track you should be able to:
 | [Claude Desktop](../labs/agent-harnesses/claude-desktop.md) | Configure Claude Desktop as an MCP client pointing at the gateway |
 | [Claude Code with Eager OAuth (Auth0)](../labs/mcp/mcp-eager-auth-auth0.md#step-10--test-with-claude-code) | Use Claude Code as an OAuth-authenticated MCP client against the Auth0-secured gateway |
 | [Claude Code with Eager OAuth (Okta)](../labs/mcp/mcp-eager-auth-okta.md#step-10--test-with-claude-code) | Same with Okta as the IdP |
+| [Claude Code with Eager OAuth (Entra)](../labs/mcp/mcp-eager-auth-entra.md#step-10--test-with-claude-code) | Same with Microsoft Entra ID as the IdP |
 
 ---
 
