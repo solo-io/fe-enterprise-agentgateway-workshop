@@ -14,32 +14,34 @@ You need an app registration in Microsoft Entra ID with the **Authorization Code
 | `ENTRA_CLIENT_ID` | Application (client) ID GUID |
 | `ENTRA_CLIENT_SECRET` | Client secret value from Certificates & secrets (copy it at creation; Entra never shows it again) |
 | `ENTRA_AUTHORITY` | `https://login.microsoftonline.com/${ENTRA_TENANT_ID}` |
-| `ENTRA_AUDIENCE` | The Application ID URI, normally `api://${ENTRA_CLIENT_ID}` |
+| `ENTRA_AUDIENCE` | The Application ID URI, normally `api://${ENTRA_CLIENT_ID}`; the policy also accepts the bare client ID because Entra can use either `aud` format |
 | `ENTRA_API_SCOPE` | The exposed scope, e.g. `api://${ENTRA_CLIENT_ID}/agentgateway` |
-| `ENTRA_ISSUER` | Depends on the app's `accessTokenAcceptedVersion`. See the warning below before you set it |
+| `ENTRA_ISSUER` | Depends on the app's access token version setting. See the warning below before you set it |
 | `ENTRA_GATEWAY_HOST` | Public hostname for the gateway (no scheme); this lab uses `mcp-entra.try-solo.io` |
 
 > **⚠ Pick your issuer before anything else.** Entra mints two different `iss` values depending on
-> the app manifest's `accessTokenAcceptedVersion`, and the MCP authentication policy compares the
+> the app manifest's `api.requestedAccessTokenVersion` (called `accessTokenAcceptedVersion` in the
+> older Azure AD Graph manifest), and the MCP authentication policy compares the
 > value literally.
 >
-> | `accessTokenAcceptedVersion` | `iss` on issued tokens |
+> | Access token version | `iss` on issued tokens |
 > |---|---|
 > | `null` or `1` (the default) | `https://sts.windows.net/${ENTRA_TENANT_ID}/` **with** a trailing slash |
 > | `2` | `https://login.microsoftonline.com/${ENTRA_TENANT_ID}/v2.0` with **no** trailing slash |
 >
+> In the current Entra manifest, set `"api": { "requestedAccessTokenVersion": 2 }` to select v2.
 > A new app registration defaults to v1 even though you call the v2.0 `/authorize` and `/token`
 > endpoints, which surprises most people. This is deviation 2 in
 > [How Entra Deviates](#how-entra-deviates-from-the-other-eager-oauth-labs). Decide which you want, set the manifest to match, and
-> use the corresponding `ENTRA_ISSUER`. If a valid-looking token still returns `401`, decode it at
-> [jwt.io](https://jwt.io) and compare `iss` against what you configured.
+> use the corresponding `ENTRA_ISSUER`. If a valid-looking token still returns `401`, inspect its
+> `iss` claim and compare it against what you configured.
 
 ### Expose an API scope
 
-Entra will not mint an access token carrying `aud: api://<client-id>` unless the authorization request asks for a scope on that API.
+To get an access token for your API, the authorization request must ask for a scope exposed by that API. The resulting `aud` can be the Application ID URI or the bare client ID.
 
 1. **Expose an API → Set the Application ID URI.** Accept the default `api://${ENTRA_CLIENT_ID}`.
-2. **Add a scope**, e.g. `agentgateway`, admin-consent-only is fine for a lab.
+2. **Add a scope**, e.g. `agentgateway`. For an easy lab sign-in, set **Who can consent?** to **Admins and users**. If you choose **Admins only**, grant admin consent to the app before testing with a non-admin user.
 3. Note the full scope string `api://${ENTRA_CLIENT_ID}/agentgateway`; it becomes `ENTRA_API_SCOPE`.
 
 ### Entra app callback URLs
@@ -58,6 +60,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 - `kubectl` and `helm`
 - `openssl` (for the self-signed gateway cert)
 - Node 18+ (for MCP Inspector in Step 9)
+- Claude Code, if you want to complete Step 10
 - `jq` for inspecting JSON responses
 - A way to resolve `mcp-entra.try-solo.io` from your workstation to the gateway LoadBalancer: either a real DNS record (production-style clusters) or a local `/etc/hosts` entry (KinD/minikube/local dev clusters; requires sudo)
 
@@ -66,7 +69,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 ## Lab Objectives
 
 - Stand up the eager-OAuth feature so the gateway acts as the OAuth Authorization Server visible to MCP clients
-- Give MCP clients a single pre-registered Entra `client_id` / `client_secret`, which is the only workable option because Entra has no Dynamic Client Registration endpoint
+- Give MCP clients a single pre-registered Entra `client_id` / `client_secret` through this eager-OAuth issuer, which bridges Entra's lack of a Dynamic Client Registration endpoint
 - Broker the Entra authorization code flow through the gateway (`/oauth-issuer/...`)
 - Validate Entra-issued JWTs at the MCP backend against Entra JWKS
 - Terminate TLS on `agentgateway-proxy` with a self-signed cert for `mcp-entra.try-solo.io`
@@ -78,7 +81,7 @@ The eager-OAuth issuer runs a "dual OAuth flow" and uses different callback path
 
 Why eager OAuth with Entra?
 
-With Okta and Auth0, eager OAuth is a convenience: both support Dynamic Client Registration (RFC 7591), and the gateway spares you an admin-UI entry per MCP client. **With Entra it is the only option.** Microsoft Entra ID does not publish an RFC 7591 registration endpoint, and Microsoft's own guidance is to pre-register clients statically:
+With Okta and Auth0, eager OAuth is a convenience: both support Dynamic Client Registration (RFC 7591), and the gateway spares you an admin-UI entry per MCP client. Entra does not publish an RFC 7591 registration endpoint, so MCP clients need a gateway bridge or statically configured clients. This lab demonstrates the controller-hosted eager-OAuth issuer. Solo also documents a [native Entra provider](https://docs.solo.io/agentgateway/latest/mcp/auth/entra/) in the gateway proxy; it is a different configuration path. For background on Entra's registration behavior, see:
 
 - [Does Azure AD support Dynamic Client Registration?](https://learn.microsoft.com/en-us/answers/questions/1328487/does-azure-ad-supports-dynamic-client-registration)
 - [Building MCP servers with Entra ID and pre-authorized clients](https://techcommunity.microsoft.com/blog/azuredevcommunityblog/building-mcp-servers-with-entra-id-and-pre-authorized-clients/4508453)
@@ -115,15 +118,15 @@ places, and four of them produce a `401` or `404` that looks like a gateway misc
 
 | # | Behavior | Okta / Auth0 / Keycloak | Entra |
 |---|---|---|---|
-| 1 | Dynamic Client Registration | Supported (RFC 7591). Eager OAuth is a convenience that avoids admin-UI churn | **Not supported. No `registration_endpoint` is published at all.** Eager OAuth is the only way an MCP client can onboard |
-| 2 | Issuer (`iss`) | One value per tenant | **Two**, chosen by the app manifest's `accessTokenAcceptedVersion`. v1 (the default) emits `https://sts.windows.net/<tenant>/`; v2 emits `https://login.microsoftonline.com/<tenant>/v2.0` |
-| 3 | Where `aud` comes from | An authz-server "Audience" setting (Okta) or a tenant default-audience setting (Auth0) | **The resource that owns the requested scope.** Request only `openid profile email` and you get a Microsoft Graph token, not yours |
+| 1 | Dynamic Client Registration | Supported (RFC 7591). Eager OAuth is a convenience that avoids admin-UI churn | **Not supported. No `registration_endpoint` is published at all.** A gateway bridge, such as this eager-OAuth issuer or the native Entra provider, is needed for clients that expect DCR |
+| 2 | Issuer (`iss`) | One value per tenant | **Two**, chosen by the app manifest's access token version setting. v1 (the default) emits `https://sts.windows.net/<tenant>/`; v2 emits `https://login.microsoftonline.com/<tenant>/v2.0` |
+| 3 | Where `aud` comes from | An authz-server "Audience" setting (Okta) or a tenant default-audience setting (Auth0) | **The resource that owns the requested scope.** Requesting only `openid profile email` can produce a Microsoft Graph token. Tokens for your API can use its Application ID URI or bare client ID as `aud` |
 | 4 | JWKS path | Fixed well-known path (`/.well-known/jwks.json`, `/oauth2/<id>/v1/keys`) | **Tenant-scoped**: `<tenant-id>/discovery/v2.0/keys` |
 | 5 | Scope combination | Scopes from multiple resources can be requested together | **One resource per request.** Reserved OIDC scopes may accompany a single resource's scope; two custom APIs in one request is an Entra error |
 
 **1. No DCR endpoint.** This is the reason the lab exists. With the other three providers you could
 skip eager OAuth and let clients register themselves. Against Entra that path does not exist, so
-without the gateway acting as the Authorization Server an MCP client has nowhere to register. `agentgateway.dev/issuer-proxy` is required for the same reason: proxy Entra's own metadata and
+this lab has the gateway act as the Authorization Server. `agentgateway.dev/issuer-proxy` is required for this eager-OAuth path: proxy Entra's own metadata and
 the client receives a document with no `registration_endpoint` in it.
 
 **2. Two issuers, and the default is the surprising one.** A new app registration defaults to v1
@@ -133,10 +136,11 @@ guessing wrong is a `401` on a token that is otherwise valid. Nothing in the Okt
 Auth0 labs prepares you for this.
 
 **3. Audience follows the scope, not a setting.** Okta lets you set the audience on the
-authorization server and Auth0 lets you set a tenant default. Entra has neither. The `aud` claim is
-determined by which API the requested scope belongs to, which is why `${ENTRA_API_SCOPE}` must
-appear in `downstream_server.scopes`. Omit it and every token comes back audienced to Microsoft
-Graph (`00000003-0000-0000-c000-000000000000`).
+authorization server and Auth0 lets you set a tenant default. Entra has neither. The requested
+scope selects the API that receives the token, which is why `${ENTRA_API_SCOPE}` must appear in
+`downstream_server.scopes`. Without it, Entra can issue a token for Microsoft Graph
+(`00000003-0000-0000-c000-000000000000`). Depending on the access token version, the `aud`
+claim for your API can be its Application ID URI or the bare client ID. Step 8 accepts both.
 
 **4. Tenant-scoped JWKS.** The `jwksPath` carries the tenant GUID. Combined with the gateway's
 no-leading-slash rule, the correct value is `${ENTRA_TENANT_ID}/discovery/v2.0/keys`. A leading
@@ -172,7 +176,7 @@ export ENTRA_AUDIENCE="api://${ENTRA_CLIENT_ID}"
 export ENTRA_API_SCOPE="api://${ENTRA_CLIENT_ID}/agentgateway"
 export ENTRA_GATEWAY_HOST=mcp-entra.try-solo.io
 
-# Issuer: pick ONE, matching the app's accessTokenAcceptedVersion (see Pre-requisites)
+# Issuer: pick ONE, matching the app's requestedAccessTokenVersion (see Pre-requisites)
 export ENTRA_ISSUER="https://sts.windows.net/${ENTRA_TENANT_ID}/"            # v1 (default), trailing slash
 # export ENTRA_ISSUER="${ENTRA_AUTHORITY}/v2.0"                              # v2, no trailing slash
 
@@ -184,8 +188,8 @@ export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY   # from Lab 001
 Notes on these values:
 
 - `ENTRA_CLIENT_SECRET` is the secret **Value** column in Certificates & secrets, not the **Secret ID**. Entra shows the value once, at creation.
-- `ENTRA_AUDIENCE` must match the `aud` claim on issued tokens. Entra sets `aud` from the API the requested scope belongs to, which is why `ENTRA_API_SCOPE` has to be in the authorization request (Step 5).
-- The authorize and token endpoints stay on the **v2.0** paths (`/oauth2/v2.0/authorize`, `/oauth2/v2.0/token`) regardless of which issuer you chose. Only the `iss` claim changes.
+- `ENTRA_API_SCOPE` selects the API that the issued token targets. Entra can put either the Application ID URI or the bare client ID in `aud`, depending on the token version. Step 8 accepts both forms; after sign-in, inspect the actual `aud` claim if validation returns 401.
+- The authorize and token endpoints stay on the **v2.0** paths (`/oauth2/v2.0/authorize`, `/oauth2/v2.0/token`) regardless of which access token version you chose. The `iss` and potentially the `aud` claim change.
 
 ### Map the gateway hostname to the LoadBalancer IP
 
@@ -206,9 +210,70 @@ echo "$GATEWAY_IP $ENTRA_GATEWAY_HOST" | sudo tee -a /etc/hosts
 
 ## Step 2 — Create a Self-Signed TLS Cert and Add an HTTPS Listener
 
-Identical to the Okta and Auth0 labs; nothing here is IdP-specific. Follow
-[`mcp-eager-auth-okta.md` Step 2](./mcp-eager-auth-okta.md#step-2--create-a-self-signed-tls-cert-and-add-an-https-listener),
-substituting `$ENTRA_GATEWAY_HOST` for `$OKTA_GATEWAY_HOST` throughout.
+Create a self-signed certificate for the Entra gateway hostname and add an HTTPS listener alongside Lab 001's HTTP listener. Run these commands in a lab working directory:
+
+```bash
+mkdir -p example_certs
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 \
+  -subj '/O=Solo.io/CN=try-solo.io' \
+  -keyout example_certs/try-solo.io.key \
+  -out    example_certs/try-solo.io.crt
+
+openssl req -out example_certs/gateway.csr -newkey rsa:2048 -nodes \
+  -keyout example_certs/gateway.key \
+  -subj  "/CN=${ENTRA_GATEWAY_HOST}/O=Solo.io"
+
+openssl x509 -req -sha256 -days 365 \
+  -CA    example_certs/try-solo.io.crt \
+  -CAkey example_certs/try-solo.io.key \
+  -set_serial 0 \
+  -in    example_certs/gateway.csr \
+  -out   example_certs/gateway.crt \
+  -extfile <(printf 'subjectAltName=DNS:%s' "$ENTRA_GATEWAY_HOST")
+
+kubectl create secret tls -n agentgateway-system mcp-entra-tls \
+  --key example_certs/gateway.key \
+  --cert example_certs/gateway.crt \
+  --dry-run=client -oyaml | kubectl apply -f -
+```
+
+Update the existing Gateway, preserving its HTTP listener:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agentgateway-proxy
+  namespace: agentgateway-system
+spec:
+  gatewayClassName: enterprise-agentgateway
+  listeners:
+    - name: http
+      port: 8080
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https
+      port: 443
+      protocol: HTTPS
+      hostname: ${ENTRA_GATEWAY_HOST}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: mcp-entra-tls
+            kind: Secret
+      allowedRoutes:
+        namespaces:
+          from: All
+EOF
+
+kubectl get gateway -n agentgateway-system agentgateway-proxy \
+  -o jsonpath='{range .status.listeners[*]}{.name}{"\t"}{.conditions[?(@.type=="Programmed")].status}{"\n"}{end}'
+```
+
+Both `http` and `https` should report `True`.
 
 ---
 
@@ -301,9 +366,10 @@ kubectl rollout status -n agentgateway-system deployment/agentgateway-proxy --ti
 ```
 
 > **⚠ Why `${ENTRA_API_SCOPE}` is in `scopes`.** Entra decides the `aud` claim from the API that the
-> requested scope belongs to. Ask for only `openid profile email` and you get a token audienced to
+> requested scope belongs to. Ask for only `openid profile email` and you can get a token for
 > Microsoft Graph, which the MCP authentication policy in Step 8 will reject. Including
-> `api://<client-id>/agentgateway` is what produces `aud: api://<client-id>`. The reserved OIDC
+> `api://<client-id>/agentgateway` requests a token for your API. Its `aud` can be the Application
+> ID URI or the bare client ID, so Step 8 accepts both. The reserved OIDC
 > scopes can be combined with a single resource's scope in one request; asking for scopes from two
 > different resources in one request is an Entra error, not a gateway one. This is deviations 3 and
 > 5 in [How Entra Deviates](#how-entra-deviates-from-the-other-eager-oauth-labs).
@@ -374,7 +440,7 @@ This step deploys five resources in `agentgateway-system`:
 | `entra-jwks` | EnterpriseAgentgatewayBackend | Static backend pointing at `login.microsoftonline.com` for JWKS lookups during request validation |
 | `elicitation-secret` | Secret | **Required** by the eager-OAuth issuer at the start of an auth flow. The controller looks for this exact name in its own namespace and 500s with `secret not found: agentgateway-system/elicitation-secret` on `/oauth-issuer/authorize` if it's missing. |
 
-Apply everything except the MCP server, which is identical to the Okta lab:
+First apply the Entra-specific Secret and JWKS backend:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -408,11 +474,132 @@ spec:
 EOF
 ```
 
-For the `mcp-server` Deployment, `mcp-server` Service, `mcp-backend` and `mcp-route`, apply the
-same manifests as
-[`mcp-eager-auth-okta.md` Step 7](./mcp-eager-auth-okta.md#step-7--deploy-the-mcp-server-backend-route-jwks-backend-and-elicitation-secret),
-changing only the two `hostnames:` entries on `mcp-route` from `mcp-okta.try-solo.io` to
-`mcp-entra.try-solo.io`.
+Then apply only the four shared resources below. The Okta lab's full Step 7 manifest includes an
+Okta `elicitation-secret`; applying that whole block here would replace the Entra secret above.
+
+```bash
+kubectl apply -f - <<EOF
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server
+  namespace: agentgateway-system
+spec:
+  selector:
+    matchLabels:
+      app: mcp-server
+  template:
+    metadata:
+      labels:
+        app: mcp-server
+    spec:
+      containers:
+        - name: mcp-server
+          image: node:20-alpine
+          command:
+            - sh
+            - -c
+            - |
+              export NODE_OPTIONS="--max-old-space-size=10240 --max-semi-space-size=64"
+              npx -y @modelcontextprotocol/server-everything streamableHttp
+          ports:
+            - name: mcp-http
+              containerPort: 3001
+          env:
+            - name: PORT
+              value: "3001"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server
+  namespace: agentgateway-system
+spec:
+  selector:
+    app: mcp-server
+  ports:
+    - port: 80
+      targetPort: 3001
+      appProtocol: agentgateway.dev/mcp
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayBackend
+metadata:
+  name: mcp-backend
+  namespace: agentgateway-system
+spec:
+  mcp:
+    targets:
+      - name: mcp-target
+        static:
+          host: mcp-server.agentgateway-system.svc.cluster.local
+          port: 80
+          protocol: StreamableHTTP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp-route
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+      sectionName: https
+  hostnames:
+    - ${ENTRA_GATEWAY_HOST}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp
+      backendRefs:
+        - name: mcp-backend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /.well-known/oauth-protected-resource/mcp
+      filters:
+        - type: CORS
+          cors:
+            allowOrigins:
+              - "*"
+            allowMethods: ["GET", "OPTIONS"]
+            allowHeaders:
+              - "Content-Type"
+              - "Authorization"
+              - "Accept"
+              - "mcp-protocol-version"
+            maxAge: 86400
+      backendRefs:
+        - name: mcp-backend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /.well-known/oauth-authorization-server/mcp
+      filters:
+        - type: CORS
+          cors:
+            allowOrigins:
+              - "*"
+            allowMethods: ["GET", "OPTIONS"]
+            allowHeaders:
+              - "Content-Type"
+              - "Authorization"
+              - "Accept"
+              - "mcp-protocol-version"
+            maxAge: 86400
+      backendRefs:
+        - name: mcp-backend
+          group: enterpriseagentgateway.solo.io
+          kind: EnterpriseAgentgatewayBackend
+EOF
+```
 
 Wait for the test server to come up:
 
@@ -436,7 +623,7 @@ The policy ties everything together:
 |---|---|
 | `issuer` | Entra is the JWT issuer (`${ENTRA_ISSUER}`). Trailing slash for v1 (`https://sts.windows.net/<tenant>/`), none for v2 (`https://login.microsoftonline.com/<tenant>/v2.0`). Compared literally. |
 | `jwks` | Points at the `entra-jwks` backend created in Step 7. **`jwksPath` must be written without a leading slash** (`${ENTRA_TENANT_ID}/discovery/v2.0/keys`): the controller appends `/` between the backend URL and `jwksPath`, so a leading slash produces `https://login.microsoftonline.com//<tenant>/...`, which Entra returns 404 for. The controller log signature is `failed resolving jwks ... 404` and the policy goes `PartiallyValid`; `/mcp` then bypasses auth entirely. |
-| `audiences` | The Application ID URI, `api://${ENTRA_CLIENT_ID}` |
+| `audiences` | Both Entra formats for this API: its Application ID URI, `api://${ENTRA_CLIENT_ID}`, and the bare `${ENTRA_CLIENT_ID}` |
 | `resourceMetadata.agentgateway.dev/issuer-proxy` | Tells the gateway to serve its own AS metadata (from the in-cluster eager-OAuth issuer at `:7777/oauth-issuer`) when an MCP client fetches `.well-known/oauth-authorization-server/mcp`. Without this, the gateway would proxy Entra's metadata directly, and Entra's metadata advertises no `registration_endpoint`. |
 | `resourceMetadata.scopesSupported` | The custom API scope exposed on the Entra app; clients read this from the protected-resource document |
 | `resourceMetadata.authorizationServers` / `resource` | What shows up in the protected-resource discovery document for clients |
@@ -460,6 +647,7 @@ spec:
         issuer: ${ENTRA_ISSUER}
         audiences:
           - ${ENTRA_AUDIENCE}
+          - ${ENTRA_CLIENT_ID}
         jwks:
           backendRef:
             name: entra-jwks
@@ -477,13 +665,46 @@ spec:
 EOF
 ```
 
+Before opening an MCP client, verify that the policy is accepted and the unauthenticated endpoint
+is protected. The request should return `401 Unauthorized` and a `WWW-Authenticate` header pointing
+to the protected-resource metadata. If it does not, inspect policy status before continuing.
+
+```bash
+kubectl get enterpriseagentgatewaypolicy -n agentgateway-system mcp-entra-eager -o yaml
+
+curl -ski -X POST "https://${ENTRA_GATEWAY_HOST}/mcp" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{}},"id":1}'
+```
+
+Check both discovery documents. The protected resource should advertise the Entra API scope and
+the gateway as its authorization server. The authorization-server document's
+`registration_endpoint` should point to `/oauth-issuer/register` on this gateway; its authorization
+and token endpoints should point to the gateway too.
+
+```bash
+curl -sk "https://${ENTRA_GATEWAY_HOST}/.well-known/oauth-protected-resource/mcp" | jq .
+curl -sk "https://${ENTRA_GATEWAY_HOST}/.well-known/oauth-authorization-server/mcp" \
+  | jq '{issuer, authorization_endpoint, token_endpoint, registration_endpoint, code_challenge_methods_supported}'
+```
+
 ---
 
 ## Step 9 — Test with MCP Inspector
 
-Identical to the Okta lab apart from the hostname. Follow
-[`mcp-eager-auth-okta.md` Step 9](./mcp-eager-auth-okta.md#step-9--test-with-mcp-inspector),
-connecting to `https://mcp-entra.try-solo.io/mcp`.
+First visit `https://mcp-entra.try-solo.io/.well-known/oauth-protected-resource/mcp` in your
+browser and accept the self-signed certificate warning. Then start Inspector with TLS verification
+disabled for this process only:
+
+```bash
+NODE_TLS_REJECT_UNAUTHORIZED=0 npx @modelcontextprotocol/inspector
+```
+
+Open the URL printed by Inspector. Set **Transport type** to **Streamable HTTP**, set **Server URL**
+to `https://mcp-entra.try-solo.io/mcp`, and click **Connect**. Complete the Microsoft sign-in and
+any consent prompt. In **Tools → List Tools**, run `echo` with `{"message":"hi"}` and confirm it
+returns a result without a 401.
 
 The browser will redirect to the Microsoft sign-in page rather than Okta's. If your workstation
 already holds an active Entra session for this tenant, Entra may complete the flow without
@@ -502,9 +723,20 @@ prompting, which looks like the redirect was skipped.
 
 ## Step 10 — Test with Claude Code
 
-Identical to the Okta lab apart from the hostname. Follow
-[`mcp-eager-auth-okta.md` Step 10](./mcp-eager-auth-okta.md#step-10--test-with-claude-code),
-registering `https://mcp-entra.try-solo.io/mcp`.
+Register the Entra endpoint and launch Claude Code with the self-signed certificate workaround
+scoped to that process:
+
+```bash
+claude mcp add mcp-entra-gateway --transport http https://mcp-entra.try-solo.io/mcp
+claude mcp list
+NODE_TLS_REJECT_UNAUTHORIZED=0 claude
+```
+
+Trigger MCP tool discovery, finish the Microsoft sign-in in the browser, and ask Claude Code to use
+`mcp-entra-gateway`'s `echo` tool. A successful tool result confirms the stored token works on a
+subsequent MCP request. Remove the local entry during cleanup with
+`claude mcp remove mcp-entra-gateway`. If your gateway uses a trusted certificate, launch Claude
+Code normally without `NODE_TLS_REJECT_UNAUTHORIZED=0`.
 
 ---
 
@@ -512,12 +744,14 @@ registering `https://mcp-entra.try-solo.io/mcp`.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `401` after a successful login, token looks valid | `iss` mismatch between the token and the policy. v1 apps emit `https://sts.windows.net/<tenant>/`; v2 apps emit `https://login.microsoftonline.com/<tenant>/v2.0` | Decode the token at [jwt.io](https://jwt.io), set `ENTRA_ISSUER` to match, re-apply Step 8. Or set `accessTokenAcceptedVersion: 2` in the app manifest and use the v2 issuer |
-| `401`, token `aud` is `00000003-0000-0000-c000-000000000000` | That is Microsoft Graph. The authorization request asked only for reserved OIDC scopes | Add `${ENTRA_API_SCOPE}` to `downstream_server.scopes` in Step 5 |
+| `401` after a successful login, token looks valid | `iss` mismatch between the token and the policy. v1 apps emit `https://sts.windows.net/<tenant>/`; v2 apps emit `https://login.microsoftonline.com/<tenant>/v2.0` | Inspect the token's `iss`, set `ENTRA_ISSUER` to match, and re-apply Step 8. Or set `api.requestedAccessTokenVersion` to `2` in the current app manifest and use the v2 issuer |
+| `401`, token `aud` is `00000003-0000-0000-c000-000000000000` | That is Microsoft Graph. The authorization request did not select your API | Add `${ENTRA_API_SCOPE}` to `downstream_server.scopes` in Step 5 |
+| `401`, token `aud` is your app's bare client ID | The applied policy does not match that claim | Confirm Step 8's `audiences` list includes `${ENTRA_CLIENT_ID}` and re-apply the policy |
 | `GET /mcp` returns **406** (not 401), well-known returns 404 | MCP auth policy is `PartiallyValid`: the controller could not fetch JWKS. Almost always a **leading slash** on `jwksPath` | Use `jwksPath: ${ENTRA_TENANT_ID}/discovery/v2.0/keys` with no leading slash. Check `kubectl logs -n agentgateway-system deploy/enterprise-agentgateway \| grep -i jwks` |
 | `AADSTS50011: redirect URI does not match` after login | Only one of the two callbacks is registered on the app | Register both `/oauth-issuer/callback/downstream` and `/oauth-issuer/callback/upstream` under Authentication → Web |
 | `AADSTS7000215: Invalid client secret provided` | `ENTRA_CLIENT_SECRET` holds the secret **ID** rather than the secret **Value** | Copy the Value column in Certificates & secrets. If it was never captured, create a new secret; Entra cannot show an existing one |
 | `AADSTS650053: The application asked for scope ... that doesn't exist` | The exposed API scope name does not match `ENTRA_API_SCOPE` | Check Expose an API → Scopes and copy the full `api://<client-id>/<scope>` string |
+| Consent prompt or consent-required error blocks a non-admin user | The exposed scope allows only admin consent and an admin has not granted it | Grant admin consent before the lab, or configure **Who can consent?** as **Admins and users** |
 | Controller crashloops with `error creating actor validator: unsupported validator type:` | One of the three `tokenExchange` validators is missing | All three of `subjectValidator`, `apiValidator`, `actorValidator` are required at boot |
 | `secret not found: agentgateway-system/elicitation-secret` on `/oauth-issuer/authorize` | The elicitation Secret was not applied | Apply it from Step 7. The name is fixed; the controller looks for this exact name in its own namespace |
 
@@ -542,7 +776,64 @@ kubectl logs -n agentgateway-system deploy/agentgateway-proxy -f
 
 ## Cleanup
 
-Identical to the Okta lab apart from resource names. Follow
-[`mcp-eager-auth-okta.md` Cleanup](./mcp-eager-auth-okta.md#cleanup), substituting
-`mcp-entra-eager` for `mcp-okta-eager`, `entra-jwks` for `okta-jwks`, and
-`$ENTRA_GATEWAY_HOST` for `$OKTA_GATEWAY_HOST`.
+Return to the Lab 001 baseline. Remove the Entra resources, revert the proxy environment and
+Gateway, then reset the controller's eager-OAuth Helm values before deleting Postgres. If you used
+Claude Code in Step 10, remove its local MCP entry too.
+
+```bash
+claude mcp remove mcp-entra-gateway  # only if you completed Step 10
+
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mcp-entra-eager --ignore-not-found
+kubectl delete httproute -n agentgateway-system mcp-route oauth-issuer --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend entra-jwks --ignore-not-found
+kubectl delete deployment -n agentgateway-system mcp-server --ignore-not-found
+kubectl delete service -n agentgateway-system mcp-server --ignore-not-found
+kubectl delete secret -n agentgateway-system elicitation-secret mcp-entra-tls --ignore-not-found
+
+kubectl patch enterpriseagentgatewayparameters agentgateway-config \
+  -n agentgateway-system \
+  --type=json \
+  -p='[{"op":"remove","path":"/spec/env"}]' || true
+
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agentgateway-proxy
+  namespace: agentgateway-system
+spec:
+  gatewayClassName: enterprise-agentgateway
+  listeners:
+    - name: http
+      port: 8080
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+EOF
+
+export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
+helm upgrade -i -n agentgateway-system enterprise-agentgateway \
+  oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+  --version $ENTERPRISE_AGW_VERSION \
+  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
+
+kubectl rollout status -n agentgateway-system deployment/enterprise-agentgateway --timeout=180s
+kubectl delete namespace postgres --ignore-not-found
+```
+
+If Helm reports a no-op, restart the controller before recreating Postgres for another run:
+
+```bash
+kubectl rollout restart -n agentgateway-system deployment/enterprise-agentgateway
+kubectl rollout status -n agentgateway-system deployment/enterprise-agentgateway --timeout=180s
+```
+
+Remove the files created in Step 2 and the hosts entry added in Step 1:
+
+```bash
+rm -f example_certs/try-solo.io.key example_certs/try-solo.io.crt \
+  example_certs/gateway.key example_certs/gateway.csr example_certs/gateway.crt
+rmdir example_certs 2>/dev/null || true
+sudo sed -i '' "/${ENTRA_GATEWAY_HOST}/d" /etc/hosts  # macOS; on Linux omit the empty '' argument
+```
