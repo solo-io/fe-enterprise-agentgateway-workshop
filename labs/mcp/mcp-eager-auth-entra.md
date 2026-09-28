@@ -319,15 +319,139 @@ Both `http` and `https` should report `True`.
 
 ## Step 3 — Deploy Postgres for OAuth State
 
-Identical to the Okta and Auth0 labs. Follow
-[`mcp-eager-auth-okta.md` Step 3](./mcp-eager-auth-okta.md#step-3--deploy-postgres-for-oauth-state).
+The eager-OAuth feature stores token-exchange / authorization-code state in a database. This lab uses Postgres (production-realistic). For quick iteration you can skip Postgres and use SQLite in-memory; see the callout below.
+
+```bash
+kubectl apply -f - <<'EOF'
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: postgres
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+  namespace: postgres
+type: Opaque
+stringData:
+  POSTGRES_DB: mydb
+  POSTGRES_USER: myuser
+  POSTGRES_PASSWORD: mypassword
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: postgres
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:18
+          envFrom:
+            - secretRef:
+                name: postgres-secret
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+EOF
+```
+
+Wait for the pod to become ready:
+
+```bash
+kubectl rollout status -n postgres deployment/postgres --timeout=120s
+```
+
+Expected Output:
+
+```
+deployment "postgres" successfully rolled out
+```
+
+> **Skip Postgres? Use SQLite in-memory.** Omit Step 3 entirely, then in Step 5 omit the `database:` block from the values. The gateway will use SQLite in-memory. State is lost on pod restart: fine for a lab, not for production.
 
 ---
 
 ## Step 4 — Add STS Env Vars to the Gateway Config
 
-Identical to the Okta and Auth0 labs. Follow
-[`mcp-eager-auth-okta.md` Step 4](./mcp-eager-auth-okta.md#step-4--add-sts-env-vars-to-the-gateway-config).
+The eager-OAuth flow needs two env vars on the agentgateway proxy pod so it knows where the in-cluster STS endpoint lives. Patch the existing `agentgateway-config` `EnterpriseAgentgatewayParameters` from Lab 001. Do not recreate it; the patch preserves all other settings.
+
+```bash
+kubectl patch enterpriseagentgatewayparameters agentgateway-config \
+  -n agentgateway-system \
+  --type=merge \
+  -p='
+spec:
+  env:
+    - name: STS_URI
+      value: http://enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777/elicitations/oauth2/token
+    - name: STS_AUTH_TOKEN
+      value: /var/run/secrets/xds-tokens/xds-token
+'
+```
+
+Verify the patch landed:
+
+```bash
+kubectl get enterpriseagentgatewayparameters agentgateway-config \
+  -n agentgateway-system -o jsonpath='{.spec.env}' | jq .
+```
+
+Expected Output:
+
+```json
+[
+  {
+    "name": "STS_URI",
+    "value": "http://enterprise-agentgateway.agentgateway-system.svc.cluster.local:7777/elicitations/oauth2/token"
+  },
+  {
+    "name": "STS_AUTH_TOKEN",
+    "value": "/var/run/secrets/xds-tokens/xds-token"
+  }
+]
+```
 
 ---
 
