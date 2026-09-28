@@ -121,18 +121,15 @@ places, and four of them produce a `401` or `404` that looks like a gateway misc
 | 4 | JWKS path | Fixed well-known path (`/.well-known/jwks.json`, `/oauth2/<id>/v1/keys`) | **Tenant-scoped**: `<tenant-id>/discovery/v2.0/keys` |
 | 5 | Scope combination | Scopes from multiple resources can be requested together | **One resource per request.** Reserved OIDC scopes may accompany a single resource's scope; two custom APIs in one request is an Entra error |
 
-Taken one at a time:
-
 **1. No DCR endpoint.** This is the reason the lab exists. With the other three providers you could
 skip eager OAuth and let clients register themselves. Against Entra that path does not exist, so
-without the gateway acting as the Authorization Server an MCP client has nowhere to register. It is
-also why `agentgateway.dev/issuer-proxy` is not optional here: proxying Entra's own metadata would
-hand the client a document with no `registration_endpoint` in it.
+without the gateway acting as the Authorization Server an MCP client has nowhere to register. `agentgateway.dev/issuer-proxy` is required for the same reason: proxy Entra's own metadata and
+the client receives a document with no `registration_endpoint` in it.
 
 **2. Two issuers, and the default is the surprising one.** A new app registration defaults to v1
 even though this lab calls the v2.0 `/authorize` and `/token` endpoints. So the endpoints say v2.0
 and the token says `sts.windows.net`. The MCP authentication policy compares `iss` literally, so
-guessing wrong is a `401` on a token that is otherwise completely valid. Nothing in the Okta or
+guessing wrong is a `401` on a token that is otherwise valid. Nothing in the Okta or
 Auth0 labs prepares you for this.
 
 **3. Audience follows the scope, not a setting.** Okta lets you set the audience on the
