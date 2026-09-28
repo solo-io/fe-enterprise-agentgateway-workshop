@@ -123,6 +123,7 @@ places, and four of them produce a `401` or `404` that looks like a gateway misc
 | 3 | Where `aud` comes from | An authz-server "Audience" setting (Okta) or a tenant default-audience setting (Auth0) | **The resource that owns the requested scope.** Requesting only `openid profile email` can produce a Microsoft Graph token. Tokens for your API can use its Application ID URI or bare client ID as `aud` |
 | 4 | JWKS path | Fixed well-known path (`/.well-known/jwks.json`, `/oauth2/<id>/v1/keys`) | **Tenant-scoped**: `<tenant-id>/discovery/v2.0/keys` |
 | 5 | Scope combination | Scopes from multiple resources can be requested together | **One resource per request.** Reserved OIDC scopes may accompany a single resource's scope; two custom APIs in one request is an Entra error |
+| 6 | RFC 8707 `resource` parameter | Accepted, and MCP clients send it to name the target resource | **Rejected.** A client that sends `resource` on `/authorize` gets an Entra error unless something strips it first |
 
 **1. No DCR endpoint.** This is the reason the lab exists. With the other three providers you could
 skip eager OAuth and let clients register themselves. Against Entra that path does not exist, so
@@ -150,6 +151,45 @@ enforcing auth rather than failing closed.
 **5. One resource per authorization request.** Relevant if you later extend this lab to broker a
 second downstream API. You cannot ask for scopes on two custom APIs in a single `/authorize` call;
 you need a separate token acquisition per resource.
+
+**6. Entra rejects the RFC 8707 `resource` parameter.** MCP clients send it to name the resource
+they want a token for. Entra returns an error. The eager-OAuth issuer sidesteps this because it
+builds the downstream `/authorize` URL itself from `downstream_server` rather than forwarding the
+client's parameters, so the client's `resource` never reaches Entra. The native provider below
+strips it explicitly.
+
+---
+
+## Two Ways to Do This, and When to Pick Each
+
+agentgateway offers a second, lighter path for Entra: a **native Entra provider**
+(`provider: Entra`), documented at
+[Set up Microsoft Entra ID](https://docs.solo.io/agentgateway/kubernetes/latest/documentation/mcp/auth/entra/).
+It solves the same problem this lab solves. Know both before you build either.
+
+| | This lab (eager OAuth) | Native `provider: Entra` |
+|---|---|---|
+| Who answers DCR | The controller's OAuth issuer on `:7777` | The proxy short-circuits it with your pre-registered client ID |
+| AS metadata | Gateway serves its own via `issuer-proxy` | Proxy serves RFC 8414 metadata derived from Entra's OIDC discovery |
+| RFC 8707 `resource` | Never forwarded, because the issuer builds the downstream URL itself | Stripped explicitly before the request reaches Entra |
+| Postgres | Required, for OAuth state | Not required |
+| `tokenExchange` helm values | Required, all three validators, or the controller will not boot | Not required |
+| `/oauth-issuer` HTTPRoute to `:7777` | Required | Not required |
+| Entra app shape | Confidential client with a secret | Public client using PKCE |
+| Client secret in cluster | Yes | No |
+
+**Pick the native provider** when Entra is the only IdP in front of these MCP servers and you want
+the smallest moving-parts count. No database, no controller-side OAuth server, no client secret
+stored in the cluster.
+
+**Pick eager OAuth**, which is what this lab builds, when you want one mechanism across several
+IdPs (the Okta, Auth0 and Keycloak labs configure the same issuer), when you need the issuer's
+pre-registered client table to hand different `client_id`s to different MCP clients, or when you
+are heading toward the entitlement gating in
+[MCP Pre-Issuance Entitlement Gating](./mcp-eager-auth-auth0-pre-issuance-authz.md), which hooks
+the issuer's token endpoint.
+
+Everything below builds the eager-OAuth path.
 
 ---
 
