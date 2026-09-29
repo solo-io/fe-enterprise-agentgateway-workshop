@@ -86,6 +86,12 @@ The `authz` policy in this lab defines three personas. The persona comes from th
 
 Deploy the mock procurement MCP server, route `/procurement/mcp` to it, and require a JWT signed by the workshop's demo key under `lib/jwt/`. Run the commands in this lab from the root of the workshop repo.
 
+`lib/jwt/generate-jwt.sh` creates the demo key pair and `lib/jwt/jwks.json` on its first run. Mint a throwaway token so the file exists before the policy below inlines it:
+
+```bash
+./lib/jwt/generate-jwt.sh lib/jwt/claims/buyer.json > /dev/null
+```
+
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: v1
@@ -188,7 +194,7 @@ EOF
 kubectl rollout status -n procurement deploy/procurement-mcp --timeout=180s
 ```
 
-> The `$(sed ...)` substitution inlines `lib/jwt/jwks.json` with the indentation YAML needs. `lib/jwt/generate-jwt.sh` creates that file on its first run; if it is missing, run `./lib/jwt/generate-jwt.sh lib/jwt/claims/buyer.json > /dev/null` first.
+> The `$(sed ...)` substitution inlines `lib/jwt/jwks.json` with the indentation YAML needs.
 
 ### Get the gateway address
 
@@ -929,6 +935,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 jwt.sub=bailey-buyer	gen_ai.tool.name=create_purchase_order	error="mcp: mcpGuardrails rejected: amount $25000 exceeds the $10000 limit for buyer; approval required"
 jwt.sub=bailey-buyer	gen_ai.tool.name=create_purchase_order	error="mcp: mcpGuardrails rejected: amount $5000 exceeds the $2500 limit for buyer; approval required"
 jwt.sub=bailey-buyer	gen_ai.tool.name=create_purchase_order	error="mcp: mcpGuardrails rejected: create_purchase_order needs a numeric amount"
+jwt.sub=bailey-buyer	gen_ai.tool.name=get_supplier	error="mcp: mcpGuardrails rejected: mcpGuardrails checkRequest failed: upstream call timeout"
 jwt.sub=bailey-buyer	gen_ai.tool.name=send_supplier_email	error="mcp: mcpGuardrails rejected: recipient domain gmail.com not allowed"
 jwt.sub=bailey-buyer	gen_ai.tool.name=send_supplier_email	error="mcp: mcpGuardrails rejected: recipient domain try-solo.io.attacker.example not allowed"
 jwt.sub=fran-finance	gen_ai.tool.name=delete_supplier	error="mcp: mcpGuardrails rejected: tool delete_supplier is disabled"
