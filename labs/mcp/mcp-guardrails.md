@@ -10,8 +10,6 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 > **Version:** MCP guardrails are available in Enterprise Agentgateway **v2026.8.2 and later**.
 
-This runbook was validated against controller **v2026.8.2** on a local KinD cluster.
-
 ## Lab Objectives
 - Deploy a procurement MCP server behind agentgateway with JWT authentication
 - Attach an ExtMCP guardrails processor to an `EnterpriseAgentgatewayBackend` with an `EnterpriseAgentgatewayPolicy`
@@ -25,31 +23,19 @@ This runbook was validated against controller **v2026.8.2** on a local KinD clus
 
 MCP guardrails (also called ExtMCP) call an external gRPC policy server at the MCP method layer. For each method you opt in, agentgateway sends the server the JSON-RPC method, the target backend, the request `params` or response `result`, and caller metadata computed with CEL. The server passes the message, returns a rewritten one, or denies it. A denial reaches the client as a JSON-RPC error.
 
-```
-                         ┌──────────── agentgateway-proxy ─────────────┐
- curl / MCP client       │ JWT auth (lib/jwt JWKS, inline)             │
- Bearer <persona JWT> ──▶│ /procurement/mcp → procurement-mcp backend  │──▶ procurement-mcp
-                         │   guardrails processors, in order:          │      get_supplier
-                         │    [1] extmcp-authz   FailClosed            │      list_purchase_orders
-                         │        tools/call: Request                  │      create_purchase_order
-                         │        tools/list: Response                 │      send_supplier_email
-                         │        metadata: persona, sub (from JWT)    │      delete_supplier
-                         │    [2] extmcp-redact  FailOpen              │
-                         │        tools/call: Response                 │
-                         └──────────┬──────────────────┬───────────────┘
-                                    │ gRPC (h2c)       │ gRPC (h2c)
-                              extmcp-authz       extmcp-redact
-```
+![MCP guardrails architecture: an MCP client sends a persona JWT to agentgateway-proxy, which authenticates the JWT, routes /procurement/mcp to the procurement-mcp server over Streamable HTTP, and calls two ExtMCP policy servers over gRPC in order: extmcp-authz (FailClosed) gates tools/call requests and filters tools/list responses using the persona and sub claims, and extmcp-redact (FailOpen) masks bank account and tax ID values in tools/call responses. Each policy server reads its policy from a ConfigMap mounted at /etc/extmcp](../../images/mcp/mcp-guardrails-architecture.png)
 
 Each place you can put MCP authorization logic sees a different part of the call:
 
 | Mechanism | What it sees | What it can do |
 |---|---|---|
 | [ext_authz](mcp-byo-grpc-ext-authz.md) | HTTP method, path, headers | Allow or deny the HTTP request |
-| `mcpAuthorization` CEL rules | Tool name and JWT claims | Allow or deny a tool |
+| [`mcp.authorization` CEL rules](mcp-tool-federation.md#step-7-persona-based-tool-filtering) | Tool name and JWT claims | Allow or deny a tool |
 | ExtMCP guardrails | Method, tool, argument values, results, caller metadata | Allow, deny, or rewrite the request or the result |
 
 A limit on a purchase-order amount needs the argument value, so it belongs in ExtMCP.
+
+> **Tip:** CEL rules evaluate inside the proxy. For per-persona tool scoping alone, a CEL rule on the backend is enough. This lab scopes tools in ExtMCP to keep all procurement policy in one ConfigMap. To use both, scope tools with CEL and check argument values and results with ExtMCP.
 
 Each processor lists the methods it handles and the phase in which agentgateway calls it:
 
@@ -679,93 +665,7 @@ mcp_call "$BUYER" tools/call '{"name":"get_supplier","arguments":{"id":"SUP-001"
 
 ## Step 5 — Compare Failure Modes
 
-### Add a callout timeout
-
-When a policy server is slow, the gateway waits up to 10 seconds for its answer before it applies the processor's failure mode. Set a shorter request timeout on each policy server's Service. A backend policy that targets a Service attaches once a route references that Service, so each timeout comes with a route on a placeholder hostname. These routes attach to the same listener that serves `/procurement/mcp`, with no JWT policy. In production, attach them to a Gateway that only in-cluster clients can reach.
-
-```bash
-kubectl apply -f - <<'EOF'
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: extmcp-authz-timeout
-  namespace: procurement
-spec:
-  parentRefs:
-    - name: agentgateway-proxy
-      namespace: agentgateway-system
-  hostnames:
-    - extmcp-authz.internal
-  rules:
-    - backendRefs:
-        - name: extmcp-authz
-          port: 4445
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: extmcp-authz-timeout
-  namespace: procurement
-spec:
-  targetRefs:
-    - group: ""
-      kind: Service
-      name: extmcp-authz
-  backend:
-    http:
-      requestTimeout: 5s
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: extmcp-redact-timeout
-  namespace: procurement
-spec:
-  parentRefs:
-    - name: agentgateway-proxy
-      namespace: agentgateway-system
-  hostnames:
-    - extmcp-redact.internal
-  rules:
-    - backendRefs:
-        - name: extmcp-redact
-          port: 4445
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: extmcp-redact-timeout
-  namespace: procurement
-spec:
-  targetRefs:
-    - group: ""
-      kind: Service
-      name: extmcp-redact
-  backend:
-    http:
-      requestTimeout: 5s
-EOF
-```
-
-### Slow down the authorization server
-
-The policy server's `SIMULATED_DELAY` setting makes it wait before each decision. Make the authorization server take 30 seconds, time one call, then remove the delay:
-
-```bash
-kubectl set env -n procurement deploy/extmcp-authz SIMULATED_DELAY=30s
-kubectl rollout status -n procurement deploy/extmcp-authz --timeout=120s
-time (mcp_call "$BUYER" tools/call '{"name":"get_supplier","arguments":{"id":"SUP-001"}}' | jq -c .)
-kubectl set env -n procurement deploy/extmcp-authz SIMULATED_DELAY-
-kubectl rollout status -n procurement deploy/extmcp-authz --timeout=120s
-```
-
-```
-{"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":"mcpGuardrails checkRequest failed: upstream call timeout"}}
-
-real	0m5.079s
-```
-
-The gateway stops waiting after 5 seconds and, because the authorization processor is `FailClosed`, returns an error. Without the timeout policy the same call fails after 10 seconds.
+Scale each policy server to zero and see how its failure mode changes the result.
 
 ### Take down the redaction server
 
@@ -808,6 +708,8 @@ Every governed call fails, including the finance approver's.
 |---|---|---|---|
 | `extmcp-authz` | `FailClosed` | Governed calls fail with a JSON-RPC error | No unauthorized call reaches the MCP server |
 | `extmcp-redact` | `FailOpen` | Calls succeed unredacted | Agents keep working, payment data is exposed |
+
+> **Note:** A slow policy server is bounded too. The gateway waits up to 10 seconds for a decision, then applies the processor's failure mode. To shorten the wait, set `backend.http.requestTimeout` in an `EnterpriseAgentgatewayPolicy` that targets the policy server's Service. That policy attaches only once a route references the Service.
 
 ### Restore both servers
 
@@ -862,7 +764,7 @@ EOF
 )"
 ```
 
-The kubelet refreshes ConfigMap volumes on its sync period, which can take up to a minute, and the policy server checks the file every 5 seconds. Wait for the reload:
+The kubelet refreshes ConfigMap volumes on its sync period, which can take a minute or two, and the policy server checks the file every 5 seconds. Wait for the reload:
 
 ```bash
 until kubectl logs -n procurement deploy/extmcp-authz --since=5m | grep -q '"msg":"policy reloaded"'; do sleep 5; done
@@ -912,18 +814,9 @@ kubectl logs -n procurement deploy/extmcp-redact --tail=50 | jq -c 'select(.msg=
 
 The authorization server restarted in Step 5, so its log starts there. Each redaction counts twice because the result carries the values in both `structuredContent` and the text content.
 
-
 ### View access logs
 
-The gateway logs every MCP request to stdout:
-
-```bash
-kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
-```
-
-The log line carries the MCP fields `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`, plus a `trace.id` you can search for in the Solo UI's **Tracing** view.
-
-When a processor denies a call, the gateway's log line for that request carries the policy server's reason in `error`, next to `jwt.sub` and `gen_ai.tool.name`. List the distinct rejections from this lab:
+Each MCP request's log line carries `mcp.method.name`, `mcp.resource.type`, `mcp.target`, and `mcp.session.id`, plus a `trace.id` you can search for in the Solo UI's **Tracing** view. When a processor denies a call, the gateway's log line for that request carries the policy server's reason in `error`, next to `jwt.sub` and `gen_ai.tool.name`. List the distinct rejections from this lab:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --tail=500 --prefix=false \
@@ -935,32 +828,12 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 jwt.sub=bailey-buyer	gen_ai.tool.name=create_purchase_order	error="mcp: mcpGuardrails rejected: amount $25000 exceeds the $10000 limit for buyer; approval required"
 jwt.sub=bailey-buyer	gen_ai.tool.name=create_purchase_order	error="mcp: mcpGuardrails rejected: amount $5000 exceeds the $2500 limit for buyer; approval required"
 jwt.sub=bailey-buyer	gen_ai.tool.name=create_purchase_order	error="mcp: mcpGuardrails rejected: create_purchase_order needs a numeric amount"
-jwt.sub=bailey-buyer	gen_ai.tool.name=get_supplier	error="mcp: mcpGuardrails rejected: mcpGuardrails checkRequest failed: upstream call timeout"
 jwt.sub=bailey-buyer	gen_ai.tool.name=send_supplier_email	error="mcp: mcpGuardrails rejected: recipient domain gmail.com not allowed"
 jwt.sub=bailey-buyer	gen_ai.tool.name=send_supplier_email	error="mcp: mcpGuardrails rejected: recipient domain try-solo.io.attacker.example not allowed"
 jwt.sub=fran-finance	gen_ai.tool.name=delete_supplier	error="mcp: mcpGuardrails rejected: tool delete_supplier is disabled"
 jwt.sub=fran-finance	gen_ai.tool.name=list_purchase_orders	error="mcp: mcpGuardrails rejected: mcpGuardrails checkRequest failed: no healthy backends"
 jwt.sub=riley-requester	gen_ai.tool.name=delete_supplier	error="mcp: mcpGuardrails rejected: persona requester may not call delete_supplier"
 ```
-
-### View MCP metrics
-
-The proxy exposes Prometheus metrics at `/metrics` on port `15020`:
-
-```bash
-# `001` runs two proxy replicas and a request is only counted on the replica
-# that served it, so scrape both.
-for pod in $(kubectl get pods -n agentgateway-system \
-    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
-  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
-  PF=$!
-  sleep 3
-  curl -s http://localhost:15020/metrics | grep -E 'agentgateway_mcp_requests_total|protocol="mcp"'
-  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
-done
-```
-
-`agentgateway_mcp_requests_total` counts MCP calls by `method`, `server`, and `resource` (the tool name). For the Grafana dashboard, see the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md).
 
 ## Key Takeaways
 
@@ -973,8 +846,8 @@ done
 ## Cleanup
 
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n procurement procurement-guardrails procurement-jwt extmcp-authz-timeout extmcp-redact-timeout --ignore-not-found
-kubectl delete httproute -n procurement procurement-mcp extmcp-authz-timeout extmcp-redact-timeout --ignore-not-found
+kubectl delete enterpriseagentgatewaypolicy -n procurement procurement-guardrails procurement-jwt --ignore-not-found
+kubectl delete httproute -n procurement procurement-mcp --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n procurement procurement-mcp --ignore-not-found
 kubectl delete namespace procurement --ignore-not-found
 unset REQUESTER BUYER APPROVER MCP_URL

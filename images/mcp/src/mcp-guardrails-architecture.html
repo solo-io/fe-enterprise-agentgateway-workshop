@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+html, body { margin: 0; }
+body { width: 1240px; padding: 40px 0 36px; background: #0B0D18; color: #FFFFFF; }
+.overline { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 13px; letter-spacing: 0.32em; text-transform: uppercase; color: #8C7CF0; text-align: center; }
+h1 { font-family: 'Figtree', sans-serif; font-weight: 700; font-size: 32px; text-align: center; margin: 18px auto 40px; }
+svg { display: block; margin: 0 auto; }
+.node-name { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; fill: #FFFFFF; }
+.node-sub  { font-family: 'JetBrains Mono', monospace; font-size: 10px; fill: #9DA1BD; }
+.node-code { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; fill: #C9CCDE; }
+.ns-label  { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: #8A8EA8; letter-spacing: 0.06em; }
+.cluster-label { font-family: 'Figtree', sans-serif; font-weight: 700; font-size: 15px; fill: #E6E8F2; }
+.edge-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: #C9CCDE; }
+.legend-label { font-family: 'DM Sans', sans-serif; font-size: 13px; fill: #C9CCDE; }
+.tag-closed { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; fill: #FF8A8A; }
+.tag-open   { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 10px; fill: #F5C26B; }
+.box-solo  { fill: #1D1440; stroke: #A664F6; stroke-width: 1.4; }
+.box-stage { fill: #140E30; stroke: rgba(166, 100, 246, 0.45); stroke-width: 1.2; }
+.box-ext   { fill: #0E2230; stroke: rgba(31, 238, 179, 0.6); stroke-width: 1.4; }
+.box-infra { fill: #1A1D2E; stroke: rgba(157, 161, 189, 0.55); stroke-width: 1.4; }
+.ns-box { fill: none; stroke: rgba(157, 161, 189, 0.35); stroke-width: 1; stroke-dasharray: 4 4; }
+.cluster-box { fill: rgba(20, 23, 42, 0.5); stroke: rgba(157, 161, 189, 0.5); stroke-width: 1.4; }
+.edge-data { stroke: #9DA1BD; stroke-width: 1.6; fill: none; }
+.edge-ext  { stroke: #1FEEB3; stroke-width: 1.4; fill: none; stroke-dasharray: 5 4; }
+</style>
+</head>
+<body>
+
+<div class="overline">Enterprise Agentgateway</div>
+<h1>MCP Guardrails: Procurement Policy Servers</h1>
+
+<svg viewBox="0 0 1152 600" width="1152" height="600">
+  <defs>
+    <marker id="ah-data" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#9DA1BD"/></marker>
+    <marker id="ah-ext"  markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#1FEEB3"/></marker>
+    <marker id="ah-ext-start" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto-start-reverse"><path d="M0,0 L9,4 L0,8 z" fill="#1FEEB3"/></marker>
+  </defs>
+
+  <!-- ======================= client ======================= -->
+  <rect class="box-infra" x="8" y="126" width="166" height="92" rx="10"/>
+  <text class="node-name" x="91" y="154" text-anchor="middle">MCP client</text>
+  <text class="node-sub"  x="91" y="174" text-anchor="middle">curl · agents</text>
+  <text class="node-sub"  x="91" y="192" text-anchor="middle">Bearer &lt;persona JWT&gt;</text>
+
+  <!-- ======================= cluster ======================= -->
+  <rect class="cluster-box" x="204" y="10" width="940" height="534" rx="12"/>
+  <text class="cluster-label" x="220" y="36">Kubernetes cluster</text>
+
+  <!-- agentgateway-system namespace -->
+  <rect class="ns-box" x="222" y="52" width="416" height="474" rx="8"/>
+  <text class="ns-label" x="626" y="70" text-anchor="end">agentgateway-system</text>
+
+  <rect class="box-solo" x="238" y="82" width="384" height="428" rx="10"/>
+  <text class="node-name" x="430" y="106" text-anchor="middle">agentgateway-proxy</text>
+  <text class="node-sub"  x="430" y="122" text-anchor="middle">Gateway · listener 8080</text>
+
+  <!-- stage 1: JWT -->
+  <rect class="box-stage" x="254" y="138" width="352" height="46" rx="8"/>
+  <text class="node-name" x="430" y="157" text-anchor="middle">JWT authentication</text>
+  <text class="node-sub"  x="430" y="173" text-anchor="middle">Strict · inline JWKS (lib/jwt)</text>
+
+  <path class="edge-data" d="M430,184 L430,198" marker-end="url(#ah-data)"/>
+
+  <!-- stage 2: route -->
+  <rect class="box-stage" x="254" y="200" width="352" height="46" rx="8"/>
+  <text class="node-name" x="430" y="219" text-anchor="middle">HTTPRoute /procurement/mcp</text>
+  <text class="node-sub"  x="430" y="235" text-anchor="middle">backend: procurement-mcp</text>
+
+  <path class="edge-data" d="M430,246 L430,268" marker-end="url(#ah-data)"/>
+  <text class="ns-label" x="254" y="286">guardrails processors, in order</text>
+
+  <!-- processor 1: authz -->
+  <rect class="box-ext" x="254" y="298" width="352" height="96" rx="8"/>
+  <text class="node-name" x="270" y="320">[1] extmcp-authz</text>
+  <text class="tag-closed" x="590" y="320" text-anchor="end">FailClosed</text>
+  <text class="node-code" x="270" y="342">tools/call: Request</text>
+  <text class="node-code" x="270" y="360">tools/list: Response</text>
+  <text class="node-code" x="270" y="378">metadata: persona, sub (from JWT)</text>
+
+  <!-- processor 2: redact -->
+  <rect class="box-ext" x="254" y="410" width="352" height="80" rx="8"/>
+  <text class="node-name" x="270" y="432">[2] extmcp-redact</text>
+  <text class="tag-open" x="590" y="432" text-anchor="end">FailOpen</text>
+  <text class="node-code" x="270" y="454">tools/call: Response</text>
+  <text class="node-code" x="270" y="472">masks bank account, tax ID</text>
+
+  <!-- procurement namespace -->
+  <rect class="ns-box" x="648" y="52" width="480" height="474" rx="8"/>
+  <text class="ns-label" x="1116" y="70" text-anchor="end">procurement</text>
+
+  <rect class="box-infra" x="860" y="82" width="252" height="172" rx="8"/>
+  <text class="node-name" x="986" y="106" text-anchor="middle">procurement-mcp</text>
+  <text class="node-sub"  x="986" y="122" text-anchor="middle">MCP server · port 80</text>
+  <text class="node-code" x="880" y="150">get_supplier</text>
+  <text class="node-code" x="880" y="170">list_purchase_orders</text>
+  <text class="node-code" x="880" y="190">create_purchase_order</text>
+  <text class="node-code" x="880" y="210">send_supplier_email</text>
+  <text class="node-code" x="880" y="230">delete_supplier</text>
+
+  <rect class="box-ext" x="758" y="322" width="170" height="48" rx="8"/>
+  <text class="node-name" x="843" y="342" text-anchor="middle">extmcp-authz</text>
+  <text class="node-sub"  x="843" y="358" text-anchor="middle">mode: authz</text>
+
+  <rect class="box-infra" x="950" y="322" width="162" height="48" rx="8"/>
+  <text class="node-name" x="1031" y="342" text-anchor="middle">extmcp-authz-config</text>
+  <text class="node-sub"  x="1031" y="358" text-anchor="middle">ConfigMap</text>
+
+  <rect class="box-ext" x="758" y="426" width="170" height="48" rx="8"/>
+  <text class="node-name" x="843" y="446" text-anchor="middle">extmcp-redact</text>
+  <text class="node-sub"  x="843" y="462" text-anchor="middle">mode: redact</text>
+
+  <rect class="box-infra" x="950" y="426" width="162" height="48" rx="8"/>
+  <text class="node-name" x="1031" y="446" text-anchor="middle">extmcp-redact-config</text>
+  <text class="node-sub"  x="1031" y="462" text-anchor="middle">ConfigMap</text>
+
+  <!-- ======================= edges ======================= -->
+  <!-- client -> proxy -->
+  <path class="edge-data" d="M174,161 L252,161" marker-end="url(#ah-data)"/>
+
+  <!-- proxy -> MCP server -->
+  <path class="edge-data" d="M606,223 L858,223" marker-end="url(#ah-data)"/>
+  <text class="edge-label" x="732" y="213" text-anchor="middle">Streamable HTTP</text>
+
+  <!-- processors <-> policy servers -->
+  <path class="edge-ext" d="M606,346 L756,346" marker-start="url(#ah-ext-start)" marker-end="url(#ah-ext)"/>
+  <text class="edge-label" x="703" y="336" text-anchor="middle">gRPC: 4445</text>
+  <path class="edge-ext" d="M606,450 L756,450" marker-start="url(#ah-ext-start)" marker-end="url(#ah-ext)"/>
+  <text class="edge-label" x="703" y="440" text-anchor="middle">gRPC: 4445</text>
+
+  <!-- ConfigMaps mounted into policy servers -->
+  <path class="edge-data" d="M950,346 L930,346" marker-end="url(#ah-data)"/>
+  <path class="edge-data" d="M950,450 L930,450" marker-end="url(#ah-data)"/>
+  <text class="node-sub" x="1031" y="392" text-anchor="middle">mounted at /etc/extmcp</text>
+  <text class="node-sub" x="1031" y="496" text-anchor="middle">mounted at /etc/extmcp</text>
+
+  <!-- ======================= legend ======================= -->
+  <rect class="box-solo" x="220" y="570" width="16" height="16" rx="4"/>
+  <text class="legend-label" x="244" y="583">Solo core</text>
+  <rect class="box-ext" x="360" y="570" width="16" height="16" rx="4"/>
+  <text class="legend-label" x="384" y="583">Guardrails (ExtMCP)</text>
+  <rect class="box-infra" x="560" y="570" width="16" height="16" rx="4"/>
+  <text class="legend-label" x="584" y="583">Your infrastructure</text>
+</svg>
+
+</body>
+</html>
