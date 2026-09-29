@@ -1,0 +1,8 @@
+{
+  "iss": "workshop.solo.io",
+  "sub": "bailey-buyer",
+  "exp": 4070908800,
+  "persona": "buyer",
+  "org": "procurement",
+  "team": "purchasing"
+}

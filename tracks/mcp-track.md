@@ -88,6 +88,7 @@ After completing this track you should be able to:
 | [MCP Eager OAuth with Microsoft Entra ID](../labs/mcp/mcp-eager-auth-entra.md) | Same pattern with Entra, which has no DCR endpoint at all, so the gateway acting as the AS is the only way a client can register |
 | [MCP Pre-Issuance Entitlement Gating with Auth0](../labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md) | Add a gRPC ext-authz hook that checks entitlements before issuing OAuth tokens; denied users are redirected before they get any credentials |
 | [Web Application Firewall (WAF) for Agentic Traffic](../labs/security/WAF.md) | Attach a `WAFPolicy` to harden the HTTP surface and block tool-call payload abuse (command-exec, file-exfil signatures) and credential leakage, the deterministic layer beneath semantic guardrails |
+| [Guard MCP Tool Calls with an External Policy Server](../labs/mcp/mcp-guardrails.md) | Put an ExtMCP policy server in the tool path: per-identity tool lists, argument limits with an approval payload, email-domain allowlists, result redaction, and a fail-closed and a fail-open processor side by side |
 
 ---
 

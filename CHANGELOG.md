@@ -1,5 +1,12 @@
 # Changelog
 
+0.14.3 - (9-29-26)
+---
+- Add `labs/mcp/mcp-guardrails.md`: MCP guardrails with an ExtMCP policy server in front of a mock procurement MCP server. Per-persona tool lists from a JWT claim, a purchase-order amount limit that returns an approval payload, an email-domain allowlist, bank account and tax ID redaction in tool results, a FailClosed and a FailOpen processor compared with each server down, and a live policy change through a ConfigMap
+- The lab's policy server and mock MCP server are `ably7/extmcp-guardrails:0.1.1` and `ably7/procurement-mcp:0.1.1`, built from [ably77/extmcp-guardrails](https://github.com/ably77/extmcp-guardrails)
+- Add `lib/jwt/claims/{requester,buyer,finance-approver}.json` personas for the new lab
+- List the lab in `README.md` (MCP and Guardrails sections, use cases) and `tracks/mcp-track.md`
+
 0.14.2 - (9-23-26)
 ---
 - Prose cleanup across all workshop markdown (labs, README, tracks, style guide, chart and lib READMEs)
