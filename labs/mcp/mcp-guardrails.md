@@ -10,8 +10,6 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 > **Version:** MCP guardrails are available in Enterprise Agentgateway **v2026.8.2 and later**.
 
-This runbook was validated against controller **v2026.8.2** on a local KinD cluster.
-
 ## Lab Objectives
 - Deploy a procurement MCP server behind agentgateway with JWT authentication
 - Attach an ExtMCP guardrails processor to an `EnterpriseAgentgatewayBackend` with an `EnterpriseAgentgatewayPolicy`
@@ -25,31 +23,19 @@ This runbook was validated against controller **v2026.8.2** on a local KinD clus
 
 MCP guardrails (also called ExtMCP) call an external gRPC policy server at the MCP method layer. For each method you opt in, agentgateway sends the server the JSON-RPC method, the target backend, the request `params` or response `result`, and caller metadata computed with CEL. The server passes the message, returns a rewritten one, or denies it. A denial reaches the client as a JSON-RPC error.
 
-```
-                         ┌──────────── agentgateway-proxy ─────────────┐
- curl / MCP client       │ JWT auth (lib/jwt JWKS, inline)             │
- Bearer <persona JWT> ──▶│ /procurement/mcp → procurement-mcp backend  │──▶ procurement-mcp
-                         │   guardrails processors, in order:          │      get_supplier
-                         │    [1] extmcp-authz   FailClosed            │      list_purchase_orders
-                         │        tools/call: Request                  │      create_purchase_order
-                         │        tools/list: Response                 │      send_supplier_email
-                         │        metadata: persona, sub (from JWT)    │      delete_supplier
-                         │    [2] extmcp-redact  FailOpen              │
-                         │        tools/call: Response                 │
-                         └──────────┬──────────────────┬───────────────┘
-                                    │ gRPC (h2c)       │ gRPC (h2c)
-                              extmcp-authz       extmcp-redact
-```
+![MCP guardrails architecture: an MCP client sends a persona JWT to agentgateway-proxy, which authenticates the JWT, routes /procurement/mcp to the procurement-mcp server over Streamable HTTP, and calls two ExtMCP policy servers over gRPC in order: extmcp-authz (FailClosed) gates tools/call requests and filters tools/list responses using the persona and sub claims, and extmcp-redact (FailOpen) masks bank account and tax ID values in tools/call responses. Each policy server reads its policy from a ConfigMap mounted at /etc/extmcp](../../images/mcp/mcp-guardrails-architecture.png)
 
 Each place you can put MCP authorization logic sees a different part of the call:
 
 | Mechanism | What it sees | What it can do |
 |---|---|---|
 | [ext_authz](mcp-byo-grpc-ext-authz.md) | HTTP method, path, headers | Allow or deny the HTTP request |
-| `mcpAuthorization` CEL rules | Tool name and JWT claims | Allow or deny a tool |
+| [`mcp.authorization` CEL rules](mcp-tool-federation.md#step-7-persona-based-tool-filtering) | Tool name and JWT claims | Allow or deny a tool |
 | ExtMCP guardrails | Method, tool, argument values, results, caller metadata | Allow, deny, or rewrite the request or the result |
 
 A limit on a purchase-order amount needs the argument value, so it belongs in ExtMCP.
+
+> **Tip:** CEL rules evaluate inside the proxy. For per-persona tool scoping alone, a CEL rule on the backend is enough. This lab scopes tools in ExtMCP to keep all procurement policy in one ConfigMap. To use both, scope tools with CEL and check argument values and results with ExtMCP.
 
 Each processor lists the methods it handles and the phase in which agentgateway calls it:
 
@@ -862,7 +848,7 @@ EOF
 )"
 ```
 
-The kubelet refreshes ConfigMap volumes on its sync period, which can take up to a minute, and the policy server checks the file every 5 seconds. Wait for the reload:
+The kubelet refreshes ConfigMap volumes on its sync period, which can take a minute or two, and the policy server checks the file every 5 seconds. Wait for the reload:
 
 ```bash
 until kubectl logs -n procurement deploy/extmcp-authz --since=5m | grep -q '"msg":"policy reloaded"'; do sleep 5; done
@@ -955,7 +941,7 @@ for pod in $(kubectl get pods -n agentgateway-system \
   kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
   PF=$!
   sleep 3
-  curl -s http://localhost:15020/metrics | grep -E 'agentgateway_mcp_requests_total|protocol="mcp"'
+  curl -s http://localhost:15020/metrics | grep '^agentgateway_mcp_requests_total'
   kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
 done
 ```

@@ -1,11 +1,17 @@
 # Changelog
 
+0.14.4 - (9-29-26)
+---
+- Minor updates and improvements to `labs/mcp/mcp-guardrails.md`
+
 0.14.3 - (9-29-26)
 ---
 - Add `labs/mcp/mcp-guardrails.md`: MCP guardrails with an ExtMCP policy server in front of a mock procurement MCP server. Per-persona tool lists from a JWT claim, a purchase-order amount limit that returns an approval payload, an email-domain allowlist, bank account and tax ID redaction in tool results, a FailClosed and a FailOpen processor compared with each server down, and a live policy change through a ConfigMap
 - The lab's policy server and mock MCP server are `ably7/extmcp-guardrails:0.1.1` and `ably7/procurement-mcp:0.1.1`, built from [ably77/extmcp-guardrails](https://github.com/ably77/extmcp-guardrails)
 - Add `lib/jwt/claims/{requester,buyer,finance-approver}.json` personas for the new lab
 - List the lab in `README.md` (MCP and Guardrails sections, use cases) and `tracks/mcp-track.md`
+- `mcp-guardrails.md`: the ConfigMap reload wait now reads "a minute or two", and the metrics step greps only `agentgateway_mcp_requests_total` instead of also printing the request-duration histogram buckets
+- `mcp-guardrails.md`: the Overview's ASCII diagram is now `images/mcp/mcp-guardrails-architecture.png` (HTML source in `images/mcp/src/`), the CEL row in the mechanism table uses the `mcp.authorization` field name and links to the CEL step in `mcp-tool-federation.md`, and a Tip says when a CEL rule is enough for tool scoping
 
 0.14.2 - (9-23-26)
 ---
