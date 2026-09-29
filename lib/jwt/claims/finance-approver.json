@@ -1,0 +1,8 @@
+{
+  "iss": "workshop.solo.io",
+  "sub": "fran-finance",
+  "exp": 4070908800,
+  "persona": "finance-approver",
+  "org": "procurement",
+  "team": "finance"
+}

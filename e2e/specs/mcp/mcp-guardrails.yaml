@@ -1,0 +1,204 @@
+lab: labs/mcp/mcp-guardrails.md
+description: ExtMCP guardrails, per-persona tools, PO amount limit, email allowlist, redaction, fail-open vs fail-closed, live policy reload
+tier: t0
+requires: []
+timeout: 1200
+
+# Self-contained: the MCP server, both policy servers and the JWT key are local.
+# Images come from docker.io/ably7 (multi-arch).
+steps:
+  - section: "Step 1 — Deploy the Procurement MCP Server"
+    run: all
+    wait: "--for=condition=Available deploy/procurement-mcp -n procurement --timeout=300s"
+
+  # blocks: [1] canonical GATEWAY_IP export + echo  [2] MCP_URL (silent)
+  - section: "Get the gateway address"
+    run: [1]
+    assert:
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+
+  - section: "Get the gateway address"
+    run: [2]
+
+  - section: "Mint persona tokens"
+    run: all
+    assert:
+      - contains: '"persona": "buyer"'
+
+  - section: "Define the MCP helper"
+    run: all
+
+  # Route and JWT policy programming is async; retry until the tool call lands.
+  - section: "Test the baseline"
+    run: all
+    retry:
+      attempts: 8
+      delay: 4
+      until: "004815162342"
+    assert:
+      - contains: "401"
+      - contains: "delete_supplier"
+      - contains: '"bankAccount": "004815162342"'
+
+  - section: "Deploy the authorization policy server"
+    run: all
+    wait: "--for=condition=Available deploy/extmcp-authz -n procurement --timeout=300s"
+
+  - section: "Attach the guardrails policy"
+    run: all
+
+  # The last block is the direct delete_supplier call; the list output of the
+  # earlier lines in the same block is checked by the probe below.
+  - section: "Test tool scoping"
+    run: all
+    retry:
+      attempts: 8
+      delay: 4
+      until: "may not call delete_supplier"
+    assert:
+      - contains: '"code": -32001'
+      - contains: "persona requester may not call delete_supplier"
+
+  - probe: "tools/list is filtered per persona"
+    script: |
+      echo "requester=$(list_tools "$REQUESTER" | sort | tr '\n' ' ')"
+      echo "approver=$(list_tools "$APPROVER" | sort | tr '\n' ' ')"
+    assert:
+      - contains: "requester=create_purchase_order get_supplier list_purchase_orders "
+      - contains: "approver=create_purchase_order delete_supplier get_supplier list_purchase_orders send_supplier_email "
+
+  # blocks: [1] buyer $5,000 then $25,000  [2] approver $25,000  [3] string amount
+  - section: "Step 3 — Gate Purchase Orders on Amount"
+    run: [1]
+    assert:
+      - contains: '"status": "created"'
+      - contains: '"code": -32003'
+      - contains: '"approval_required": true'
+      - contains: "amount $25000 exceeds the $10000 limit for buyer"
+
+  - section: "Step 3 — Gate Purchase Orders on Amount"
+    run: [2]
+    assert:
+      - contains: '"amount": 25000'
+      - contains: '"status": "created"'
+
+  - section: "Step 3 — Gate Purchase Orders on Amount"
+    run: [3]
+    assert:
+      - contains: '"code": -32600'
+      - contains: "create_purchase_order needs a numeric amount"
+
+  - section: "Deploy the redaction policy server"
+    run: all
+    wait: "--for=condition=Available deploy/extmcp-redact -n procurement --timeout=300s"
+
+  - section: "Chain the redaction processor"
+    run: all
+
+  # blocks: [1] email denials + structured redaction  [2] text-content redaction
+  - section: "Test the exfiltration controls"
+    run: [1]
+    retry:
+      attempts: 8
+      delay: 4
+      until: "<BANK_ACCOUNT>"
+    assert:
+      - contains: "recipient domain gmail.com not allowed"
+      - contains: "recipient domain try-solo.io.attacker.example not allowed"
+      - contains: '"status":"queued"'
+      - contains: '"bankAccount": "<BANK_ACCOUNT>"'
+      - contains: '"taxId": "<TAX_ID>"'
+      - not_contains: "004815162342"
+
+  - section: "Test the exfiltration controls"
+    run: [2]
+    assert:
+      - contains: '"bankAccount":"<BANK_ACCOUNT>"'
+      - not_contains: "004815162342"
+      - not_contains: "94-3175520"
+
+  - section: "Add a callout timeout"
+    run: all
+
+  # A 30s policy server must be cut off by the 5s requestTimeout, not the
+  # 10s gateway default, and FailClosed must turn that into an error.
+  - section: "Slow down the authorization server"
+    run: all
+    assert:
+      - contains: "mcpGuardrails checkRequest failed: upstream call timeout"
+      - matches: 'real[[:space:]]+0m[5-8]\.'
+
+  # FailOpen: with the redaction server gone the raw values come back.
+  - section: "Take down the redaction server"
+    run: all
+    retry:
+      attempts: 6
+      delay: 4
+      until: "004815162342"
+    assert:
+      - contains: '"bankAccount": "004815162342"'
+
+  # FailClosed: with the authorization server gone every governed call errors.
+  - section: "Take down the authorization server"
+    run: all
+    retry:
+      attempts: 6
+      delay: 4
+      until: "checkResponse failed"
+    assert:
+      - contains: "mcpGuardrails checkRequest failed"
+      - contains: "mcpGuardrails checkResponse failed"
+      - not_contains: "PO-1001"
+
+  - section: "Restore both servers"
+    run: all
+    retry:
+      attempts: 8
+      delay: 4
+      until: "<BANK_ACCOUNT>"
+    assert:
+      - contains: "<BANK_ACCOUNT>"
+
+  # blocks: [1] patch ConfigMap  [2] wait for reload  [3] re-test
+  - section: "Step 6 — Change Policy Without Touching the Gateway"
+    run: [1, 2]
+    assert:
+      - contains: '"msg":"policy reloaded"'
+
+  - section: "Step 6 — Change Policy Without Touching the Gateway"
+    run: [3]
+    assert:
+      - contains: "amount $5000 exceeds the $2500 limit for buyer"
+      - contains: "tool delete_supplier is disabled"
+
+  - probe: "the killswitch hides delete_supplier even from the wildcard persona"
+    script: |
+      echo "approver=$(list_tools "$APPROVER" | sort | tr '\n' ' ')"
+    assert:
+      - contains: "approver=create_purchase_order get_supplier list_purchase_orders send_supplier_email "
+      - not_contains: "delete_supplier"
+
+  - section: "View guardrail decisions"
+    run: all
+    assert:
+      - contains: '"msg":"deny"'
+      - contains: '"msg":"redact"'
+
+  # blocks: [1] recent access log lines  [2] guardrail rejections in the access log
+  - section: "View access logs"
+    run: all
+    assert:
+      - contains: "persona requester may not call delete_supplier"
+      - contains: "jwt.sub=bailey-buyer"
+
+  - section: "View MCP metrics"
+    run: all
+    retry:
+      attempts: 4
+      delay: 3
+      until: "agentgateway_mcp"
+    assert:
+      - matches: 'agentgateway_mcp_requests_total\{'
+
+cleanup:
+  section: "Cleanup"

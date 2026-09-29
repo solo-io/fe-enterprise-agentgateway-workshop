@@ -120,6 +120,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Built-in Guardrails](labs/guardrails/builtin-guardrails.md)
 - [External Moderation (OpenAI)](labs/guardrails/external-moderation-guardrails.md)
 - [Advanced Guardrails Webhook](labs/guardrails/advanced-guardrails-webhook.md)
+- [Guard MCP Tool Calls with an External Policy Server](labs/mcp/mcp-guardrails.md) _(see also: MCP)_
 
 ---
 
@@ -143,6 +144,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [MCP Tool Mode — Code](labs/mcp/mcp-tool-mode-code.md)
 - [MCP Tool Rate Limiting](labs/mcp/mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
 - [MCP BYO gRPC External Authorization (ext-authz)](labs/mcp/mcp-byo-grpc-ext-authz.md) _(see also: Security)_
+- [Guard MCP Tool Calls with an External Policy Server](labs/mcp/mcp-guardrails.md): per-persona tool lists, argument-based purchase-order limits, email allowlists, and redaction of tool results, with fail-closed and fail-open processors _(see also: Guardrails, Security)_
 - [MCP Eager OAuth with Auth0](labs/mcp/mcp-eager-auth-auth0.md) _(see also: Security, Identity & Delegation)_
 - [MCP Eager OAuth with Okta](labs/mcp/mcp-eager-auth-okta.md) _(see also: Security, Identity & Delegation)_
 - [MCP Eager OAuth with Microsoft Entra ID](labs/mcp/mcp-eager-auth-entra.md) _(see also: Security, Identity & Delegation)_
@@ -295,6 +297,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - MCP tool modes: Search (`get_tool` / `invoke_tool` meta-tools) and Code (`run_code` in a sandboxed JS runtime)
     - Secure MCP servers with JWT auth
     - BYO gRPC external authorization (ext-authz) for MCP routes
+    - MCP guardrails (ExtMCP): per-identity tool lists, argument-aware limits with an approval payload, and tool-result redaction through an external policy server
     - Eager OAuth with a pre-registered upstream IdP (Auth0 and Okta): gateway acts as the OAuth Authorization Server visible to MCP clients
     - Pre-issuance entitlement gating: gRPC ext_authz hook gates OAuth token issuance per user, redirects denied users to a configurable URL
     - Two-layer OAuth for a real SaaS API (Figma): eager OAuth front door (Auth0 or Microsoft Entra ID) plus per-user downstream credential forwarding to a vendor-provided IdP via token-exchange elicitation

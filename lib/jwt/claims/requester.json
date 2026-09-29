@@ -1,0 +1,8 @@
+{
+  "iss": "workshop.solo.io",
+  "sub": "riley-requester",
+  "exp": 4070908800,
+  "persona": "requester",
+  "org": "procurement",
+  "team": "operations"
+}
