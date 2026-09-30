@@ -150,6 +150,28 @@ steps:
       # nonzero total is what distinguishes priced from unpriced.
       - matches: 'cost\.total=[0-9]*\.?[0-9]*[1-9]'
 
+  # The gpt-5.6 traffic above is priced by the built-in base catalog, so it
+  # passes with or without the overlay. gpt-4.1-nano is absent from the base
+  # and priced only by llm-model-costs, so a nonzero cost on it proves the
+  # overlay reached the proxy.
+  - probe: "the overlay prices a model the base catalog lacks"
+    script: |
+      curl -s -o /dev/null "http://$GATEWAY_IP:8080/openai" \
+        -H 'content-type: application/json' \
+        -H 'Authorization: Bearer sk-alice-abc123def456' \
+        -d '{"model":"gpt-4.1-nano","messages":[{"role":"user","content":"Hello!"}]}'
+      sleep 2
+      kubectl logs -n agentgateway-system \
+        -l app.kubernetes.io/name=agentgateway-proxy --tail 300 \
+        | grep 'gen_ai.request.model=gpt-4.1-nano' \
+        | grep -oE 'agw.ai.usage.cost.total=[0-9.e-]+' | tail -1
+    retry:
+      attempts: 12
+      delay: 15
+      until: 'cost.total=[0-9]*\.?[0-9]*[1-9]'
+    assert:
+      - matches: 'cost\.total=[0-9]*\.?[0-9]*[1-9]'
+
   # Enforcement, end to end: bob's 2,000-token cap rejects, and the
   # exact-subject entry debits only him.
   - section: "Watch a budget block"

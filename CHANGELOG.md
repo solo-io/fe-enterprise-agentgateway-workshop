@@ -1,5 +1,15 @@
 # Changelog
 
+0.14.5 - (9-30-26)
+---
+- Bump Enterprise Agentgateway from `v2026.8.2` to `v2026.9.3` 
+- Update the image list and the air-gap lab
+- Remove `labs/upgrades/migrate-v2026.5.x-to-v2026.7.x.md`. The workshop is now well past that release
+- Mirror the `v2026.9.3` images and `redis:8.6.7-alpine` to `docker.io/ably7` (multi-arch) for the air-gap lab
+- `llm-cost-management.md`: from `v2026.9.1` the base model catalog is built into the proxy instead of an `agentgateway-proxy-model-catalog` ConfigMap, and it now prices the `gpt-5.6` family. The overlay now adds `gpt-4.1-nano`, which the base catalog lacks, in place of the `gpt-5.6` entries, and the dashboard step now says the Model Cost Catalog tab lists only your overlay entries.
+- `e2e/specs/observability/llm-cost-management.yaml`: new probe checks that the overlay prices `gpt-4.1-nano`, because the `gpt-5.6` traffic now prices without the overlay
+- Remove the old minimum-version notes from `WAF.md`, `centralized-llm-ops-helm-chart.md`, `platform-and-developer-helm-charts-mcp.md`, and `mcp-eager-auth-auth0-pre-issuance-authz.md`. Labs assume the version `001` installs
+
 0.14.4 - (9-29-26)
 ---
 - Minor updates and improvements to `labs/mcp/mcp-guardrails.md`

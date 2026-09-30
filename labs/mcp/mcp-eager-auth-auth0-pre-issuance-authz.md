@@ -4,8 +4,6 @@
 
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 
-> ⚠ This lab requires enterprise-agentgateway **`v2026.7.0` or newer**, needed for the refresh token grant tested in Step 10.
-
 This lab uses the same gateway hostname (`mcp-auth0.try-solo.io`) as [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md). The two labs cannot run concurrently: clean up the other lab before starting this one. The Okta labs use `mcp-okta.try-solo.io` and do not collide.
 
 ### Auth0 requirements
@@ -938,7 +936,7 @@ Step 5 already requested the `offline_access` scope, so the token response Inspe
 
 > If `refresh_token` is missing and `scope` doesn't include `offline_access`, the Auth0 API's "Allow Offline Access" setting is off; see the Auth0 requirements section. This fails silently: no error, Auth0 just omits the scope.
 
-Copy the `refresh_token` value and redeem it directly against the gateway's issuer (the refresh grant added in `v2026.7.0`):
+Copy the `refresh_token` value and redeem it directly against the gateway's issuer:
 
 ```bash
 curl -sk -X POST "https://${AUTH0_GATEWAY_HOST}/oauth-issuer/token" \
@@ -992,7 +990,7 @@ curl -sk -X POST "https://${AUTH0_GATEWAY_HOST}/mcp" \
 | Tool list renders without 401 and includes tools from **both** upstreams | Auth0-issued JWT validated against Auth0 JWKS; multiplexed `mcp-backend` is forwarding to both targets |
 | `kubectl logs` shows `ALLOWED` line | Pre-issuance hook fired and returned OK |
 | Access Tokens JSON includes `refresh_token` and `scope` contains `offline_access` | `offline_access` reached Auth0 and the API allows offline access |
-| `curl .../oauth-issuer/token` with `grant_type=refresh_token` returns `200` with a new `access_token` | The eager-OAuth issuer's refresh grant (`v2026.7.0`+) is live and forwarding correctly to Auth0 |
+| `curl .../oauth-issuer/token` with `grant_type=refresh_token` returns `200` with a new `access_token` | The eager-OAuth issuer's refresh grant is live and forwarding correctly to Auth0 |
 | Refreshed access token authenticates against `/mcp` with `200` | The refreshed token is a valid Auth0-issued JWT, not just an opaque success response |
 
 ---
@@ -1089,7 +1087,6 @@ If MCP Inspector behaves unexpectedly, this table covers the common breakage mod
 | Inspector shows "failed to process downstream callback" 400 instead of redirecting | The ext-authz pod is unreachable or timing out. With `failure_policy: closed`, gRPC dial/timeout errors do NOT trigger the deny redirect; the redirect only fires on an explicit `PERMISSION_DENIED`. | `kubectl get pods -n agentgateway-system -l app=grpc-ext-authz`; `kubectl get svc -n agentgateway-system grpc-ext-authz`; controller logs |
 | Inspector connects despite the user being absent from `ALLOWED_PRINCIPALS` | `pre_issuance.enabled` is not actually true in `KGW_OAUTH_ISSUER_CONFIG` in the running controller | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].env[?(@.name=="KGW_OAUTH_ISSUER_CONFIG")].value}' \| jq .pre_issuance` |
 | (Step 10) Token response has no `refresh_token`, `scope` omits `offline_access`, no error anywhere | The Auth0 API behind `AUTH0_AUDIENCE` has "Allow Offline Access" disabled. Auth0 silently drops the scope instead of erroring | Auth0 Dashboard → Applications → APIs → *your API* → Settings → Access Settings → enable "Allow Offline Access"; then **Clear OAuth State** in Inspector and reconnect |
-| (Step 10) `curl .../oauth-issuer/token` with `grant_type=refresh_token` returns an error | Controller is older than `v2026.7.0`: the refresh grant isn't implemented yet | `kubectl get deploy -n agentgateway-system enterprise-agentgateway -o jsonpath='{.spec.template.spec.containers[?(@.name=="controller")].image}'`; verify the image tag is `v2026.7.0` or later |
 
 Useful commands:
 
