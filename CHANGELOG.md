@@ -1,6 +1,6 @@
 # Changelog
 
-0.14.5 - (9-30-26)
+0.14.5 - (10-1-26)
 ---
 - Bump Enterprise Agentgateway from `v2026.8.2` to `v2026.9.3` 
 - Update the image list and the air-gap lab
@@ -9,6 +9,9 @@
 - `llm-cost-management.md`: from `v2026.9.1` the base model catalog is built into the proxy instead of an `agentgateway-proxy-model-catalog` ConfigMap, and it now prices the `gpt-5.6` family. The overlay now adds `gpt-4.1-nano`, which the base catalog lacks, in place of the `gpt-5.6` entries, and the dashboard step now says the Model Cost Catalog tab lists only your overlay entries.
 - `e2e/specs/observability/llm-cost-management.yaml`: new probe checks that the overlay prices `gpt-4.1-nano`, because the `gpt-5.6` traffic now prices without the overlay
 - Remove the old minimum-version notes from `WAF.md`, `centralized-llm-ops-helm-chart.md`, `platform-and-developer-helm-charts-mcp.md`, and `mcp-eager-auth-auth0-pre-issuance-authz.md`. Labs assume the version `001` installs
+- Add `labs/routing/configure-semantic-routing-jev.md`: semantic routing with TypeSafe Jev
+- Rename `labs/routing/configure-semantic-routing.md` to `labs/routing/configure-semantic-routing-vllm-sr.md`
+- List the Jev lab and the renamed vLLM Semantic Router lab in `README.md` (Routing section and Use Cases) and `tracks/llm-track.md`
 
 0.14.4 - (9-29-26)
 ---

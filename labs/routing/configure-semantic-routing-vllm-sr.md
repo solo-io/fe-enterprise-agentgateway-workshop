@@ -2,6 +2,8 @@
 
 In this lab, you'll route LLM requests by **prompt content** instead of by the model name the client asks for. Clients send one stable virtual model name, `auto_model`. [vLLM Semantic Router](https://vllm-sr.ai/) (vSR), called by the gateway as an external processor, rewrites that name to one of three price tiers before the gateway routes the request, so each prompt is served by the cheapest model that can handle it, without any change to the client.
 
+[Semantic Routing with Jev](configure-semantic-routing-jev.md) solves the same problem with a Jev classification question instead of embedding similarity.
+
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 - An OpenAI API key with access to three models of different price. This lab uses `gpt-5-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier. The same key also needs access to the embeddings API; the router uses `text-embedding-3-small` to classify prompts.
