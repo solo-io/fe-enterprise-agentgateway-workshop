@@ -12,6 +12,7 @@
 - Rename `labs/routing/configure-semantic-routing.md` to `labs/routing/configure-semantic-routing-vllm-sr.md`
 - Update `configure-semantic-routing-vllm-sr.md`: pin the vLLM Semantic Router chart and image to `0.4.0`/`v0.4.0` instead of `latest`. Updated schemas
 - Update `mcp-guardrails.md` for `v2026.9.x`: a denied `tools/call` now returns an `isError` result with the reason as text, so the error codes and approval payload no longer reach the client
+- Update `mcp-tool-rate-limiting.md` for `v2026.9.x`: a rate-limited `tools/call` returns HTTP `200` with an `isError` result (`rate limit exceeded (retry after 60s; limit 3, remaining 0)`).
 
 0.14.4 - (9-29-26)
 ---

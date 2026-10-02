@@ -9,6 +9,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - Create a `RateLimitConfig` that limits the `get-env` tool to 3 calls per minute
 - Apply the rate limit via `EnterpriseAgentgatewayPolicy` targeting the MCP HTTPRoute
 - Verify that `get-env` is rate limited while other tools like `echo` are unaffected
+- See how the gateway reports a rate-limited tool call to the MCP client
 
 ## Overview
 
@@ -250,11 +251,15 @@ In the MCP Inspector, call the `get-env` tool 4 times:
 2. Leave the parameters empty (no input required) and click **Run Tool**
 3. Repeat 3 more times
 
-The first 3 calls will succeed. On the 4th call you should see an error:
+The first 3 calls return the server's environment variables. The 4th call returns an error result with this text:
 
 ```
-MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: 
+rate limit exceeded (retry after 60s; limit 3, remaining 0)
 ```
+
+The gateway answers a rate-limited `tools/call` itself, and the request never reaches the MCP server. The response is HTTP `200` with a JSON-RPC result that sets `isError: true`, so the client hands it to the model as a failed tool call, and the model can read the retry time. The `retry-after` and `x-ratelimit-*` response headers carry the same limit and reset values. Dashboards and alerts that count HTTP 429 responses miss these denials, because the status is `200`.
+
+> **Note:** On Enterprise Agentgateway `v2026.8.x` and earlier, the gateway rejects a rate-limited `tools/call` with HTTP `429 Too Many Requests` and the same `retry-after` and `x-ratelimit-*` headers. The MCP Inspector shows that as a transport error: `MCP error -32001: Streamable HTTP error: Error POSTing to endpoint`.
 
 ### Verify independent counters with a standard tool
 

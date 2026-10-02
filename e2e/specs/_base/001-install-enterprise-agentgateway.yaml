@@ -32,11 +32,17 @@ steps:
       - contains: "ratelimitconfigs"
       - contains: "authconfigs"
 
+  # blocks: [1] helm install  [2] get pods. `helm upgrade -i` returns before the
+  # ReplicaSet creates the pod, so block 2 can print "No resources found".
   - section: "Install Enterprise Agentgateway Controller"
     run: all
+    retry:
+      attempts: 20
+      delay: 3
+      until: 'enterprise-agentgateway-[a-z0-9]+-[a-z0-9]+'
     wait: "--for=condition=Available deploy/enterprise-agentgateway -n agentgateway-system --timeout=600s"
     assert:
-      - contains: "enterprise-agentgateway"
+      - matches: 'enterprise-agentgateway-[a-z0-9]+-[a-z0-9]+'
 
   - section: "Deploy Agentgateway with customizations"
     run: all
