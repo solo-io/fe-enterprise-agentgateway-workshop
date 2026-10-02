@@ -47,7 +47,7 @@ steps:
     assert:
       - contains: "tools_list_ok=4/4"
 
-  # Route and JWT policy programming is async; retry until the tool call lands.
+  # Retry until the tool call lands.
   - section: "Test the baseline"
     run: all
     retry:
