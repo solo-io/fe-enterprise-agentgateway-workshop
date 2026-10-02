@@ -549,7 +549,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 ```
 The request fails with `authentication failure: no bearer token found`.
 
-Now send requests as **User A**. The prompt `"Whats your favorite poem?"` is 5 input tokens, so against the 10-input-tokens-per-minute budget the quota is spent after a couple of requests:
+Now send requests as **User A**. The prompt `"Whats your favorite poem?"` is about 11 input tokens, more than the whole 10-input-tokens-per-minute budget, so the first request succeeds and spends the quota:
 ```bash
 for i in $(seq 1 4); do
   echo -n "User A request $i: "
@@ -571,9 +571,36 @@ The later requests return `HTTP 429`: User A (`sub=analyst-user`) has exhausted 
 
 ### Verify independent per-user counters
 
-User B (`sub=economist-user`) has a separate counter. Even though User A is rate limited, User B's first requests still succeed:
+User B (`sub=economist-user`) has a separate counter. The rate limiter counts in fixed clock-minute windows, so User A's quota comes back at the start of each minute. The next block sends two requests as User A, which leaves User A rate limited in the current minute, then one request as User B:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+echo -n "User A request 1: "
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $USER_A_TOKEN" \
+  -d '{
+    "model": "gpt-5.4-nano",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+echo -n "User A request 2: "
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $USER_A_TOKEN" \
+  -d '{
+    "model": "gpt-5.4-nano",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+echo -n "User B: "
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $USER_B_TOKEN" \
   -d '{
@@ -586,13 +613,27 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-Each user (identified by their verified `sub` claim) gets their own quota of 10 input tokens per minute, just like the header-based example, but the identity is now cryptographically verified rather than self-asserted.
+User A request 2 returns `HTTP 429` and User B returns `HTTP 200`. Each user (identified by their verified `sub` claim) gets their own quota of 10 input tokens per minute, just like the header-based example, but the identity is now cryptographically verified rather than self-asserted.
 
 ### The claim cannot be spoofed
 
-With the header-based config, a client could change `X-User-ID` to escape their quota. Here the counter follows the verified `jwt.sub`, not any header the client sends. Send User A's (already rate-limited) token but add an arbitrary `X-User-ID`: it lands in the **same** counter, because the descriptor value comes from the signed claim:
+With the header-based config, a client could change `X-User-ID` to escape their quota. Here the counter follows the verified `jwt.sub`, not any header the client sends. The next block first sends a plain User A request, which spends whatever is left of User A's quota for the current minute. It then sends User A's token again with an arbitrary `X-User-ID`, which lands in the **same** counter because the descriptor value comes from the signed claim:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+echo -n "User A: "
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  -H "content-type: application/json" \
+  -H "Authorization: Bearer $USER_A_TOKEN" \
+  -d '{
+    "model": "gpt-5.4-nano",
+    "messages": [
+      {
+        "role": "user",
+        "content": "Whats your favorite poem?"
+      }
+    ]
+  }'
+echo -n "User A with X-User-ID: someone-else: "
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $USER_A_TOKEN" \
   -H "X-User-ID: someone-else" \
@@ -606,7 +647,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
     ]
   }'
 ```
-User A stays rate limited. The only way to obtain a separate quota is to present a different validly-signed token with a different `sub` claim, which a client cannot forge without the issuer's private key.
+The request with the spoofed header returns `HTTP 429`: User A stays rate limited. The only way to obtain a separate quota is to present a different validly-signed token with a different `sub` claim, which a client cannot forge without the issuer's private key.
 
 > **Tip:** To rate limit per team or tenant instead of per user, point the CEL expression at a different claim, for example `expression: 'jwt.team'` (the analyst token's `team` claim is `fundamentals`).
 
