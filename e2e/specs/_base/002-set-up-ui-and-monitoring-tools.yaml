@@ -18,6 +18,11 @@ steps:
     run: all
     wait: "--for=condition=Available deploy/solo-enterprise-ui -n agentgateway-system --timeout=900s"
 
+  - section: "Step 3: Apply the model cost catalog"
+    run: all
+    assert:
+      - contains: "successfully rolled out"
+
   # blocks: [1] export GRAFANA_ADMIN_PASSWORD  [2] helm install kube-prometheus-stack  [3] PodMonitor
   # Block 1 is an optional illustrative export — running it would literally set the
   # admin password to "your-secure-password". Skipped so the documented default

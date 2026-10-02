@@ -145,6 +145,18 @@ steps:
       - status: 403
       - not_contains: "chat.completion"
 
+  - section: "Route the classifier calls through the gateway"
+    run: none
+    reason: setup for the latency and cost benchmark, which has nothing deterministic to assert
+
+  - section: "Run the benchmark"
+    run: none
+    reason: latency benchmark; timings vary per run
+
+  - section: "Measure the classifier cost"
+    run: none
+    reason: cost depends on the benchmark run; its last block also undoes the classifier route
+
   # ---- Live policy update: same prompt, opposite verdict ----
   - section: "Sub-step A — Confirm the current policy has no medical rule"
     run: all

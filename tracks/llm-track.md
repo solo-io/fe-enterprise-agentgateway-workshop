@@ -127,6 +127,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | [Built-in Guardrails](../labs/guardrails/builtin-guardrails.md) | Configure Agentgateway's prompt guard (injection, jailbreak, PII, secrets, encoding evasion) |
 | [External Moderation (OpenAI)](../labs/guardrails/external-moderation-guardrails.md) | Route traffic through OpenAI's moderation API as a sidecar |
 | [Advanced Guardrails Webhook](../labs/guardrails/advanced-guardrails-webhook.md) | Call a custom webhook for policy decisions |
+| [Advanced Guardrails Webhook with Jev](../labs/guardrails/advanced-guardrails-webhook-jev.md) | The same webhook guardrail classified by Jev, with measured latency and cost against the OpenAI webhook |
 | [Prompt Enrichment](../labs/transformations/prompt-enrichment.md) | Inject system prompts or metadata before forwarding |
 | [Request/Response Transformations](../labs/transformations/transformations.md) | Rewrite headers, mutate body fields, shape responses |
 

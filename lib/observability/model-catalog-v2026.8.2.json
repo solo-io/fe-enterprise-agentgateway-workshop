@@ -1,0 +1,726 @@
+{
+  "providers": {
+    "anthropic": {
+      "models": {
+        "claude-fable-5": {
+          "rates": {
+            "input": "10",
+            "output": "50",
+            "cacheRead": "1",
+            "cacheWrite": "12.5"
+          }
+        },
+        "claude-haiku-4-5": {
+          "rates": {
+            "input": "1",
+            "output": "5",
+            "cacheRead": "0.1",
+            "cacheWrite": "1.25"
+          }
+        },
+        "claude-haiku-4-5-20251001": {
+          "rates": {
+            "input": "1",
+            "output": "5",
+            "cacheRead": "0.1",
+            "cacheWrite": "1.25"
+          }
+        },
+        "claude-opus-4-5": {
+          "rates": {
+            "input": "5",
+            "output": "25",
+            "cacheRead": "0.5",
+            "cacheWrite": "6.25"
+          }
+        },
+        "claude-opus-4-5-20251101": {
+          "rates": {
+            "input": "5",
+            "output": "25",
+            "cacheRead": "0.5",
+            "cacheWrite": "6.25"
+          }
+        },
+        "claude-opus-4-6": {
+          "rates": {
+            "input": "5",
+            "output": "25",
+            "cacheRead": "0.5",
+            "cacheWrite": "6.25"
+          }
+        },
+        "claude-opus-4-7": {
+          "rates": {
+            "input": "5",
+            "output": "25",
+            "cacheRead": "0.5",
+            "cacheWrite": "6.25"
+          }
+        },
+        "claude-opus-4-8": {
+          "rates": {
+            "input": "5",
+            "output": "25",
+            "cacheRead": "0.5",
+            "cacheWrite": "6.25"
+          }
+        },
+        "claude-opus-5": {
+          "rates": {
+            "input": "5",
+            "output": "25",
+            "cacheRead": "0.5",
+            "cacheWrite": "6.25"
+          }
+        },
+        "claude-sonnet-4-5": {
+          "rates": {
+            "input": "3",
+            "output": "15",
+            "cacheRead": "0.3",
+            "cacheWrite": "3.75"
+          }
+        },
+        "claude-sonnet-4-5-20250929": {
+          "rates": {
+            "input": "3",
+            "output": "15",
+            "cacheRead": "0.3",
+            "cacheWrite": "3.75"
+          }
+        },
+        "claude-sonnet-4-6": {
+          "rates": {
+            "input": "3",
+            "output": "15",
+            "cacheRead": "0.3",
+            "cacheWrite": "3.75"
+          }
+        },
+        "claude-sonnet-5": {
+          "rates": {
+            "input": "2",
+            "output": "10",
+            "cacheRead": "0.2",
+            "cacheWrite": "2.5"
+          }
+        }
+      }
+    },
+    "gcp.gemini": {
+      "models": {
+        "deep-research-max-preview-04-2026": {
+          "rates": {
+            "input": "2",
+            "output": "12",
+            "cacheRead": "0.2"
+          },
+          "tiers": [
+            {
+              "contextOver": 200000,
+              "rates": {
+                "input": "4",
+                "output": "18",
+                "cacheRead": "0.4"
+              }
+            }
+          ]
+        },
+        "deep-research-preview-04-2026": {
+          "rates": {
+            "input": "2",
+            "output": "12",
+            "cacheRead": "0.2"
+          },
+          "tiers": [
+            {
+              "contextOver": 200000,
+              "rates": {
+                "input": "4",
+                "output": "18",
+                "cacheRead": "0.4"
+              }
+            }
+          ]
+        },
+        "gemini-2.5-computer-use-preview-10-2025": {
+          "rates": {
+            "input": "1.25",
+            "output": "10"
+          },
+          "tiers": [
+            {
+              "contextOver": 200000,
+              "rates": {
+                "input": "2.5",
+                "output": "15"
+              }
+            }
+          ]
+        },
+        "gemini-2.5-flash": {
+          "rates": {
+            "input": "0.3",
+            "output": "2.5",
+            "cacheRead": "0.03",
+            "inputAudio": "1"
+          }
+        },
+        "gemini-2.5-flash-image": {
+          "rates": {
+            "input": "0.3",
+            "output": "30",
+            "cacheRead": "0.075"
+          }
+        },
+        "gemini-2.5-flash-lite": {
+          "rates": {
+            "input": "0.1",
+            "output": "0.4",
+            "cacheRead": "0.01",
+            "inputAudio": "0.3"
+          }
+        },
+        "gemini-2.5-flash-preview-tts": {
+          "rates": {
+            "input": "0.5",
+            "output": "10"
+          }
+        },
+        "gemini-2.5-pro": {
+          "rates": {
+            "input": "1.25",
+            "output": "10",
+            "cacheRead": "0.125"
+          },
+          "tiers": [
+            {
+              "contextOver": 200000,
+              "rates": {
+                "input": "2.5",
+                "output": "15",
+                "cacheRead": "0.25"
+              }
+            }
+          ]
+        },
+        "gemini-2.5-pro-preview-tts": {
+          "rates": {
+            "input": "1",
+            "output": "20"
+          }
+        },
+        "gemini-3-flash-preview": {
+          "rates": {
+            "input": "0.5",
+            "output": "3",
+            "cacheRead": "0.05",
+            "inputAudio": "1"
+          }
+        },
+        "gemini-3-pro-image": {
+          "rates": {
+            "input": "2",
+            "output": "120"
+          }
+        },
+        "gemini-3-pro-image-preview": {
+          "rates": {
+            "input": "2",
+            "output": "120"
+          }
+        },
+        "gemini-3.1-flash-image": {
+          "rates": {
+            "input": "0.5",
+            "output": "60"
+          }
+        },
+        "gemini-3.1-flash-image-preview": {
+          "rates": {
+            "input": "0.5",
+            "output": "60"
+          }
+        },
+        "gemini-3.1-flash-lite": {
+          "rates": {
+            "input": "0.25",
+            "output": "1.5",
+            "cacheRead": "0.025",
+            "inputAudio": "0.5"
+          }
+        },
+        "gemini-3.1-flash-lite-image": {
+          "rates": {
+            "input": "0.25",
+            "output": "30"
+          }
+        },
+        "gemini-3.1-flash-live-preview": {
+          "rates": {
+            "input": "0.75",
+            "output": "4.5",
+            "inputAudio": "3",
+            "outputAudio": "12"
+          }
+        },
+        "gemini-3.1-flash-tts-preview": {
+          "rates": {
+            "input": "1",
+            "output": "20"
+          }
+        },
+        "gemini-3.1-pro-preview": {
+          "rates": {
+            "input": "2",
+            "output": "12",
+            "cacheRead": "0.2"
+          },
+          "tiers": [
+            {
+              "contextOver": 200000,
+              "rates": {
+                "input": "4",
+                "output": "18",
+                "cacheRead": "0.4"
+              }
+            }
+          ]
+        },
+        "gemini-3.1-pro-preview-customtools": {
+          "rates": {
+            "input": "2",
+            "output": "12",
+            "cacheRead": "0.2"
+          },
+          "tiers": [
+            {
+              "contextOver": 200000,
+              "rates": {
+                "input": "4",
+                "output": "18",
+                "cacheRead": "0.4"
+              }
+            }
+          ]
+        },
+        "gemini-3.5-flash": {
+          "rates": {
+            "input": "1.5",
+            "output": "9",
+            "cacheRead": "0.15",
+            "inputAudio": "1.5"
+          }
+        },
+        "gemini-3.5-flash-lite": {
+          "rates": {
+            "input": "0.3",
+            "output": "2.5",
+            "cacheRead": "0.03"
+          }
+        },
+        "gemini-3.5-live-translate-preview": {
+          "rates": {
+            "input": "3.5",
+            "output": "21",
+            "inputAudio": "3.5",
+            "outputAudio": "21"
+          }
+        },
+        "gemini-3.6-flash": {
+          "rates": {
+            "input": "1.5",
+            "output": "7.5",
+            "cacheRead": "0.15",
+            "inputAudio": "1.5"
+          }
+        },
+        "gemini-3.7-flash": {
+          "rates": {
+            "input": "0.75",
+            "output": "3.75",
+            "cacheRead": "0.075",
+            "inputAudio": "0.75"
+          }
+        },
+        "gemini-embedding-001": {
+          "rates": {
+            "input": "0.15",
+            "output": "0"
+          }
+        },
+        "gemini-embedding-2": {
+          "rates": {
+            "input": "0.2",
+            "output": "0",
+            "inputAudio": "6.5"
+          }
+        },
+        "gemini-flash-latest": {
+          "rates": {
+            "input": "1.5",
+            "output": "9",
+            "cacheRead": "0.15",
+            "inputAudio": "1.5"
+          }
+        },
+        "gemini-flash-lite-latest": {
+          "rates": {
+            "input": "0.25",
+            "output": "1.5",
+            "cacheRead": "0.025",
+            "inputAudio": "0.5"
+          }
+        },
+        "gemini-omni-flash-preview": {
+          "rates": {
+            "input": "1.5",
+            "output": "17.5"
+          }
+        },
+        "gemini-robotics-er-1.6-preview": {
+          "rates": {
+            "input": "1",
+            "output": "5",
+            "inputAudio": "2"
+          }
+        },
+        "lyria-3-clip-preview": {
+          "rates": {
+            "input": "0",
+            "output": "0"
+          }
+        },
+        "lyria-3-pro-preview": {
+          "rates": {
+            "input": "0",
+            "output": "0"
+          }
+        }
+      }
+    },
+    "openai": {
+      "models": {
+        "gpt-4.1": {
+          "rates": {
+            "input": "2",
+            "output": "8",
+            "cacheRead": "0.5"
+          }
+        },
+        "gpt-4.1-mini": {
+          "rates": {
+            "input": "0.4",
+            "output": "1.6",
+            "cacheRead": "0.1"
+          }
+        },
+        "gpt-4o": {
+          "rates": {
+            "input": "2.5",
+            "output": "10",
+            "cacheRead": "1.25"
+          }
+        },
+        "gpt-4o-2024-08-06": {
+          "rates": {
+            "input": "2.5",
+            "output": "10",
+            "cacheRead": "1.25"
+          }
+        },
+        "gpt-4o-2024-11-20": {
+          "rates": {
+            "input": "2.5",
+            "output": "10",
+            "cacheRead": "1.25"
+          }
+        },
+        "gpt-4o-mini": {
+          "rates": {
+            "input": "0.15",
+            "output": "0.6",
+            "cacheRead": "0.075"
+          }
+        },
+        "gpt-5": {
+          "rates": {
+            "input": "1.25",
+            "output": "10",
+            "cacheRead": "0.125"
+          }
+        },
+        "gpt-5-mini": {
+          "rates": {
+            "input": "0.25",
+            "output": "2",
+            "cacheRead": "0.025"
+          }
+        },
+        "gpt-5-nano": {
+          "rates": {
+            "input": "0.05",
+            "output": "0.4",
+            "cacheRead": "0.005"
+          }
+        },
+        "gpt-5-pro": {
+          "rates": {
+            "input": "15",
+            "output": "120"
+          }
+        },
+        "gpt-5.1": {
+          "rates": {
+            "input": "1.25",
+            "output": "10",
+            "cacheRead": "0.125"
+          }
+        },
+        "gpt-5.2": {
+          "rates": {
+            "input": "1.75",
+            "output": "14",
+            "cacheRead": "0.175"
+          }
+        },
+        "gpt-5.2-chat-latest": {
+          "rates": {
+            "input": "1.75",
+            "output": "14",
+            "cacheRead": "0.175"
+          }
+        },
+        "gpt-5.2-pro": {
+          "rates": {
+            "input": "21",
+            "output": "168"
+          }
+        },
+        "gpt-5.3-chat-latest": {
+          "rates": {
+            "input": "1.75",
+            "output": "14",
+            "cacheRead": "0.175"
+          }
+        },
+        "gpt-5.3-codex": {
+          "rates": {
+            "input": "1.75",
+            "output": "14",
+            "cacheRead": "0.175"
+          }
+        },
+        "gpt-5.3-codex-spark": {
+          "rates": {
+            "input": "1.75",
+            "output": "14",
+            "cacheRead": "0.175"
+          }
+        },
+        "gpt-5.4": {
+          "rates": {
+            "input": "2.5",
+            "output": "15",
+            "cacheRead": "0.25"
+          },
+          "tiers": [
+            {
+              "contextOver": 272000,
+              "rates": {
+                "input": "5",
+                "output": "22.5",
+                "cacheRead": "0.5"
+              }
+            }
+          ]
+        },
+        "gpt-5.4-mini": {
+          "rates": {
+            "input": "0.75",
+            "output": "4.5",
+            "cacheRead": "0.075"
+          }
+        },
+        "gpt-5.4-nano": {
+          "rates": {
+            "input": "0.2",
+            "output": "1.25",
+            "cacheRead": "0.02"
+          }
+        },
+        "gpt-5.4-pro": {
+          "rates": {
+            "input": "30",
+            "output": "180"
+          },
+          "tiers": [
+            {
+              "contextOver": 272000,
+              "rates": {
+                "input": "60",
+                "output": "270"
+              }
+            }
+          ]
+        },
+        "gpt-5.5": {
+          "rates": {
+            "input": "5",
+            "output": "30",
+            "cacheRead": "0.5"
+          },
+          "tiers": [
+            {
+              "contextOver": 272000,
+              "rates": {
+                "input": "10",
+                "output": "45",
+                "cacheRead": "1"
+              }
+            }
+          ]
+        },
+        "gpt-5.5-pro": {
+          "rates": {
+            "input": "30",
+            "output": "180"
+          },
+          "tiers": [
+            {
+              "contextOver": 272000,
+              "rates": {
+                "input": "60",
+                "output": "270"
+              }
+            }
+          ]
+        },
+        "gpt-5.6": {
+          "rates": {
+            "input": "5",
+            "output": "30",
+            "cacheRead": "0.5",
+            "cacheWrite": "6.25"
+          },
+          "tiers": [
+            {
+              "contextOver": 272000,
+              "rates": {
+                "input": "10",
+                "output": "45",
+                "cacheRead": "1",
+                "cacheWrite": "12.5"
+              }
+            }
+          ]
+        },
+        "gpt-5.6-luna": {
+          "rates": {
+            "input": "0.2",
+            "output": "1.2",
+            "cacheRead": "0.02",
+            "cacheWrite": "0.25"
+          },
+          "tiers": [
+            {
+              "contextOver": 272000,
+              "rates": {
+                "input": "0.4",
+                "output": "1.8",
+                "cacheRead": "0.04",
+                "cacheWrite": "0.5"
+              }
+            }
+          ]
+        },
+        "gpt-5.6-sol": {
+          "rates": {
+            "input": "5",
+            "output": "30",
+            "cacheRead": "0.5",
+            "cacheWrite": "6.25"
+          },
+          "tiers": [
+            {
+              "contextOver": 272000,
+              "rates": {
+                "input": "10",
+                "output": "45",
+                "cacheRead": "1",
+                "cacheWrite": "12.5"
+              }
+            }
+          ]
+        },
+        "gpt-5.6-terra": {
+          "rates": {
+            "input": "2",
+            "output": "12",
+            "cacheRead": "0.2",
+            "cacheWrite": "2.5"
+          },
+          "tiers": [
+            {
+              "contextOver": 272000,
+              "rates": {
+                "input": "4",
+                "output": "18",
+                "cacheRead": "0.4",
+                "cacheWrite": "5"
+              }
+            }
+          ]
+        },
+        "gpt-image-2": {
+          "rates": {
+            "input": "5",
+            "output": "30",
+            "cacheRead": "1.25"
+          }
+        },
+        "gpt-realtime-2.1": {
+          "rates": {
+            "input": "4",
+            "output": "24",
+            "cacheRead": "0.4",
+            "inputAudio": "32",
+            "outputAudio": "64"
+          }
+        },
+        "o3": {
+          "rates": {
+            "input": "2",
+            "output": "8",
+            "cacheRead": "0.5"
+          }
+        },
+        "o3-pro": {
+          "rates": {
+            "input": "20",
+            "output": "80"
+          }
+        },
+        "text-embedding-3-large": {
+          "rates": {
+            "input": "0.13",
+            "output": "0"
+          }
+        },
+        "text-embedding-3-small": {
+          "rates": {
+            "input": "0.02",
+            "output": "0"
+          }
+        },
+        "text-embedding-ada-002": {
+          "rates": {
+            "input": "0.1",
+            "output": "0"
+          }
+        }
+      }
+    }
+  }
+}

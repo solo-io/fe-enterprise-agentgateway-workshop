@@ -1,17 +1,16 @@
 # Changelog
 
-0.14.5 - (10-1-26)
+0.14.5 - (10-2-26)
 ---
 - Bump Enterprise Agentgateway from `v2026.8.2` to `v2026.9.3` 
 - Update the image list and the air-gap lab
 - Remove `labs/upgrades/migrate-v2026.5.x-to-v2026.7.x.md`. The workshop is now well past that release
 - Mirror the `v2026.9.3` images and `redis:8.6.7-alpine` to `docker.io/ably7` (multi-arch) for the air-gap lab
-- `llm-cost-management.md`: from `v2026.9.1` the base model catalog is built into the proxy instead of an `agentgateway-proxy-model-catalog` ConfigMap, and it now prices the `gpt-5.6` family. The overlay now adds `gpt-4.1-nano`, which the base catalog lacks, in place of the `gpt-5.6` entries, and the dashboard step now says the Model Cost Catalog tab lists only your overlay entries.
-- `e2e/specs/observability/llm-cost-management.yaml`: new probe checks that the overlay prices `gpt-4.1-nano`, because the `gpt-5.6` traffic now prices without the overlay
-- Remove the old minimum-version notes from `WAF.md`, `centralized-llm-ops-helm-chart.md`, `platform-and-developer-helm-charts-mcp.md`, and `mcp-eager-auth-auth0-pre-issuance-authz.md`. Labs assume the version `001` installs
+- `002`: new Step 3 applies the `model-cost-catalog` ConfigMap (`lib/observability/model-catalog-v2026.8.2.json`) as the Gateway's `modelCatalog` source. Since `v2026.9.1` the controller no longer creates a default catalog ConfigMap, so the Cost Management dashboard's Model Cost Catalog tab showed only overlay entries. Remove the step once a release restores the default
 - Add `labs/routing/configure-semantic-routing-jev.md`: semantic routing with TypeSafe Jev
+- Add `labs/guardrails/advanced-guardrails-webhook-jev.md`: the advanced guardrails webhook with TypeSafe Jev as the classifier.
 - Rename `labs/routing/configure-semantic-routing.md` to `labs/routing/configure-semantic-routing-vllm-sr.md`
-- List the Jev lab and the renamed vLLM Semantic Router lab in `README.md` (Routing section and Use Cases) and `tracks/llm-track.md`
+- Update `configure-semantic-routing-vllm-sr.md`: pin the vLLM Semantic Router chart and image to `0.4.0`/`v0.4.0` instead of `latest`. Updated schemas
 
 0.14.4 - (9-29-26)
 ---

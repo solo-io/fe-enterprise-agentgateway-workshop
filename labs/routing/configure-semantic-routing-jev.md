@@ -61,7 +61,7 @@ The gateway speaks the ExtProc gRPC protocol to external processors, and Jev is 
 - A request that names a real model passes through unchanged, and the adapter makes no Jev call for it.
 - For `auto_model`, the adapter classifies the last user message, applies the confidence gate, and rewrites `model` in the body.
 - It removes any `x-jev-tier` or `x-jev-reason` header the client sent, then sets them to the real decision, so a client cannot pick its own tier through those headers.
-- If Jev is unreachable or rejects the call, the adapter answers `503` with a JSON error. The adapter treats a Jev outage as an error and picks no tier.
+- If Jev is unreachable or rejects the call, the adapter answers `503` with a JSON error and does not send the prompt to the fallback tier.
 
 ---
 
@@ -155,12 +155,13 @@ metadata:
 data:
   adapter.py: |
     """ExtProc adapter: asks Jev which price tier a prompt needs, then rewrites the model name."""
+    import http.client
     import json
     import os
+    import queue
     import sys
     import time
     import urllib.error
-    import urllib.request
     from concurrent import futures
 
     import grpc
@@ -169,10 +170,15 @@ data:
     from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as pb_grpc
     from envoy.type.v3 import http_status_pb2
 
-    JEV_URL = "https://api.typesafe.ai/v1/systemone"
+    JEV_HOST = "api.typesafe.ai"
+    JEV_PATH = "/v1/systemone"
     API_KEY = os.environ["TYPESAFE_AI_API_KEY"]
     PROFILE = json.load(open(os.environ.get("JEV_PROFILE_PATH", "/etc/jev/profile.json")))
     DECISION_HEADERS = ("x-jev-tier", "x-jev-reason")
+
+    # Idle connections to Jev, reused across requests so a call skips the TCP and
+    # TLS handshake. Each thread takes its own connection out of the pool.
+    IDLE_CONNECTIONS = queue.LifoQueue()
 
 
     def log(**fields):
@@ -192,19 +198,46 @@ data:
         return None
 
 
+    def jev_post(body, headers):
+        try:
+            conn, reused = IDLE_CONNECTIONS.get_nowait(), True
+        except queue.Empty:
+            conn, reused = None, False
+        while True:
+            conn = conn or http.client.HTTPSConnection(JEV_HOST, timeout=PROFILE["requestTimeoutMs"] / 1000)
+            try:
+                conn.request("POST", JEV_PATH, body, headers)
+                response = conn.getresponse()
+                data = response.read()
+            except (http.client.RemoteDisconnected, ConnectionError):
+                conn.close()
+                # Jev closes connections that sit idle. Retry once on a new
+                # connection when a pooled one turns out to be closed.
+                if not reused:
+                    raise
+                conn, reused = None, False
+                continue
+            except Exception:
+                conn.close()
+                raise
+            if response.will_close:
+                conn.close()
+            else:
+                IDLE_CONNECTIONS.put(conn)
+            return response, data
+
+
     def ask_jev(text):
-        request = {
+        body = json.dumps({
             "model": PROFILE["jevModel"],
             "state": {"prompt": text[: PROFILE["maxPromptChars"]]},
             "questions": {"tier": PROFILE["question"]},
-        }
-        http_request = urllib.request.Request(
-            JEV_URL,
-            data=json.dumps(request).encode(),
-            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-        )
-        with urllib.request.urlopen(http_request, timeout=PROFILE["requestTimeoutMs"] / 1000) as response:
-            return json.load(response)["answers"]["tier"]
+        }).encode()
+        headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+        response, data = jev_post(body, headers)
+        if response.status != 200:
+            raise urllib.error.HTTPError(JEV_HOST + JEV_PATH, response.status, response.reason, response.headers, None)
+        return json.loads(data)["answers"]["tier"]
 
 
     def decide(answer):
@@ -246,9 +279,9 @@ data:
         started = time.monotonic()
         try:
             answer = ask_jev(text)
-        except (urllib.error.URLError, TimeoutError, KeyError, ValueError) as err:
-            # A classifier outage is not a low-confidence answer. Reject instead of
-            # guessing, so the failure is visible to the client and in the logs.
+        except (OSError, http.client.HTTPException, KeyError, ValueError) as err:
+            # Reject on a classifier outage rather than serve the fallback tier,
+            # so the failure is visible to the client and in the logs.
             log(event="jev_error", error=str(err))
             return reject(503, "routing classifier unavailable")
         latency_ms = round((time.monotonic() - started) * 1000)
@@ -736,22 +769,44 @@ kubectl logs -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=ag
 ```
 
 ```
-gpt-5-nano 0.168115666s
-gpt-5.6-luna 0.185804125s
-gpt-5.6-terra 0.241888250s
-gpt-5-nano 0.001076333s
+gpt-5-nano 0.153301555s
+gpt-5.6-luna 0.144004706s
+gpt-5.6-terra 0.139670353s
+gpt-5-nano 0.000178177s
 ```
 
-The `auto_model` requests spent 150 to 250ms in the adapter, nearly all of it the Jev call. The request that named `gpt-5-nano` directly spent about 1ms. Jev charges for input tokens only. With this profile, a decision costs about 530 input tokens, roughly $0.00002 at the [published Jev rate](https://docs.typesafe.ai/models).
+The `auto_model` requests spent about 145ms in the adapter at the median and 200ms at the 90th percentile, nearly all of it the Jev call. An occasional request takes closer to 430ms. The adapter keeps its connections to Jev open between requests, so only the first call after the adapter starts pays for the TLS handshake. Opening a new connection for every call added about 30ms at the median from the test cluster, and more on a network with a longer round trip to `api.typesafe.ai`. The request that named `gpt-5-nano` directly skipped the adapter and spent under 1ms. Jev charges for input tokens only. With this profile, a decision costs about 530 input tokens, roughly $0.00002 at the [published Jev rate](https://docs.typesafe.ai/models).
+
+#### Compare the two routers
+
+Both semantic routing labs ran on the same cluster with the same client contract, tiers, and test prompts. The vLLM Semantic Router figures come from [Latency and cost of the routing call](configure-semantic-routing-vllm-sr.md#latency-and-cost-of-the-routing-call) in that lab.
+
+| | vLLM Semantic Router | Jev |
+|---|---|---|
+| Routing call per `auto_model` request | One OpenAI embeddings request | One Jev request |
+| Added latency, median (90th percentile) | 190ms (235ms) | 145ms (200ms) |
+| Tokens per decision | The prompt | The prompt plus the question, about 530 for the test prompts |
+| Cost per decision for the test prompts | Under $0.000001 | About $0.00002 |
+| What you tune | Candidate phrases and cosine thresholds | Tier descriptions and the confidence gate |
+
+Jev adds about 45ms less than vSR at the median, and both routers had occasional requests near 400ms. Either routing call costs a small fraction of a high-tier answer: the `gpt-5.6-terra` answer to the proof prompt cost about $0.014. Latency depends on the network path from your cluster to each API, so measure from your own cluster before you choose.
 
 ### View Metrics Endpoint
 
 AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. Each tier appears as a distinct label set, so cost and token usage split by the model the adapter chose:
 
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics \
-  | grep -o 'gen_ai_request_model="[^"]*",gen_ai_response_model="[^"]*"' | sort -u && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 3
+  curl -s http://localhost:15020/metrics \
+    | grep -o 'gen_ai_request_model="[^"]*",gen_ai_response_model="[^"]*"'
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done | sort -u
 ```
 
 ```
@@ -759,8 +814,6 @@ gen_ai_request_model="gpt-5-nano",gen_ai_response_model="gpt-5-nano-2025-08-07"
 gen_ai_request_model="gpt-5.6-luna",gen_ai_response_model="gpt-5.6-luna"
 gen_ai_request_model="gpt-5.6-terra",gen_ai_response_model="gpt-5.6-terra"
 ```
-
-The port-forward reaches one proxy replica, so with more than one replica you may see only the tiers that replica served.
 
 > **`auto_model` does not appear in metrics.** The rewrite happens at `PreRouting`, so the gateway only sees the *selected* model and records that in `gen_ai_request_model`. To chart requested against selected, use the adapter's `routing_decision` log line.
 

@@ -90,6 +90,17 @@ Check that the Solo UI components are running:
 kubectl get pods -n agentgateway-system -l app.kubernetes.io/instance=management
 ```
 
+### Step 3: Apply the model cost catalog
+
+```bash
+kubectl create configmap model-cost-catalog -n agentgateway-system \
+  --from-file=catalog.json=lib/observability/model-catalog-v2026.8.2.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
+  --type merge -p '{"spec":{"modelCatalog":{"sources":[{"configMap":{"name":"model-cost-catalog","key":"catalog.json"}}]}}}'
+kubectl rollout status deploy/agentgateway-proxy -n agentgateway-system
+```
+
 ## Deploy metrics
 
 (Optional) Set a custom Grafana admin password before installation:
@@ -350,6 +361,9 @@ Remove the Solo UI:
 ```bash
 helm uninstall management -n agentgateway-system
 helm uninstall management-crds -n agentgateway-system
+kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
+  --type merge -p '{"spec":{"modelCatalog":null}}'
+kubectl delete configmap model-cost-catalog -n agentgateway-system --ignore-not-found
 ```
 
 Remove Grafana and Prometheus:

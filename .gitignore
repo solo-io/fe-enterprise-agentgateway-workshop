@@ -63,3 +63,6 @@ scripts/
 # Diagram HTML sources (rendered PNGs are committed instead)
 images/platform-engineering/src/
 images/src/
+
+# Local parking lot (follow-ups, kept locally)
+PARKING-LOT.md

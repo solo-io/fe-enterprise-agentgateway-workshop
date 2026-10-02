@@ -2,7 +2,7 @@
 
 In this lab, you'll route LLM requests by **prompt content** instead of by the model name the client asks for. Clients send one stable virtual model name, `auto_model`. [vLLM Semantic Router](https://vllm-sr.ai/) (vSR), called by the gateway as an external processor, rewrites that name to one of three price tiers before the gateway routes the request, so each prompt is served by the cheapest model that can handle it, without any change to the client.
 
-[Semantic Routing with Jev](configure-semantic-routing-jev.md) solves the same problem with a Jev classification question instead of embedding similarity.
+[Semantic Routing with Jev](configure-semantic-routing-jev.md) solves the same problem with a Jev classification question instead of embedding similarity, and [compares the two routers](configure-semantic-routing-jev.md#compare-the-two-routers).
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -84,10 +84,9 @@ Install the chart into `agentgateway-system`, watching that namespace.
 ```bash
 helm upgrade -i semantic-router \
   oci://ghcr.io/vllm-project/charts/semantic-router \
-  --version 0.0.0-latest \
+  --version 0.4.0 \
   --namespace agentgateway-system \
-  --set-string image.tag=latest \
-  --set image.pullPolicy=Always \
+  --set-string image.tag=v0.4.0 \
   --set-json 'args=["--secure=false","--namespace=semantic-router-config"]' \
   -f - <<'EOF'
 # Embeddings come from the OpenAI embeddings API, so there is nothing to
@@ -111,29 +110,68 @@ resources:
     memory: 4Gi
 
 config:
+  version: v0.3
   providers:
     defaults:
-      default_model: gpt-5-nano
-      # Tells vSR how to express reasoning for gpt-family models, so a decision
-      # with useReasoning: true sets OpenAI's reasoning_effort parameter.
-      reasoning_families:
-        gpt:
-          type: reasoning_effort
-          parameter: reasoning_effort
-      default_reasoning_effort: high
+      model: gpt-5-nano
+      reasoning_effort: high
+    # The router validates its default model before the Kubernetes reconciler
+    # applies the IntelligentPool, so every name any pool can select is
+    # declared here and in routing.modelCards. The gateway sends the request
+    # to OpenAI; backend_refs names the provider so the router config is valid.
     models:
       - name: gpt-5-nano
         provider_model_id: gpt-5-nano
         api_format: openai
+        backend_refs:
+          - name: openai
+            provider: openai
+            base_url: https://api.openai.com/v1
+      # The reasoning block tells vSR how OpenAI expresses reasoning, so a
+      # decision with useReasoning: true sets the top-level reasoning_effort
+      # request field.
+      - name: gpt-5.6-luna
+        provider_model_id: gpt-5.6-luna
+        api_format: openai
+        backend_refs:
+          - name: openai
+            provider: openai
+            base_url: https://api.openai.com/v1
+        reasoning:
+          type: top_level_reasoning_effort
+          parameter: reasoning_effort
+          levels:
+            - low
+            - medium
+            - high
+          default: high
+      - name: gpt-5.6-terra
+        provider_model_id: gpt-5.6-terra
+        api_format: openai
+        backend_refs:
+          - name: openai
+            provider: openai
+            base_url: https://api.openai.com/v1
+        reasoning:
+          type: top_level_reasoning_effort
+          parameter: reasoning_effort
+          levels:
+            - low
+            - medium
+            - high
+          default: high
   routing:
-    # The router validates its default model before the Kubernetes reconciler
-    # applies the IntelligentPool, so every name any pool can select has to be
-    # declared here for the process to start cleanly.
+    # Each model the pool can select needs a model card. These entries also
+    # replace the chart's placeholder model.
     modelCards:
       - name: gpt-5-nano
       - name: gpt-5.6-luna
       - name: gpt-5.6-terra
-    signals: {}
+    # Signals and decisions come from the IntelligentRoute. The empty domains
+    # list clears the chart's default domain signal, which would otherwise
+    # download a local classifier model.
+    signals:
+      domains: []
     decisions: []
   global:
     router:
@@ -165,6 +203,11 @@ config:
             timeout_seconds: 10
             max_retries: 2
             dimensions: 1536
+    stores:
+      # The chart enables a response cache by default, and it needs a local
+      # embedding model. Disable it, since this lab embeds remotely.
+      response_cache:
+        enabled: false
     services:
       # The gateway owns rate limiting in this workshop. Disable the chart's
       # sample rules so the two do not both decide.
@@ -173,12 +216,7 @@ config:
 EOF
 ```
 
-Wait for the Deployment.
-
-```bash
-kubectl wait --for=condition=Available deployment/semantic-router \
-  -n agentgateway-system --timeout=600s
-```
+> **Helm values seed the router config at install time.** On a later `helm upgrade`, the chart keeps the config in the live `semantic-router-config` ConfigMap. To apply changed values, delete that ConfigMap, rerun the `helm upgrade` command, then restart the router with `kubectl rollout restart deployment/semantic-router -n agentgateway-system`.
 
 ## Define the pool and the routing rule
 
@@ -246,8 +284,8 @@ spec:
           - type: embedding
             name: hard
       modelRefs:
-        # useReasoning sets reasoning_effort (via reasoning_families in the
-        # Helm values) at default_reasoning_effort on the selected model.
+        # useReasoning sets reasoning_effort on the selected model, using the
+        # model's reasoning block and the default effort in the Helm values.
         - model: gpt-5.6-terra
           useReasoning: true
     - name: route-moderate-prompts
@@ -264,7 +302,14 @@ spec:
 EOF
 ```
 
-Confirm both reached Ready. vSR reports Ready only after it has reconciled the resource into its running configuration, so the rule is live.
+The router pod reports Ready only after it finds an `IntelligentPool`, so wait for the Deployment now that the pool exists:
+
+```bash
+kubectl wait --for=condition=Available deployment/semantic-router \
+  -n agentgateway-system --timeout=600s
+```
+
+Confirm both resources reached Ready. vSR reports Ready only after it has reconciled the resource into its running configuration, so the rule is live.
 
 ```bash
 kubectl wait --for=condition=Ready \
@@ -433,26 +478,23 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 
 ### Read the decision in the router log
 
-The gateway access log records the model that *served* the request. The reason it was chosen lives in the router, across two lines: `routing_decision` names the selected model and the rule that fired, and `router_replay_start` adds the signals that fired that rule along with the raw similarity score.
+The gateway access log records the model that *served* the request. The reason it was chosen is in the router's `routing_decision` line, which names the selected model, the decision that fired, and the reasoning effort it set:
 
 ```bash
-kubectl logs -n agentgateway-system -l app.kubernetes.io/name=semantic-router --tail=50 | grep router_replay_start | tail -1 | jq '{original_model, selected_model, decision, decision_priority, embedding_signals: .signals.embedding, similarity: .signal_values."embedding:hard"}'
+kubectl logs -n agentgateway-system -l app.kubernetes.io/name=semantic-router --tail=100 \
+  | grep '"msg":"routing_decision"' | tail -3 \
+  | jq -c '{selected_model, decision, reasoning_effort, routing_latency_ms}'
 ```
 
 ```json
-{
-  "original_model": "auto_model",
-  "selected_model": "gpt-5.6-terra",
-  "decision": "escalate-hard-prompts",
-  "decision_priority": 100,
-  "embedding_signals": [
-    "hard"
-  ],
-  "similarity": 0.4119
-}
+{"selected_model":"gpt-5-nano","decision":"","reasoning_effort":"","routing_latency_ms":272}
+{"selected_model":"gpt-5.6-luna","decision":"route-moderate-prompts","reasoning_effort":"high","routing_latency_ms":202}
+{"selected_model":"gpt-5.6-terra","decision":"escalate-hard-prompts","reasoning_effort":"high","routing_latency_ms":206}
 ```
 
-The per-rule scoring also lands in the log at info level, useful when calibrating the thresholds. Each request scores against both signals, so the three test prompts produce six lines:
+The easy prompt matched no decision, so `decision` is empty and the pool's `defaultModel` served it. The two matched decisions set `reasoning_effort: high` on the request, from the `reasoning` block in the Helm values.
+
+The similarity scores are in the per-rule scoring lines, which help when you calibrate the thresholds. Each request scores against both signals, so the three test prompts produce six lines:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=semantic-router --tail=200 \
@@ -470,14 +512,41 @@ Rule "moderate": score=0.1279 best=0.1303 support=0.1208 threshold=0.300 matched
 
 ## Observability
 
+### Latency and cost of the routing call
+
+The access log's `request_proc_duration` field measures time spent in request policies, which here is the vSR round trip:
+
+```bash
+kubectl logs -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=agentgateway-proxy --tail=50 \
+  | grep "http.path=/semantic" | grep "http.status=200" \
+  | sed -E 's/.*gen_ai.request.model=([^ ]+).*request_proc_duration="([^"]+)".*/\1 \2/'
+```
+
+```
+gpt-5-nano 0.196427209s
+gpt-5.6-luna 0.288807792s
+gpt-5.6-terra 0.332621500s
+gpt-5-nano 0.000967500s
+```
+
+The `auto_model` requests spent about 190ms in vSR at the median and 235ms at the 90th percentile, nearly all of it the OpenAI embeddings call. An occasional request takes closer to 400ms. The request that named `gpt-5-nano` directly spent about 1ms. The first `auto_model` request after the router starts can take up to a second. vSR embeds only the prompt for each request, so a decision costs about as many tokens as the prompt itself, at the `text-embedding-3-small` rate of $0.02 per million tokens.
+
 ### View Metrics Endpoint
 
 AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. Each tier appears as a distinct label set, so cost and token usage split by the model vSR chose:
 
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics \
-  | grep -o 'gen_ai_request_model="[^"]*",gen_ai_response_model="[^"]*"' | sort -u && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 3
+  curl -s http://localhost:15020/metrics \
+    | grep -o 'gen_ai_request_model="[^"]*",gen_ai_response_model="[^"]*"'
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done | sort -u
 ```
 
 ```

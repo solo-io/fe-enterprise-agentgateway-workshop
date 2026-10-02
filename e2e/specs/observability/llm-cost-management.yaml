@@ -74,6 +74,10 @@ steps:
       # the last block prints the resulting resource.
       - contains: "modelCatalog"
       - contains: "logging"
+      # The merge patch replaces the whole sources list, so it must restate
+      # 002's base source ahead of the overlay.
+      - contains: "model-cost-catalog"
+      - contains: "llm-model-costs"
 
   # Three separately-owned budget resources, all enforced at once. The lab's
   # claim is that entries compose across resources and the most restrictive wins.

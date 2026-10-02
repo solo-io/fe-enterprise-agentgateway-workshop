@@ -1,6 +1,6 @@
 # Guard MCP Tool Calls with an External Policy Server
 
-In this lab, you put a policy server between agents and a procurement MCP server. Each caller sees only the tools it is entitled to, a purchase order above the caller's limit returns an approval request, email can only go to approved domains, and bank account and tax ID values are masked before a tool result reaches the model.
+In this lab, you put a policy server between agents and a procurement MCP server. Each caller sees only the tools it is entitled to, a purchase order above the caller's limit is denied with a message that approval is required, email can only go to approved domains, and bank account and tax ID values are masked before a tool result reaches the model.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
@@ -14,14 +14,14 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - Deploy a procurement MCP server behind agentgateway with JWT authentication
 - Attach an ExtMCP guardrails processor to an `EnterpriseAgentgatewayBackend` with an `EnterpriseAgentgatewayPolicy`
 - Filter `tools/list` and gate `tools/call` per caller, using a JWT claim passed to the policy server
-- Deny purchase orders above a per-persona limit with a structured approval payload
+- Deny purchase orders above a per-persona limit and tell the agent that approval is required
 - Block email to unapproved domains and redact bank account and tax ID values from tool results
 - Compare a `FailClosed` and a `FailOpen` processor when their policy servers go down
 - Change policy at runtime by editing a ConfigMap
 
 ## Overview
 
-MCP guardrails (also called ExtMCP) call an external gRPC policy server at the MCP method layer. For each method you opt in, agentgateway sends the server the JSON-RPC method, the target backend, the request `params` or response `result`, and caller metadata computed with CEL. The server passes the message, returns a rewritten one, or denies it. A denial reaches the client as a JSON-RPC error.
+MCP guardrails (also called ExtMCP) call an external gRPC policy server at the MCP method layer. For each method you opt in, agentgateway sends the server the JSON-RPC method, the target backend, the request `params` or response `result`, and caller metadata computed with CEL. The server passes the message, returns a rewritten one, or denies it. A denied `tools/call` request reaches the client as a tool result with `isError: true` and the policy server's message as text, so the agent can read why the call failed. Any other denial reaches the client as a JSON-RPC error.
 
 ![MCP guardrails architecture: an MCP client sends a persona JWT to agentgateway-proxy, which authenticates the JWT, routes /procurement/mcp to the procurement-mcp server over Streamable HTTP, and calls two ExtMCP policy servers over gRPC in order: extmcp-authz (FailClosed) gates tools/call requests and filters tools/list responses using the persona and sub claims, and extmcp-redact (FailOpen) masks bank account and tax ID values in tools/call responses. Each policy server reads its policy from a ConfigMap mounted at /etc/extmcp](../../images/mcp/mcp-guardrails-architecture.png)
 
@@ -46,7 +46,7 @@ Each processor lists the methods it handles and the phase in which agentgateway 
 | `Full` | Both. |
 | `Off` | Never. |
 
-The code the policy server returns sets the JSON-RPC error code:
+For a denial that reaches the client as a JSON-RPC error, the code the policy server returns sets the error code:
 
 | Policy server code | JSON-RPC error code |
 |---|---|
@@ -433,9 +433,14 @@ send_supplier_email
 {
   "jsonrpc": "2.0",
   "id": 2,
-  "error": {
-    "code": -32001,
-    "message": "persona requester may not call delete_supplier"
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "persona requester may not call delete_supplier"
+      }
+    ],
+    "isError": true
   }
 }
 ```
@@ -464,20 +469,19 @@ mcp_call "$BUYER" tools/call '{"name":"create_purchase_order","arguments":{"supp
 {
   "jsonrpc": "2.0",
   "id": 2,
-  "error": {
-    "code": -32003,
-    "message": "amount $25000 exceeds the $10000 limit for buyer; approval required",
-    "data": {
-      "amount": 25000,
-      "approval_required": true,
-      "approval_url": "https://approvals.try-solo.io/requests?amount=25000&persona=buyer&supplier=SUP-002",
-      "limit": 10000
-    }
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "amount $25000 exceeds the $10000 limit for buyer; approval required"
+      }
+    ],
+    "isError": true
   }
 }
 ```
 
-The error's `data` field carries the approval request, so an agent can tell the user what happened and where to request approval. The finance approver's limit covers the same order:
+The message names the limit and says approval is required, so the agent can tell the user what happened. The policy server also builds an approval payload with the `approval.url` from its policy, but agentgateway passes only the message to the client for a denied `tools/call`. The finance approver's limit covers the same order:
 
 ```bash
 mcp_call "$APPROVER" tools/call '{"name":"create_purchase_order","arguments":{"supplier":"SUP-002","amount":25000,"description":"Forklift"}}' | jq .result.structuredContent
@@ -503,14 +507,19 @@ mcp_call "$BUYER" tools/call '{"name":"create_purchase_order","arguments":{"supp
 {
   "jsonrpc": "2.0",
   "id": 2,
-  "error": {
-    "code": -32600,
-    "message": "create_purchase_order needs a numeric amount"
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "create_purchase_order needs a numeric amount"
+      }
+    ],
+    "isError": true
   }
 }
 ```
 
-> **Approval happens outside the gateway.** The gateway returns the approval payload and ends the call. Your approval system records the approval, and the agent re-submits the order under an identity whose limit covers it.
+> **Approval happens outside the gateway.** The gateway returns the denial and ends the call. Your approval system records the approval, and the agent re-submits the order under an identity whose limit covers it.
 
 ---
 
@@ -631,15 +640,15 @@ EOF
 Try to email supplier details to an outside address, then to a look-alike domain, then to an approved supplier contact. Finally, look up a supplier again:
 
 ```bash
-mcp_call "$BUYER" tools/call '{"name":"send_supplier_email","arguments":{"to":"x@gmail.com","subject":"Bank details","body":"See attached"}}' | jq -c .error
-mcp_call "$BUYER" tools/call '{"name":"send_supplier_email","arguments":{"to":"ap@try-solo.io.attacker.example","subject":"Bank details","body":"See attached"}}' | jq -c .error
+mcp_call "$BUYER" tools/call '{"name":"send_supplier_email","arguments":{"to":"x@gmail.com","subject":"Bank details","body":"See attached"}}' | jq -c .result
+mcp_call "$BUYER" tools/call '{"name":"send_supplier_email","arguments":{"to":"ap@try-solo.io.attacker.example","subject":"Bank details","body":"See attached"}}' | jq -c .result
 mcp_call "$BUYER" tools/call '{"name":"send_supplier_email","arguments":{"to":"globex@try-solo.io","subject":"PO-1002","body":"Please confirm delivery"}}' | jq -c .result.structuredContent
 mcp_call "$BUYER" tools/call '{"name":"get_supplier","arguments":{"id":"SUP-001"}}' | jq .result.structuredContent
 ```
 
 ```
-{"code":-32001,"message":"recipient domain gmail.com not allowed"}
-{"code":-32001,"message":"recipient domain try-solo.io.attacker.example not allowed"}
+{"content":[{"type":"text","text":"recipient domain gmail.com not allowed"}],"isError":true}
+{"content":[{"type":"text","text":"recipient domain try-solo.io.attacker.example not allowed"}],"isError":true}
 {"status":"queued","to":"globex@try-solo.io"}
 {
   "bankAccount": "<BANK_ACCOUNT>",
@@ -774,18 +783,18 @@ kubectl logs -n procurement deploy/extmcp-authz --since=5m | grep '"msg":"policy
 Repeat the buyer's $5,000 order from Step 3, then check the finance approver's tools:
 
 ```bash
-mcp_call "$BUYER" tools/call '{"name":"create_purchase_order","arguments":{"supplier":"SUP-002","amount":5000}}' | jq -c .error
+mcp_call "$BUYER" tools/call '{"name":"create_purchase_order","arguments":{"supplier":"SUP-002","amount":5000}}' | jq -c .result
 list_tools "$APPROVER"
-mcp_call "$APPROVER" tools/call '{"name":"delete_supplier","arguments":{"id":"SUP-003"}}' | jq -c .error
+mcp_call "$APPROVER" tools/call '{"name":"delete_supplier","arguments":{"id":"SUP-003"}}' | jq -c .result
 ```
 
 ```
-{"code":-32003,"message":"amount $5000 exceeds the $2500 limit for buyer; approval required","data":{"amount":5000,"approval_required":true,"approval_url":"https://approvals.try-solo.io/requests?amount=5000&persona=buyer&supplier=SUP-002","limit":2500}}
+{"content":[{"type":"text","text":"amount $5000 exceeds the $2500 limit for buyer; approval required"}],"isError":true}
 create_purchase_order
 get_supplier
 list_purchase_orders
 send_supplier_email
-{"code":-32001,"message":"tool delete_supplier is disabled"}
+{"content":[{"type":"text","text":"tool delete_supplier is disabled"}],"isError":true}
 ```
 
 The order that passed in Step 3 now needs approval, and `delete_supplier` is gone for every persona, including the one whose policy allows all tools. If an edit does not parse, the policy server keeps enforcing the previous policy and logs `policy reload failed`.
