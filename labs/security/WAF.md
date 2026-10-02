@@ -7,9 +7,6 @@ This lab focuses on the use cases that matter for agentic traffic: enforcing API
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces. It also assumes you have an `OPENAI_API_KEY` available.
 
-> [!NOTE]
-> WAF for Enterprise Agentgateway is available in **v2026.6.3 and later** (the version installed in `001`). Earlier releases such as `v2026.6.1` do not ship the `WAFPolicy` CRD or the `entWAF` policy field; upgrade first if you are on one.
-
 ## Lab Objectives
 - Understand where WAF fits versus AI guardrails, and which threats each is best suited for
 - Verify the WAF server is running

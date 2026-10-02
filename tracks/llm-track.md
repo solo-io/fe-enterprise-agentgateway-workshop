@@ -80,7 +80,8 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 |---|---|
 | [Routing by Match Type (Path, Header, Query Parameter)](../labs/routing/routing-match-types.md) | Route the same models via path, header, or query param matching |
 | [Body-Based Routing](../labs/routing/configure-body-based-routing.md) | Route on request body fields (e.g., `model`, `stream`) |
-| [Semantic Routing with vLLM Semantic Router](../labs/routing/configure-semantic-routing.md) | One virtual model name, routed to an economy, mid, or high tier model by prompt content via ExtProc |
+| [Semantic Routing with vLLM Semantic Router](../labs/routing/configure-semantic-routing-vllm-sr.md) | One virtual model name, routed to an economy, mid, or high tier model by prompt content via ExtProc |
+| [Semantic Routing with Jev](../labs/routing/configure-semantic-routing-jev.md) | The same tier routing, classified by Jev with a confidence gate that sends uncertain prompts to a fallback tier |
 | [Timeouts and Retries](../labs/routing/timeouts-and-retries.md) | Configure per-route timeouts and retry policies |
 | [LLM Failover](../labs/routing/llm-failover.md) | Priority-group failover between providers |
 | [Advanced LLM Failover Patterns](../labs/routing/llm-failover-advanced.md) | Health-based routing, 429 failover, intra-group P2C load balancing |
@@ -126,6 +127,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | [Built-in Guardrails](../labs/guardrails/builtin-guardrails.md) | Configure Agentgateway's prompt guard (injection, jailbreak, PII, secrets, encoding evasion) |
 | [External Moderation (OpenAI)](../labs/guardrails/external-moderation-guardrails.md) | Route traffic through OpenAI's moderation API as a sidecar |
 | [Advanced Guardrails Webhook](../labs/guardrails/advanced-guardrails-webhook.md) | Call a custom webhook for policy decisions |
+| [Advanced Guardrails Webhook with Jev](../labs/guardrails/advanced-guardrails-webhook-jev.md) | The same webhook guardrail classified by Jev, with measured latency and cost against the OpenAI webhook |
 | [Prompt Enrichment](../labs/transformations/prompt-enrichment.md) | Inject system prompts or metadata before forwarding |
 | [Request/Response Transformations](../labs/transformations/transformations.md) | Rewrite headers, mutate body fields, shape responses |
 

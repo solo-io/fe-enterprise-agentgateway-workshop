@@ -43,33 +43,48 @@ steps:
       - matches: 'type: Attached'
       - not_contains: 'status: "False"'
 
-  # The rate limiter uses a fixed wall-clock minute window, so a burst that
-  # straddles a boundary can get a fresh budget mid-burst. Retry the whole burst
-  # rather than assert on a single call.
+  # A rate-limited tools/call is HTTP 200 with a JSON-RPC result carrying
+  # isError:true and the limiter's text, not a 429, so classify each call by
+  # its body. The rate limiter uses a fixed wall-clock minute window, so a burst
+  # that straddles a boundary can get a fresh budget mid-burst. Retry the whole
+  # burst rather than assert on a single call.
   - probe: "get-env is limited to 3 calls per minute"
     script: |
       burst() {
         SID="$(e2e_mcp_init)"
         for n in 1 2 3 4 5 6; do
-          curl -s -o /dev/null -w '%{http_code} ' -X POST "$E2E_MCP_URL" \
+          RESP="$(curl -s -i -X POST "$E2E_MCP_URL" \
             -H 'Content-Type: application/json' \
             -H 'Accept: application/json, text/event-stream' \
             -H "mcp-session-id: $SID" \
-            -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get-env","arguments":{}}}'
+            -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get-env","arguments":{}}}')"
+          CODE="$(sed -n '1s/^HTTP\/[0-9.]* \([0-9]*\).*/\1/p' <<<"$RESP")"
+          if grep -q 'rate limit exceeded' <<<"$RESP" && grep -q '"isError":true' <<<"$RESP"; then
+            VERDICT=denied
+            DENIAL="$(grep -o 'rate limit exceeded[^"]*' <<<"$RESP" | head -1)"
+          elif grep -q '"result"' <<<"$RESP" && ! grep -q '"isError":true' <<<"$RESP"; then
+            VERDICT=allowed
+          else
+            VERDICT=other
+          fi
+          echo "call ${n}: http=${CODE} ${VERDICT}"
         done
-        echo
+        [ -n "${DENIAL:-}" ] && echo "denial text: ${DENIAL}"
       }
       # entRateLimit needs a few seconds to settle after the policy attaches.
       sleep 12
       for attempt in 1 2 3 4 5; do
+        echo "attempt${attempt}:"
         OUT="$(burst)"
-        echo "attempt${attempt}: $OUT"
-        grep -q '429' <<<"$OUT" && break
+        echo "$OUT"
+        grep -q 'denied' <<<"$OUT" && break
         sleep 20
       done
     assert:
-      - contains: "429"
-      - contains: "200"
+      - matches: 'call 1: http=200 allowed'
+      - matches: 'call [4-6]: http=200 denied'
+      - contains: "denial text: rate limit exceeded (retry after"
+      - not_contains: " other"
 
   - probe: "echo matches no descriptor, so it is never counted"
     script: |
@@ -80,7 +95,8 @@ steps:
       done
     assert:
       - contains: "Echo: still-allowed"
-      - not_contains: "429"
+      - not_contains: "rate limit exceeded"
+      - not_contains: '"isError":true'
 
 cleanup:
   section: "Cleanup"

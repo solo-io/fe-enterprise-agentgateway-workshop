@@ -9,8 +9,6 @@ The chart operates a small catalog of named aliases, and this lab uses two of th
 - **`chat-mock`**: an LLM-shaped endpoint for tests and CI, where nobody reads the answer. Auth, rate limiting, WAF, and routing behave as they do for a real model, but every token is free.
 - **`chat-real`**: real completions, where the platform manages the provider relationship. Today that provider is OpenAI; tomorrow the platform can point the same alias at a different provider or model without any team noticing.
 
-> This lab requires Enterprise Agentgateway **v2026.6.3** or later (the version installed in [001](../../001-install-enterprise-agentgateway.md)).
-
 ## Pre-requisites
 
 This lab assumes you have completed the setup in [001](../../001-install-enterprise-agentgateway.md). [002](../../002-set-up-ui-and-monitoring-tools.md) is optional but recommended if you want to observe metrics and traces.

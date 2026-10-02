@@ -228,11 +228,11 @@ The Cost Management dashboard in the Solo UI is enabled by the `products.agentga
 
 ## Configure a model cost catalog
 
-The gateway ships a base catalog: the controller creates an `agentgateway-proxy-model-catalog` ConfigMap alongside each Gateway, covering OpenAI, Anthropic, and Gemini models known at release time, so those models are priced with no configuration from you. A model the base catalog doesn't know, whether a mock, a self-hosted model, or one released after the gateway, still contributes token and request volume but `$0.00` of spend.
+The gateway ships a base catalog built into the proxy. It covers the models that OpenAI, Anthropic, Google, AWS Bedrock, Azure, and other providers offered at release time, so the proxy prices those models by default. The `gpt-5.6-luna` and `gpt-5.6-terra` traffic in this lab prices at list from the base catalog alone. A model the base catalog doesn't know, whether a mock, a self-hosted model, or one released after the gateway, still contributes token and request volume but `$0.00` of spend.
 
 You layer your own catalog on top of that base as an overlay. The one below does both overlay jobs:
 
-- **Add a model the base catalog doesn't price.** This release's base catalog stops short of the `gpt-5.6` family, so `gpt-5.6-luna` traffic prices at `$0.00` until you supply rates for it.
+- **Add a model the base catalog doesn't price.** The base catalog has no entry for `gpt-4.1-nano`, so its traffic prices at `$0.00` until you supply rates for it.
 - **Override a model it does price.** The base prices `gpt-5.5` at public list, `$5.00` input and `$30.00` output per 1M tokens; the overlay restates it at a contracted 50% of list.
 
 ```bash
@@ -248,14 +248,8 @@ data:
       "providers": {
         "openai": {
           "models": {
-            "gpt-5.6-luna": {
-              "rates": { "input": "0.20", "output": "1.20", "cacheRead": "0.02", "cacheWrite": "0.25" }
-            },
-            "gpt-5.6-terra": {
-              "rates": { "input": "2.00", "output": "12.00", "cacheRead": "0.20", "cacheWrite": "2.50" }
-            },
-            "gpt-5.6-sol": {
-              "rates": { "input": "5.00", "output": "30.00", "cacheRead": "0.50", "cacheWrite": "6.25" }
+            "gpt-4.1-nano": {
+              "rates": { "input": "0.10", "output": "0.40", "cacheRead": "0.025" }
             },
             "gpt-5.5": {
               "rates": { "input": "2.50", "output": "15.00", "cacheRead": "0.25" },
@@ -275,11 +269,11 @@ EOF
 
 > **Note:** An overlay entry **replaces** the base entry for that model rather than merging into it, so an override has to restate every field it wants to keep. The base `gpt-5.5` entry carries a `cacheRead` rate and a `tiers` block that reprices requests over a 272,000-token context; an override setting only `input` and `output` would silently drop both. The entry above restates them at the same 50% discount.
 
-`001` created the `agentgateway-config` `EnterpriseAgentgatewayParameters` and attached it to the Gateway via `spec.infrastructure.parametersRef`. Point the Gateway at your catalog by adding `modelCatalog` there with a **merge patch** rather than `kubectl apply`: a full `apply` without the fields `001` set (like `logging`) would strip them.
+`001` created the `agentgateway-config` `EnterpriseAgentgatewayParameters` and attached it to the Gateway via `spec.infrastructure.parametersRef`. Add your catalog to its `modelCatalog.sources` with a **merge patch** rather than `kubectl apply`: a full `apply` without the fields `001` set (like `logging`) would strip them.
 
 ```bash
 kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
-  --type merge -p '{"spec":{"modelCatalog":{"sources":[{"configMap":{"name":"llm-model-costs","key":"catalog.json"}}]}}}'
+  --type merge -p '{"spec":{"modelCatalog":{"sources":[{"configMap":{"name":"model-cost-catalog","key":"catalog.json"}},{"configMap":{"name":"llm-model-costs","key":"catalog.json"}}]}}}'
 ```
 
 Confirm the existing fields (e.g. `logging`) are still present alongside the new `modelCatalog` block:
@@ -582,9 +576,10 @@ Open [http://localhost:4000/age/](http://localhost:4000/age/) and select **Cost 
 - **Dashboard**: a summary row of total spend, tokens, and request count, followed by paired **Spend by** and **Spend Over Time by** panels. Switch a panel's pivot from **Provider** to **Group** to **User**, and the same traffic re-slices as `research` against `engineering`, then as alice against bob. The **Filters** row narrows every panel at once, and **Export CSV** downloads the current view. If you ran the seeding step, select the **30d** range and the pivots fill out to four providers, five teams, and eleven users.
   - Every request attributes to a user, group, and virtual key, because each key sets `id`, `user`, and `group`. Requests where a dimension resolves to nothing appear under **Unattributed**.
   - Model breakdowns list the model ID the provider returns on the response. `gpt-5.6-luna` and `gpt-5.6-terra` appear verbatim; a model that answers with a dated snapshot ID, such as `gpt-5.4-nano-2026-03-17`, shows that snapshot, and the gateway resolves it back to the alias in your catalog for pricing.
-- **Model Cost Catalog**: the header names the base catalog, lists your overlay under **Overlay catalogs are applied in this order**, and reports `1 model entry is overridden by overlay sources`. Search the table to see both halves of the overlay:
-  - `gpt-5.6` returns the three added models with the rates you supplied.
-  - `gpt-5.5` shows `$2.50` input, `$15.00` output, and `$0.25` cache read instead of the list `$5.00`/`$30.00`/`$0.50`, tagged source `Override`.
+- **Model Cost Catalog**: the header names `agentgateway-system/model-cost-catalog:catalog.json` as the base model catalog, lists your `agentgateway-system/llm-model-costs:catalog.json` as an overlay, and reports `1 model entry is overridden by overlay sources`. The table merges both sources into 81 entries. Search the table for these models:
+  - `gpt-4.1-nano` shows the `$0.10` input and `$0.40` output rates you added.
+  - `gpt-5.5` shows `$2.50` input, `$15.00` output, and `$0.25` cache read instead of the list `$5.00`/`$30.00`/`$0.50`, with **Source** `Override`.
+  - `gpt-5.6-luna` shows its list `$0.20` input and `$1.20` output, with **Source** `Base`.
 - **Budgets**: one row per `EnterpriseAgentgatewayBudget`, with a header counting `Within budget` against `Exceeding budget`: `4 Budgets`, `3 Within budget`, `1 Exceeding budget` after the steps above. Each row shows its **Scope**, so `research-team-quota` is visibly owned by `team-research` while the rest sit in `agentgateway-system`. Click a row to open its detail drawer, where each entry shows its subject, window, and usage against its limit:
   - `user-exceptions` is the one over budget: `bob-daily-tokens`, subject `user bob`, `2,000 tokens of 2,000 tokens`, flagged `Over budget` at `100%` after the blocking step. Its sibling `alice-daily-tokens` reads e.g. `694 tokens of 500,000 tokens`, `On track`
   - `platform-defaults`: `any-user-daily-tokens`, subject `user *`, e.g. `368 tokens of 100,000 tokens`, `On track`. Bob's traffic is absent here, because his exact entry takes precedence and debits his own cap instead of the shared default
@@ -607,7 +602,7 @@ kubectl delete namespace team-research --ignore-not-found
 
 # Model cost catalog wiring (leaves other parameters fields, e.g. logging, untouched)
 kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
-  --type merge -p '{"spec":{"modelCatalog":null}}'
+  --type merge -p '{"spec":{"modelCatalog":{"sources":[{"configMap":{"name":"model-cost-catalog","key":"catalog.json"}}]}}}'
 kubectl delete configmap -n agentgateway-system llm-model-costs --ignore-not-found
 
 # API key authentication + budget enforcement policy, virtual keys

@@ -38,6 +38,10 @@ python3 -m unittest discover -s lib/observability/tests -v
 
 Checks the dashboard JSON parses, `dash_prices.py validate` passes, and the dashboard's live rates match `pricing.json`.
 
+## `model-catalog-v2026.8.2.json`
+
+The model cost catalog (Anthropic, Gemini, and OpenAI per-token list prices) that the `v2026.8.2` controller generated as its default catalog ConfigMap. `002` loads it into the `model-cost-catalog` ConfigMap and sets that as the Gateway's first `modelCatalog` source, so the Cost Management dashboard has a base catalog to display. `llm-cost-management.md` layers its overlay after it.
+
 ## `seed-cost-data.sh`
 
 Backfills ClickHouse with synthetic LLM spend so the Cost Management dashboard renders a full history instead of the single spike a few live requests produce.
@@ -65,7 +69,7 @@ Seeding fills the **Dashboard** tab only. The **Budgets** tab reads live rate-li
 ## Used by
 
 - [`labs/observability/llm-cost-management.md`](../../labs/observability/llm-cost-management.md): `seed-cost-data.sh`
-- [`002-set-up-ui-and-monitoring-tools.md`](../../002-set-up-ui-and-monitoring-tools.md): the Grafana dashboard JSON
+- [`002-set-up-ui-and-monitoring-tools.md`](../../002-set-up-ui-and-monitoring-tools.md): the Grafana dashboard JSON and `model-catalog-v2026.8.2.json`
 
 ## Downstream copies of the dashboard JSON
 

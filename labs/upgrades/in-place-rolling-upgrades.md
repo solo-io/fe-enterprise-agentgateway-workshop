@@ -603,7 +603,7 @@ kubectl rollout status deployment/enterprise-agentgateway -n agentgateway-system
 kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system --timeout=300s
 ```
 
-> Pass your values with `-f`, not `--reuse-values`: `--reuse-values` does not merge the new chart's defaults and can fail to template across a version bump (`<.Values.externalSecrets.stores>: nil pointer`). For a cross-minor upgrade, also reconcile image settings; see the [migration guide](migrate-v2026.5.x-to-v2026.7.x.md).
+> Pass your values with `-f`, not `--reuse-values`: `--reuse-values` does not merge the new chart's defaults and can fail to template across a version bump (`<.Values.externalSecrets.stores>: nil pointer`). Also remove any per-component image tag you pinned (Helm `controller.image`, or `spec.image` and `spec.sharedExtensions.<name>.image` on the `EnterpriseAgentgatewayParameters`). A pinned tag keeps that component on the old version after the chart moves.
 
 Run any of the k6 Jobs above during the upgrade to confirm the same zero-downtime behavior end-to-end.
 

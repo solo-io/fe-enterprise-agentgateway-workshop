@@ -50,7 +50,7 @@ tlsroutes                         gateway.networking.k8s.io/v1   true         TL
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.8.2
+export ENTERPRISE_AGW_VERSION=v2026.9.3
 ```
 
 ### Enterprise Agentgateway CRDs

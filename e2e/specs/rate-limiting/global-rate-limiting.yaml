@@ -127,23 +127,31 @@ steps:
       - contains: "HTTP 429"
 
   # The lab's central claim for this section: User B's counter is untouched by
-  # User A's exhaustion.
+  # User A's exhaustion. The block exhausts User A itself, so it holds in any
+  # clock-minute window. A retry covers a window reset between User A's two
+  # requests.
   - section: "Verify independent per-user counters"
     run: all
     retry:
-      attempts: 6
+      attempts: 4
       delay: 5
-      until: "HTTP/[0-9.]+ 200"
+      until: "User A request 2: HTTP 429"
     assert:
-      - status: 200
-      - contains: "chat.completion"
+      - contains: "User A request 2: HTTP 429"
+      - contains: "User B: HTTP 200"
 
   # And the security claim: a header cannot move you to a different counter,
-  # because the descriptor value comes from the signed claim.
+  # because the descriptor value comes from the signed claim. The block spends
+  # User A's quota first, so a clock-minute reset before it cannot turn the
+  # spoofed request into a 200. A retry covers a reset between the two requests.
   - section: "The claim cannot be spoofed"
     run: all
+    retry:
+      attempts: 4
+      delay: 3
+      until: "User A with X-User-ID: someone-else: HTTP 429"
     assert:
-      - status: 429
+      - contains: "User A with X-User-ID: someone-else: HTTP 429"
 
   - section: "Composite keys: rate limit on multiple JWT claims"
     run: all

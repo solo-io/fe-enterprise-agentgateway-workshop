@@ -1,6 +1,6 @@
 # AgentGateway Enterprise — System Requirements
 
-## Kubernetes & Tooling Versions (v2026.8.2)
+## Kubernetes & Tooling Versions (v2026.9.3)
 
 | Component | Requirement |
 |---|---|
@@ -97,7 +97,7 @@ Enterprise AgentGateway automatically deploys shared extension servers for ext-a
 
 ## Reference Links
 
-- Version Support Matrix (v2026.8.2)
+- Version Support Matrix (v2026.9.3)
 - Installation Guide
 - Changelog
 - API Reference

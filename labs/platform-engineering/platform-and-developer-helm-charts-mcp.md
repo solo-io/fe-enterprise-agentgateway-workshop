@@ -4,8 +4,6 @@ An MCP server is a **team workload**. It wraps the team's own APIs and tools, sh
 
 This lab uses **delegation**: teams self-serve the endpoint, and the platform owns the front door structurally. It splits the gateway into two Helm charts for two personas. `agentgateway-platform`, owned by the platform team, owns the `Gateway`, the security baseline, the observability pipeline, the URL space, and the cost tiers, and onboards application teams. `agentgateway-developer`, owned by an application team, lets that team self-serve endpoints under the path prefix the platform assigned it; its `values.schema.json` has **no field** for rate limits, auth, WAF, or logging, so a team cannot express a traffic policy even if it wanted to. A team declares its server as a `type: mcp` endpoint, and the chart renders an `EnterpriseAgentgatewayBackend` (`entMcp`) plus a prefix-enforced, team-labeled child route. The platform's controls attach to the parent route, so tier budgets, JWT, and access logging cover MCP tool calls as they cover any other traffic; the team never configures any of them. A backend that is a vendor relationship rather than a team workload calls for the opposite governance model: see [LLM Access, Centralized: The Platform as Provider](centralized-llm-ops-helm-chart.md).
 
-> This lab requires Enterprise Agentgateway **v2026.6.3** or later (the version installed in `001`).
-
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
 - **Helm 3** installed.

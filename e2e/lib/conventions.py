@@ -39,7 +39,6 @@ CLEANUP_ALLOW = {
     "labs/installation/openshift/002-set-up-monitoring-tools-ocp.md",
     "labs/observability/production-observability-alerting-and-scaling.md",
     "labs/platform-engineering/networking-architecture.md",
-    "labs/upgrades/migrate-v2026.5.x-to-v2026.7.x.md",
 }
 
 # The Kyverno lab shows a bare AgentgatewayBackend as the resource its

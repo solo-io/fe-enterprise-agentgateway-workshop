@@ -57,7 +57,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Basic Routing to OpenAI](labs/routing/configure-routing-openai.md) _(OpenAI)_
 - [Routing by Match Type (Path, Header, Query Parameter)](labs/routing/routing-match-types.md) _(OpenAI)_
 - [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
-- [Semantic Routing with vLLM Semantic Router](labs/routing/configure-semantic-routing.md) _(OpenAI + vLLM Semantic Router)_: one virtual model name routed to an economy, mid, or high tier model by prompt content, via ExtProc
+- [Semantic Routing with vLLM Semantic Router](labs/routing/configure-semantic-routing-vllm-sr.md) _(OpenAI + vLLM Semantic Router)_: one virtual model name routed to an economy, mid, or high tier model by prompt content, via ExtProc
+- [Semantic Routing with Jev](labs/routing/configure-semantic-routing-jev.md) _(OpenAI + TypeSafe Jev)_: the same three-tier routing, classified by a Jev `choice` question with a confidence gate, via an ExtProc adapter
 - [Routing to AWS Bedrock](labs/routing/configure-routing-aws-bedrock.md) _(AWS Bedrock)_
 - [Routing to AWS Bedrock via API Keys](labs/routing/configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
 - [AWS Bedrock with IRSA](labs/routing/configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_
@@ -120,6 +121,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Built-in Guardrails](labs/guardrails/builtin-guardrails.md)
 - [External Moderation (OpenAI)](labs/guardrails/external-moderation-guardrails.md)
 - [Advanced Guardrails Webhook](labs/guardrails/advanced-guardrails-webhook.md)
+- [Advanced Guardrails Webhook with Jev](labs/guardrails/advanced-guardrails-webhook-jev.md) _(OpenAI + TypeSafe Jev)_: the same webhook guardrail, with one Jev yes/no question per rule and context-aware masking of regex-found values, measured for latency and cost against the OpenAI webhook
 - [Guard MCP Tool Calls with an External Policy Server](labs/mcp/mcp-guardrails.md) _(see also: MCP)_
 
 ---
@@ -213,7 +215,6 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 > Strategies for upgrading Enterprise Agentgateway without dropping traffic.
 
-- [Migration Guide: v2026.5.x → v2026.7.x](labs/upgrades/migrate-v2026.5.x-to-v2026.7.x.md): version-to-version deltas (image registry consolidation, Kubernetes floor, imagePullSecrets consolidation), prerequisites, and the exact upgrade commands
 - [In-Place Rolling Upgrades — Validate Zero Downtime](labs/upgrades/in-place-rolling-upgrades.md)
 - [Blue/Green Upgrades Across Namespaces](labs/upgrades/blue-green-namespaces.md)
 - [Multi-Cluster Upgrades](labs/upgrades/multi-cluster-upgrades.md): upgrade a whole cluster while a peer serves the same global LLM over an ambient multicluster mesh
@@ -261,7 +262,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - Token-based metrics from LLM
 - LLM request/response metadata in Traces
 - Traffic Routing patterns (path, host, header, query parameter, request body)
-- Semantic routing: one virtual model name (`auto_model`) resolved to an economy, mid, or high tier model by prompt content, using vLLM Semantic Router as an ExtProc processor in the `PreRouting` phase
+- Semantic routing: one virtual model name (`auto_model`) resolved to an economy, mid, or high tier model by prompt content, using vLLM Semantic Router or a TypeSafe Jev adapter as an ExtProc processor in the `PreRouting` phase
 - Inference routing to in-cluster LLMs via the Gateway API Inference Extension (`InferencePool` + `llm-d` Endpoint Picker)
 - Model Evaluations
 - Security & Access Control
@@ -279,6 +280,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - Built-in Prompt Guard (prompt injection, jailbreak, PII, secrets, harmful content, encoding evasion, and more)
     - External moderation guardrails (OpenAI moderation API)
     - Advanced Webhook Prompt Guard
+    - Advanced Webhook Prompt Guard with TypeSafe Jev, compared with the OpenAI webhook on latency and classifier cost
 - Prompt Enrichment
 - Rate Limiting
     - Rate Limit on a per-request basis
@@ -334,7 +336,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway v2026.8.2
+- Enterprise Agentgateway v2026.9.3
 
 
 ## User Stories / Acceptance Criteria

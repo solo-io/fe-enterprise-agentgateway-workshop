@@ -1,5 +1,20 @@
 # Changelog
 
+0.14.5 - (10-2-26)
+---
+- Bump Enterprise Agentgateway from `v2026.8.2` to `v2026.9.3` 
+- Update the image list and the air-gap lab
+- Remove `labs/upgrades/migrate-v2026.5.x-to-v2026.7.x.md`. The workshop is now well past that release
+- Mirror the `v2026.9.3` images and `redis:8.6.7-alpine` to `docker.io/ably7` (multi-arch) for the air-gap lab
+- `002`: new Step 3 applies the `model-cost-catalog` ConfigMap (`lib/observability/model-catalog-v2026.8.2.json`) as the Gateway's `modelCatalog` source. Since `v2026.9.1` the controller no longer creates a default catalog ConfigMap, so the Cost Management dashboard's Model Cost Catalog tab showed only overlay entries. Remove the step once a release restores the default
+- Add `labs/routing/configure-semantic-routing-jev.md`: semantic routing with TypeSafe Jev
+- Add `labs/guardrails/advanced-guardrails-webhook-jev.md`: the advanced guardrails webhook with TypeSafe Jev as the classifier.
+- Rename `labs/routing/configure-semantic-routing.md` to `labs/routing/configure-semantic-routing-vllm-sr.md`
+- Update `configure-semantic-routing-vllm-sr.md`: pin the vLLM Semantic Router chart and image to `0.4.0`/`v0.4.0` instead of `latest`. Updated schemas
+- Update `mcp-guardrails.md` for `v2026.9.x`: a denied `tools/call` now returns an `isError` result with the reason as text, so the error codes and approval payload no longer reach the client
+- Update `mcp-tool-rate-limiting.md` for `v2026.9.x`: a rate-limited `tools/call` returns HTTP `200` with an `isError` result (`rate limit exceeded (retry after 60s; limit 3, remaining 0)`).
+- Minor updates to `global-rate-limiting.md`
+
 0.14.4 - (9-29-26)
 ---
 - Minor updates and improvements to `labs/mcp/mcp-guardrails.md`
