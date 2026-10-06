@@ -1,24 +1,30 @@
-# Configure Semantic Routing with Jev
+# Configure Semantic Routing with the OpenAI Decisions API
 
-In this lab, you'll route LLM requests by prompt content instead of by the model name the client asks for. Clients send one stable virtual model name, `auto_model`. A small adapter, called by the gateway as an external processor, asks [Jev](https://docs.typesafe.ai/introduction) which of three price tiers the prompt needs and rewrites the model name before the gateway routes the request. OpenAI answers each prompt with the cheapest tier that can handle it, and the client code stays the same.
+In this lab, you'll route LLM requests by prompt content instead of by the model name the client asks for. Clients send one stable virtual model name, `auto_model`. A small adapter, called by the gateway as an external processor, asks the OpenAI Decisions API which of three price tiers the prompt needs and rewrites the model name before the gateway routes the request. OpenAI answers each prompt with the cheapest tier that can handle it, and the client code stays the same.
 
-[Semantic Routing with vLLM Semantic Router](configure-semantic-routing-vllm-sr.md) solves the same problem with embedding similarity, and [Semantic Routing with the OpenAI Decisions API](configure-semantic-routing-openai-decisions.md) solves it with OpenAI's decision model. This lab keeps the same client contract, route, and tiers as both, so you can compare the three.
+The Decisions API is a decision model: it returns a choice from options you define instead of generated text. You send context and typed questions, each with a fixed set of possible answers, and the model returns one answer per question with a probability for each option. OpenAI says a call returns about 10 times faster than the same question sent through the Responses API, and you pay for input tokens only. TypeSafe's [Jev](https://docs.typesafe.ai/introduction) is a hosted decision model of this kind. OpenAI announced its equivalent, the [Decisions API](https://developers.openai.com/api/docs/guides/decisions), at DevDay on September 29, 2026:
+
+- The endpoint is `POST /v1/decisions`, in public beta. `gpt-6-luna` is the only model.
+- There are three question types: `predicate` returns the probability that a condition is true, `choice` picks one of the options you supply, and `score` rates the input on an ordered scale.
+- A `choice` answer returns the winning option, a probability for every option, and a confidence value. The adapter's confidence gate reads all three.
+- Input tokens cost $0.10 per 1M. Output tokens are free.
+
+[Semantic Routing with vLLM Semantic Router](configure-semantic-routing-vllm-sr.md) solves the same problem with embedding similarity, and [Semantic Routing with Jev](configure-semantic-routing-jev.md) solves it with Jev. This lab keeps the same client contract, route, and tiers as both, so you can compare the three.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
-- An OpenAI API key with access to three models of different price. This lab uses `gpt-5-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier.
-- A TypeSafe API key from the [TypeSafe console](https://console.typesafe.ai), exported as `TYPESAFE_AI_API_KEY`.
+- An OpenAI API key with access to the Decisions API and to three models of different price. This lab uses `gpt-5-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier. The classifier model, `gpt-6-luna`, is separate from the tier models.
 - Egress from the cluster to `pypi.org`. The adapter pod installs its two Python packages at startup.
 
-> **Prompts leave the cluster twice.** The adapter sends the user's prompt to the hosted Jev API at `api.typesafe.ai` to classify it, before the gateway forwards it to OpenAI. Review TypeSafe's data handling terms before you route sensitive traffic this way.
+> **The prompt goes to OpenAI twice.** The adapter sends the user's prompt to the Decisions API to classify it, then the gateway forwards the same prompt to OpenAI for the completion. Both calls go to the same provider under the same data terms. Zero Data Retention and HIPAA eligibility apply to the Decisions API for eligible OpenAI accounts.
 
 ## Lab Objectives
-- Deploy an ExtProc adapter that classifies each prompt with one Jev `choice` question and rewrites `auto_model` to the selected tier
+- Deploy an ExtProc adapter that classifies each prompt with one Decisions API `choice` question and rewrites `auto_model` to the selected tier
 - Keep the tier definitions, the model for each tier, and the confidence thresholds in a ConfigMap profile you can tune without changing code
 - Call the adapter from the gateway with an `EnterpriseAgentgatewayPolicy` using `traffic.extProc` in the `PreRouting` phase, with a configurable CEL condition that decides which requests reach the adapter
 - Send requests that differ only in their prompt text, and observe different models answering
 - Read the tier, probabilities, and confidence for each decision in the adapter log, and see a low-confidence prompt fall back to the mid tier
-- Observe how the gateway behaves when Jev or the adapter is unavailable
+- Observe how the gateway behaves when the Decisions API or the adapter is unavailable
 
 ## Architecture
 
@@ -27,11 +33,11 @@ Client Request
     │  body: { "model": "auto_model", "messages": [...] }
     ▼
 EnterpriseAgentgatewayPolicy (traffic.phase: PreRouting, traffic.extProc)
-    │  only when $JEV_ROUTING_CONDITION matches (default: /semantic + auto_model)
-    │  gRPC → jev-extproc:50051, failureMode: FailClosed
+    │  only when $DECISIONS_ROUTING_CONDITION matches (default: /semantic + auto_model)
+    │  gRPC → decisions-extproc:50051, failureMode: FailClosed
     ▼
-jev-extproc adapter
-    │  POST https://api.typesafe.ai/v1/systemone
+decisions-extproc adapter
+    │  POST https://api.openai.com/v1/decisions  (model: gpt-6-luna)
     │  one choice question: economy | mid | high, with probabilities and confidence
     │  confidence or margin below threshold?  → fallback tier
     │  rewrites body model: auto_model → gpt-5-nano | gpt-5.6-luna | gpt-5.6-terra
@@ -48,20 +54,20 @@ OpenAI
 
 Without this pattern, each client hardcodes a model name. Developers pick one that handles their hardest case, so `gpt-5.6-terra` ends up answering throwaway prompts like "Write a 500-word essay about nothing." at high-tier prices. With a virtual model name, model choice becomes a platform decision: `auto_model` is the only name clients need, and the rule behind it lives in a Kubernetes ConfigMap you change at the platform layer.
 
-### How Jev makes the decision
+### How the Decisions API makes the decision
 
-Jev is a classification model. You send it state (here, the prompt) and typed questions, and it returns a structured answer for each question. This lab asks one `choice` question whose options are the three tiers, each described in plain language with examples. Jev returns the winning tier, a probability for every tier, and a confidence value derived from that distribution.
+This lab asks one `choice` question whose options are the three tiers, each described in plain language with examples. The Decisions API returns the winning tier, a probability for every tier, and a confidence value.
 
-Compared with embedding similarity, you describe each tier in words instead of collecting candidate phrases and calibrating a cosine threshold for one embedding model. The probabilities also let the adapter act on uncertainty: when Jev splits its answer between two tiers, the adapter sends the prompt to a fallback tier.
+Compared with embedding similarity, you describe each tier in words instead of collecting candidate phrases and calibrating a cosine threshold for one embedding model. The probabilities also let the adapter act on uncertainty: when the model splits its answer between two tiers, the adapter sends the prompt to a fallback tier. OpenAI does not document how it computes `confidence`, so the adapter also computes its own margin from the probabilities and gates on both.
 
 ### Why an adapter?
 
-The gateway speaks the ExtProc gRPC protocol to external processors, and Jev is an HTTP API. The adapter translates between them, and it owns the routing policy:
+The gateway speaks the ExtProc gRPC protocol to external processors, and the Decisions API is an HTTP API. The adapter translates between them, and it owns the routing policy:
 
-- A request that names a real model passes through unchanged, and the adapter makes no Jev call for it.
+- A request that names a real model passes through unchanged, and the adapter makes no Decisions API call for it.
 - For `auto_model`, the adapter classifies the last user message, applies the confidence gate, and rewrites `model` in the body.
-- It removes any `x-jev-tier` or `x-jev-reason` header the client sent, then sets them to the real decision, so a client cannot pick its own tier through those headers.
-- If Jev is unreachable or rejects the call, the adapter answers `503` with a JSON error and does not send the prompt to the fallback tier.
+- It removes any `x-decision-tier` or `x-decision-reason` header the client sent, then sets them to the real decision, so a client cannot pick its own tier through those headers.
+- If the Decisions API is unreachable or rejects the call, the adapter answers `503` with a JSON error and does not send the prompt to the fallback tier.
 
 ---
 
@@ -69,18 +75,9 @@ The gateway speaks the ExtProc gRPC protocol to external processors, and Jev is 
 
 ```bash
 export OPENAI_API_KEY=$OPENAI_API_KEY
-export TYPESAFE_AI_API_KEY=$TYPESAFE_AI_API_KEY
 ```
 
-The adapter reads the TypeSafe key from this Secret:
-
-```bash
-kubectl create secret generic typesafe-api-key -n agentgateway-system \
-  --from-literal=TYPESAFE_AI_API_KEY=$TYPESAFE_AI_API_KEY \
-  --dry-run=client -oyaml | kubectl apply -f -
-```
-
-The completion path authenticates with its own Secret, in the header format the gateway forwards to OpenAI:
+The completion path authenticates with this Secret, in the header format the gateway forwards to OpenAI:
 
 ```bash
 kubectl create secret generic openai-secret -n agentgateway-system \
@@ -88,11 +85,19 @@ kubectl create secret generic openai-secret -n agentgateway-system \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
+The adapter reads its key from a second Secret. This lab stores the same key in both. A separate Secret lets you give the classifier its own OpenAI project key, with its own usage limits and rotation schedule:
+
+```bash
+kubectl create secret generic openai-decisions-key -n agentgateway-system \
+  --from-literal=OPENAI_API_KEY=$OPENAI_API_KEY \
+  --dry-run=client -oyaml | kubectl apply -f -
+```
+
 ## Define the routing profile
 
-The profile holds everything you would tune: the Jev question, the model behind each tier, and the confidence gate.
+The profile holds everything you would tune: the Decisions API question, the model behind each tier, and the confidence gate.
 
-- `question` is sent to Jev as-is. Each tier has a description and examples, which Jev reads as the definition of that option.
+- `question` is sent to the Decisions API as-is. Each entry in `choices` has a `value` and a `description`, which the model reads as the definition of that option. The examples for each tier go at the end of its description.
 - `tiers` maps each answer to the OpenAI model that serves it.
 - `minConfidence` and `minMargin` form the confidence gate. The margin is the gap between the winning tier's probability and the runner-up's. If either value is below its threshold, the request goes to `fallbackTier`.
 - `fallbackTier` is `mid`. An uncertain prompt usually splits between two adjacent tiers, and the mid tier is never more than one step from the right answer.
@@ -102,13 +107,13 @@ kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: jev-routing-profile
+  name: decisions-routing-profile
   namespace: agentgateway-system
 data:
   profile.json: |
     {
       "virtualModel": "auto_model",
-      "jevModel": "jev-1.13.0",
+      "decisionsModel": "gpt-6-luna",
       "requestTimeoutMs": 2000,
       "maxPromptChars": 20000,
       "minConfidence": 0.5,
@@ -121,21 +126,22 @@ data:
       },
       "question": {
         "type": "choice",
-        "instructions": "Choose the least expensive model tier that can fully answer the request in `prompt`.",
-        "criteria": {
-          "economy": {
-            "description": "Everyday language tasks that need no technical expertise.",
-            "examples": ["summarize or rewrite text", "answer a simple factual question", "translate a phrase", "brainstorm names or ideas", "free-form writing"]
+        "name": "tier",
+        "instructions": "Choose the least expensive model tier that can fully answer this request.",
+        "choices": [
+          {
+            "value": "economy",
+            "description": "Everyday language tasks that need no technical expertise. Examples: summarize or rewrite text, answer a simple factual question, translate a phrase, brainstorm names or ideas, free-form writing."
           },
-          "mid": {
-            "description": "Routine software or technical work a competent engineer finishes quickly.",
-            "examples": ["write or fix a short function or script", "explain or refactor code", "write a config file or query"]
+          {
+            "value": "mid",
+            "description": "Routine software or technical work a competent engineer finishes quickly. Examples: write or fix a short function or script, explain or refactor code, write a config file or query."
           },
-          "high": {
-            "description": "Tasks that need rigorous multi-step reasoning, even when the prompt is short.",
-            "examples": ["prove a mathematical statement", "derive a formula from first principles", "diagnose a subtle concurrency or race-condition bug", "design and justify a correct concurrent algorithm"]
+          {
+            "value": "high",
+            "description": "Tasks that need rigorous multi-step reasoning, even when the prompt is short. Examples: prove a mathematical statement, derive a formula from first principles, diagnose a subtle concurrency or race-condition bug, design and justify a correct concurrent algorithm."
           }
-        }
+        ]
       }
     }
 EOF
@@ -150,11 +156,11 @@ kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: jev-extproc-code
+  name: decisions-extproc-code
   namespace: agentgateway-system
 data:
   adapter.py: |
-    """ExtProc adapter: asks Jev which price tier a prompt needs, then rewrites the model name."""
+    """ExtProc adapter: asks the OpenAI Decisions API which price tier a prompt needs, then rewrites the model name."""
     import http.client
     import json
     import os
@@ -170,14 +176,14 @@ data:
     from envoy.service.ext_proc.v3 import external_processor_pb2_grpc as pb_grpc
     from envoy.type.v3 import http_status_pb2
 
-    JEV_HOST = "api.typesafe.ai"
-    JEV_PATH = "/v1/systemone"
-    API_KEY = os.environ["TYPESAFE_AI_API_KEY"]
-    PROFILE = json.load(open(os.environ.get("JEV_PROFILE_PATH", "/etc/jev/profile.json")))
-    DECISION_HEADERS = ("x-jev-tier", "x-jev-reason")
+    DECISIONS_HOST = "api.openai.com"
+    DECISIONS_PATH = "/v1/decisions"
+    API_KEY = os.environ["OPENAI_API_KEY"]
+    PROFILE = json.load(open(os.environ.get("DECISIONS_PROFILE_PATH", "/etc/decisions/profile.json")))
+    DECISION_HEADERS = ("x-decision-tier", "x-decision-reason")
 
-    # Idle connections to Jev, reused across requests so a call skips the TCP and
-    # TLS handshake. Each thread takes its own connection out of the pool.
+    # Idle connections to OpenAI, reused across requests so a call skips the TCP
+    # and TLS handshake. Each thread takes its own connection out of the pool.
     IDLE_CONNECTIONS = queue.LifoQueue()
 
 
@@ -198,21 +204,21 @@ data:
         return None
 
 
-    def jev_post(body, headers):
+    def decisions_post(body, headers):
         try:
             conn, reused = IDLE_CONNECTIONS.get_nowait(), True
         except queue.Empty:
             conn, reused = None, False
         while True:
-            conn = conn or http.client.HTTPSConnection(JEV_HOST, timeout=PROFILE["requestTimeoutMs"] / 1000)
+            conn = conn or http.client.HTTPSConnection(DECISIONS_HOST, timeout=PROFILE["requestTimeoutMs"] / 1000)
             try:
-                conn.request("POST", JEV_PATH, body, headers)
+                conn.request("POST", DECISIONS_PATH, body, headers)
                 response = conn.getresponse()
                 data = response.read()
             except (http.client.RemoteDisconnected, ConnectionError):
                 conn.close()
-                # Jev closes connections that sit idle. Retry once on a new
-                # connection when a pooled one turns out to be closed.
+                # The server closes connections that sit idle. Retry once on a
+                # new connection when a pooled one turns out to be closed.
                 if not reused:
                     raise
                 conn, reused = None, False
@@ -227,17 +233,21 @@ data:
             return response, data
 
 
-    def ask_jev(text):
+    def ask_decisions(text):
+        question = PROFILE["question"]
         body = json.dumps({
-            "model": PROFILE["jevModel"],
-            "state": {"prompt": text[: PROFILE["maxPromptChars"]]},
-            "questions": {"tier": PROFILE["question"]},
+            "model": PROFILE["decisionsModel"],
+            "input": text[: PROFILE["maxPromptChars"]],
+            "questions": [question],
         }).encode()
         headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
-        response, data = jev_post(body, headers)
+        response, data = decisions_post(body, headers)
         if response.status != 200:
-            raise urllib.error.HTTPError(JEV_HOST + JEV_PATH, response.status, response.reason, response.headers, None)
-        return json.loads(data)["answers"]["tier"]
+            raise urllib.error.HTTPError(DECISIONS_HOST + DECISIONS_PATH, response.status, response.reason, response.headers, None)
+        answer = next(a for a in json.loads(data)["answers"] if a["name"] == question["name"])
+        # The API returns probabilities as a list of {value, probability}.
+        answer["probabilities"] = {p["value"]: p["probability"] for p in answer["probabilities"]}
+        return answer
 
 
     def decide(answer):
@@ -269,7 +279,7 @@ data:
         except ValueError:
             return pb.ProcessingResponse(request_body=pb.BodyResponse())
         # Only the virtual model name opts in. A request that names a real model
-        # passes through untouched and costs no Jev call.
+        # passes through untouched and costs no Decisions API call.
         if body.get("model") != PROFILE["virtualModel"]:
             return pb.ProcessingResponse(request_body=pb.BodyResponse())
         text = prompt_text(body)
@@ -278,11 +288,11 @@ data:
 
         started = time.monotonic()
         try:
-            answer = ask_jev(text)
-        except (OSError, http.client.HTTPException, KeyError, ValueError) as err:
+            answer = ask_decisions(text)
+        except (OSError, http.client.HTTPException, KeyError, ValueError, StopIteration) as err:
             # Reject on a classifier outage rather than serve the fallback tier,
             # so the failure is visible to the client and in the logs.
-            log(event="jev_error", error=str(err))
+            log(event="decisions_error", error=str(err))
             return reject(503, "routing classifier unavailable")
         latency_ms = round((time.monotonic() - started) * 1000)
 
@@ -293,12 +303,12 @@ data:
             original_model=body["model"],
             selected_model=model,
             tier=tier,
-            jev_choice=answer["choice"],
+            decisions_choice=answer["choice"],
             reason=reason,
             confidence=round(answer["confidence"], 3),
             margin=round(margin, 3),
             probabilities={k: round(v, 3) for k, v in answer["probabilities"].items()},
-            jev_latency_ms=latency_ms,
+            decisions_latency_ms=latency_ms,
         )
 
         body["model"] = model
@@ -308,8 +318,8 @@ data:
                 response=pb.CommonResponse(
                     header_mutation=pb.HeaderMutation(
                         set_headers=[
-                            header("x-jev-tier", tier),
-                            header("x-jev-reason", reason),
+                            header("x-decision-tier", tier),
+                            header("x-decision-reason", reason),
                             # The gateway rejects a body mutation whose length
                             # disagrees with the request's content-length.
                             header("content-length", str(len(new_body))),
@@ -366,17 +376,17 @@ kubectl apply -f - <<'EOF'
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: jev-extproc
+  name: decisions-extproc
   namespace: agentgateway-system
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: jev-extproc
+      app: decisions-extproc
   template:
     metadata:
       labels:
-        app: jev-extproc
+        app: decisions-extproc
     spec:
       securityContext:
         runAsNonRoot: true
@@ -403,13 +413,13 @@ spec:
           env:
             - name: PYTHONPATH
               value: /deps
-            - name: JEV_PROFILE_PATH
-              value: /etc/jev/profile.json
-            - name: TYPESAFE_AI_API_KEY
+            - name: DECISIONS_PROFILE_PATH
+              value: /etc/decisions/profile.json
+            - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: typesafe-api-key
-                  key: TYPESAFE_AI_API_KEY
+                  name: openai-decisions-key
+                  key: OPENAI_API_KEY
           ports:
             - name: grpc
               containerPort: 50051
@@ -428,25 +438,25 @@ spec:
             - name: code
               mountPath: /app
             - name: profile
-              mountPath: /etc/jev
+              mountPath: /etc/decisions
       volumes:
         - name: deps
           emptyDir: {}
         - name: code
           configMap:
-            name: jev-extproc-code
+            name: decisions-extproc-code
         - name: profile
           configMap:
-            name: jev-routing-profile
+            name: decisions-routing-profile
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: jev-extproc
+  name: decisions-extproc
   namespace: agentgateway-system
 spec:
   selector:
-    app: jev-extproc
+    app: decisions-extproc
   ports:
     - name: grpc
       port: 50051
@@ -458,8 +468,8 @@ EOF
 Wait for the rollout, then confirm the adapter loaded the profile:
 
 ```bash
-kubectl rollout status deployment/jev-extproc -n agentgateway-system --timeout=300s
-kubectl logs -n agentgateway-system deploy/jev-extproc -c adapter --tail=1
+kubectl rollout status deployment/decisions-extproc -n agentgateway-system --timeout=300s
+kubectl logs -n agentgateway-system deploy/decisions-extproc -c adapter --tail=1
 ```
 
 ```json
@@ -530,21 +540,21 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 
 ### Choose which requests reach the adapter
 
-Set `JEV_ROUTING_CONDITION` to one of these expressions:
+Set `DECISIONS_ROUTING_CONDITION` to one of these expressions:
 
-| Scope | `JEV_ROUTING_CONDITION` | Requests that depend on the adapter |
+| Scope | `DECISIONS_ROUTING_CONDITION` | Requests that depend on the adapter |
 |---|---|---|
 | Path and model (default) | `request.path.startsWith("/semantic") && json(request.body).model == "auto_model"` | `auto_model` requests on `/semantic` |
 | Model on any path | `json(request.body).model == "auto_model"` | `auto_model` requests on any route |
 | Path only | `request.path.startsWith("/semantic")` | Every request on `/semantic`, including requests that name a real model |
-| Header opt-in | `request.headers["x-route-by"] == "jev"` | Requests that send `x-route-by: jev` |
+| Header opt-in | `request.headers["x-route-by"] == "decisions"` | Requests that send `x-route-by: decisions` |
 
 The default limits the outage impact the most: requests on other routes, and requests on `/semantic` that name a real model, keep working when the adapter is down. The path check comes first, so the gateway only parses the body of `/semantic` requests. A non-JSON body makes `json()` fail the match, so non-JSON requests skip the adapter.
 
 With the header opt-in, an `auto_model` request sent without the header skips the adapter, and OpenAI answers `404` with `model_not_found`.
 
 ```bash
-export JEV_ROUTING_CONDITION='request.path.startsWith("/semantic") && json(request.body).model == "auto_model"'
+export DECISIONS_ROUTING_CONDITION='request.path.startsWith("/semantic") && json(request.body).model == "auto_model"'
 ```
 
 If you change `virtualModel` in the routing profile, change the model name in this expression to match.
@@ -556,7 +566,7 @@ kubectl apply -f - <<EOF
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
 metadata:
-  name: jev-router
+  name: decisions-router
   namespace: agentgateway-system
 spec:
   targetRefs:
@@ -567,10 +577,10 @@ spec:
     phase: PreRouting
     extProc:
       conditional:
-        - condition: '${JEV_ROUTING_CONDITION}'
+        - condition: '${DECISIONS_ROUTING_CONDITION}'
           policy:
             backendRef:
-              name: jev-extproc
+              name: decisions-extproc
               namespace: agentgateway-system
               port: 50051
             failureMode: FailClosed
@@ -589,12 +599,12 @@ EOF
 ```
 
 ```bash
-kubectl get enterpriseagentgatewaypolicy jev-router -n agentgateway-system
+kubectl get enterpriseagentgatewaypolicy decisions-router -n agentgateway-system
 ```
 
 ```
-NAME         ACCEPTED   ATTACHED   AGE
-jev-router   True       True       3s
+NAME               ACCEPTED   ATTACHED   AGE
+decisions-router   True       True       3s
 ```
 
 > **Why `FailClosed`?** With `FailOpen`, an adapter outage sends the request on with `auto_model` still in the body, and OpenAI answers `model_not_found`, which points you at the provider instead of at the adapter. `FailClosed` rejects the request instead. An adapter outage surfaces as HTTP 500 with `reason=ExtProc` in the access log.
@@ -639,12 +649,12 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 "gpt-5.6-terra"
 ```
 
-Asking what a regex does could be a quick lookup or a technical explanation, and Jev splits its answer between `economy` and `mid`. Because of the split, the adapter's confidence gate sends the prompt to the fallback tier:
+A request for a regex could be a quick lookup or routine technical work. The Decisions API leans toward `economy` but with low confidence, so the adapter's confidence gate sends the prompt to the fallback tier:
 
 ```bash
 curl -s "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"auto_model","messages":[{"role":"user","content":"Explain what this regex does: ^\\d{3}-\\d{4}$"}]}' | jq '.model'
+  -d '{"model":"auto_model","messages":[{"role":"user","content":"Write a regex that matches US phone numbers."}]}' | jq '.model'
 ```
 
 ```
@@ -656,18 +666,18 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 The gateway access log records the model that *served* the request. The reason it was chosen is in the adapter's `routing_decision` line:
 
 ```bash
-kubectl logs -n agentgateway-system deploy/jev-extproc -c adapter --tail=4 \
-  | jq -c '{selected_model, jev_choice, reason, confidence, margin, probabilities, jev_latency_ms}'
+kubectl logs -n agentgateway-system deploy/decisions-extproc -c adapter --tail=4 \
+  | jq -c '{selected_model, decisions_choice, reason, confidence, margin, probabilities, decisions_latency_ms}'
 ```
 
 ```json
-{"selected_model":"gpt-5-nano","jev_choice":"economy","reason":"classified","confidence":1.0,"margin":1.0,"probabilities":{"mid":0.0,"high":0.0,"economy":1.0},"jev_latency_ms":344}
-{"selected_model":"gpt-5.6-luna","jev_choice":"mid","reason":"classified","confidence":1.0,"margin":1.0,"probabilities":{"high":0.0,"economy":0.0,"mid":1.0},"jev_latency_ms":135}
-{"selected_model":"gpt-5.6-terra","jev_choice":"high","reason":"classified","confidence":0.91,"margin":0.88,"probabilities":{"mid":0.0,"economy":0.06,"high":0.94},"jev_latency_ms":130}
-{"selected_model":"gpt-5.6-luna","jev_choice":"mid","reason":"low_confidence","confidence":0.35,"margin":0.12,"probabilities":{"economy":0.44,"high":0.0,"mid":0.56},"jev_latency_ms":161}
+{"selected_model":"gpt-5-nano","decisions_choice":"economy","reason":"classified","confidence":1.0,"margin":1.0,"probabilities":{"economy":1.0,"mid":0.0,"high":0.0},"decisions_latency_ms":209}
+{"selected_model":"gpt-5.6-luna","decisions_choice":"mid","reason":"classified","confidence":0.97,"margin":0.96,"probabilities":{"economy":0.02,"mid":0.98,"high":0.0},"decisions_latency_ms":139}
+{"selected_model":"gpt-5.6-terra","decisions_choice":"high","reason":"classified","confidence":0.76,"margin":0.69,"probabilities":{"economy":0.15,"mid":0.01,"high":0.84},"decisions_latency_ms":94}
+{"selected_model":"gpt-5.6-luna","decisions_choice":"economy","reason":"low_confidence","confidence":0.42,"margin":0.22,"probabilities":{"economy":0.61,"mid":0.39,"high":0.0},"decisions_latency_ms":216}
 ```
 
-The last line is the regex prompt. Jev picked `mid`, but with a margin of about 0.1 against a `minMargin` of 0.2, so the adapter recorded `reason=low_confidence` and served the fallback tier. If you set `fallbackTier` to `economy`, the same prompt would be served by `gpt-5-nano`. Exact probabilities vary slightly between runs.
+The last line is the regex prompt. The Decisions API picked `economy` with a confidence of 0.42, below the `minConfidence` of 0.5, so the adapter recorded `reason=low_confidence` and served the fallback tier. The margin of 0.22 alone would have passed the gate. If you set `fallbackTier` to `economy`, the same prompt would be served by `gpt-5-nano`.
 
 ### Requests that name a real model
 
@@ -687,32 +697,32 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 
 ## Tune the profile
 
-The tier descriptions are the routing rule. To change how prompts are classified, edit `jev-routing-profile`, then restart the adapter, which reads the profile at startup:
+The tier descriptions are the routing rule. To change how prompts are classified, edit `decisions-routing-profile`, then restart the adapter, which reads the profile at startup:
 
 ```bash
-kubectl edit configmap jev-routing-profile -n agentgateway-system
-kubectl rollout restart deployment/jev-extproc -n agentgateway-system
-kubectl rollout status deployment/jev-extproc -n agentgateway-system --timeout=300s
+kubectl edit configmap decisions-routing-profile -n agentgateway-system
+kubectl rollout restart deployment/decisions-extproc -n agentgateway-system
+kubectl rollout status deployment/decisions-extproc -n agentgateway-system --timeout=300s
 ```
 
 When you tune the profile:
 
 - Change one tier description at a time, then replay a fixed set of representative prompts and compare the `routing_decision` lines.
-- Raise `minMargin` to send more borderline prompts to the fallback tier. Lower it to trust Jev's first choice more often.
-- Describe what a tier *needs*, such as rigorous reasoning or routine code, rather than listing surface keywords. Jev matches the meaning of the description.
+- Raise `minMargin` to send more borderline prompts to the fallback tier. Lower it to trust the model's first choice more often.
+- Describe what a tier *needs*, such as rigorous reasoning or routine code, rather than listing surface keywords. The model matches the meaning of the description.
 
 ## Observe failure behavior
 
-A Jev failure and an adapter failure produce different errors, so you can tell them apart in alerts.
+A Decisions API failure and an adapter failure produce different errors, so you can tell them apart in alerts.
 
-To simulate Jev rejecting the call, give the adapter an invalid TypeSafe key:
+To simulate the Decisions API rejecting the call, give the adapter an invalid key. The completion path uses `openai-secret`, which stays valid:
 
 ```bash
-kubectl create secret generic typesafe-api-key -n agentgateway-system \
-  --from-literal=TYPESAFE_AI_API_KEY=invalid \
+kubectl create secret generic openai-decisions-key -n agentgateway-system \
+  --from-literal=OPENAI_API_KEY=invalid \
   --dry-run=client -oyaml | kubectl apply -f -
-kubectl rollout restart deployment/jev-extproc -n agentgateway-system
-kubectl rollout status deployment/jev-extproc -n agentgateway-system --timeout=300s
+kubectl rollout restart deployment/decisions-extproc -n agentgateway-system
+kubectl rollout status deployment/decisions-extproc -n agentgateway-system --timeout=300s
 
 curl -s -w ' %{http_code}\n' "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
@@ -726,8 +736,8 @@ curl -s -w ' %{http_code}\n' "$GATEWAY_IP:8080/semantic" \
 To simulate an adapter outage, scale it to zero:
 
 ```bash
-kubectl scale deployment/jev-extproc -n agentgateway-system --replicas=0
-kubectl wait --for=delete pod -l app=jev-extproc -n agentgateway-system --timeout=60s
+kubectl scale deployment/decisions-extproc -n agentgateway-system --replicas=0
+kubectl wait --for=delete pod -l app=decisions-extproc -n agentgateway-system --timeout=60s
 
 curl -s -o /dev/null -w 'auto_model: %{http_code}\n' "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
@@ -749,11 +759,11 @@ The `auto_model` request fails closed with `reason=ExtProc` in the access log. W
 Restore the key and the adapter:
 
 ```bash
-kubectl create secret generic typesafe-api-key -n agentgateway-system \
-  --from-literal=TYPESAFE_AI_API_KEY=$TYPESAFE_AI_API_KEY \
+kubectl create secret generic openai-decisions-key -n agentgateway-system \
+  --from-literal=OPENAI_API_KEY=$OPENAI_API_KEY \
   --dry-run=client -oyaml | kubectl apply -f -
-kubectl scale deployment/jev-extproc -n agentgateway-system --replicas=1
-kubectl rollout status deployment/jev-extproc -n agentgateway-system --timeout=300s
+kubectl scale deployment/decisions-extproc -n agentgateway-system --replicas=1
+kubectl rollout status deployment/decisions-extproc -n agentgateway-system --timeout=300s
 ```
 
 ## Observability
@@ -769,13 +779,15 @@ kubectl logs -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=ag
 ```
 
 ```
-gpt-5-nano 0.153301555s
-gpt-5.6-luna 0.144004706s
-gpt-5.6-terra 0.139670353s
-gpt-5-nano 0.000178177s
+gpt-5-nano 0.002096181s
+gpt-5-nano 0.213251659s
+gpt-5.6-luna 0.14109197s
+gpt-5.6-terra 0.096132777s
+gpt-5.6-luna 0.218115836s
+gpt-5-nano 0.000210107s
 ```
 
-The `auto_model` requests spent about 145ms in the adapter at the median and 200ms at the 90th percentile, nearly all of it the Jev call. An occasional request takes closer to 430ms. The adapter keeps its connections to Jev open between requests, so only the first call after the adapter starts pays for the TLS handshake. Opening a new connection for every call added about 30ms at the median from the test cluster, and more on a network with a longer round trip to `api.typesafe.ai`. The request that named `gpt-5-nano` directly skipped the adapter and spent under 1ms. Jev charges for input tokens only. With this profile, a decision costs about 530 input tokens, roughly $0.00002 at the [published Jev rate](https://docs.typesafe.ai/models).
+The first and last lines are the requests that named `gpt-5-nano` directly. They skipped the adapter and spent a few milliseconds or less in request policies. Across 120 `auto_model` requests, the adapter added about 100ms at the median and 150ms at the 90th percentile, nearly all of it the Decisions API call. An occasional request takes 250 to 350ms. The adapter keeps its connections to OpenAI open between requests, so only the first call after the adapter starts pays for the TLS handshake, which adds about 50ms. The Decisions API charges for input tokens only. With this profile, a decision costs about 245 input tokens, roughly $0.000025 at the [published rate](https://developers.openai.com/api/docs/guides/decisions).
 
 #### Compare the three routers
 
@@ -790,7 +802,7 @@ All three semantic routing labs were tested on GKE using the same client contrac
 | Providers that receive the prompt | OpenAI | TypeSafe and OpenAI | OpenAI |
 | What you tune | Candidate phrases and cosine thresholds | Tier descriptions and the confidence gate | Tier descriptions and the confidence gate |
 
-At the median, Jev adds about 45ms less than vSR, and the [Decisions API](configure-semantic-routing-openai-decisions.md) adds about 45ms less than Jev. Jev and the Decisions API cost about the same per decision: the Decisions API rate per token is higher, but it counts about half as many tokens for the same question. The Decisions API also sends the prompt to one provider under one set of data terms instead of two. Any of the three routing calls costs a small fraction of a high-tier answer: the `gpt-5.6-terra` answer to the proof prompt cost about $0.014. Latency depends on the network path from your cluster to each API, so measure from your own cluster before you choose.
+The Decisions API costs about the same per decision as Jev: its rate per token is higher, but it counts about half as many tokens for the same question. It also sends the prompt to one provider under one set of data terms instead of two. Any of the three routing calls costs a small fraction of a high-tier answer: the `gpt-5.6-terra` answer to the proof prompt cost about $0.014. Latency depends on the network path from your cluster to each API, so measure from your own cluster before you choose.
 
 ### View Metrics Endpoint
 
@@ -816,7 +828,7 @@ gen_ai_request_model="gpt-5.6-luna",gen_ai_response_model="gpt-5.6-luna"
 gen_ai_request_model="gpt-5.6-terra",gen_ai_response_model="gpt-5.6-terra"
 ```
 
-> **`auto_model` does not appear in metrics.** The rewrite happens at `PreRouting`, so the gateway only sees the *selected* model and records that in `gen_ai_request_model`. To chart requested against selected, use the adapter's `routing_decision` log line.
+> **`auto_model` does not appear in metrics.** The rewrite happens at `PreRouting`, so the gateway only sees the *selected* model and records that in `gen_ai_request_model`. The Decisions API call goes from the adapter straight to OpenAI, so its tokens do not appear in gateway metrics either. To chart requested against selected, use the adapter's `routing_decision` log line.
 
 Output tokens per tier:
 
@@ -844,10 +856,10 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 ## Cleanup
 
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system jev-router --ignore-not-found
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system decisions-router --ignore-not-found
 kubectl delete httproute -n agentgateway-system semantic --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
-kubectl delete deployment,service -n agentgateway-system jev-extproc --ignore-not-found
-kubectl delete configmap -n agentgateway-system jev-extproc-code jev-routing-profile --ignore-not-found
-kubectl delete secret -n agentgateway-system openai-secret typesafe-api-key --ignore-not-found
+kubectl delete deployment,service -n agentgateway-system decisions-extproc --ignore-not-found
+kubectl delete configmap -n agentgateway-system decisions-extproc-code decisions-routing-profile --ignore-not-found
+kubectl delete secret -n agentgateway-system openai-secret openai-decisions-key --ignore-not-found
 ```

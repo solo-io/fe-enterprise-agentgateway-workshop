@@ -2,7 +2,7 @@
 
 In this lab, you'll route LLM requests by **prompt content** instead of by the model name the client asks for. Clients send one stable virtual model name, `auto_model`. [vLLM Semantic Router](https://vllm-sr.ai/) (vSR), called by the gateway as an external processor, rewrites that name to one of three price tiers before the gateway routes the request, so each prompt is served by the cheapest model that can handle it, without any change to the client.
 
-[Semantic Routing with Jev](configure-semantic-routing-jev.md) solves the same problem with a Jev classification question instead of embedding similarity, and [compares the two routers](configure-semantic-routing-jev.md#compare-the-two-routers).
+[Semantic Routing with Jev](configure-semantic-routing-jev.md) and [Semantic Routing with the OpenAI Decisions API](configure-semantic-routing-openai-decisions.md) solve the same problem with a classification question to a decision model instead of embedding similarity. The Jev lab [compares the three routers](configure-semantic-routing-jev.md#compare-the-three-routers).
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
