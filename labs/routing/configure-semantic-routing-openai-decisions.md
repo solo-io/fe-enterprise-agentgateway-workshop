@@ -802,7 +802,7 @@ All three semantic routing labs were tested on GKE using the same client contrac
 | Providers that receive the prompt | OpenAI | TypeSafe and OpenAI | OpenAI |
 | What you tune | Candidate phrases and cosine thresholds | Tier descriptions and the confidence gate | Tier descriptions and the confidence gate |
 
-The Decisions API costs about the same per decision as Jev: its rate per token is higher, but it counts about half as many tokens for the same question. It also sends the prompt to one provider under one set of data terms instead of two. Any of the three routing calls costs a small fraction of a high-tier answer: the `gpt-5.6-terra` answer to the proof prompt cost about $0.014. Latency depends on the network path from your cluster to each API, so measure from your own cluster before you choose.
+The Decisions API costs about the same per decision as Jev: its rate per token is higher, but it counts about half as many tokens for this one-question call. The Decisions API counts about 150 tokens per question and Jev about 280 per call, so with several questions per call Jev costs less, as the [guardrail webhook comparison](../guardrails/advanced-guardrails-webhook-openai-decisions.md#compare-the-three-guardrail-webhooks) shows. The Decisions API also sends the prompt to one provider under one set of data terms instead of two. Any of the three routing calls costs a small fraction of a high-tier answer: the `gpt-5.6-terra` answer to the proof prompt cost about $0.014. Latency depends on the network path from your cluster to each API, so measure from your own cluster before you choose.
 
 ### View Metrics Endpoint
 

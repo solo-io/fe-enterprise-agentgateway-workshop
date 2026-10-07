@@ -123,6 +123,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [External Moderation (OpenAI)](labs/guardrails/external-moderation-guardrails.md)
 - [Advanced Guardrails Webhook](labs/guardrails/advanced-guardrails-webhook.md)
 - [Advanced Guardrails Webhook with Jev](labs/guardrails/advanced-guardrails-webhook-jev.md) _(OpenAI + TypeSafe Jev)_: the same webhook guardrail, with one Jev yes/no question per rule and context-aware masking of regex-found values, measured for latency and cost against the OpenAI webhook
+- [Advanced Guardrails Webhook with the OpenAI Decisions API](labs/guardrails/advanced-guardrails-webhook-openai-decisions.md) _(OpenAI + OpenAI Decisions API)_: the same webhook guardrail, with one Decisions API `predicate` question per rule and per regex-found value, so the prompt goes only to OpenAI
 - [Guard MCP Tool Calls with an External Policy Server](labs/mcp/mcp-guardrails.md) _(see also: MCP)_
 
 ---

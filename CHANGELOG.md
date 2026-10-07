@@ -1,5 +1,12 @@
 # Changelog
 
+0.14.7 - (10-7-26)
+---
+- Add `labs/guardrails/advanced-guardrails-webhook-openai-decisions.md`: the advanced guardrails webhook with the OpenAI Decisions API (`gpt-6-luna`) as the classifier.
+- List the lab in `README.md`
+- The guardrail webhook comparison in `advanced-guardrails-webhook-jev.md` and the new lab now covers all three webhooks (OpenAI, Jev, OpenAI Decisions API)
+- `advanced-guardrails-webhook-jev.md` and `advanced-guardrails-webhook.md`: link the Decisions API lab and the three-way comparison
+
 0.14.6 - (10-7-26)
 ---
 - Add `labs/routing/configure-semantic-routing-openai-decisions.md`: semantic routing with the OpenAI Decisions API (`gpt-6-luna`), OpenAI's equivalent of TypeSafe Jev. Same `auto_model` contract, route, tiers and confidence gate as the Jev lab, with a three-way latency and cost comparison.
