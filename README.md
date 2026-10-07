@@ -59,6 +59,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
 - [Semantic Routing with vLLM Semantic Router](labs/routing/configure-semantic-routing-vllm-sr.md) _(OpenAI + vLLM Semantic Router)_: one virtual model name routed to an economy, mid, or high tier model by prompt content, via ExtProc
 - [Semantic Routing with Jev](labs/routing/configure-semantic-routing-jev.md) _(OpenAI + TypeSafe Jev)_: the same three-tier routing, classified by a Jev `choice` question with a confidence gate, via an ExtProc adapter
+- [Semantic Routing with the OpenAI Decisions API](labs/routing/configure-semantic-routing-openai-decisions.md) _(OpenAI + OpenAI Decisions API)_: the same three-tier routing, classified by a Decisions API `choice` question with a confidence gate, so the prompt goes only to OpenAI
 - [Routing to AWS Bedrock](labs/routing/configure-routing-aws-bedrock.md) _(AWS Bedrock)_
 - [Routing to AWS Bedrock via API Keys](labs/routing/configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
 - [AWS Bedrock with IRSA](labs/routing/configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_

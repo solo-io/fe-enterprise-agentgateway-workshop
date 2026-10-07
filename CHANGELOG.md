@@ -1,5 +1,12 @@
 # Changelog
 
+0.14.6 - (10-7-26)
+---
+- Add `labs/routing/configure-semantic-routing-openai-decisions.md`: semantic routing with the OpenAI Decisions API (`gpt-6-luna`), OpenAI's equivalent of TypeSafe Jev. Same `auto_model` contract, route, tiers and confidence gate as the Jev lab, with a three-way latency and cost comparison.
+- List the lab in `README.md`
+- `configure-semantic-routing-jev.md`: the router comparison now covers all three semantic routing labs (vSR, Jev, OpenAI Decisions API), and its intro links the Decisions API lab
+- `configure-semantic-routing-vllm-sr.md`: the intro links the Decisions API lab and the three-way comparison
+
 0.14.5 - (10-2-26)
 ---
 - Bump Enterprise Agentgateway from `v2026.8.2` to `v2026.9.3` 
