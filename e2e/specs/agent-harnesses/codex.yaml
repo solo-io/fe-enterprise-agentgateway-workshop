@@ -1,0 +1,71 @@
+lab: labs/agent-harnesses/codex.md
+description: Codex CLI on a gateway-injected OpenAI key through the Responses API
+tier: t1-key
+timeout: 600
+requires:
+  - OPENAI_API_KEY
+
+# Needs the `codex` CLI on PATH. The lab writes ~/.codex/agentgateway.config.toml
+# and its Cleanup removes it.
+
+steps:
+  - section: "Configure Required Variables"
+    run: all
+
+  - section: "Create the Codex Route and Backend"
+    run: all
+
+  - section: "Serve the Codex Model Catalog"
+    run: all
+
+  - section: "Export the Gateway IP"
+    run: all
+
+  - section: "Test the Route with curl"
+    run: all
+    retry:
+      attempts: 10
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: '"status":"completed"'
+
+  - section: "Configure and Launch Codex"
+    run: [1, 2]
+    assert:
+      - contains: "provider: agentgateway"
+      - contains: "hello from agentgateway"
+      - not_contains: "failed to refresh available models"
+
+  - section: "Configure and Launch Codex"
+    run: none
+    reason: "interactive Codex TUI"
+
+  - section: "View Metrics in Grafana"
+    run: none
+    reason: "foreground port-forward for a browser walkthrough"
+
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: "foreground port-forward for a browser walkthrough"
+
+  - section: "View Access Logs"
+    run: all
+    retry:
+      attempts: 5
+      delay: 3
+      until: "gen_ai.response.model="
+    assert:
+      - contains: "route=agentgateway-system/codex-route"
+      - contains: "http.path=/codex/v1/responses"
+      - matches: "gen_ai.usage.input_tokens=[1-9]"
+      - matches: "route=agentgateway-system/codex-models-route .*http.status=200"
+
+  - section: "View Metrics Endpoint"
+    run: all
+    assert:
+      - contains: "agentgateway_"
+
+cleanup:
+  section: "Cleanup"
