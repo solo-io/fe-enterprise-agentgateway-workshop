@@ -1,6 +1,6 @@
 # Changelog
 
-0.14.6 - (10-6-26)
+0.14.6 - (10-7-26)
 ---
 - Add `labs/routing/configure-semantic-routing-openai-decisions.md`: semantic routing with the OpenAI Decisions API (`gpt-6-luna`), OpenAI's equivalent of TypeSafe Jev. Same `auto_model` contract, route, tiers and confidence gate as the Jev lab, with a three-way latency and cost comparison.
 - List the lab in `README.md`
