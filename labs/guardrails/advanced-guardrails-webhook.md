@@ -594,7 +594,7 @@ INFO:     10.244.2.8:55900 - "POST /request HTTP/1.1" 200 OK
 
 ## Measure latency and cost
 
-Measure how long the webhook takes to decide and what each classifier call costs. [Advanced Guardrails Webhook with Jev](advanced-guardrails-webhook-jev.md#measure-latency-and-cost) runs the same benchmark against a Jev classifier, so you can compare the two.
+Measure how long the webhook takes to decide and what each classifier call costs. [Advanced Guardrails Webhook with Jev](advanced-guardrails-webhook-jev.md#measure-latency-and-cost) and [Advanced Guardrails Webhook with the OpenAI Decisions API](advanced-guardrails-webhook-openai-decisions.md#measure-latency-and-cost) run the same benchmark against their classifiers, and [Compare the three guardrail webhooks](advanced-guardrails-webhook-openai-decisions.md#compare-the-three-guardrail-webhooks) sets the three results side by side.
 
 ### Route the classifier calls through the gateway
 
@@ -700,14 +700,14 @@ Two runs of the script on one cluster produced these results:
 
 ```
 webhook                  hook      calls    p50    p90    max   (ms)
-OpenAI (gpt-5.4-nano)    /request     30    903   1030   1082
-OpenAI (gpt-5.4-nano)    /response    10    863    944   1038
+OpenAI (gpt-5.4-nano)    /request     30    822   1118   1985
+OpenAI (gpt-5.4-nano)    /response    10    769   1024   1212
 
-OpenAI (gpt-5.4-nano)    /request     30    844   1035   1332
-OpenAI (gpt-5.4-nano)    /response    10    797    851    893
+OpenAI (gpt-5.4-nano)    /request     30    800    960   7821
+OpenAI (gpt-5.4-nano)    /response    10    618    716    768
 ```
 
-The webhook makes one model call for every request and every response, so a request that passes both hooks spent about 1.7 s in the guardrail at the median. A single call can take much longer: in a third run on the same cluster, one classifier call took 29.7 s at OpenAI, which set that run's `/response` max. Your numbers depend on your network path to `api.openai.com`.
+The webhook makes one model call for every request and every response, so a request that passes both hooks spent about 1.5 s in the guardrail at the median. A single call can take much longer: one classifier call in the second run took 7.8 s, which set that run's `/request` max. Your numbers depend on your network path to `api.openai.com`.
 
 ### Measure the classifier cost
 
@@ -721,13 +721,13 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
   | awk '{n++; i+=$1; o+=$2; c+=$3} END {printf "OpenAI: %d classifier calls, %.0f input + %.0f output tokens per call, $%.7f per webhook call\n", n, i/n, o/n, c/n}'
 ```
 
-The cost per call ranged from $0.0001312 to $0.0001346 across three runs, because the model's verdict varied by a few tokens. One run:
+The cost per call ranged from $0.0001307 to $0.0001347 across three runs, because the model's verdict varied by a few tokens. One run:
 
 ```
-OpenAI: 40 classifier calls, 363 input + 48 output tokens per call, $0.0001331 per webhook call
+OpenAI: 40 classifier calls, 363 input + 47 output tokens per call, $0.0001317 per webhook call
 ```
 
-Across a million webhook calls with this mix of payloads, the classifier costs about $133. gpt-5.4-nano charges $0.20 per million input tokens and $1.25 per million output tokens, and each classification returns a JSON verdict of about 48 tokens. The price comes from the gateway's model cost catalog.
+Across a million webhook calls with this mix of payloads, the classifier costs about $132. gpt-5.4-nano charges $0.20 per million input tokens and $1.25 per million output tokens, and each classification returns a JSON verdict of 46 to 50 tokens. The price comes from the gateway's model cost catalog.
 
 When you finish measuring, point the webhook back at OpenAI and remove the classifier route:
 
