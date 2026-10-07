@@ -19,7 +19,7 @@ You also need the [Codex CLI](https://github.com/openai/codex) installed locally
 Codex talks to OpenAI through the Responses API (`/v1/responses`). This lab configures Enterprise AgentGateway as a custom Codex model provider:
 
 - **Responses API** (`/v1/responses`): the format Codex uses for every agent turn, including tool calls
-- **Additional endpoints** (`/v1/models`, `*`): all other API endpoints pass through
+- **Additional endpoints** (`*`): all other API endpoints pass through
 
 The gateway holds the OpenAI API key and injects it on every request. Developers run Codex with no OpenAI credential on their machine, and the platform team gets observability, rate limiting, and guardrails for all Codex traffic.
 
@@ -84,7 +84,6 @@ spec:
     ai:
       routes:
         "/v1/responses": "Responses"
-        "/v1/models": "Passthrough"
         "*": "Passthrough"
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
@@ -117,9 +116,9 @@ The `RequestHeaderModifier` filter removes any `Authorization` header the client
 
 ## Serve the Codex Model Catalog
 
-At startup Codex requests its model catalog from the provider at `<base_url>/models`. Codex expects its own catalog format, `{"models":[...]}`, which `api.openai.com` does not serve: the passthrough route returns `404` and Codex prints `ERROR codex_models_manager::manager: failed to refresh available models`. Forwarding the request to OpenAI's `/v1/models` gives a `200`, but Codex cannot decode OpenAI's model list and prints a decode error instead.
+At startup Codex requests its model catalog from `<base_url>/models` in a Codex-specific format that OpenAI does not serve. Without this route, OpenAI returns `404` and Codex logs `ERROR codex_models_manager::manager: failed to refresh available models`.
 
-Answer the request at the gateway. An `Exact` path match takes precedence over the `/codex` `PathPrefix` match, so this route handles only `/codex/v1/models`, and a `directResponse` returns an empty catalog. With an empty catalog, Codex keeps its built-in model metadata. Codex caches the catalog in `~/.codex/models_cache.json` keyed to the provider, so your next Codex session without the profile fetches its regular catalog again:
+This route answers `/codex/v1/models` at the gateway with an empty catalog, so Codex uses its built-in model metadata. The `Exact` match takes precedence over the `/codex` `PathPrefix` match in `codex-route`:
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
