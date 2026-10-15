@@ -1,6 +1,6 @@
 # Changelog
 
-0.14.8 - (10-7-26)
+0.14.8 - (10-15-26)
 ---
 - Add `labs/agent-harnesses/codex.md`: the Codex CLI through Enterprise Agentgateway. The gateway holds the OpenAI API key and routes `/v1/responses` as the `Responses` format, so Codex runs with no local credential through an `agentgateway` Codex profile.
 - List the lab in `README.md`
