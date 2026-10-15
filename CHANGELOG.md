@@ -1,5 +1,11 @@
 # Changelog
 
+0.14.8 - (10-15-26)
+---
+- Add `labs/agent-harnesses/codex.md`: the Codex CLI through Enterprise Agentgateway. The gateway holds the OpenAI API key and routes `/v1/responses` as the `Responses` format, so Codex runs with no local credential through an `agentgateway` Codex profile.
+- List the lab in `README.md`
+- Add `e2e/specs/agent-harnesses/codex.yaml` (`t1-key`): runs the curl test and a `codex exec` task through the gateway, asserts the catalog request returns `200` with no refresh error, and checks the access log and metrics
+
 0.14.7 - (10-7-26)
 ---
 - Add `labs/guardrails/advanced-guardrails-webhook-openai-decisions.md`: the advanced guardrails webhook with the OpenAI Decisions API (`gpt-6-luna`) as the classifier.

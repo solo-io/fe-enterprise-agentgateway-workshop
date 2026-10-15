@@ -171,6 +171,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Claude Code](labs/agent-harnesses/claude-code.md)
 - [Keep Claude Code Authenticated with Per-User Auth0 Tokens](labs/agent-harnesses/claude-code-auth0-pkce.md) _(Auth0 / Anthropic)_: per-user PKCE token renewed automatically via `apiKeyHelper`
 - [Claude Desktop](labs/agent-harnesses/claude-desktop.md)
+- [Codex](labs/agent-harnesses/codex.md) _(OpenAI)_: Codex CLI on a gateway-held OpenAI API key through the Responses API
 - [Claude Code as MCP Client with Eager OAuth (Auth0)](labs/mcp/mcp-eager-auth-auth0.md#step-10--test-with-claude-code)
 - [Claude Code as MCP Client with Eager OAuth (Okta)](labs/mcp/mcp-eager-auth-okta.md#step-10--test-with-claude-code)
 - [Claude Code as MCP Client with Eager OAuth (Entra)](labs/mcp/mcp-eager-auth-entra.md#step-10--test-with-claude-code)
