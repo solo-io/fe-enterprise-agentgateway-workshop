@@ -56,7 +56,7 @@ us-docker.pkg.dev/solo-public/enterprise-agentgateway/waf-server:2026.9.3
 
 ### Image list for Solo UI
 
-**0.5.8**
+**0.5.11**
 
 Helm chart:
 
@@ -67,11 +67,11 @@ oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management
 Images:
 
 ```bash
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-frontend:0.5.8
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-backend:0.5.8
-us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-autoauth:v0.2.3
-docker.io/otel/opentelemetry-collector-contrib:0.158.0
-docker.io/clickhouse/clickhouse-server:26.3.17-alpine
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-frontend:0.5.11
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-ui-backend:0.5.11
+us-docker.pkg.dev/solo-public/solo-enterprise/solo-enterprise-autoauth:v0.2.4
+docker.io/otel/opentelemetry-collector-contrib:0.161.0
+docker.io/clickhouse/clickhouse-server:26.3.35-alpine
 ```
 
 Helm values overrides:
@@ -85,12 +85,12 @@ global:
   #image:
   #  registry: my-registry.example.com
   #  repository: solo-enterprise
-  #  tag: "0.5.8"
+  #  tag: "0.5.11"
 clickhouse:
   #--- Image override for ClickHouse (embed registry in repository if using private registry) ---
   #image:
   #  repository: clickhouse/clickhouse-server
-  #  tag: "26.3.17-alpine"
+  #  tag: "26.3.35-alpine"
 ```
 
 ## Air-Gap Mirror Reference (`docker.io/ably7`)
@@ -108,12 +108,12 @@ docker.io/ably7/rate-limiter:2026.9.3
 docker.io/ably7/waf-server:2026.9.3
 ```
 
-### Solo UI (0.5.8)
+### Solo UI (0.5.11)
 
 ```
-docker.io/ably7/solo-enterprise-ui-frontend:0.5.8
-docker.io/ably7/solo-enterprise-ui-backend:0.5.8
-docker.io/ably7/solo-enterprise-autoauth:v0.2.3
-docker.io/ably7/opentelemetry-collector-contrib:0.158.0
-docker.io/ably7/clickhouse-server:26.3.17-alpine
+docker.io/ably7/solo-enterprise-ui-frontend:0.5.11
+docker.io/ably7/solo-enterprise-ui-backend:0.5.11
+docker.io/ably7/solo-enterprise-autoauth:v0.2.4
+docker.io/ably7/opentelemetry-collector-contrib:0.161.0
+docker.io/ably7/clickhouse-server:26.3.35-alpine
 ```

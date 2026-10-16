@@ -1,0 +1,172 @@
+lab: labs/observability/solo-ui-fine-grained-rbac.md
+description: Solo UI fine-grained RBAC with EnterpriseAgentgatewayRBACPolicy, driven as the built-in Admin/Writer/Reader profiles
+tier: t0
+requires: []
+timeout: 900
+
+# The lab verifies everything in the browser (Change Role, page reloads, the
+# Create Virtual API Key form). The probes below make the same calls the UI
+# makes: they mint a token for a built-in profile from the UI's autoAuth IdP and
+# call the UI backend's gRPC-web API through the frontend, then assert on which
+# budgets, virtual keys, and routes come back for each profile.
+
+steps:
+  - section: "Turn On Fine-Grained Mode"
+    run: [1]
+    assert:
+      - contains: "successfully rolled out"
+  # Block 2 is a foreground port-forward; the probes open their own.
+
+  - probe: "the management release is in fine-grained mode with userClaim=sub"
+    script: |
+      helm get values management -n agentgateway-system -a -o json \
+        | jq -r '"mode=\(.rbac.mode) userClaim=\(.rbac.subjectMapping.userClaim)"'
+    assert:
+      - contains: "mode=fine-grained userClaim=sub"
+
+  - section: "Create Two Team Namespaces"
+    run: [1]
+
+  # Budget enforcement status is reconciled after apply returns.
+  - section: "Create Two Team Namespaces"
+    run: [2]
+    retry: {attempts: 20, delay: 3, until: "team-b-quota +True +True"}
+    assert:
+      - matches: "team-a-quota +True +True"
+      - matches: "team-b-quota +True +True"
+
+  # ui_rpc <profile> <Service/Method> [base64 grpc-web frame]
+  # Prints "grpc-status=<n> <grpc-message>" then the printable strings of the
+  # reply, '|'-joined. Errors arrive trailers-only (grpc-status in the HTTP
+  # headers, empty body); successes carry the status in a body trailer frame.
+  # Defined once; blocks share one shell.
+  - probe: "define the gRPC-web helper and check each profile resolves"
+    script: |
+      UI_PORT=14000
+      ui_rpc() {
+        local tok hdr
+        hdr=$(mktemp)
+        tok=$(curl -s -X POST -d "{\"user_type\":\"$1\"}" \
+          "http://127.0.0.1:${UI_PORT}/api/autoauth/token" | jq -r .access_token)
+        curl -s -m 15 -D "$hdr" -H "Authorization: Bearer $tok" \
+          -H 'Content-Type: application/grpc-web-text' -H 'x-grpc-web: 1' \
+          --data "${3:-AAAAAAA=}" "http://127.0.0.1:${UI_PORT}/api/$2" \
+        | python3 -c '
+      import sys, base64, re
+      from urllib.parse import unquote
+      raw = sys.stdin.read().strip()  # first: returns once curl exits and the header file is complete
+      hdrs = dict(l.split(":", 1) for l in open(sys.argv[1]).read().splitlines() if ":" in l)
+      hdrs = {k.strip().lower(): v.strip() for k, v in hdrs.items()}
+      data = b"".join(base64.b64decode(c + "=" * (-len(c) % 4))
+                      for c in re.findall(r"[A-Za-z0-9+/]+=*", raw))
+      trailer, strings, i = "grpc-status=?", [], 0
+      if "grpc-status" in hdrs:
+          trailer = "grpc-status=%s %s" % (hdrs["grpc-status"], unquote(hdrs.get("grpc-message", "")))
+      while i + 5 <= len(data):
+          flag, n = data[i], int.from_bytes(data[i+1:i+5], "big")
+          body = data[i+5:i+5+n]; i += 5 + n
+          if flag & 0x80:
+              t = dict(l.split(":", 1) for l in body.decode(errors="replace").split("\r\n") if ":" in l)
+              trailer = "grpc-status=%s %s" % (t.get("grpc-status", "?").strip(), t.get("grpc-message", "").strip())
+          else:
+              strings += [s.decode() for s in re.findall(rb"[\x20-\x7e]{3,}", body)]
+      print(trailer, "|".join(strings))' "$hdr"
+        rm -f "$hdr"
+      }
+      # ui_frame <field>=<string> ... : one grpc-web frame of a flat message.
+      # ui_vk_frame <id> <group> <user> <key_set>: CreateVirtualKeyRequest.
+      ui_frame() {
+        python3 -c '
+      import sys, base64
+      m = b""
+      for kv in sys.argv[1:]:
+          f, v = kv.split("=", 1); v = v.encode()
+          m += bytes([(int(f) << 3) | 2, len(v)]) + v
+      print(base64.b64encode(b"\x00" + len(m).to_bytes(4, "big") + m).decode())' "$@"
+      }
+      ui_vk_frame() {
+        python3 -c '
+      import sys, base64
+      def s(f, v): v = v.encode(); return bytes([(f << 3) | 2, len(v)]) + v
+      vk = s(1, sys.argv[1]) + s(4, sys.argv[2]) + s(5, sys.argv[3]) + s(6, sys.argv[4])
+      m = bytes([(1 << 3) | 2, len(vk)]) + vk
+      print(base64.b64encode(b"\x00" + len(m).to_bytes(4, "big") + m).decode())' "$@"
+      }
+      COST=rpc.agentgateway.solo.io.AgentgatewayCostAPI
+      ROUTES=rpc.agentgateway.solo.io.GatewayAPI/ListHTTPRoutes
+      e2e_pf agentgateway-system svc/solo-enterprise-ui ${UI_PORT}:80
+      for p in admin writer reader; do
+        echo "$p: $(ui_rpc $p rpc.common.solo.io.UserService/GetCurrentUser)"
+      done
+      e2e_pf_stop
+    assert:
+      - matches: "admin: grpc-status=0 .*\\|global\\.Admin"
+      - matches: "writer: grpc-status=0 .*\\|global\\.Writer"
+      - matches: "reader: grpc-status=0 .*\\|global\\.Reader"
+
+  # "Review the Default Access" has no bash; this is its table, per profile.
+  - probe: "default access: Admin sees nothing, owners see only their own"
+    script: |
+      e2e_pf agentgateway-system svc/solo-enterprise-ui ${UI_PORT}:80
+      keys() { ui_rpc "$1" $COST/ListVirtualKeys | grep -oE 'vk-[a-z]+' | sort -u | tr '\n' ' '; }
+      entries() { ui_rpc "$1" $COST/ListBudgets "$(ui_frame 2=$2)" | grep -oE '[a-z-]+-daily-tokens' | sort -u | tr '\n' ' '; }
+      echo "admin keys=[$(keys admin)] budgets_a=[$(entries admin team-a)]"
+      echo "writer keys=[$(keys writer)]"
+      echo "reader keys=[$(keys reader)] budgets_a=[$(entries reader team-a)]"
+      e2e_pf_stop
+    assert:
+      - contains: "admin keys=[] budgets_a=[]"
+      - contains: "writer keys=[vk-writer ]"
+      - contains: "reader keys=[vk-reader ] budgets_a=[reader-daily-tokens ]"
+
+  - section: "Grant Access with RBAC Policies"
+    run: all
+    assert:
+      - matches: "platform-admins +True +Accepted"
+      - matches: "team-a-leads +True +Accepted"
+
+  # The lab's post-policy table. Writer must lose sight of team-b everywhere.
+  - probe: "granted access matches the per-profile table"
+    script: |
+      e2e_pf agentgateway-system svc/solo-enterprise-ui ${UI_PORT}:80
+      keys() { ui_rpc "$1" $COST/ListVirtualKeys | grep -oE 'vk-[a-z]+' | sort -u | tr '\n' ' '; }
+      entries() { ui_rpc "$1" $COST/ListBudgets "$(ui_frame 2=$2)" | grep -oE '[a-z-]+-daily-tokens' | sort -u | tr '\n' ' '; }
+      routes() { ui_rpc "$1" $ROUTES | grep -oE 'team-[ab]-llm' | sort -u | tr '\n' ' '; }
+      for p in admin writer reader; do
+        echo "$p keys=[$(keys $p)] a=[$(entries $p team-a)] b=[$(entries $p team-b)] routes=[$(routes $p)]"
+      done
+      e2e_pf_stop
+    retry: {attempts: 10, delay: 3, until: "admin keys=\\[vk-bob"}
+    assert:
+      - contains: "admin keys=[vk-bob vk-reader vk-writer ] a=[reader-daily-tokens team-a-daily-tokens ] b=[team-b-daily-tokens ] routes=[team-a-llm team-b-llm ]"
+      - contains: "writer keys=[vk-reader vk-writer ] a=[reader-daily-tokens team-a-daily-tokens ] b=[] routes=[team-a-llm ]"
+      - contains: "reader keys=[vk-reader ] a=[reader-daily-tokens ] b=[] routes=[]"
+
+  # The lab does this in the Create Virtual API Key form; same RPC, same denial.
+  - probe: "Writer is denied a key in team-b and allowed one in team-a"
+    script: |
+      e2e_pf agentgateway-system svc/solo-enterprise-ui ${UI_PORT}:80
+      echo "team-b: $(ui_rpc writer $COST/CreateVirtualKey "$(ui_vk_frame vk-carol team-b carol team-b-keys)")"
+      echo "team-a: $(ui_rpc writer $COST/CreateVirtualKey "$(ui_vk_frame vk-carol team-a carol team-a-keys)")"
+      e2e_pf_stop
+    assert:
+      - contains: "team-b: grpc-status=7 cannot create virtual key: a matching manage grant must cover the target"
+      - matches: "team-a: grpc-status=0 .*vk-carol"
+
+  - section: "Try to Write Outside the Team's Namespace"
+    run: all
+    assert:
+      - contains: "vk-carol"
+
+  - probe: "team-b's key set is untouched"
+    script: |
+      kubectl get secret team-b-keys -n team-b -o json | jq -r '.data | keys | join(",")' | sed 's/^/team_b_keys=/'
+    assert:
+      - matches: "^team_b_keys=bob$"
+
+  - section: "Use Your Identity Provider in Production"
+    run: none
+    reason: reference values for an external OIDC provider; no commands
+
+cleanup:
+  section: "Cleanup"

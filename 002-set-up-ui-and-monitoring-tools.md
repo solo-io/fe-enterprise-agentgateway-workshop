@@ -18,7 +18,7 @@ The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-teleme
 Export your Solo license key (same key used in lab 001):
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export AGW_UI_VERSION=0.5.8
+export AGW_UI_VERSION=0.5.11
 ```
 
 ### Step 1: Install/upgrade CRDs
@@ -353,6 +353,10 @@ The dashboard is organized into the following metric categories:
 - Token Consumption by Organization (input tokens per org)
 
 ![usage-tracking-by-org-v2-1.png](images/grafana-dashboard/usage-tracking-by-org-v2-1.png)
+
+## (Optional) Fine-Grained RBAC for the Solo UI
+
+The UI installs with coarse roles (Admin, Writer, Reader) that apply to every resource. To scope budgets, virtual keys, and HTTPRoutes per team with `EnterpriseAgentgatewayRBACPolicy`, see the [Solo UI Fine-Grained RBAC lab](labs/observability/solo-ui-fine-grained-rbac.md).
 
 ## Uninstall
 

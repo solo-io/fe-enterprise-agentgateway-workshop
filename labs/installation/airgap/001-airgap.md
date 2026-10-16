@@ -392,7 +392,7 @@ The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-teleme
 ### Set required variables
 
 ```bash
-export AGW_UI_VERSION=0.5.8
+export AGW_UI_VERSION=0.5.11
 ```
 
 ### Step 1: Install/upgrade CRDs
@@ -447,18 +447,18 @@ idp:
   registry: docker.io
   repository: ably7
   name: solo-enterprise-autoauth
-  tag: "v0.2.3"
+  tag: "v0.2.4"
 telemetry:
   image:
     registry: docker.io
     repository: ably7
     name: opentelemetry-collector-contrib
-    tag: "0.158.0"
+    tag: "0.161.0"
 clickhouse:
   enabled: true
   image:
     repository: docker.io/ably7/clickhouse-server
-    tag: "26.3.17-alpine"
+    tag: "26.3.35-alpine"
 tracing:
   verbose: true
 EOF

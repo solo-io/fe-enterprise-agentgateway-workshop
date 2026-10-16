@@ -91,6 +91,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [Virtual Keys](labs/security/virtual-keys.md) _(see also: Rate Limiting)_
 - [JWT Auth with RBAC](labs/security/jwt-auth-with-rbac.md)
+- [Scope Solo UI Access per Team with Fine-Grained RBAC](labs/observability/solo-ui-fine-grained-rbac.md) _(see also: Observability)_
 - [JWT Auth Through a Corporate Proxy (Tunnel)](labs/security/jwt-auth-through-corporate-proxy-okta.md) _(Okta)_
 - [JWT Auth Through a Corporate Proxy (Tunnel)](labs/security/jwt-auth-through-corporate-proxy-entra.md) _(Entra)_
 - [TLS Termination](labs/security/tls-termination.md)
@@ -210,6 +211,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 ## Observability
 
 - [LLM Cost Management](labs/observability/llm-cost-management.md) _(see also: Security, Rate Limiting)_
+- [Scope Solo UI Access per Team with Fine-Grained RBAC](labs/observability/solo-ui-fine-grained-rbac.md) _(see also: Security)_
 - [Production Observability, Alerting, and Scaling](labs/observability/production-observability-alerting-and-scaling.md)
 
 ---
