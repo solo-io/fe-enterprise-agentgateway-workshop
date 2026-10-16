@@ -38,7 +38,6 @@ grpcroutes                        gateway.networking.k8s.io/v1   true         GR
 httproutes                        gateway.networking.k8s.io/v1   true         HTTPRoute
 listenersets         lset         gateway.networking.k8s.io/v1   true         ListenerSet
 referencegrants      refgrant     gateway.networking.k8s.io/v1   true         ReferenceGrant
-tlsroutes                         gateway.networking.k8s.io/v1   true         TLSRoute
 ```
 
 > [!NOTE]
@@ -78,6 +77,7 @@ Expected output
 ```
 NAME                                    SHORTNAMES   APIVERSION                                NAMESPACED   KIND
 agentgatewaybackends                    agbe         agentgateway.dev/v1alpha1                 true         AgentgatewayBackend
+agentgatewaymodels                      agmodel      agentgateway.dev/v1alpha1                 true         AgentgatewayModel
 agentgatewayparameters                  agpar        agentgateway.dev/v1alpha1                 true         AgentgatewayParameters
 agentgatewaypolicies                    agpol        agentgateway.dev/v1alpha1                 true         AgentgatewayPolicy
 enterpriseagentgatewaybackends          eagbe        enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayBackend

@@ -18,7 +18,7 @@ The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-teleme
 Export your Solo license key (same key used in lab 001):
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export AGW_UI_VERSION=0.5.8
+export AGW_UI_VERSION=0.5.11
 ```
 
 ### Step 1: Install/upgrade CRDs
@@ -59,8 +59,6 @@ service:
   type: ClusterIP
   clusterIP: ""
 products:
-  kagent:
-    enabled: false
   agentgateway:
     enabled: true
     namespace: agentgateway-system
@@ -69,10 +67,6 @@ products:
       cost-management: true
       #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
       cost-management-writes: true
-  mesh:
-    enabled: false
-  agentregistry:
-    enabled: false
 clickhouse:
   enabled: true
   #--- Image override for ClickHouse (no registry key — embed registry in repository if needed) ---
@@ -87,7 +81,17 @@ EOF
 Check that the Solo UI components are running:
 
 ```bash
-kubectl get pods -n agentgateway-system -l app.kubernetes.io/instance=management
+kubectl get pods -n agentgateway-system | awk 'NR==1 || /solo-enterprise|clickhouse/'
+```
+
+Expected Output:
+
+```
+NAME                                                   READY   STATUS    RESTARTS   AGE
+management-clickhouse-shard0-0                         1/1     Running   0          51s
+solo-enterprise-k8sobjects-collector-d4d9774bb-rqptk   1/1     Running   0          51s
+solo-enterprise-telemetry-collector-57448bc4b5-gmvkl   1/1     Running   0          51s
+solo-enterprise-ui-7dbf5c9c5c-zj7z2                    3/3     Running   0          51s
 ```
 
 ### Step 3: Apply the model cost catalog
@@ -353,6 +357,10 @@ The dashboard is organized into the following metric categories:
 - Token Consumption by Organization (input tokens per org)
 
 ![usage-tracking-by-org-v2-1.png](images/grafana-dashboard/usage-tracking-by-org-v2-1.png)
+
+## (Optional) Fine-Grained RBAC for the Solo UI
+
+The UI installs with coarse roles (Admin, Writer, Reader) that apply to every resource. To scope budgets, virtual keys, and HTTPRoutes per team with `EnterpriseAgentgatewayRBACPolicy`, see the [Solo UI Fine-Grained RBAC lab](labs/observability/solo-ui-fine-grained-rbac.md).
 
 ## Uninstall
 

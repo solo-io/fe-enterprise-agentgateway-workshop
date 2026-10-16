@@ -39,7 +39,6 @@ httproutes                        gateway.networking.k8s.io/v1         true     
 listenersets         lset         gateway.networking.k8s.io/v1         true         ListenerSet
 referencegrants      refgrant     gateway.networking.k8s.io/v1         true         ReferenceGrant
 tcproutes                         gateway.networking.k8s.io/v1alpha2   true         TCPRoute
-tlsroutes                         gateway.networking.k8s.io/v1         true         TLSRoute
 udproutes                         gateway.networking.k8s.io/v1alpha2   true         UDPRoute
 ```
 
