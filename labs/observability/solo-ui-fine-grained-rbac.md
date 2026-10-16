@@ -270,7 +270,7 @@ Before any policy exists, each caller gets these defaults:
 | Virtual keys | `manage` on keys whose `user` is the caller |
 | HTTPRoutes | None |
 
-Switch through the profiles and open **Cost Management** > **Budgets** and **Virtual Keys**:
+Switch through the profiles and open **Cost Management** > **Budgets**, then **Virtual Keys** in the sidebar:
 
 - As Admin, both pages are empty. `global.Admin` gets no fine-grained access until a policy grants it.
 

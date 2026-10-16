@@ -3,6 +3,8 @@
 0.14.9 - (10-16-26)
 ---
 - Bump the Solo UI (`management`, `management-crds`) from `0.5.8` to `0.5.11` in `002`.
+- `002`: drop the `products.kagent`, `products.mesh` and `products.agentregistry` blocks from the Solo UI Helm values (all three matched the chart defaults)
+- `solo-ui-fine-grained-rbac.md`: Virtual Keys is a sidebar item, not a tab under Cost Management
 - Update the Solo UI image list (`0.5.11`, autoauth `v0.2.4`, OTEL collector `0.161.0`, ClickHouse `26.3.35-alpine`) and the system requirements
 - Mirror the `0.5.11` Solo UI images to `docker.io/ably7` (multi-arch) and bump the air-gap lab and the image list's mirror section to them
 - Add `labs/observability/solo-ui-fine-grained-rbac.md`: scope Solo UI access per team with `rbac.mode: fine-grained` and `EnterpriseAgentgatewayRBACPolicy`.

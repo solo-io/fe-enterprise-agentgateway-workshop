@@ -59,8 +59,6 @@ service:
   type: ClusterIP
   clusterIP: ""
 products:
-  kagent:
-    enabled: false
   agentgateway:
     enabled: true
     namespace: agentgateway-system
@@ -69,10 +67,6 @@ products:
       cost-management: true
       #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
       cost-management-writes: true
-  mesh:
-    enabled: false
-  agentregistry:
-    enabled: false
 clickhouse:
   enabled: true
   #--- Image override for ClickHouse (no registry key — embed registry in repository if needed) ---
@@ -87,7 +81,17 @@ EOF
 Check that the Solo UI components are running:
 
 ```bash
-kubectl get pods -n agentgateway-system -l app.kubernetes.io/instance=management
+kubectl get pods -n agentgateway-system | awk 'NR==1 || /solo-enterprise|clickhouse/'
+```
+
+Expected Output:
+
+```
+NAME                                                   READY   STATUS    RESTARTS   AGE
+management-clickhouse-shard0-0                         1/1     Running   0          51s
+solo-enterprise-k8sobjects-collector-d4d9774bb-rqptk   1/1     Running   0          51s
+solo-enterprise-telemetry-collector-57448bc4b5-gmvkl   1/1     Running   0          51s
+solo-enterprise-ui-7dbf5c9c5c-zj7z2                    3/3     Running   0          51s
 ```
 
 ### Step 3: Apply the model cost catalog

@@ -41,7 +41,6 @@ httproutes                        gateway.networking.k8s.io/v1         true     
 listenersets         lset         gateway.networking.k8s.io/v1         true         ListenerSet
 referencegrants      refgrant     gateway.networking.k8s.io/v1         true         ReferenceGrant
 tcproutes                         gateway.networking.k8s.io/v1alpha2   true         TCPRoute
-tlsroutes                         gateway.networking.k8s.io/v1         true         TLSRoute
 udproutes                         gateway.networking.k8s.io/v1alpha2   true         UDPRoute
 ```
 
@@ -77,14 +76,18 @@ kubectl api-resources | awk 'NR==1 || /enterpriseagentgateway\.solo\.io|agentgat
 Expected output
 
 ```
-NAME                                SHORTNAMES        APIVERSION                                NAMESPACED   KIND
-agentgatewaybackends                agbe              agentgateway.dev/v1alpha1                 true         AgentgatewayBackend
-agentgatewayparameters              agpar             agentgateway.dev/v1alpha1                 true         AgentgatewayParameters
-agentgatewaypolicies                agpol             agentgateway.dev/v1alpha1                 true         AgentgatewayPolicy
-enterpriseagentgatewayparameters    eagpar            enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
-enterpriseagentgatewaypolicies      eagpol            enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
-authconfigs                         ac                extauth.solo.io/v1                        true         AuthConfig
-ratelimitconfigs                    rlc               ratelimit.solo.io/v1alpha1                true         RateLimitConfig
+NAME                                    SHORTNAMES   APIVERSION                                NAMESPACED   KIND
+agentgatewaybackends                    agbe         agentgateway.dev/v1alpha1                 true         AgentgatewayBackend
+agentgatewaymodels                      agmodel      agentgateway.dev/v1alpha1                 true         AgentgatewayModel
+agentgatewayparameters                  agpar        agentgateway.dev/v1alpha1                 true         AgentgatewayParameters
+agentgatewaypolicies                    agpol        agentgateway.dev/v1alpha1                 true         AgentgatewayPolicy
+enterpriseagentgatewaybackends          eagbe        enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayBackend
+enterpriseagentgatewaybudgets           eagbud       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayBudget
+enterpriseagentgatewayexternalsecrets   eages        enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayExternalSecret
+enterpriseagentgatewayparameters        eagpar       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
+enterpriseagentgatewaypolicies          eagpol       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
+authconfigs                             ac           extauth.solo.io/v1                        true         AuthConfig
+ratelimitconfigs                        rlc          ratelimit.solo.io/v1alpha1                true         RateLimitConfig
 ```
 
 ## Install Enterprise Agentgateway Controller
@@ -467,7 +470,7 @@ EOF
 Check that the Solo UI components are running:
 
 ```bash
-kubectl get pods -n agentgateway-system -l app.kubernetes.io/instance=management
+kubectl get pods -n agentgateway-system | awk 'NR==1 || /solo-enterprise|clickhouse/'
 ```
 
 ## Access Solo UI
