@@ -1,7 +1,7 @@
 # Scope Solo UI Access per Team with Fine-Grained RBAC
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001` and `002`.
+This lab assumes that you have completed the setup in `001`.
 
 ## Lab Objectives
 - Switch the Solo UI from coarse roles to fine-grained RBAC

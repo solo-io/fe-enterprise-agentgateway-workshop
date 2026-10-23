@@ -3,7 +3,7 @@
 Embedding models use a different request format than standard chat completions, so they require the `Passthrough` route type. This lab demonstrates how to route requests to the Amazon Titan Embed Text v2 model through AgentGateway using a `Passthrough` route with a URL rewrite to the Bedrock InvokeModel endpoint.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 You will also need:
 - An AWS account with Bedrock access enabled
@@ -155,7 +155,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash

@@ -3,7 +3,7 @@
 Expose an existing REST API as MCP tools by handing agentgateway an OpenAPI schema: no custom MCP server required.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 This lab points the gateway at the public **[Open-Meteo](https://open-meteo.com/)** weather API (`api.open-meteo.com`). It is free, requires **no API key or account**, and serves live data over HTTPS. The only requirement is that your cluster has outbound internet egress (the same assumption as the `in-cluster-mcp` fetch tool and the HTTPS MCP labs).
 

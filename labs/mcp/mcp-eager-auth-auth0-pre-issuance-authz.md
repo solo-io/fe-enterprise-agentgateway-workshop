@@ -2,7 +2,7 @@
 
 ## Pre-requisites
 
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 This lab uses the same gateway hostname (`mcp-auth0.try-solo.io`) as [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md). The two labs cannot run concurrently: clean up the other lab before starting this one. The Okta labs use `mcp-okta.try-solo.io` and do not collide.
 

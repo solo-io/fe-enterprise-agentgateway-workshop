@@ -20,9 +20,9 @@ steps:
     assert:
       - contains: "successfully rolled out"
 
-  # 002 turns Cost Management on, so the lab no longer enables it. Assert the
+  # 001 turns Cost Management on, so the lab no longer enables it. Assert the
   # prerequisite anyway: without the flag the whole lab has nowhere to render.
-  - probe: "002 left Cost Management enabled on the ui subchart"
+  - probe: "001 left Cost Management enabled on the ui subchart"
     script: |
       helm get values enterprise-agentgateway -n agentgateway-system -a -o json \
         | jq -r '.ui.features.costManagement // "unset"' \
@@ -33,7 +33,7 @@ steps:
   - resource: deploy/enterprise-agentgateway-ui
     jsonpath: .status.readyReplicas
     expect: "1"
-    name: the Solo UI 002 installed is ready to render Cost Management
+    name: the Solo UI 001 installed is ready to render Cost Management
 
   - section: "Set up the OpenAI backend"
     run: all

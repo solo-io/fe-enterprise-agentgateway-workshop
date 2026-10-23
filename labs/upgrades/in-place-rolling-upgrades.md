@@ -8,7 +8,7 @@ To take an entire cluster out of service for an upgrade while a peer keeps servi
 
 ## Pre-requisites
 - [001 — Install Enterprise Agentgateway](../../001-install-enterprise-agentgateway.md)
-- [002 — Set Up UI and Monitoring Tools](../../002-set-up-ui-and-monitoring-tools.md)
+- [002 — Set Up Monitoring Tools](../../002-set-up-monitoring-tools.md)
 - [Configure Mock OpenAI Server](../routing/configure-mock-openai-server.md): provides the `mock-gpt-4o` backend on the `/openai` route
 - A cluster with **at least 2 proxy replicas** (this lab configures that in the first section)
 
@@ -603,7 +603,7 @@ kubectl rollout status deployment/enterprise-agentgateway -n agentgateway-system
 kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system --timeout=300s
 ```
 
-> Pass your values with `-f`, not `--reuse-values`: `--reuse-values` does not merge the new chart's defaults and can fail to template across a version bump (`<.Values.externalSecrets.stores>: nil pointer`). Also remove any per-component image tag you pinned (Helm `controller.image`, or `spec.image` and `spec.sharedExtensions.<name>.image` on the `EnterpriseAgentgatewayParameters`). A pinned tag keeps that component on the old version after the chart moves. If you enabled the Solo UI in `002`, put its `ui` block in `your-values.yaml`, or the upgrade removes the UI.
+> Pass your values with `-f`, not `--reuse-values`: `--reuse-values` does not merge the new chart's defaults and can fail to template across a version bump (`<.Values.externalSecrets.stores>: nil pointer`). Also remove any per-component image tag you pinned (Helm `controller.image`, or `spec.image` and `spec.sharedExtensions.<name>.image` on the `EnterpriseAgentgatewayParameters`). A pinned tag keeps that component on the old version after the chart moves. If you enabled the Solo UI in `001`, put its `ui` block in `your-values.yaml`, or the upgrade removes the UI.
 
 > [!NOTE]
 > An upgrade to `v2026.10.1` or later encrypts the OAuth flow state and the upstream dynamic client registrations that the token exchange server stores. The upgrade deletes the existing upstream registrations, and agentgateway registers again on first use. Users of eager-OAuth MCP backends must authorize again, and logins in progress must restart.
@@ -612,7 +612,7 @@ Run any of the k6 Jobs above during the upgrade to confirm the same zero-downtim
 
 ### What to Monitor
 
-Watch these in the Grafana stack from [lab 002](../../002-set-up-ui-and-monitoring-tools.md) (see the [scaling lab](../observability/production-observability-alerting-and-scaling.md#rolling-upgrades) for the full list):
+Watch these in the Grafana stack from [lab 002](../../002-set-up-monitoring-tools.md) (see the [scaling lab](../observability/production-observability-alerting-and-scaling.md#rolling-upgrades) for the full list):
 
 - `agentgateway_build_info`: shows old and new versions during the rollout, then only the new one.
 - `agentgateway_requests_total{status=~"5.."}`: error rate must not spike.

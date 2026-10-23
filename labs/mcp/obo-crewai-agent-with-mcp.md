@@ -1,7 +1,7 @@
 # CrewAI Agent with MCP Tools and OBO Auth
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Deploy Keycloak as the in-cluster identity provider

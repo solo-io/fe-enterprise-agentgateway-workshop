@@ -5,7 +5,7 @@ In this lab, you'll route LLM requests by prompt content instead of by the model
 [Semantic Routing with vLLM Semantic Router](configure-semantic-routing-vllm-sr.md) solves the same problem with embedding similarity, and [Semantic Routing with the OpenAI Decisions API](configure-semantic-routing-openai-decisions.md) solves it with OpenAI's decision model. This lab keeps the same client contract, route, and tiers as both, so you can compare the three.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 - An OpenAI API key with access to three models of different price. This lab uses `gpt-5.4-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier.
 - A TypeSafe API key from the [TypeSafe console](https://console.typesafe.ai), exported as `TYPESAFE_AI_API_KEY`.
 - Egress from the cluster to `pypi.org`. The adapter pod installs its two Python packages at startup.
@@ -826,7 +826,7 @@ sum by (gen_ai_request_model) (increase(agentgateway_gen_ai_client_token_usage_s
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash

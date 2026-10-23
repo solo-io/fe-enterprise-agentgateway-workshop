@@ -5,7 +5,7 @@ In this lab, you'll guard LLM traffic with a webhook that asks [Jev](https://doc
 [Advanced Guardrails Webhook](advanced-guardrails-webhook.md) builds the same guardrail with an OpenAI chat model as the classifier, and [Advanced Guardrails Webhook with the OpenAI Decisions API](advanced-guardrails-webhook-openai-decisions.md) builds it with OpenAI's decision model. All three labs use the same test prompts, and [Compare the three guardrail webhooks](#compare-the-three-guardrail-webhooks) sets their latency and cost results side by side.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 - An OpenAI API key, exported as `OPENAI_API_KEY`. OpenAI answers the requests the guardrail allows.
 - A TypeSafe API key from the [TypeSafe console](https://console.typesafe.ai), exported as `TYPESAFE_AI_API_KEY`.
 

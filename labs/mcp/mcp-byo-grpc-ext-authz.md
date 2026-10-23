@@ -1,7 +1,7 @@
 # MCP BYO gRPC External Authorization (ext-authz)
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 You should also have a working MCP route configured. If not, complete the [In-Cluster MCP](in-cluster-mcp.md) or [Remote MCP](remote-mcp.md) lab first.
 

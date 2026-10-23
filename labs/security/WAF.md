@@ -5,7 +5,7 @@ A WAF gives you a deterministic, rule-driven perimeter around your AI/LLM endpoi
 This lab focuses on the use cases that matter for agentic traffic: enforcing API shape and model governance, blocking tool-call abuse, hard-blocking credential leakage on both the request and the response, and layering WAF with AI guardrails for defense-in-depth.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces. It also assumes you have an `OPENAI_API_KEY` available.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana. It also assumes you have an `OPENAI_API_KEY` available.
 
 ## Lab Objectives
 - Understand where WAF fits versus AI guardrails, and which threats each is best suited for

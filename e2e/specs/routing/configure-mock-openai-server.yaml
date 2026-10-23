@@ -50,7 +50,7 @@ steps:
 
   - section: "View Metrics and Traces in Grafana"
     run: none
-    reason: browser step, covered by the 002 baseline check
+    reason: browser step, covered by the 001 baseline check
 
   - section: "View Traces in the Solo UI"
     run: none

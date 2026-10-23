@@ -307,7 +307,7 @@ install_base() {
   printf "${BOLD}═══ Installing baseline (001 + 002) ═══${NC}\n\n"
   local spec
   for spec in "${SPEC_DIR}/_base/001-install-enterprise-agentgateway.yaml" \
-              "${SPEC_DIR}/_base/002-set-up-ui-and-monitoring-tools.yaml"; do
+              "${SPEC_DIR}/_base/002-set-up-monitoring-tools.yaml"; do
     [[ -f "$spec" ]] || { printf "${RED}missing base spec: %s${NC}\n" "$spec"; exit 1; }
     run_lab "$spec"
   done

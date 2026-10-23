@@ -5,7 +5,7 @@ Many enterprises don't allow direct egress to the internet; all outbound traffic
 This lab is focused on the tunnel mechanics: it configures JWT authentication only, with no authorization/RBAC rules. For an Entra-backed lab with token exchange, see [Microsoft Entra On-Behalf-Of Token Exchange](../identity-delegation/msft-entra-obo.md), whose Entra JWKS setup this lab reuses.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 - An Entra ID tenant, and the `az` CLI installed and authenticated (`az login`) so you can mint a test token.
 - Your Entra tenant ID:
 
@@ -332,7 +332,7 @@ Cross-reference with agentgateway's own logs to see the JWT validation succeed o
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-For metrics and traces on this traffic, see `002`.
+For metrics on this traffic, see `002`. For traces, use the Solo UI from `001`.
 
 ## Negative Test: Deny Entra at the Proxy
 

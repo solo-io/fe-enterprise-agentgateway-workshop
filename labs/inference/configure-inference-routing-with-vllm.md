@@ -1,7 +1,7 @@
 # Configure Inference Routing with vLLM
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 > **Node architecture (important):** this lab requires `linux/amd64` nodes. The upstream Endpoint Picker image (`registry.k8s.io/gateway-api-inference-extension/epp:v1.1.0`) is published as a single-platform `linux/amd64` image. On `arm64` clusters (e.g., kind on Apple Silicon Macs), the EPP pod will fail with `exec /epp: exec format error`. Run this lab on a cloud cluster (GKE/EKS/AKS) or an x86 VM. The vLLM CPU image also fails inside Docker Desktop on Mac with `AssertionError: Not enough allowed NUMA nodes`, even on amd64 Docker Desktop.
 
@@ -299,7 +299,7 @@ Look for `gRPC server listening` on port `9002`: this is the ext-proc endpoint t
 
 ### View Metrics and Traces
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the **Tracing** view in the Solo UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the **Tracing** view in the Solo UI.
 
 1. Port-forward to the Grafana service:
    ```bash

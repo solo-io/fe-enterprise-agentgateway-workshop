@@ -3,7 +3,7 @@
 Expose a service you already run in your cluster as MCP tools by handing agentgateway its OpenAPI schema: no custom MCP server required.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 This lab deploys the **[Stripe mock server](https://github.com/stripe/stripe-mock)** (`stripe/stripe-mock`) into your cluster. It is a stateless mock that returns realistic, hardcoded Stripe API responses: **no Stripe account, real keys, or internet egress required**.
 

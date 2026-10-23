@@ -12,7 +12,7 @@ This guide documents the conventions of this repo so that any author, human or a
 
 | Path | Purpose |
 |---|---|
-| `001-install-enterprise-agentgateway.md`, `002-set-up-ui-and-monitoring-tools.md` | Foundational install labs. Top-level, everything depends on them. Only these live at the root. |
+| `001-install-enterprise-agentgateway.md`, `002-set-up-monitoring-tools.md` | Foundational install labs. Top-level, everything depends on them. Only these live at the root. |
 | `labs/<category>/<name>.md` | All other labs. Categories: `routing`, `security`, `rate-limiting`, `guardrails`, `transformations`, `mcp`, `inference`, `identity-delegation`, `observability`, `upgrades`, `load-testing`, `evaluations`, `agent-frameworks`, `agent-harnesses`, `installation` |
 | `labs/<category>/<name>/` (subdirectory lab) | Only when the lab ships binary/large assets: screenshots, big OpenAPI specs, templated YAML bundles. The runbook is `README.md` inside the folder (see §4) |
 | `lib/<concern>/` | Shared, reusable cross-lab assets (`jwt/`, `keycloak/`, `crewai/`, `langchain/`, `observability/`); see §11 |
@@ -41,7 +41,7 @@ Pick the archetype before writing; conventions differ slightly.
 <Optional 1-sentence intro: "In this lab, you'll ...">
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 - <extra deps: $OPENAI_API_KEY, external accounts, required CLIs, version gates>
 
 ## Lab Objectives
@@ -62,7 +62,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 Rules:
 
 - **Title**: H1, Title Case, describes the outcome, no lab number. Verb-first (`# Configure Basic Routing to OpenAI`) or `<Feature> using Agentgateway` (`# Transformations using Agentgateway`) are both established; verb-first preferred for new labs.
-- **Pre-requisites boilerplate** (use verbatim): *"This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces."* Reference labs `001`/`002` by bare backticked number in this sentence; reference all other labs with relative markdown links (`[Mock OpenAI Server lab](configure-mock-openai-server.md)`, `[001 — Install...](../../001-install-enterprise-agentgateway.md)` from two levels deep).
+- **Pre-requisites boilerplate** (use verbatim): *"This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana."* Reference labs `001`/`002` by bare backticked number in this sentence; reference all other labs with relative markdown links (`[Mock OpenAI Server lab](configure-mock-openai-server.md)`, `[001 — Install...](../../001-install-enterprise-agentgateway.md)` from two levels deep).
 - **Hard requirements** (architecture, sizing, version gates) go in bold-lead blockquotes right after Pre-requisites: `> **Node architecture (important):** ...`. Labs assume the version `001` installs, so skip version gates for features that version already ships. Add one only for a feature from the last release or two, which users on a slightly older install may lack. State it plainly (*"available in **v2026.9.3 and later**"*), and remove it once the gate is a few releases old.
 - **Lab Objectives**: always present, bulleted, verb-first, e.g. `- Create a route to OpenAI using an `EnterpriseAgentgatewayBackend` and `HTTPRoute``. Multi-part labs may use bold sub-labels: `- **Part A — Impersonation:** ...`.
 - **Step headings** (normative): for multi-step runbooks use `## Step N — Title` (em-dash; this is the dominant style; do **not** use `## Step N: Title`). Short labs skip numbering and use plain descriptive `##`/`###` Title Case headings. Use `---` horizontal rules between major sections in long labs.

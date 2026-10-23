@@ -5,7 +5,7 @@ In this lab, you'll route LLM requests by **prompt content** instead of by the m
 [Semantic Routing with Jev](configure-semantic-routing-jev.md) and [Semantic Routing with the OpenAI Decisions API](configure-semantic-routing-openai-decisions.md) solve the same problem with a classification question to a decision model instead of embedding similarity. The Jev lab [compares the three routers](configure-semantic-routing-jev.md#compare-the-three-routers).
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 - An OpenAI API key with access to three models of different price. This lab uses `gpt-5.4-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier. The same key also needs access to the embeddings API; the router uses `text-embedding-3-small` to classify prompts.
 - `helm` on your path. You install vSR from the upstream chart.
 
@@ -580,7 +580,7 @@ agw.ai.usage.cost.total=0.014040 ... model="gpt-5.6-terra" total_cost_usd="0.014
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash

@@ -1,7 +1,7 @@
 # OPA Authorization with Enterprise Agentgateway
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 You will also need:
 - An OpenAI API key stored as an environment variable (`$OPENAI_API_KEY`)

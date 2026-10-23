@@ -1,7 +1,7 @@
 # LLM Cost Management
 
 ## Pre-requisites
-- Complete the setup in `001` and `002` first. Cost Management runs on the Solo UI and OTEL collector that `002` installs.
+- Complete the setup in `001` first. Cost Management runs on the Solo UI and OTEL collector that `001` installs.
 - A valid OpenAI API key, exported as `OPENAI_API_KEY`.
 
 ## Lab Objectives
@@ -224,7 +224,7 @@ curl -s -o /dev/null -w "invalid: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai"
 
 Expected output: alice and bob both `HTTP 200`, the invalid key `HTTP 401`.
 
-The Cost Management dashboard in the Solo UI is enabled by the `ui.features.costManagement` Helm value, which `002` already sets. Set `ui.features.costManagementWrites: false` there if you want the dashboard read-only, with no budget or dimension edits from the UI.
+The Cost Management dashboard in the Solo UI is enabled by the `ui.features.costManagement` Helm value, which `001` already sets. Set `ui.features.costManagementWrites: false` there if you want the dashboard read-only, with no budget or dimension edits from the UI.
 
 ## Configure a model cost catalog
 

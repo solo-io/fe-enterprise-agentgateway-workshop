@@ -2,7 +2,7 @@
 
 ## Pre-requisites
 
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ### Keycloak requirements
 

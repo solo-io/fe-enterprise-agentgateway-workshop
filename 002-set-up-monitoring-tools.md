@@ -1,78 +1,13 @@
-# Set up UI and monitoring tools
-Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the box. In this lab, we’ll deploy the Solo UI (with its built-in OTEL collector) for tracing, and Grafana + Prometheus for metrics visualization.
+# Set up monitoring tools
+Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the box. Lab `001` installs the Solo UI for traces. In this lab, you deploy Grafana and Prometheus for metrics visualization.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`
 
 ## Lab Objectives
-- Deploy Solo UI with OTEL collector (for tracing)
 - Deploy metrics (Prometheus, Grafana)
 - Configure Prometheus to scrape Agentgateway
-
-## Deploy Solo UI
-
-The Solo UI ships as the `ui` subchart of the `enterprise-agentgateway` chart installed in `001`. It includes a built-in OpenTelemetry collector (`enterprise-agentgateway-ui-telemetry-collector`) that receives traces from Agentgateway and surfaces them in the UI, plus a ClickHouse database that stores them. The UI reads the license key from the Secret that `001` created.
-
-### Set required variables
-
-Use the same Enterprise Agentgateway version as lab `001`:
-```bash
-export ENTERPRISE_AGW_VERSION=v2026.10.1
-```
-
-### Enable the UI subchart
-
-Upgrade the `enterprise-agentgateway` release with the `ui` values. `--reuse-values` keeps the values you set in `001`:
-
-```bash
-helm upgrade -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
---version "$ENTERPRISE_AGW_VERSION" \
---reuse-values \
--f - <<EOF
-ui:
-  enabled: true
-  #--- imagePullSecrets and registry override for the UI images (UI backend, autoauth, OTEL collectors) ---
-  #global:
-  #  imagePullSecrets:
-  #  - name: my-registry-secret
-  #  imageRegistry: my-registry.example.com
-  service:
-    type: ClusterIP
-  features:
-    #--- Cost Management dashboard (budgets, spend by model/team) ---
-    costManagement: true
-    #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
-    costManagementWrites: true
-  traces:
-    verbose: true
-  clickhouse:
-    enabled: true
-    #--- Image override for ClickHouse (no registry key, embed registry in repository if needed) ---
-    #image:
-    #  repository: clickhouse/clickhouse-server
-    #  tag: ""
-EOF
-```
-
-> [!NOTE]
-> Later labs that re-run `helm upgrade` on `enterprise-agentgateway` pass `--reuse-values` so the `ui` values stay in place. If you run your own upgrade without it, include the `ui` block above or Helm removes the UI.
-
-Check that the Solo UI components are running:
-
-```bash
-kubectl rollout status deploy/enterprise-agentgateway-ui -n agentgateway-system --timeout=300s
-kubectl get pods -n agentgateway-system | awk 'NR==1 || /-ui|clickhouse/'
-```
-
-Expected Output:
-
-```
-NAME                                                              READY   STATUS    RESTARTS   AGE
-enterprise-agentgateway-clickhouse-shard0-0                       1/1     Running   0          60s
-enterprise-agentgateway-ui-d77d84fc4-md7n8                        2/2     Running   0          60s
-enterprise-agentgateway-ui-k8sobjects-collector-cc6948cbc-d6t95   1/1     Running   0          60s
-enterprise-agentgateway-ui-telemetry-collector-0                  1/1     Running   0          60s
-```
+- Install the AgentGateway Grafana dashboard
 
 ## Deploy metrics
 
@@ -201,17 +136,6 @@ grafana-prometheus-kube-state-metrics-7c6d5ff8f6-77hkl   1/1     Running   0    
 prometheus-grafana-prometheus-kube-pr-prometheus-0       2/2     Running   0          2m50s
 ```
 
-## Access Solo UI
-
-To access the Solo UI and view traces:
-
-1. Port-forward to the Solo UI service:
-```bash
-kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
-```
-
-2. Open your browser and navigate to `http://localhost:4000`
-
 ## Access Grafana
 
 To access Grafana and view the AgentGateway dashboard:
@@ -327,20 +251,7 @@ The dashboard is organized into the following metric categories:
 
 ![usage-tracking-by-org-v2-1.png](images/grafana-dashboard/usage-tracking-by-org-v2-1.png)
 
-## (Optional) Fine-Grained RBAC for the Solo UI
-
-The UI installs with coarse roles (Admin, Writer, Reader) that apply to every resource. To scope budgets, virtual keys, and HTTPRoutes per team with `EnterpriseAgentgatewayRBACPolicy`, see the [Solo UI Fine-Grained RBAC lab](labs/observability/solo-ui-fine-grained-rbac.md).
-
 ## Uninstall
-
-Remove the Solo UI:
-
-```bash
-helm upgrade -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
---version "$ENTERPRISE_AGW_VERSION" \
---reuse-values \
---set ui.enabled=false
-```
 
 Remove Grafana and Prometheus:
 

@@ -1,39 +1,11 @@
-lab: 002-set-up-ui-and-monitoring-tools.md
-description: Solo UI + OTEL collector, Prometheus, Grafana, AgentGateway dashboard
+lab: 002-set-up-monitoring-tools.md
+description: Prometheus, Grafana, AgentGateway dashboard
 tier: t0
-requires:
-  - SOLO_TRIAL_LICENSE_KEY
-timeout: 1500
+requires: []
+timeout: 1200
 
 # Run by `--install-base`, after 001. No `cleanup:` — this is baseline state.
 steps:
-  - section: "Set required variables"
-    run: all
-
-  # blocks: [1] helm upgrade enterprise-agentgateway with ui.enabled  [2] rollout status + get pods
-  - section: "Enable the UI subchart"
-    run: all
-    wait: "--for=condition=Available deploy/enterprise-agentgateway-ui -n agentgateway-system --timeout=900s"
-    assert:
-      - contains: "successfully rolled out"
-
-  # Later labs re-run `helm upgrade` with --reuse-values; this is the value they must carry.
-  - probe: "the enterprise-agentgateway release has the ui subchart enabled"
-    script: |
-      helm get values enterprise-agentgateway -n agentgateway-system -o json \
-        | jq -r '"ui_enabled=\(.ui.enabled) cost_management=\(.ui.features.costManagement)"'
-    assert:
-      - contains: "ui_enabled=true cost_management=true"
-
-  # With no modelCatalog source set, the UI must still show the built-in base catalog.
-  - probe: "the Gateway parameters carry no modelCatalog source"
-    script: |
-      echo "sources=$(kubectl get enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
-        -o jsonpath='{.spec.modelCatalog.sources}')"
-    assert:
-      - contains: "sources="
-      - not_contains: "model-cost-catalog"
-
   # blocks: [1] export GRAFANA_ADMIN_PASSWORD  [2] helm install kube-prometheus-stack  [3] PodMonitor
   # Block 1 is an optional illustrative export — running it would literally set the
   # admin password to "your-secure-password". Skipped so the documented default
@@ -47,26 +19,9 @@ steps:
     assert:
       - contains: "grafana-prometheus"
 
-  - section: "Access Solo UI"
-    run: none
-    reason: "`kubectl port-forward` in the foreground never returns; probed below"
-
   - section: "Access Grafana"
     run: none
     reason: "`kubectl port-forward` in the foreground never returns; probed below"
-
-  - probe: "Solo UI serves the app over its Service"
-    script: |
-      e2e_pf agentgateway-system svc/enterprise-agentgateway-ui 14000:80
-      echo "solo_ui=$(curl -s -o /dev/null -w '%{http_code}' localhost:14000)"
-      e2e_pf_stop
-    assert:
-      - contains: "solo_ui=200"
-
-  - resource: svc/enterprise-agentgateway-ui-telemetry-collector
-    jsonpath: ".spec.ports[?(@.port==4317)].port"
-    expect: "4317"
-    name: the OTEL collector that 001's tracing policy targets exists
 
   - probe: "Grafana is healthy and has loaded the AgentGateway dashboard"
     script: |

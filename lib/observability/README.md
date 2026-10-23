@@ -65,7 +65,7 @@ Seeding fills the **Dashboard** tab only. The **Budgets** tab reads live rate-li
 ## Used by
 
 - [`labs/observability/llm-cost-management.md`](../../labs/observability/llm-cost-management.md): `seed-cost-data.sh`
-- [`002-set-up-ui-and-monitoring-tools.md`](../../002-set-up-ui-and-monitoring-tools.md): the Grafana dashboard JSON
+- [`002-set-up-monitoring-tools.md`](../../002-set-up-monitoring-tools.md): the Grafana dashboard JSON
 
 ## Downstream copies of the dashboard JSON
 

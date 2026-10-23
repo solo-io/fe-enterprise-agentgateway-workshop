@@ -8,7 +8,7 @@ This is the side-by-side alternative to the [In-Place Rolling Upgrades](in-place
 
 ## Pre-requisites
 - [001 — Install Enterprise Agentgateway](../../001-install-enterprise-agentgateway.md)
-- [002 — Set Up UI and Monitoring Tools](../../002-set-up-ui-and-monitoring-tools.md)
+- [002 — Set Up Monitoring Tools](../../002-set-up-monitoring-tools.md)
 - [Configure Mock OpenAI Server](../routing/configure-mock-openai-server.md): provides the shared `mock-gpt-4o-svc` LLM backend reused by both colors
 - [In-Place Rolling Upgrades](in-place-rolling-upgrades.md): the in-place counterpart
 

@@ -5,7 +5,7 @@ Most "give the agent one useful tool" stories require data from several backends
 > Unlike [MCP Tool Federation](mcp-tool-federation.md), which routes each tool call to its owning backend (the client still makes N calls), Composable MCP fans one call out to distinct backends and merges the responses into a single result.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Declare a composite MCP tool that fans out to distinct backends
@@ -1071,9 +1071,9 @@ data: {"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"{\"ope
 
 ---
 
-## Observe it (optional, requires `002`)
+## Observe it (optional)
 
-From the caller's side, `account-brief` is one `tools/call`. Behind the gateway it's two upstream requests (the `account` step into `accounts-mcp`/`getAccount`, the `orders` step into `orders-api`), and both observability surfaces from `002` show that fan-out at different granularities.
+From the caller's side, `account-brief` is one `tools/call`. Behind the gateway it's two upstream requests (the `account` step into `accounts-mcp`/`getAccount`, the `orders` step into `orders-api`), and the access log and the Solo UI traces from `001` show that fan-out at different granularities.
 
 The access log records one line per client-facing request, tagged with the composite target's name rather than the individual steps behind it:
 

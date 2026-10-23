@@ -3,7 +3,7 @@
 In this lab, you put a policy server between agents and a procurement MCP server. Each caller sees only the tools it is entitled to, a purchase order above the caller's limit is denied with a message that approval is required, email can only go to approved domains, and bank account and tax ID values are masked before a tool result reaches the model.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 - `jq`, `openssl`, `base64`, and `bash` on your local machine (`openssl` and `base64` are used by the `lib/jwt/generate-jwt.sh` helper)
 - The MCP server and both policy servers run in your cluster, and `lib/jwt/generate-jwt.sh` signs tokens with a key it generates locally.
