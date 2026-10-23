@@ -1,5 +1,9 @@
 # Changelog
 
+0.15.1 - (10-23-26)
+---
+- `002`: add a `Next Steps` section
+
 0.15.0 - (10-23-26)
 ---
 - Bump Enterprise Agentgateway from `v2026.9.3` to `v2026.10.1`. Update the image list, the system requirements, the README and the `appVersion` of the three charts
