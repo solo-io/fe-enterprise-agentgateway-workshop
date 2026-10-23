@@ -88,7 +88,13 @@ done
 #   This machine has neither `timeout` nor `gtimeout`, and a lab that hangs on
 #   a port-forward would otherwise wedge the whole suite. Runs the child in its
 #   own process group so backgrounded port-forwards die with it.
+#
+#   That process group is not the terminal's foreground group, so Ctrl-C reaches
+#   only the runner. on_interrupt forwards it; otherwise the driver outlives the
+#   runner, keeps changing the cluster, and writes into the next run's work dir.
 # ---------------------------------------------------------------------------
+E2E_CHILD_PGID=""
+
 run_with_timeout() {
   local secs="$1"; shift
   local pid rc waited=0
@@ -96,6 +102,7 @@ run_with_timeout() {
   set -m
   "$@" & pid=$!
   set +m
+  E2E_CHILD_PGID="$pid"
 
   while kill -0 "$pid" 2>/dev/null; do
     if (( waited >= secs )); then
@@ -103,13 +110,33 @@ run_with_timeout() {
       sleep 2
       kill -KILL "-${pid}" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
       wait "$pid" 2>/dev/null
+      E2E_CHILD_PGID=""
       return 124
     fi
     sleep 1
     waited=$((waited + 1))
   done
   wait "$pid"; rc=$?
+  E2E_CHILD_PGID=""
   return "$rc"
+}
+
+# on_interrupt
+#   SIGTERM lets the driver's EXIT trap run the lab's Cleanup section. A driver
+#   still alive after 30s gets SIGKILL, so the runner never leaves one behind.
+on_interrupt() {
+  trap - INT TERM HUP
+  local pgid="$E2E_CHILD_PGID" i
+  if [[ -n "$pgid" ]] && kill -0 "-${pgid}" 2>/dev/null; then
+    printf "\n${YELLOW}Interrupted: stopping the running lab (pgid %s) and its cleanup${NC}\n" "$pgid" >&2
+    kill -TERM "-${pgid}" 2>/dev/null
+    for i in $(seq 1 30); do
+      kill -0 "-${pgid}" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL "-${pgid}" 2>/dev/null
+  fi
+  exit 130
 }
 
 # ---------------------------------------------------------------------------
@@ -363,6 +390,7 @@ acquire_run_lock() {
   date '+%Y-%m-%d %H:%M:%S' > "${lock}/started"
   printf '%s\n' "${ORIGINAL_ARGS[*]:-}" > "${lock}/args"
   trap 'release_run_lock' EXIT
+  trap 'on_interrupt' INT TERM HUP
 }
 
 release_run_lock() {

@@ -23,7 +23,7 @@
 - `seed-cost-data.sh`: write to `agentgateway.agw_spans_typed` on `enterprise-agentgateway-clickhouse-shard0-0`
 - `networking-architecture.md`: the telemetry collector runs in `agentgateway-system`, not `solo-ui`
 - e2e: the `001` base spec checks the Solo UI rollout, the `ui` values, the UI Service and the OTEL collector. The `002` base spec is renamed to `002-set-up-monitoring-tools.yaml` and covers Grafana and Prometheus only. Update the cost, RBAC and system-requirements specs for the `ui` subchart
-- `run-e2e.sh` runs `labdoc.py` with the first Python that can import PyYAML (`E2E_PYTHON` overrides it). Before, a `python3` without PyYAML ended the run with `E2E_SPEC_TIER: unbound variable`
+- `run-e2e.sh` updates
 
 0.14.9 - (10-16-26)
 ---
