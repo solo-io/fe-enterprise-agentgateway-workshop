@@ -11,7 +11,7 @@ In this workshop, you'll deploy Enterprise Agentgateway and complete hands-on la
 ## Lab Objectives
 - Configure Kubernetes Gateway API CRDs
 - Configure Enterprise Agentgateway CRDs
-- Install Enterprise Agentgateway Controller
+- Install Enterprise Agentgateway Controller and the Solo UI
 - Configure agentgateway
 - Validate that components are installed
 
@@ -50,7 +50,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.9.3
+export ENTERPRISE_AGW_VERSION=v2026.10.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -86,6 +86,7 @@ enterpriseagentgatewaybudgets           eagbud       enterpriseagentgateway.solo
 enterpriseagentgatewayexternalsecrets   eages        enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayExternalSecret
 enterpriseagentgatewayparameters        eagpar       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
 enterpriseagentgatewaypolicies          eagpol       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
+enterpriseagentgatewayrbacpolicies      eagrbacpol   enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayRBACPolicy
 authconfigs                             ac           extauth.solo.io/v1                        true         AuthConfig
 ratelimitconfigs                        rlc          ratelimit.solo.io/v1alpha1                true         RateLimitConfig
 ```
@@ -93,7 +94,9 @@ ratelimitconfigs                        rlc          ratelimit.solo.io/v1alpha1 
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> The top-level Helm `image.registry` is the global default registry for every chart-managed image: the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.9.3`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.7-alpine`). Mirror each image at the tag shown in the [Air-Gap Mirror Reference](../image-list.md#air-gap-mirror-reference-dockerioably7). The top-level Helm `imagePullSecrets` is the global default too, and it reaches the proxy and every extension. Add a per-CR pull-secret override only when one extension uses a different secret than the rest.
+> The top-level Helm `image.registry` is the global default registry for every chart-managed image: the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.10.1`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.7-alpine`). Mirror each image at the tag shown in the [Air-Gap Mirror Reference](../image-list.md#air-gap-mirror-reference-dockerioably7). The top-level Helm `imagePullSecrets` is the global default too, and it reaches the proxy and every extension. Add a per-CR pull-secret override only when one extension uses a different secret than the rest.
+
+The `enterprise-agentgateway` chart also installs the Solo UI through its `ui` subchart. The UI includes a built-in OpenTelemetry collector (`enterprise-agentgateway-ui-telemetry-collector`) that receives traces from Agentgateway. `ui.global.imageRegistry` keeps each image's repository path (for example `enterprise-agentgateway/solo-enterprise-ui-backend`), and a Docker Hub namespace holds only one path level. The `ui` values set `registry` and `repository` per image, so each image resolves to `docker.io/ably7/<name>`.
 
 Using Helm:
 ```bash
@@ -124,6 +127,38 @@ rateLimiter:
 extCache:
   image:
     repository: redis
+# --- Solo UI (ui subchart) ---
+# ui.global.imageRegistry keeps each image's repository path, and a Docker Hub
+# namespace holds only one path level, so set registry/repository per image.
+ui:
+  enabled: true
+  global:
+    imagePullPolicy: IfNotPresent
+    imagePullSecrets: []
+  service:
+    type: ClusterIP
+  features:
+    #--- Cost Management dashboard (budgets, spend by model/team) ---
+    costManagement: true
+    #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
+    costManagementWrites: true
+  traces:
+    verbose: true
+  backend:
+    registry: docker.io
+    repository: ably7
+  idp:
+    registry: docker.io
+    repository: ably7
+  telemetry:
+    image:
+      registry: docker.io
+      repository: ably7
+      name: opentelemetry-collector-contrib
+  clickhouse:
+    enabled: true
+    image:
+      repository: docker.io/ably7/clickhouse-server
 EOF
 ```
 
@@ -138,6 +173,15 @@ Expected Output:
 ```
 NAME                                       READY   STATUS    RESTARTS   AGE
 enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
+```
+
+### Check the Solo UI
+
+Check that the Solo UI components are running:
+
+```bash
+kubectl rollout status deploy/enterprise-agentgateway-ui -n agentgateway-system --timeout=300s
+kubectl get pods -n agentgateway-system | awk 'NR==1 || /-ui|clickhouse/'
 ```
 
 ## Deploy Agentgateway with customizations
@@ -339,7 +383,7 @@ EOF
 
 ## Configure tracing
 
-Apply an `EnterpriseAgentgatewayPolicy` to export traces to the telemetry collector deployed in `002`. Skip this step if you are not setting up the Solo UI.
+Apply an `EnterpriseAgentgatewayPolicy` to export traces to the Solo UI telemetry collector. Skip this step if you set `ui.enabled: false`.
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -356,7 +400,7 @@ spec:
   frontend:
     tracing:
       backendRef:
-        name: solo-enterprise-telemetry-collector
+        name: enterprise-agentgateway-ui-telemetry-collector
         namespace: agentgateway-system
         port: 4317
       protocol: GRPC
@@ -388,96 +432,11 @@ spec:
 EOF
 ```
 
-## Deploy Solo UI
-
-The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
-
-### Set required variables
-
-```bash
-export AGW_UI_VERSION=0.5.11
-```
-
-### Step 1: Install/upgrade CRDs
-
-```bash
-helm upgrade -i management-crds oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management-crds \
-  --namespace agentgateway-system \
-  --create-namespace \
-  --version "$AGW_UI_VERSION"
-```
-
-### Step 2: Install/upgrade the chart
-
-The `management-crds` subchart is bundled inside `management` and enabled by default. Since we installed it separately in Step 1, disable it here to avoid ownership conflicts:
-
-```bash
-helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
---namespace agentgateway-system \
---create-namespace \
---version "$AGW_UI_VERSION" \
--f - <<EOF
-management-crds:
-  enabled: false
-licensing:
-  licenseKey: "${SOLO_TRIAL_LICENSE_KEY}"
-global:
-  imagePullPolicy: IfNotPresent
-  imagePullSecrets: []
-  image:
-    registry: docker.io
-    repository: ably7
-    tag: ""
-service:
-  type: ClusterIP
-  clusterIP: ""
-products:
-  kagent:
-    enabled: false
-  agentgateway:
-    enabled: true
-    namespace: agentgateway-system
-    features:
-      #--- Cost Management dashboard (budgets, spend by model/team) ---
-      cost-management: true
-      #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
-      cost-management-writes: true
-  mesh:
-    enabled: false
-  agentregistry:
-    enabled: false
-idp:
-  registry: docker.io
-  repository: ably7
-  name: solo-enterprise-autoauth
-  tag: "v0.2.4"
-telemetry:
-  image:
-    registry: docker.io
-    repository: ably7
-    name: opentelemetry-collector-contrib
-    tag: "0.161.0"
-clickhouse:
-  enabled: true
-  image:
-    repository: docker.io/ably7/clickhouse-server
-    tag: "26.3.35-alpine"
-tracing:
-  verbose: true
-EOF
-```
-
-Check that the Solo UI components are running:
-
-```bash
-kubectl get pods -n agentgateway-system | awk 'NR==1 || /solo-enterprise|clickhouse/'
-```
-
 ## Access Solo UI
 
 1. Port-forward to the Solo UI service:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 2. Open your browser and navigate to `http://localhost:4000`
@@ -490,10 +449,10 @@ To tear everything down, work in reverse order. Delete the `Gateway` first so th
 kubectl delete enterpriseagentgatewaypolicy metrics access-logs tracing -n agentgateway-system --ignore-not-found
 kubectl delete gateway agentgateway-proxy -n agentgateway-system --ignore-not-found
 kubectl delete enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --ignore-not-found
-helm uninstall management -n agentgateway-system
-helm uninstall management-crds -n agentgateway-system
 helm uninstall enterprise-agentgateway -n agentgateway-system
 helm uninstall enterprise-agentgateway-crds -n agentgateway-system
+# The CRDs chart keeps the RBAC policy CRD on uninstall; delete it explicitly
+kubectl delete crd enterpriseagentgatewayrbacpolicies.enterpriseagentgateway.solo.io --ignore-not-found
 kubectl delete gatewayclass enterprise-agentgateway enterprise-agentgateway-waypoint --ignore-not-found
 kubectl delete namespace agentgateway-system
 # (Optional) Remove the Kubernetes Gateway API CRDs only if nothing else on the cluster uses them

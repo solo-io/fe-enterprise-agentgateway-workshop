@@ -1,7 +1,7 @@
 # Automate Claude Desktop Authentication with Microsoft Entra ID SSO
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 You will also need:
 - A Microsoft Entra ID tenant where you can register applications
@@ -283,7 +283,7 @@ Start a new conversation in Claude Desktop and note the **Gateway** indicator in
 
 Every prompt now flows through the gateway carrying your personal Entra ID token, which the gateway validates and swaps for the centrally-managed Anthropic credential. The app refreshes the token silently in the background; if your session is revoked or expires under your tenant's policy, Claude Desktop shows a **Sign in again** prompt instead of failing silently.
 
-For metrics, traces, and access logs on this traffic, use the observability tooling from the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md); the same dashboards and trace views shown in the [Claude Desktop lab](claude-desktop.md) apply unchanged.
+For metrics, traces, and access logs on this traffic, use the Solo UI from [lab 001](../../001-install-enterprise-agentgateway.md) and the Grafana dashboard from the [monitoring tools lab](../../002-set-up-monitoring-tools.md); the same dashboards and trace views shown in the [Claude Desktop lab](claude-desktop.md) apply unchanged.
 
 ## Deploy at Scale with MDM
 

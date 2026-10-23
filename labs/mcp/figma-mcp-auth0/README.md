@@ -264,6 +264,18 @@ controller:
             "${AUTH0_CLIENT_ID}": "${AUTH0_CLIENT_SECRET}"
           }
         },
+        "incoming_clients": {
+          "allowed_redirect_uris": [
+            "http://localhost/oauth/callback",
+            "http://localhost/oauth/callback/debug",
+            "http://127.0.0.1/oauth/callback",
+            "http://127.0.0.1/oauth/callback/debug",
+            "http://localhost/callback",
+            "http://127.0.0.1/",
+            "https://vscode.dev/redirect",
+            "https://insiders.vscode.dev/redirect"
+          ]
+        },
         "downstream_server": {
           "name": "auth0",
           "client_id": "${AUTH0_CLIENT_ID}",
@@ -282,6 +294,11 @@ kubectl rollout status -n agentgateway-system deployment/agentgateway-proxy --ti
 
 > All three validators (`subject`/`api`/`actor`) are required at boot even though only the
 > eager-OAuth issuer is used. Missing one → `error creating actor validator: unsupported validator type:`.
+
+> `incoming_clients.allowed_redirect_uris` lists the redirect URIs MCP clients may register: MCP Inspector
+> (`/oauth/callback` and `/oauth/callback/debug` on `localhost` or `127.0.0.1`), Claude Code (`/callback`),
+> and VS Code. HTTP loopback entries match any port. A client with an unlisted redirect URI fails at
+> `/oauth-issuer/register` with `invalid_redirect_uri`.
 
 ---
 
@@ -605,11 +622,13 @@ spec:
         namespaces: { from: All }
 EOF
 
-# Disable eager-OAuth (reuse-values keeps the license key)
-helm upgrade enterprise-agentgateway \
-  oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
-  --version $ENTERPRISE_AGW_VERSION -n agentgateway-system \
-  --reuse-values --set tokenExchange.enabled=false
+# Remove the eager-OAuth values; the exported values keep the license key and the UI
+helm get values enterprise-agentgateway -n agentgateway-system -o json \
+  | jq 'del(.tokenExchange, .controller.extraEnv)' \
+  | helm upgrade -n agentgateway-system enterprise-agentgateway \
+      oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+      --version $ENTERPRISE_AGW_VERSION \
+      --reset-values -f -
 kubectl rollout restart -n agentgateway-system deployment/enterprise-agentgateway
 
 rm -rf example_certs

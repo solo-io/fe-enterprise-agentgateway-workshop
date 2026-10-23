@@ -1,7 +1,7 @@
 # Configure Route to Remote MCP Server
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Route to an external MCP server using AgentGateway
@@ -194,7 +194,7 @@ You should see MCP-specific metrics like:
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash
@@ -221,7 +221,7 @@ To view distributed traces with MCP-specific spans:
 
 1. Port-forward to the Solo UI:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 2. Open http://localhost:4000 in your browser

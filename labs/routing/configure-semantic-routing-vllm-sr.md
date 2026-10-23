@@ -5,8 +5,8 @@ In this lab, you'll route LLM requests by **prompt content** instead of by the m
 [Semantic Routing with Jev](configure-semantic-routing-jev.md) and [Semantic Routing with the OpenAI Decisions API](configure-semantic-routing-openai-decisions.md) solve the same problem with a classification question to a decision model instead of embedding similarity. The Jev lab [compares the three routers](configure-semantic-routing-jev.md#compare-the-three-routers).
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
-- An OpenAI API key with access to three models of different price. This lab uses `gpt-5-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier. The same key also needs access to the embeddings API; the router uses `text-embedding-3-small` to classify prompts.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
+- An OpenAI API key with access to three models of different price. This lab uses `gpt-5.4-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier. The same key also needs access to the embeddings API; the router uses `text-embedding-3-small` to classify prompts.
 - `helm` on your path. You install vSR from the upstream chart.
 
 > **The router is a separate deployment.** Enterprise Agentgateway does not ship an embedding model or a classifier. It calls whichever router you deploy over ExtProc and honors the answer. vSR owns the model-selection policy. The gateway owns auth, routing, rate limits, and telemetry.
@@ -31,7 +31,7 @@ vLLM Semantic Router
     │  embeds the prompt via the OpenAI embeddings API
     │  IntelligentRoute: cosine similarity vs candidate phrases ≥ threshold?
     │  IntelligentPool:  which models is this client allowed to reach?
-    │  rewrites body model: auto_model → gpt-5-nano | gpt-5.6-luna | gpt-5.6-terra
+    │  rewrites body model: auto_model → gpt-5.4-nano | gpt-5.6-luna | gpt-5.6-terra
     ▼
 HTTPRoute /semantic  →  EnterpriseAgentgatewayBackend (openai-all-models)
     │  no model override, so the rewritten name passes straight through
@@ -113,15 +113,15 @@ config:
   version: v0.3
   providers:
     defaults:
-      model: gpt-5-nano
+      model: gpt-5.4-nano
       reasoning_effort: high
     # The router validates its default model before the Kubernetes reconciler
     # applies the IntelligentPool, so every name any pool can select is
     # declared here and in routing.modelCards. The gateway sends the request
     # to OpenAI; backend_refs names the provider so the router config is valid.
     models:
-      - name: gpt-5-nano
-        provider_model_id: gpt-5-nano
+      - name: gpt-5.4-nano
+        provider_model_id: gpt-5.4-nano
         api_format: openai
         backend_refs:
           - name: openai
@@ -164,7 +164,7 @@ config:
     # Each model the pool can select needs a model card. These entries also
     # replace the chart's placeholder model.
     modelCards:
-      - name: gpt-5-nano
+      - name: gpt-5.4-nano
       - name: gpt-5.6-luna
       - name: gpt-5.6-terra
     # Signals and decisions come from the IntelligentRoute. The empty domains
@@ -238,9 +238,9 @@ metadata:
 spec:
   # Every request that matches no decision gets this model, so a prompt that
   # fails to escalate falls back to the cheapest model instead of erroring.
-  defaultModel: gpt-5-nano
+  defaultModel: gpt-5.4-nano
   models:
-    - name: gpt-5-nano
+    - name: gpt-5.4-nano
     - name: gpt-5.6-luna
     - name: gpt-5.6-terra
 ---
@@ -376,11 +376,11 @@ echo $GATEWAY_IP
 
 curl -s "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-5-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
+  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
 ```
 
 ```
-"gpt-5-nano-2025-08-07"
+"gpt-5.4-nano-2026-03-17"
 ```
 
 ## Call the router from the gateway
@@ -449,7 +449,7 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 ```
 
 ```
-"gpt-5-nano-2025-08-07"
+"gpt-5.4-nano-2026-03-17"
 ```
 
 A routine coding task matches the `moderate` signal and reaches the mid tier:
@@ -487,7 +487,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=semantic-router --
 ```
 
 ```json
-{"selected_model":"gpt-5-nano","decision":"","reasoning_effort":"","routing_latency_ms":272}
+{"selected_model":"gpt-5.4-nano","decision":"","reasoning_effort":"","routing_latency_ms":272}
 {"selected_model":"gpt-5.6-luna","decision":"route-moderate-prompts","reasoning_effort":"high","routing_latency_ms":202}
 {"selected_model":"gpt-5.6-terra","decision":"escalate-hard-prompts","reasoning_effort":"high","routing_latency_ms":206}
 ```
@@ -523,13 +523,13 @@ kubectl logs -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=ag
 ```
 
 ```
-gpt-5-nano 0.196427209s
+gpt-5.4-nano 0.196427209s
 gpt-5.6-luna 0.288807792s
 gpt-5.6-terra 0.332621500s
-gpt-5-nano 0.000967500s
+gpt-5.4-nano 0.000967500s
 ```
 
-The `auto_model` requests spent about 190ms in vSR at the median and 235ms at the 90th percentile, nearly all of it the OpenAI embeddings call. An occasional request takes closer to 400ms. The request that named `gpt-5-nano` directly spent about 1ms. The first `auto_model` request after the router starts can take up to a second. vSR embeds only the prompt for each request, so a decision costs about as many tokens as the prompt itself, at the `text-embedding-3-small` rate of $0.02 per million tokens.
+The `auto_model` requests spent about 190ms in vSR at the median and 235ms at the 90th percentile, nearly all of it the OpenAI embeddings call. An occasional request takes closer to 400ms. The request that named `gpt-5.4-nano` directly spent about 1ms. The first `auto_model` request after the router starts can take up to a second. vSR embeds only the prompt for each request, so a decision costs about as many tokens as the prompt itself, at the `text-embedding-3-small` rate of $0.02 per million tokens.
 
 ### View Metrics Endpoint
 
@@ -550,7 +550,7 @@ done | sort -u
 ```
 
 ```
-gen_ai_request_model="gpt-5-nano",gen_ai_response_model="gpt-5-nano-2025-08-07"
+gen_ai_request_model="gpt-5.4-nano",gen_ai_response_model="gpt-5.4-nano-2026-03-17"
 gen_ai_request_model="gpt-5.6-luna",gen_ai_response_model="gpt-5.6-luna"
 gen_ai_request_model="gpt-5.6-terra",gen_ai_response_model="gpt-5.6-terra"
 ```
@@ -580,7 +580,7 @@ agw.ai.usage.cost.total=0.014040 ... model="gpt-5.6-terra" total_cost_usd="0.014
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash

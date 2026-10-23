@@ -4,7 +4,7 @@ In this lab, you'll route Claude Code through the gateway to Anthropic and authe
 
 ## Pre-requisites
 
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 - `$ANTHROPIC_API_KEY` set in your shell, the key the **gateway** will hold on behalf of your developers
 - [Claude Code](https://code.claude.com/docs) installed and working
@@ -732,7 +732,7 @@ Open http://localhost:3000 and navigate to **Dashboards > AgentGateway Dashboard
 Port-forward the Solo UI:
 
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 Open http://localhost:4000 and click **Tracing** in the left navigation.

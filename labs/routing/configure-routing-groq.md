@@ -3,7 +3,7 @@
 In this lab, you'll route to [Groq](https://console.groq.com/), an OpenAI-compatible inference provider, using the `openai` provider with a host override.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 - A Groq API key from [console.groq.com/keys](https://console.groq.com/keys) (the free tier is enough for this lab)
 
 ## Lab Objectives
@@ -147,7 +147,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash
@@ -176,7 +176,7 @@ To view distributed traces with LLM-specific spans:
 
 1. Port-forward to the Solo UI:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 2. Open http://localhost:4000 in your browser

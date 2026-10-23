@@ -11,7 +11,7 @@ The chart operates a small catalog of named aliases, and this lab uses two of th
 
 ## Pre-requisites
 
-This lab assumes you have completed the setup in [001](../../001-install-enterprise-agentgateway.md). [002](../../002-set-up-ui-and-monitoring-tools.md) is optional but recommended if you want to observe metrics and traces.
+This lab assumes you have completed the setup in [001](../../001-install-enterprise-agentgateway.md). [002](../../002-set-up-monitoring-tools.md) is optional but recommended if you want to observe metrics in Grafana.
 
 - **Helm 3** installed.
 - Run every command **from the workshop root** (the directory that contains `charts/`). Chart paths below are repo-root-relative.
@@ -489,7 +489,7 @@ modelCatalog:
     apiPath: /v1/chat/completions
   - alias: chat-real
     provider: openai
-    model: gpt-4.1-nano
+    model: gpt-5.4-mini
     auth:
       secretRef: openai-secret
 grants:
@@ -535,12 +535,12 @@ curl -s "http://${GATEWAY_IP}:8080/llm/chat-real" \
 Expected output:
 
 ```
-gpt-4.1-nano
+gpt-5.4-mini-2026-03-17
 ```
 
-(OpenAI may return a dated variant of this model name; either confirms the swap took effect.)
+OpenAI returns the dated snapshot ID for `gpt-5.4-mini`.
 
-Team alpha's request body still says `gpt-5.4-nano`, byte for byte the string it sent in Step 2, and the answer came back from `gpt-4.1-nano`. The `EnterpriseAgentgatewayBackend`'s pinned model wins: the gateway never consults the request body's `model` field for routing, so the platform can move an alias to a different model or provider while a team's request stays as it was. Swapping the *provider* takes the same one-line edit (`provider: anthropic` plus a different platform-held `secretRef`); this lab swaps the model because a second provider credential is more than most readers have on hand.
+Team alpha's request body still says `gpt-5.4-nano`, byte for byte the string it sent in Step 2, and the answer came back from `gpt-5.4-mini`. The `EnterpriseAgentgatewayBackend`'s pinned model wins: the gateway never consults the request body's `model` field for routing, so the platform can move an alias to a different model or provider while a team's request stays as it was. Swapping the *provider* takes the same one-line edit (`provider: anthropic` plus a different platform-held `secretRef`); this lab swaps the model because a second provider credential is more than most readers have on hand.
 
 ---
 
@@ -567,7 +567,7 @@ modelCatalog:
     apiPath: /v1/chat/completions
   - alias: chat-real
     provider: openai
-    model: gpt-4.1-nano
+    model: gpt-5.4-mini
     auth:
       secretRef: openai-secret
 grants:
@@ -747,7 +747,7 @@ Each LLM request shows its route, status, token usage, and whether the response 
 ...gateway=agentgateway-system/agw-llm-ops route=agentgateway-system/llm-chat-mock ... http.status=429 protocol=llm reason=DirectResponse
 ```
 
-The access log carries no per-team field: it shows route, status, and token counts, but not which key made the call. A `429` from the budget limiter logs as `reason=DirectResponse` with no per-team detail. Per-team accounting lives in the rate limiter instead: each team gets its own `llm-budget-<team>` `RateLimitConfig`, tracked and capped on its own, and each alias route carries one `EnterpriseAgentgatewayPolicy` listing the budgets of the teams that release granted that alias. You can trace a `429` on an alias back to a team's usage that way, even though the log line does not name the team. For dashboards and traces on top of this, use the Grafana stack from `002`.
+The access log carries no per-team field: it shows route, status, and token counts, but not which key made the call. A `429` from the budget limiter logs as `reason=DirectResponse` with no per-team detail. Per-team accounting lives in the rate limiter instead: each team gets its own `llm-budget-<team>` `RateLimitConfig`, tracked and capped on its own, and each alias route carries one `EnterpriseAgentgatewayPolicy` listing the budgets of the teams that release granted that alias. You can trace a `429` on an alias back to a team's usage that way, even though the log line does not name the team. For dashboards on top of this, use the Grafana stack from `002`. For traces, use the Solo UI from `001`.
 
 ---
 

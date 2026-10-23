@@ -1,9 +1,9 @@
 lab: 001-install-enterprise-agentgateway.md
-description: Gateway API CRDs, Enterprise CRDs, controller, proxy Gateway, policies
+description: Gateway API CRDs, Enterprise CRDs, controller + Solo UI, proxy Gateway, policies
 tier: t0
 requires:
   - SOLO_TRIAL_LICENSE_KEY
-timeout: 1200
+timeout: 1800
 
 # Run by `--install-base`. There is deliberately no `cleanup:` — this lab IS the
 # baseline every other lab depends on, so its Uninstall section is never run.
@@ -32,8 +32,8 @@ steps:
       - contains: "ratelimitconfigs"
       - contains: "authconfigs"
 
-  # blocks: [1] helm install  [2] get pods. `helm upgrade -i` returns before the
-  # ReplicaSet creates the pod, so block 2 can print "No resources found".
+  # blocks: [1] helm install (controller + ui subchart)  [2] get pods. `helm upgrade -i`
+  # returns before the ReplicaSet creates the pod, so block 2 can print "No resources found".
   - section: "Install Enterprise Agentgateway Controller"
     run: all
     retry:
@@ -43,6 +43,21 @@ steps:
     wait: "--for=condition=Available deploy/enterprise-agentgateway -n agentgateway-system --timeout=600s"
     assert:
       - matches: 'enterprise-agentgateway-[a-z0-9]+-[a-z0-9]+'
+
+  # blocks: [1] rollout status + get pods
+  - section: "Check the Solo UI"
+    run: all
+    wait: "--for=condition=Available deploy/enterprise-agentgateway-ui -n agentgateway-system --timeout=900s"
+    assert:
+      - contains: "successfully rolled out"
+
+  # Later labs re-run `helm upgrade` with --reuse-values; this is the value they must carry.
+  - probe: "the enterprise-agentgateway release has the ui subchart enabled"
+    script: |
+      helm get values enterprise-agentgateway -n agentgateway-system -o json \
+        | jq -r '"ui_enabled=\(.ui.enabled) cost_management=\(.ui.features.costManagement)"'
+    assert:
+      - contains: "ui_enabled=true cost_management=true"
 
   - section: "Deploy Agentgateway with customizations"
     run: all
@@ -90,6 +105,32 @@ steps:
       - contains: "access-logs"
       - contains: "tracing"
       - not_contains: "False"
+
+  # With no modelCatalog source set, the UI must still show the built-in base catalog.
+  - probe: "the Gateway parameters carry no modelCatalog source"
+    script: |
+      echo "sources=$(kubectl get enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
+        -o jsonpath='{.spec.modelCatalog.sources}')"
+    assert:
+      - contains: "sources="
+      - not_contains: "model-cost-catalog"
+
+  - section: "Access Solo UI"
+    run: none
+    reason: "`kubectl port-forward` in the foreground never returns; probed below"
+
+  - probe: "Solo UI serves the app over its Service"
+    script: |
+      e2e_pf agentgateway-system svc/enterprise-agentgateway-ui 14000:80
+      echo "solo_ui=$(curl -s -o /dev/null -w '%{http_code}' localhost:14000)"
+      e2e_pf_stop
+    assert:
+      - contains: "solo_ui=200"
+
+  - resource: svc/enterprise-agentgateway-ui-telemetry-collector
+    jsonpath: ".spec.ports[?(@.port==4317)].port"
+    expect: "4317"
+    name: the OTEL collector that the tracing policy targets exists
 
   - section: "Uninstall"
     run: none

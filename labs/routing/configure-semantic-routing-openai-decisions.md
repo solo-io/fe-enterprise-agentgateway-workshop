@@ -12,8 +12,8 @@ The Decisions API is a decision model: it returns a choice from options you defi
 [Semantic Routing with vLLM Semantic Router](configure-semantic-routing-vllm-sr.md) solves the same problem with embedding similarity, and [Semantic Routing with Jev](configure-semantic-routing-jev.md) solves it with Jev. This lab keeps the same client contract, route, and tiers as both, so you can compare the three.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
-- An OpenAI API key with access to the Decisions API and to three models of different price. This lab uses `gpt-5-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier. The classifier model, `gpt-6-luna`, is separate from the tier models.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
+- An OpenAI API key with access to the Decisions API and to three models of different price. This lab uses `gpt-5.4-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier. The classifier model, `gpt-6-luna`, is separate from the tier models.
 - Egress from the cluster to `pypi.org`. The adapter pod installs its two Python packages at startup.
 
 > **The prompt goes to OpenAI twice.** The adapter sends the user's prompt to the Decisions API to classify it, then the gateway forwards the same prompt to OpenAI for the completion. Both calls go to the same provider under the same data terms. Zero Data Retention and HIPAA eligibility apply to the Decisions API for eligible OpenAI accounts.
@@ -40,7 +40,7 @@ decisions-extproc adapter
     │  POST https://api.openai.com/v1/decisions  (model: gpt-6-luna)
     │  one choice question: economy | mid | high, with probabilities and confidence
     │  confidence or margin below threshold?  → fallback tier
-    │  rewrites body model: auto_model → gpt-5-nano | gpt-5.6-luna | gpt-5.6-terra
+    │  rewrites body model: auto_model → gpt-5.4-nano | gpt-5.6-luna | gpt-5.6-terra
     ▼
 HTTPRoute /semantic  →  EnterpriseAgentgatewayBackend (openai-all-models)
     │  no model override, so the rewritten name passes straight through
@@ -120,7 +120,7 @@ data:
       "minMargin": 0.2,
       "fallbackTier": "mid",
       "tiers": {
-        "economy": "gpt-5-nano",
+        "economy": "gpt-5.4-nano",
         "mid": "gpt-5.6-luna",
         "high": "gpt-5.6-terra"
       },
@@ -473,7 +473,7 @@ kubectl logs -n agentgateway-system deploy/decisions-extproc -c adapter --tail=1
 ```
 
 ```json
-{"event": "started", "port": 50051, "tiers": {"economy": "gpt-5-nano", "mid": "gpt-5.6-luna", "high": "gpt-5.6-terra"}}
+{"event": "started", "port": 50051, "tiers": {"economy": "gpt-5.4-nano", "mid": "gpt-5.6-luna", "high": "gpt-5.6-terra"}}
 ```
 
 ## Create the OpenAI backend and route
@@ -527,11 +527,11 @@ echo $GATEWAY_IP
 
 curl -s "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-5-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
+  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
 ```
 
 ```
-"gpt-5-nano-2025-08-07"
+"gpt-5.4-nano-2026-03-17"
 ```
 
 ## Call the adapter from the gateway
@@ -622,7 +622,7 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 ```
 
 ```
-"gpt-5-nano-2025-08-07"
+"gpt-5.4-nano-2026-03-17"
 ```
 
 A routine coding task goes to the mid tier:
@@ -671,13 +671,13 @@ kubectl logs -n agentgateway-system deploy/decisions-extproc -c adapter --tail=4
 ```
 
 ```json
-{"selected_model":"gpt-5-nano","decisions_choice":"economy","reason":"classified","confidence":1.0,"margin":1.0,"probabilities":{"economy":1.0,"mid":0.0,"high":0.0},"decisions_latency_ms":209}
+{"selected_model":"gpt-5.4-nano","decisions_choice":"economy","reason":"classified","confidence":1.0,"margin":1.0,"probabilities":{"economy":1.0,"mid":0.0,"high":0.0},"decisions_latency_ms":209}
 {"selected_model":"gpt-5.6-luna","decisions_choice":"mid","reason":"classified","confidence":0.97,"margin":0.96,"probabilities":{"economy":0.02,"mid":0.98,"high":0.0},"decisions_latency_ms":139}
 {"selected_model":"gpt-5.6-terra","decisions_choice":"high","reason":"classified","confidence":0.76,"margin":0.69,"probabilities":{"economy":0.15,"mid":0.01,"high":0.84},"decisions_latency_ms":94}
 {"selected_model":"gpt-5.6-luna","decisions_choice":"economy","reason":"low_confidence","confidence":0.42,"margin":0.22,"probabilities":{"economy":0.61,"mid":0.39,"high":0.0},"decisions_latency_ms":216}
 ```
 
-The last line is the regex prompt. The Decisions API picked `economy` with a confidence of 0.42, below the `minConfidence` of 0.5, so the adapter recorded `reason=low_confidence` and served the fallback tier. The margin of 0.22 alone would have passed the gate. If you set `fallbackTier` to `economy`, the same prompt would be served by `gpt-5-nano`.
+The last line is the regex prompt. The Decisions API picked `economy` with a confidence of 0.42, below the `minConfidence` of 0.5, so the adapter recorded `reason=low_confidence` and served the fallback tier. The margin of 0.22 alone would have passed the gate. If you set `fallbackTier` to `economy`, the same prompt would be served by `gpt-5.4-nano`.
 
 ### Requests that name a real model
 
@@ -686,11 +686,11 @@ A request that names a real model skips classification. This proof request would
 ```bash
 curl -s "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-5-nano","messages":[{"role":"user","content":"Prove that sqrt(2) is irrational."}]}' | jq '.model'
+  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Prove that sqrt(2) is irrational."}]}' | jq '.model'
 ```
 
 ```
-"gpt-5-nano-2025-08-07"
+"gpt-5.4-nano-2026-03-17"
 ```
 
 > **Clients can still name a premium model.** This lab makes `auto_model` the cheap default without taking choice away from clients. To require routing for every request, reject other model names on this route.
@@ -744,7 +744,7 @@ curl -s -o /dev/null -w 'auto_model: %{http_code}\n' "$GATEWAY_IP:8080/semantic"
   -d '{"model":"auto_model","messages":[{"role":"user","content":"say hi"}]}'
 curl -s -o /dev/null -w 'named model: %{http_code}\n' "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-5-nano","messages":[{"role":"user","content":"say hi"}]}'
+  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}'
 curl -s -o /dev/null -w 'other path: %{http_code}\n' "$GATEWAY_IP:8080/other"
 ```
 
@@ -754,7 +754,7 @@ named model: 200
 other path: 404
 ```
 
-The `auto_model` request fails closed with `reason=ExtProc` in the access log. With the default condition, the request that names `gpt-5-nano` skips the adapter and OpenAI answers it. `/other` returns the gateway's normal `404` for an unmatched path. With the path-only condition, the named-model request would also return `500`.
+The `auto_model` request fails closed with `reason=ExtProc` in the access log. With the default condition, the request that names `gpt-5.4-nano` skips the adapter and OpenAI answers it. `/other` returns the gateway's normal `404` for an unmatched path. With the path-only condition, the named-model request would also return `500`.
 
 Restore the key and the adapter:
 
@@ -779,15 +779,15 @@ kubectl logs -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=ag
 ```
 
 ```
-gpt-5-nano 0.002096181s
-gpt-5-nano 0.213251659s
+gpt-5.4-nano 0.002096181s
+gpt-5.4-nano 0.213251659s
 gpt-5.6-luna 0.14109197s
 gpt-5.6-terra 0.096132777s
 gpt-5.6-luna 0.218115836s
-gpt-5-nano 0.000210107s
+gpt-5.4-nano 0.000210107s
 ```
 
-The first and last lines are the requests that named `gpt-5-nano` directly. They skipped the adapter and spent a few milliseconds or less in request policies. Across 120 `auto_model` requests, the adapter added about 100ms at the median and 150ms at the 90th percentile, nearly all of it the Decisions API call. An occasional request takes 250 to 350ms. The adapter keeps its connections to OpenAI open between requests, so only the first call after the adapter starts pays for the TLS handshake, which adds about 50ms. The Decisions API charges for input tokens only. With this profile, a decision costs about 245 input tokens, roughly $0.000025 at the [published rate](https://developers.openai.com/api/docs/guides/decisions).
+The first and last lines are the requests that named `gpt-5.4-nano` directly. They skipped the adapter and spent a few milliseconds or less in request policies. Across 120 `auto_model` requests, the adapter added about 100ms at the median and 150ms at the 90th percentile, nearly all of it the Decisions API call. An occasional request takes 250 to 350ms. The adapter keeps its connections to OpenAI open between requests, so only the first call after the adapter starts pays for the TLS handshake, which adds about 50ms. The Decisions API charges for input tokens only. With this profile, a decision costs about 245 input tokens, roughly $0.000025 at the [published rate](https://developers.openai.com/api/docs/guides/decisions).
 
 #### Compare the three routers
 
@@ -823,7 +823,7 @@ done | sort -u
 ```
 
 ```
-gen_ai_request_model="gpt-5-nano",gen_ai_response_model="gpt-5-nano-2025-08-07"
+gen_ai_request_model="gpt-5.4-nano",gen_ai_response_model="gpt-5.4-nano-2026-03-17"
 gen_ai_request_model="gpt-5.6-luna",gen_ai_response_model="gpt-5.6-luna"
 gen_ai_request_model="gpt-5.6-terra",gen_ai_response_model="gpt-5.6-terra"
 ```
@@ -838,7 +838,7 @@ sum by (gen_ai_request_model) (increase(agentgateway_gen_ai_client_token_usage_s
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash

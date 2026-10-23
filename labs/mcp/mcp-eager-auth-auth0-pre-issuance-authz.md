@@ -2,7 +2,7 @@
 
 ## Pre-requisites
 
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 This lab uses the same gateway hostname (`mcp-auth0.try-solo.io`) as [`mcp-eager-auth-auth0.md`](mcp-eager-auth-auth0.md). The two labs cannot run concurrently: clean up the other lab before starting this one. The Okta labs use `mcp-okta.try-solo.io` and do not collide.
 
@@ -212,6 +212,11 @@ metadata:
   namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
+  infrastructure:
+    parametersRef:
+      group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayParameters
+      name: agentgateway-config
   listeners:
     - name: http
       port: 8080
@@ -396,6 +401,7 @@ Re-run `helm upgrade` to enable the eager-OAuth feature in the controller, point
 helm upgrade -i -n agentgateway-system enterprise-agentgateway \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --version $ENTERPRISE_AGW_VERSION \
+  --reuse-values \
   --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
   -f -<<EOF
 
@@ -430,6 +436,18 @@ controller:
             "${AUTH0_CLIENT_ID}": "${AUTH0_CLIENT_SECRET}"
           }
         },
+        "incoming_clients": {
+          "allowed_redirect_uris": [
+            "http://localhost/oauth/callback",
+            "http://localhost/oauth/callback/debug",
+            "http://127.0.0.1/oauth/callback",
+            "http://127.0.0.1/oauth/callback/debug",
+            "http://localhost/callback",
+            "http://127.0.0.1/",
+            "https://vscode.dev/redirect",
+            "https://insiders.vscode.dev/redirect"
+          ]
+        },
         "downstream_server": {
           "name": "auth0",
           "client_id": "${AUTH0_CLIENT_ID}",
@@ -461,6 +479,7 @@ What each setting does:
 | `tokenExchange.database.postgres.url` | Postgres connection string from Step 3; omit for SQLite in-memory |
 | `gateway_config.base_url` | Public URL clients use to reach the gateway's AS endpoints (must include `/oauth-issuer`) |
 | `client_config.clients` | Pre-registered `client_id`/`client_secret` table; `/oauth-issuer/register` returns one of these |
+| `incoming_clients.allowed_redirect_uris` | The redirect URIs MCP clients may register and use: MCP Inspector (`/oauth/callback` and `/oauth/callback/debug`, on `localhost` or `127.0.0.1` depending on the Inspector version), Claude Code (`/callback`), and VS Code (its loopback redirect plus the `vscode.dev` relays). HTTP loopback entries match any port. A client whose redirect URI is not listed fails at `/oauth-issuer/register` with `invalid_redirect_uri`. Without this list, the issuer accepts any redirect URI for the configured client ID |
 | `downstream_server` | Credentials and URLs for the gateway to talk to Auth0 during the authorization code flow; `redirect_uri` must match an entry in the Auth0 app's "Allowed Callback URLs" |
 | `downstream_server.scopes` includes `offline_access` | Tells Auth0 to also issue a `refresh_token` alongside the access token, so the OAuth flow can be redeemed for a fresh access token later without a repeat browser login (tested in Step 10). Requires "Allow Offline Access" enabled on the Auth0 API; see the Auth0 requirements section. |
 | `pre_issuance.enabled: true` | Turns the pre-issuance hook on. When `false` (or absent), the controller skips the gRPC Check entirely. |
@@ -1141,6 +1160,11 @@ metadata:
   namespace: agentgateway-system
 spec:
   gatewayClassName: enterprise-agentgateway
+  infrastructure:
+    parametersRef:
+      group: enterpriseagentgateway.solo.io
+      kind: EnterpriseAgentgatewayParameters
+      name: agentgateway-config
   listeners:
     - name: http
       port: 8080
@@ -1150,15 +1174,17 @@ spec:
           from: All
 EOF
 
-# 4. Re-run Lab 001's helm upgrade to drop tokenExchange + KGW_OAUTH_ISSUER_CONFIG
+# 4. Remove tokenExchange and KGW_OAUTH_ISSUER_CONFIG from the Helm release.
 #    (including the pre_issuance block). This restarts the controller and
 #    clears its stale postgres connection.
 #    Re-detect ENTERPRISE_AGW_VERSION in case this cleanup runs in a fresh shell.
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
-helm upgrade -i -n agentgateway-system enterprise-agentgateway \
-  oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
-  --version $ENTERPRISE_AGW_VERSION \
-  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
+helm get values enterprise-agentgateway -n agentgateway-system -o json \
+  | jq 'del(.tokenExchange, .controller.extraEnv)' \
+  | helm upgrade -n agentgateway-system enterprise-agentgateway \
+      oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+      --version $ENTERPRISE_AGW_VERSION \
+      --reset-values -f -
 
 kubectl rollout status -n agentgateway-system deployment/enterprise-agentgateway --timeout=180s
 

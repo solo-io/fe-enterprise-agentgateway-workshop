@@ -1,7 +1,7 @@
 # MCP Tool Rate Limiting
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Deploy the `mcp-server-everything` reference MCP server
@@ -258,8 +258,6 @@ rate limit exceeded (retry after 60s; limit 3, remaining 0)
 ```
 
 The gateway answers a rate-limited `tools/call` itself, and the request never reaches the MCP server. The response is HTTP `200` with a JSON-RPC result that sets `isError: true`, so the client hands it to the model as a failed tool call, and the model can read the retry time. The `retry-after` and `x-ratelimit-*` response headers carry the same limit and reset values. Dashboards and alerts that count HTTP 429 responses miss these denials, because the status is `200`.
-
-> **Note:** On Enterprise Agentgateway `v2026.8.x` and earlier, the gateway rejects a rate-limited `tools/call` with HTTP `429 Too Many Requests` and the same `retry-after` and `x-ratelimit-*` headers. The MCP Inspector shows that as a transport error: `MCP error -32001: Streamable HTTP error: Error POSTing to endpoint`.
 
 ### Verify independent counters with a standard tool
 

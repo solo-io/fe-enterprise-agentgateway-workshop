@@ -30,7 +30,7 @@ Arrows in the diagram point away from the side that opens the connection. This t
 | 9 | `agentgateway-proxy` | `api.openai.com` | 443 | TLS | LLM provider backend (`/openai` route) |
 | 10 | `agentgateway-proxy` | `search.solo.io` | 443 | TLS | Remote MCP server, StreamableHTTP (`/mcp` route) |
 | 11 | `agentgateway-proxy` | `internal-mcp-tool.mcp` | 80 | StreamableHTTP | In-cluster MCP server backend (optional, when deployed) |
-| 12 | `agentgateway-proxy` | `solo-enterprise-telemetry-collector.solo-ui` | 4317 | gRPC (OTLP) | Trace export (configured by the `tracing` policy) |
+| 12 | `agentgateway-proxy` | `enterprise-agentgateway-ui-telemetry-collector.agentgateway-system` | 4317 | gRPC (OTLP) | Trace export (configured by the `tracing` policy) |
 | 13 | Telemetry collector | ClickHouse | 9000 | TCP | Trace and log storage |
 | 14 | Solo UI | ClickHouse | 9000 | TCP | Reads traces and logs for display |
 
@@ -46,4 +46,4 @@ Clients reach a proxy through its Gateway's LoadBalancer on the port defined by 
 
 ### Telemetry flow
 
-Three telemetry paths run concurrently with traffic. The `tracing` policy has the proxy export OTLP spans over gRPC to the telemetry collector in `solo-ui`, which writes them to ClickHouse; the Solo UI reads ClickHouse to display traces. Prometheus-compatible metrics endpoints are exposed for a bring-your-own monitoring stack (e.g. Datadog, Dynatrace): the proxy on 15020, the controller on 9092, and the extension services on 9091. Access logs go to the proxy's stdout (configured by the `access-logs` policy) and are readable with `kubectl logs`.
+Three telemetry paths run concurrently with traffic. The `tracing` policy has the proxy export OTLP spans over gRPC to the telemetry collector in `agentgateway-system`, which writes them to ClickHouse; the Solo UI reads ClickHouse to display traces. Prometheus-compatible metrics endpoints are exposed for a bring-your-own monitoring stack (e.g. Datadog, Dynatrace): the proxy on 15020, the controller on 9092, and the extension services on 9091. Access logs go to the proxy's stdout (configured by the `access-logs` policy) and are readable with `kubectl logs`.

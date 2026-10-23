@@ -3,7 +3,7 @@
 In this lab, you'll proxy OpenAI's Audio API through AgentGateway to generate speech from text and transcribe audio back to text. This demonstrates AgentGateway's ability to handle audio payloads using the `Passthrough` route type.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Configure an AgentGateway backend with Passthrough routes for OpenAI Audio endpoints
@@ -215,7 +215,7 @@ For Passthrough requests, you'll see:
 
 ### View Metrics in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash

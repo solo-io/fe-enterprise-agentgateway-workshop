@@ -1,7 +1,7 @@
 # Advanced Guardrails Webhook Endpoint
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Deploy an LLM-powered guardrail webhook that uses OpenAI to semantically classify content
@@ -913,7 +913,7 @@ Masked prompts and completions are text rather than metrics, so no dashboard pan
 
 ### View traces
 
-Port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80`, open http://localhost:4000, and click **Tracing** in the left navigation. Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, and `gen_ai.usage.output_tokens`, plus per-request cost under `agw.ai.usage.cost`. Spans also carry message content: the first user message as `llm.prompt.user` and the response text as `llm.completion.output`. The access logs record tokens and cost but no message text, because `001` ships the `llm_prompt` and `llm_completion` log attributes commented out.
+Port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80`, open http://localhost:4000, and click **Tracing** in the left navigation. Each span carries LLM attributes including `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, and `gen_ai.usage.output_tokens`, plus per-request cost under `agw.ai.usage.cost`. Spans also carry message content: the first user message as `llm.prompt.user` and the response text as `llm.completion.output`. The access logs record tokens and cost but no message text, because `001` ships the `llm_prompt` and `llm_completion` log attributes commented out.
 
 Rejected requests produce spans too, and they stand out: each carries `http.status=403`, `reason=Guardrail`, and `error="request rejected by webhook guardrail"`. Because the request never reached the provider, the span has no `gen_ai.*` or `agw.ai.usage.cost` attributes.
 

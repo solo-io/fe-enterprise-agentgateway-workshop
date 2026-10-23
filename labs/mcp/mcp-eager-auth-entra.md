@@ -2,7 +2,7 @@
 
 ## Pre-requisites
 
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ### Entra requirements
 
@@ -472,6 +472,7 @@ Re-run `helm upgrade` to enable the eager-OAuth feature in the controller, point
 helm upgrade -i -n agentgateway-system enterprise-agentgateway \
   oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --version $ENTERPRISE_AGW_VERSION \
+  --reuse-values \
   --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
   -f -<<EOF
 
@@ -507,6 +508,18 @@ controller:
             "${ENTRA_CLIENT_ID}": "${ENTRA_CLIENT_SECRET}"
           }
         },
+        "incoming_clients": {
+          "allowed_redirect_uris": [
+            "http://localhost/oauth/callback",
+            "http://localhost/oauth/callback/debug",
+            "http://127.0.0.1/oauth/callback",
+            "http://127.0.0.1/oauth/callback/debug",
+            "http://localhost/callback",
+            "http://127.0.0.1/",
+            "https://vscode.dev/redirect",
+            "https://insiders.vscode.dev/redirect"
+          ]
+        },
         "downstream_server": {
           "name": "entra",
           "client_id": "${ENTRA_CLIENT_ID}",
@@ -529,6 +542,7 @@ What each piece does:
 | `tokenExchange.database.postgres.url` | Postgres connection string from Step 3; omit for SQLite in-memory |
 | `gateway_config.base_url` | Public URL clients use to reach the gateway's AS endpoints (must include `/oauth-issuer`) |
 | `client_config.clients` | Pre-registered `client_id`/`client_secret` table; `/oauth-issuer/register` returns one of these |
+| `incoming_clients.allowed_redirect_uris` | The redirect URIs MCP clients may register and use: MCP Inspector (`/oauth/callback` and `/oauth/callback/debug`, on `localhost` or `127.0.0.1` depending on the Inspector version), Claude Code (`/callback`), and VS Code (its loopback redirect plus the `vscode.dev` relays). HTTP loopback entries match any port. A client whose redirect URI is not listed fails at `/oauth-issuer/register` with `invalid_redirect_uri`. Without this list, the issuer accepts any redirect URI for the configured client ID |
 | `downstream_server` | Credentials and URLs for the gateway to talk to Entra during the authorization code flow; `redirect_uri` must match a Web platform redirect URI on the app registration |
 
 Wait for the controller and proxy pods to restart cleanly:
@@ -1006,10 +1020,12 @@ kubectl patch gateway agentgateway-proxy -n agentgateway-system --type=json -p '
 ]'
 
 export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
-helm upgrade -i -n agentgateway-system enterprise-agentgateway \
-  oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
-  --version $ENTERPRISE_AGW_VERSION \
-  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
+helm get values enterprise-agentgateway -n agentgateway-system -o json \
+  | jq 'del(.tokenExchange, .controller.extraEnv)' \
+  | helm upgrade -n agentgateway-system enterprise-agentgateway \
+      oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+      --version $ENTERPRISE_AGW_VERSION \
+      --reset-values -f -
 
 kubectl rollout status -n agentgateway-system deployment/enterprise-agentgateway --timeout=180s
 kubectl delete namespace postgres --ignore-not-found

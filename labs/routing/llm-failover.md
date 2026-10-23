@@ -3,7 +3,7 @@
 In this lab, you'll configure priority group failover using an `EnterpriseAgentgatewayPolicy` health policy. You'll deploy a mock openai server configured to return rate limit errors (priority group 1) and use OpenAI as the failover (priority group 2). When the health policy detects unhealthy responses, the backend is evicted from its priority group, causing subsequent requests to route to the next available group
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Deploy a mock openai server configured to always return 429 rate limit errors
@@ -345,7 +345,7 @@ To view distributed traces and see failover behavior across requests:
 
 1. Port-forward to the Solo UI:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 2. Open http://localhost:4000 in your browser

@@ -13,7 +13,7 @@ This is the cross-cluster counterpart to the other two upgrade labs:
 The per-cluster zero-downtime mechanism is the in-place recipe (≥2 replicas + PDB + graceful shutdown); the multi-cluster-specific part is taking a whole cluster out of service while the global service continues from the peer.
 
 ## Pre-requisites
-- [001 — Install Enterprise Agentgateway](../../001-install-enterprise-agentgateway.md) and [002 — Set Up UI and Monitoring Tools](../../002-set-up-ui-and-monitoring-tools.md) for background; this lab installs its own two-cluster stack from scratch.
+- [001 — Install Enterprise Agentgateway](../../001-install-enterprise-agentgateway.md) and [002 — Set Up Monitoring Tools](../../002-set-up-monitoring-tools.md) for background; this lab installs its own two-cluster stack from scratch.
 - [In-Place Rolling Upgrades](in-place-rolling-upgrades.md): the per-cluster zero-downtime posture reused here.
 - Two clusters. Locally: `vind-up-2` brings up `cluster1` (region `us-west`) and `cluster2` (region `us-east`) on a shared Docker network with LoadBalancer support.
 - Licenses: an Enterprise-level Solo Enterprise for Istio license (ambient) and a Solo Enterprise for agentgateway license. Both are provided here via `SOLO_TRIAL_LICENSE_KEY`.
@@ -57,7 +57,7 @@ export KUBECONTEXT_CLUSTER2=cluster2
 export MESH_NAME_CLUSTER1=cluster1
 export MESH_NAME_CLUSTER2=cluster2
 export ISTIO_VERSION=1.30.0
-export ENTERPRISE_AGW_VERSION=v2026.9.3
+export ENTERPRISE_AGW_VERSION=v2026.10.1
 : "${SOLO_TRIAL_LICENSE_KEY:?export your Solo license key first}"
 ```
 

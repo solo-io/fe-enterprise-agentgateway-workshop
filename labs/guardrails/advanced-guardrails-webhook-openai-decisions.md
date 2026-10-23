@@ -12,7 +12,7 @@ Two other labs build the same guardrail with a different classifier:
 [Compare the three guardrail webhooks](#compare-the-three-guardrail-webhooks) sets their latency and cost results side by side.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 - An OpenAI API key with access to the Decisions API and to `gpt-5.4-nano`, exported as `OPENAI_API_KEY`. `gpt-5.4-nano` answers the requests the guardrail allows, and `gpt-6-luna` is the classifier model.
 
 > **The prompt goes to OpenAI twice.** The webhook sends each prompt to the Decisions API to classify it, then the gateway forwards the prompt to OpenAI for the completion. The webhook also sends OpenAI's answer to the Decisions API when the answer contains a value to judge. All of these calls go to one provider under one set of data terms. Zero Data Retention and HIPAA eligibility apply to the Decisions API for eligible OpenAI accounts.
@@ -1186,7 +1186,7 @@ The Decisions API calls go from the webhook straight to OpenAI, so their tokens 
 
 ### View traces
 
-Port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80`, open http://localhost:4000, and click **Tracing** in the left navigation. Spans carry the first user message as `llm.prompt.user` and the response text as `llm.completion.output`, so you can read the masked prompt and the masked completion there. Rejected requests carry `http.status=403`, `reason=Guardrail`, and `error="request rejected by webhook guardrail"`, and have no `gen_ai.*` attributes because the request never reached OpenAI's completion endpoint.
+Port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80`, open http://localhost:4000, and click **Tracing** in the left navigation. Spans carry the first user message as `llm.prompt.user` and the response text as `llm.completion.output`, so you can read the masked prompt and the masked completion there. Rejected requests carry `http.status=403`, `reason=Guardrail`, and `error="request rejected by webhook guardrail"`, and have no `gen_ai.*` attributes because the request never reached OpenAI's completion endpoint.
 
 ### View AgentGateway access logs
 

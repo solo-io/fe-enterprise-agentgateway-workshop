@@ -1,7 +1,7 @@
 # Configure Enterprise AgentGateway for Claude Code
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Choose between Direct API Key or Claude Max / Team Subscription access
@@ -298,7 +298,7 @@ These steps apply to both Option A and Option B.
 
 ### View Metrics in Grafana
 
-Use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md) to visualize metrics.
+Use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md) to visualize metrics.
 
 1. Port-forward to the Grafana service:
 ```bash
@@ -321,11 +321,11 @@ The dashboard provides real-time visualization of:
 
 ### View Traces in the Solo UI
 
-Distributed traces for Claude Code requests are surfaced in the Solo UI deployed in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). The UI ingests OTLP spans from AgentGateway via its built-in OpenTelemetry collector and stores them in ClickHouse.
+Distributed traces for Claude Code requests are surfaced in the Solo UI installed in [lab 001](../../001-install-enterprise-agentgateway.md). The UI ingests OTLP spans from AgentGateway via its built-in OpenTelemetry collector and stores them in ClickHouse.
 
 1. Port-forward to the Solo UI service:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 2. Open http://localhost:4000 in your browser

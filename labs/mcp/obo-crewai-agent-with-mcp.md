@@ -1,7 +1,7 @@
 # CrewAI Agent with MCP Tools and OBO Auth
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Deploy Keycloak as the in-cluster identity provider
@@ -163,13 +163,14 @@ Upgrade the controller helm release, adding the `tokenExchange` block pointing t
 
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.9.3
+export ENTERPRISE_AGW_VERSION=v2026.10.1
 ```
 
 ```bash
 helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $ENTERPRISE_AGW_VERSION \
+--reuse-values \
 --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 tokenExchange:
@@ -570,9 +571,10 @@ kubectl delete namespace keycloak
 rm -rf lib/crewai/agentgateway-copilot-with-obo/.venv
 
 # Restore controller to its original configuration (no tokenExchange)
-helm upgrade -i -n agentgateway-system enterprise-agentgateway \
-  oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
-  --create-namespace \
-  --version $ENTERPRISE_AGW_VERSION \
-  --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
+helm get values enterprise-agentgateway -n agentgateway-system -o json \
+  | jq 'del(.tokenExchange)' \
+  | helm upgrade -n agentgateway-system enterprise-agentgateway \
+      oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+      --version $ENTERPRISE_AGW_VERSION \
+      --reset-values -f -
 ```

@@ -1,6 +1,6 @@
 # AgentGateway Enterprise — System Requirements
 
-## Kubernetes & Tooling Versions (v2026.9.3)
+## Kubernetes & Tooling Versions (v2026.10.1)
 
 | Component | Requirement |
 |---|---|
@@ -8,7 +8,7 @@
 | Helm | ≥ 3.12 |
 | Gateway API CRDs | 1.4 – 1.6 (Standard channel; 1.6 for Experimental) |
 | Istio (if using waypoint/ambient features) | 1.26 – 1.30 |
-| Solo UI | 0.5.11 |
+| Solo UI | Bundled as the `ui` subchart of the `enterprise-agentgateway` chart |
 
 Source: Version Support Matrix
 
@@ -97,7 +97,7 @@ Enterprise AgentGateway automatically deploys shared extension servers for ext-a
 
 ## Reference Links
 
-- Version Support Matrix (v2026.9.3)
+- Version Support Matrix (v2026.10.1)
 - Installation Guide
 - Changelog
 - API Reference

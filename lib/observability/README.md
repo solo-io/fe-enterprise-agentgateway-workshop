@@ -38,15 +38,11 @@ python3 -m unittest discover -s lib/observability/tests -v
 
 Checks the dashboard JSON parses, `dash_prices.py validate` passes, and the dashboard's live rates match `pricing.json`.
 
-## `model-catalog-v2026.8.2.json`
-
-The model cost catalog (Anthropic, Gemini, and OpenAI per-token list prices) that the `v2026.8.2` controller generated as its default catalog ConfigMap. `002` loads it into the `model-cost-catalog` ConfigMap and sets that as the Gateway's first `modelCatalog` source, so the Cost Management dashboard has a base catalog to display. `llm-cost-management.md` layers its overlay after it.
-
 ## `seed-cost-data.sh`
 
 Backfills ClickHouse with synthetic LLM spend so the Cost Management dashboard renders a full history instead of the single spike a few live requests produce.
 
-Rows are inserted into `platformdb.agw_spans_typed`; the built-in materialized views fire on insert and populate the 5-minute rollups the UI reads. The traffic covers OpenAI (the `gpt-5.6` family at the rates the cost lab's overlay catalog sets), Anthropic, Gemini, and AWS Bedrock, across five teams of one to three members each, keeping alice's and bob's virtual keys so seeded history lines up with live requests.
+Rows are inserted into `agentgateway.agw_spans_typed`; the built-in materialized views fire on insert and populate the 5-minute rollups the UI reads. The traffic covers OpenAI (the `gpt-5.6` family at the rates the cost lab's overlay catalog sets), Anthropic, Gemini, and AWS Bedrock, across five teams of one to three members each, keeping alice's and bob's virtual keys so seeded history lines up with live requests.
 
 ```bash
 ./lib/observability/seed-cost-data.sh
@@ -59,7 +55,7 @@ TRUNCATE=true ./lib/observability/seed-cost-data.sh       # clean slate first
 | `ROWS` | `300000` | Approximate request count over the window |
 | `DAYS` | `30` | Length of the backfilled window |
 | `NS` | `agentgateway-system` | Namespace holding the ClickHouse pod |
-| `CH_POD` | `management-clickhouse-shard0-0` | ClickHouse pod name |
+| `CH_POD` | `enterprise-agentgateway-clickhouse-shard0-0` | ClickHouse pod name |
 | `CLUSTER` | `mgmt-cluster` | `Cluster` value on seeded spans; must match live traffic or the UI's **Scope** filter splits them |
 
 `TRUNCATE=true` clears the spans table and the cost rollups, which discards real traffic and traces along with previous seeds.
@@ -69,7 +65,7 @@ Seeding fills the **Dashboard** tab only. The **Budgets** tab reads live rate-li
 ## Used by
 
 - [`labs/observability/llm-cost-management.md`](../../labs/observability/llm-cost-management.md): `seed-cost-data.sh`
-- [`002-set-up-ui-and-monitoring-tools.md`](../../002-set-up-ui-and-monitoring-tools.md): the Grafana dashboard JSON and `model-catalog-v2026.8.2.json`
+- [`002-set-up-monitoring-tools.md`](../../002-set-up-monitoring-tools.md): the Grafana dashboard JSON
 
 ## Downstream copies of the dashboard JSON
 

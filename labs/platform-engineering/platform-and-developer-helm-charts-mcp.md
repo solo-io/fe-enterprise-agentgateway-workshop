@@ -5,7 +5,7 @@ An MCP server is a **team workload**. It wraps the team's own APIs and tools, sh
 This lab uses **delegation**: teams self-serve the endpoint, and the platform owns the front door structurally. It splits the gateway into two Helm charts for two personas. `agentgateway-platform`, owned by the platform team, owns the `Gateway`, the security baseline, the observability pipeline, the URL space, and the cost tiers, and onboards application teams. `agentgateway-developer`, owned by an application team, lets that team self-serve endpoints under the path prefix the platform assigned it; its `values.schema.json` has **no field** for rate limits, auth, WAF, or logging, so a team cannot express a traffic policy even if it wanted to. A team declares its server as a `type: mcp` endpoint, and the chart renders an `EnterpriseAgentgatewayBackend` (`entMcp`) plus a prefix-enforced, team-labeled child route. The platform's controls attach to the parent route, so tier budgets, JWT, and access logging cover MCP tool calls as they cover any other traffic; the team never configures any of them. A backend that is a vendor relationship rather than a team workload calls for the opposite governance model: see [LLM Access, Centralized: The Platform as Provider](centralized-llm-ops-helm-chart.md).
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 - **Helm 3** installed.
 - Run every command **from the workshop root** (the directory that contains `charts/`). Chart paths below are repo-root-relative.
 - The two charts referenced here live at `charts/agentgateway-platform` and `charts/agentgateway-developer`.
@@ -709,7 +709,7 @@ Each MCP request shows its route, status, and MCP-specific attributes, for examp
 ...route=team-tools/team-tools-tools ... http.status=401 protocol=http error="authentication failure: no bearer token found" reason=JwtAuth duration=0ms
 ```
 
-Note the second line: with JWT enabled, the platform's logs attribute every tool call to a subject (`jwt.sub=user-id`). That is per-user MCP auditing with zero configuration by the team. To enable Prometheus scraping, the platform team sets `observability.metrics.enabled=true` (requires the prometheus-operator `PodMonitor` CRD). For dashboards and traces, use the Grafana stack from `002`; the AgentGateway dashboard has dedicated MCP panels (tool calls, server requests).
+Note the second line: with JWT enabled, the platform's logs attribute every tool call to a subject (`jwt.sub=user-id`). That is per-user MCP auditing with zero configuration by the team. To enable Prometheus scraping, the platform team sets `observability.metrics.enabled=true` (requires the prometheus-operator `PodMonitor` CRD). For dashboards, use the Grafana stack from `002`; the AgentGateway dashboard has dedicated MCP panels (tool calls, server requests). For traces, use the Solo UI from `001`.
 
 ---
 

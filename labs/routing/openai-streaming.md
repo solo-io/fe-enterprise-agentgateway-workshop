@@ -3,7 +3,7 @@
 In this lab, you'll test streaming responses from OpenAI through AgentGateway. Streaming allows you to receive LLM responses incrementally as they're generated.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Configure routing to OpenAI with streaming support
@@ -176,7 +176,7 @@ Streaming requests generate the same distributed traces as non-streaming:
 
 1. Port-forward to the Solo UI:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 2. Open http://localhost:4000 in your browser

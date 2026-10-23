@@ -3,7 +3,7 @@
 In this lab, you'll configure **body-based routing** to automatically dispatch incoming LLM requests to different backends based on the `model` field in the JSON request body. An `EnterpriseAgentgatewayPolicy` extracts the model name at request time and promotes it to a request header; a standard `HTTPRoute` then uses header matching to route to either OpenAI or a local mock LLM server, with no client-side changes.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Deploy a mock LLM server to act as a second backend
@@ -325,7 +325,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash
@@ -352,7 +352,7 @@ To view distributed traces with LLM-specific spans:
 
 1. Port-forward to the Solo UI:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 2. Open http://localhost:4000 in your browser

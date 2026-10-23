@@ -1,7 +1,7 @@
 # Virtual Keys using Agentgateway
 
 ## Prerequisites
-This lab assumes that you have completed `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Issue per-user virtual keys (alice and bob) with independent token budgets

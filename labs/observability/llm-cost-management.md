@@ -1,7 +1,7 @@
 # LLM Cost Management
 
 ## Pre-requisites
-- Complete the setup in `001` and `002` first. Cost Management runs on the Solo UI and OTEL collector that `002` installs.
+- Complete the setup in `001` first. Cost Management runs on the Solo UI and OTEL collector that `001` installs.
 - A valid OpenAI API key, exported as `OPENAI_API_KEY`.
 
 ## Lab Objectives
@@ -224,16 +224,13 @@ curl -s -o /dev/null -w "invalid: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai"
 
 Expected output: alice and bob both `HTTP 200`, the invalid key `HTTP 401`.
 
-The Cost Management dashboard in the Solo UI is enabled by the `products.agentgateway.features.cost-management` flag, which `002` already sets. Set `cost-management-writes: false` there if you want the dashboard read-only, with no budget or dimension edits from the UI.
+The Cost Management dashboard in the Solo UI is enabled by the `ui.features.costManagement` Helm value, which `001` already sets. Set `ui.features.costManagementWrites: false` there if you want the dashboard read-only, with no budget or dimension edits from the UI.
 
 ## Configure a model cost catalog
 
 The gateway ships a base catalog built into the proxy. It covers the models that OpenAI, Anthropic, Google, AWS Bedrock, Azure, and other providers offered at release time, so the proxy prices those models by default. The `gpt-5.6-luna` and `gpt-5.6-terra` traffic in this lab prices at list from the base catalog alone. A model the base catalog doesn't know, whether a mock, a self-hosted model, or one released after the gateway, still contributes token and request volume but `$0.00` of spend.
 
-You layer your own catalog on top of that base as an overlay. The one below does both overlay jobs:
-
-- **Add a model the base catalog doesn't price.** The base catalog has no entry for `gpt-4.1-nano`, so its traffic prices at `$0.00` until you supply rates for it.
-- **Override a model it does price.** The base prices `gpt-5.5` at public list, `$5.00` input and `$30.00` output per 1M tokens; the overlay restates it at a contracted 50% of list.
+You layer your own catalog on top of that base as an overlay. An overlay entry can add rates for a model the base catalog doesn't price, or override the rates of one it does. The overlay below overrides `gpt-5.5`: the base prices it at public list, `$5.00` input and `$30.00` output per 1M tokens, and the overlay restates it at a contracted 50% of list.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -248,9 +245,6 @@ data:
       "providers": {
         "openai": {
           "models": {
-            "gpt-4.1-nano": {
-              "rates": { "input": "0.10", "output": "0.40", "cacheRead": "0.025" }
-            },
             "gpt-5.5": {
               "rates": { "input": "2.50", "output": "15.00", "cacheRead": "0.25" },
               "tiers": [
@@ -273,7 +267,7 @@ EOF
 
 ```bash
 kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
-  --type merge -p '{"spec":{"modelCatalog":{"sources":[{"configMap":{"name":"model-cost-catalog","key":"catalog.json"}},{"configMap":{"name":"llm-model-costs","key":"catalog.json"}}]}}}'
+  --type merge -p '{"spec":{"modelCatalog":{"sources":[{"configMap":{"name":"llm-model-costs","key":"catalog.json"}}]}}}'
 ```
 
 Confirm the existing fields (e.g. `logging`) are still present alongside the new `modelCatalog` block:
@@ -546,7 +540,7 @@ Alice and bob keep the virtual keys you issued them, so the synthetic history li
 Expected output:
 
 ```
-Seeding 300000 synthetic spans across 30d into platformdb.agw_spans_typed ...
+Seeding 300000 synthetic spans across 30d into agentgateway.agw_spans_typed ...
 Done. Totals now in ClickHouse:
 requests	292.52 thousand
 tokens	8.71 billion
@@ -568,16 +562,15 @@ Re-running adds more spend on top of what is already there. To start over, run i
 Port-forward the Solo UI:
 
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
-Open [http://localhost:4000/age/](http://localhost:4000/age/) and select **Cost Management** from the menu.
+Open [http://localhost:4000](http://localhost:4000) and select **Cost Management** from the menu.
 
 - **Dashboard**: a summary row of total spend, tokens, and request count, followed by paired **Spend by** and **Spend Over Time by** panels. Switch a panel's pivot from **Provider** to **Group** to **User**, and the same traffic re-slices as `research` against `engineering`, then as alice against bob. The **Filters** row narrows every panel at once, and **Export CSV** downloads the current view. If you ran the seeding step, select the **30d** range and the pivots fill out to four providers, five teams, and eleven users.
   - Every request attributes to a user, group, and virtual key, because each key sets `id`, `user`, and `group`. Requests where a dimension resolves to nothing appear under **Unattributed**.
   - Model breakdowns list the model ID the provider returns on the response. `gpt-5.6-luna` and `gpt-5.6-terra` appear verbatim; a model that answers with a dated snapshot ID, such as `gpt-5.4-nano-2026-03-17`, shows that snapshot, and the gateway resolves it back to the alias in your catalog for pricing.
-- **Model Cost Catalog**: the header names `agentgateway-system/model-cost-catalog:catalog.json` as the base model catalog, lists your `agentgateway-system/llm-model-costs:catalog.json` as an overlay, and reports `1 model entry is overridden by overlay sources`. The table merges both sources into 81 entries. Search the table for these models:
-  - `gpt-4.1-nano` shows the `$0.10` input and `$0.40` output rates you added.
+- **Model Cost Catalog**: the header names `built-in` as the base model catalog, lists your `agentgateway-system/llm-model-costs:catalog.json` as an overlay, and reports `1 model entry is overridden by overlay sources`. The table merges both into 787 entries. Search the table for these models:
   - `gpt-5.5` shows `$2.50` input, `$15.00` output, and `$0.25` cache read instead of the list `$5.00`/`$30.00`/`$0.50`, with **Source** `Override`.
   - `gpt-5.6-luna` shows its list `$0.20` input and `$1.20` output, with **Source** `Base`.
 - **Budgets**: one row per `EnterpriseAgentgatewayBudget`, with a header counting `Within budget` against `Exceeding budget`: `4 Budgets`, `3 Within budget`, `1 Exceeding budget` after the steps above. Each row shows its **Scope**, so `research-team-quota` is visibly owned by `team-research` while the rest sit in `agentgateway-system`. Click a row to open its detail drawer, where each entry shows its subject, window, and usage against its limit:
@@ -602,7 +595,7 @@ kubectl delete namespace team-research --ignore-not-found
 
 # Model cost catalog wiring (leaves other parameters fields, e.g. logging, untouched)
 kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
-  --type merge -p '{"spec":{"modelCatalog":{"sources":[{"configMap":{"name":"model-cost-catalog","key":"catalog.json"}}]}}}'
+  --type merge -p '{"spec":{"modelCatalog":null}}'
 kubectl delete configmap -n agentgateway-system llm-model-costs --ignore-not-found
 
 # API key authentication + budget enforcement policy, virtual keys
@@ -626,9 +619,9 @@ TRUNCATE=true ROWS=0 ./lib/observability/seed-cost-data.sh
 To disable the Cost Management feature:
 
 ```bash
-helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
---namespace agentgateway-system \
---version "$AGW_UI_VERSION" \
+export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
+helm upgrade -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+--version "$ENTERPRISE_AGW_VERSION" \
 --reuse-values \
---set products.agentgateway.features.cost-management=false
+--set ui.features.costManagement=false
 ```

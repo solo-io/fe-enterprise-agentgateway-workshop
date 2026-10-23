@@ -9,7 +9,7 @@ In this workshop, you’ll deploy Enterprise Agentgateway and complete hands-on 
 ## Lab Objectives
 - Configure Kubernetes Gateway API CRDs
 - Configure Enterprise Agentgateway CRDs
-- Install Enterprise Agentgateway Controller
+- Install Enterprise Agentgateway Controller and the Solo UI
 - Configure agentgateway
 - Validate that components are installed
 
@@ -49,7 +49,7 @@ referencegrants      refgrant     gateway.networking.k8s.io/v1   true         Re
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.9.3
+export ENTERPRISE_AGW_VERSION=v2026.10.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -85,6 +85,7 @@ enterpriseagentgatewaybudgets           eagbud       enterpriseagentgateway.solo
 enterpriseagentgatewayexternalsecrets   eages        enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayExternalSecret
 enterpriseagentgatewayparameters        eagpar       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
 enterpriseagentgatewaypolicies          eagpol       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
+enterpriseagentgatewayrbacpolicies      eagrbacpol   enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayRBACPolicy
 authconfigs                             ac           extauth.solo.io/v1                        true         AuthConfig
 ratelimitconfigs                        rlc          ratelimit.solo.io/v1alpha1                true         RateLimitConfig
 ```
@@ -96,13 +97,42 @@ The OSS `agentgateway.dev` CRDs and the Enterprise `enterpriseagentgateway.solo.
 > [!NOTE]
 > **Air-gapped or private-registry install?** This lab pulls images from the public registry. For the full set of charts and images to mirror, see the [image list](labs/installation/image-list.md). To mirror all chart-managed images into a private registry, follow the dedicated [air-gap install lab](labs/installation/airgap/001-airgap.md) instead.
 
+The `enterprise-agentgateway` chart also installs the Solo UI through its `ui` subchart. The UI includes a built-in OpenTelemetry collector (`enterprise-agentgateway-ui-telemetry-collector`) that receives traces from Agentgateway, and a ClickHouse database that stores them. The UI reads the license key from the Secret that this release creates.
+
 Using Helm:
 ```bash
 helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $ENTERPRISE_AGW_VERSION \
---set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
+--set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
+-f - <<EOF
+ui:
+  enabled: true
+  #--- imagePullSecrets and registry override for the UI images (UI backend, autoauth, OTEL collectors) ---
+  #global:
+  #  imagePullSecrets:
+  #  - name: my-registry-secret
+  #  imageRegistry: my-registry.example.com
+  service:
+    type: ClusterIP
+  features:
+    #--- Cost Management dashboard (budgets, spend by model/team) ---
+    costManagement: true
+    #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
+    costManagementWrites: true
+  traces:
+    verbose: true
+  clickhouse:
+    enabled: true
+    #--- Image override for ClickHouse (no registry key, embed registry in repository if needed) ---
+    #image:
+    #  repository: clickhouse/clickhouse-server
+    #  tag: ""
+EOF
 ```
+
+> [!NOTE]
+> Later labs that re-run `helm upgrade` on `enterprise-agentgateway` pass `--reuse-values` so the license and `ui` values stay in place. If you run your own upgrade without it, include the `ui` block above or Helm removes the UI. To install without the UI, set `ui.enabled: false`. Tracing and the Cost Management labs need the UI.
 
 Check that the Enterprise Agentgateway Controller is now running:
 
@@ -115,6 +145,25 @@ Expected Output:
 ```
 NAME                                       READY   STATUS    RESTARTS   AGE
 enterprise-agentgateway-5fc9d95758-n8vvb   1/1     Running   0          87s
+```
+
+### Check the Solo UI
+
+Check that the Solo UI components are running:
+
+```bash
+kubectl rollout status deploy/enterprise-agentgateway-ui -n agentgateway-system --timeout=300s
+kubectl get pods -n agentgateway-system | awk 'NR==1 || /-ui|clickhouse/'
+```
+
+Expected Output:
+
+```
+NAME                                                              READY   STATUS    RESTARTS   AGE
+enterprise-agentgateway-clickhouse-shard0-0                       1/1     Running   0          60s
+enterprise-agentgateway-ui-d77d84fc4-md7n8                        2/2     Running   0          60s
+enterprise-agentgateway-ui-k8sobjects-collector-cc6948cbc-d6t95   1/1     Running   0          60s
+enterprise-agentgateway-ui-telemetry-collector-0                  1/1     Running   0          60s
 ```
 
 ## Deploy Agentgateway with customizations
@@ -316,7 +365,7 @@ EOF
 
 ## Configure tracing
 
-Apply an `EnterpriseAgentgatewayPolicy` to export traces to the telemetry collector deployed in `002`. Skip this step if you are not setting up the Solo UI.
+Apply an `EnterpriseAgentgatewayPolicy` to export traces to the Solo UI telemetry collector. Skip this step if you set `ui.enabled: false`.
 
 ```bash
 kubectl apply -f- <<'EOF'
@@ -333,7 +382,7 @@ spec:
   frontend:
     tracing:
       backendRef:
-        name: solo-enterprise-telemetry-collector
+        name: enterprise-agentgateway-ui-telemetry-collector
         namespace: agentgateway-system
         port: 4317
       protocol: GRPC
@@ -365,6 +414,21 @@ spec:
 EOF
 ```
 
+## Access Solo UI
+
+To access the Solo UI and view traces:
+
+1. Port-forward to the Solo UI service:
+```bash
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
+```
+
+2. Open your browser and navigate to `http://localhost:4000`
+
+## (Optional) Fine-Grained RBAC for the Solo UI
+
+The UI installs with coarse roles (Admin, Writer, Reader) that apply to every resource. To scope budgets, virtual keys, and HTTPRoutes per team with `EnterpriseAgentgatewayRBACPolicy`, see the [Solo UI Fine-Grained RBAC lab](labs/observability/solo-ui-fine-grained-rbac.md).
+
 ## Uninstall
 
 To tear everything down, work in reverse order. Delete the `Gateway` first so the controller can clean up the proxy deployment and service before you remove the controller itself.
@@ -375,6 +439,8 @@ kubectl delete gateway agentgateway-proxy -n agentgateway-system --ignore-not-fo
 kubectl delete enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system --ignore-not-found
 helm uninstall enterprise-agentgateway -n agentgateway-system
 helm uninstall enterprise-agentgateway-crds -n agentgateway-system
+# The CRDs chart keeps the RBAC policy CRD on uninstall; delete it explicitly
+kubectl delete crd enterpriseagentgatewayrbacpolicies.enterpriseagentgateway.solo.io --ignore-not-found
 kubectl delete gatewayclass enterprise-agentgateway enterprise-agentgateway-waypoint --ignore-not-found
 kubectl delete namespace agentgateway-system
 # (Optional) Remove the Kubernetes Gateway API CRDs only if nothing else on the cluster uses them
@@ -382,4 +448,4 @@ kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/downlo
 ```
 
 ## Next Steps
-Enterprise Agentgateway is now installed and configured with observability. Continue with `002` to set up the Solo UI and monitoring tools (Prometheus, Grafana) to visualize metrics, logs, and traces.
+Enterprise Agentgateway and the Solo UI are now installed and configured with observability. Continue with `002` to set up monitoring tools (Prometheus, Grafana) to visualize metrics.

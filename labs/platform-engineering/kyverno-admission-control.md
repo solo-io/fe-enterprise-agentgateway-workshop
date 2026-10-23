@@ -3,7 +3,7 @@
 Agentgateway decides whether a *request* is allowed. Kyverno decides whether the *configuration* is allowed. In this lab you put four governance policies in front of the Kubernetes API server, so the API server rejects unsafe `EnterpriseAgentgatewayBackend` manifests before the controller translates them.
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 - `helm` CLI
 
 > **Note: Kyverno is not a Solo.io component.** It's a CNCF policy engine you install alongside Enterprise Agentgateway. These steps run against Kyverno **v1.18.2** (chart `3.8.2`).

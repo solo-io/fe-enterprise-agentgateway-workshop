@@ -1,7 +1,7 @@
 # Configure Routing to Azure OpenAI using Azure Workload Identity
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
+This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 This lab also requires:
 - An **AKS cluster** with the OIDC issuer and Microsoft Entra Workload ID enabled (Workload Identity is an AKS-specific feature analogous to EKS IRSA)
@@ -307,7 +307,7 @@ sleep 1 && curl -s http://localhost:15020/metrics && kill $!
 
 ### View Metrics and Traces in Grafana
 
-For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-ui-and-monitoring-tools.md). For traces, use the AgentGateway UI.
+For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring tools lab](../../002-set-up-monitoring-tools.md). For traces, use the AgentGateway UI.
 
 1. Port-forward to the Grafana service:
 ```bash
@@ -334,7 +334,7 @@ To view distributed traces with LLM-specific spans:
 
 1. Port-forward to the Solo UI:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 2. Open http://localhost:4000 in your browser

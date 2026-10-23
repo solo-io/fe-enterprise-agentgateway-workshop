@@ -1,109 +1,13 @@
-# Set up UI and monitoring tools
-Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the box. In this lab, we’ll deploy the Solo UI (with its built-in OTEL collector) for tracing, and Grafana + Prometheus for metrics visualization.
+# Set up monitoring tools
+Agentgateway emits OpenTelemetry-compatible metrics, logs, and traces out of the box. Lab `001` installs the Solo UI for traces. In this lab, you deploy Grafana and Prometheus for metrics visualization.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`
 
 ## Lab Objectives
-- Deploy Solo UI with OTEL collector (for tracing)
 - Deploy metrics (Prometheus, Grafana)
 - Configure Prometheus to scrape Agentgateway
-
-## Deploy Solo UI
-
-The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
-
-### Set required variables
-
-Export your Solo license key (same key used in lab 001):
-```bash
-export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export AGW_UI_VERSION=0.5.11
-```
-
-### Step 1: Install/upgrade CRDs
-
-```bash
-helm upgrade -i management-crds oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management-crds \
-  --namespace agentgateway-system \
-  --create-namespace \
-  --version "$AGW_UI_VERSION"
-```
-
-### Step 2: Install/upgrade the chart
-
-The `management-crds` subchart is bundled inside `management` and enabled by default. Since we installed it separately in Step 1, disable it here to avoid ownership conflicts:
-
-```bash
-helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
---namespace agentgateway-system \
---create-namespace \
---version "$AGW_UI_VERSION" \
--f - <<EOF
-management-crds:
-  enabled: false
-licensing:
-  licenseKey: "${SOLO_TRIAL_LICENSE_KEY}"
-global:
-  imagePullPolicy: IfNotPresent
-  #--- imagePullSecrets for private registry (propagated to all subcharts) ---
-  #imagePullSecrets:
-  #- name: my-registry-secret
-  imagePullSecrets: []
-  #--- Image overrides for all Solo-owned images (UI, OTEL collector) ---
-  #image:
-  #  registry: my-registry.example.com
-  #  repository: solo-enterprise
-  #  tag: ""
-service:
-  type: ClusterIP
-  clusterIP: ""
-products:
-  agentgateway:
-    enabled: true
-    namespace: agentgateway-system
-    features:
-      #--- Cost Management dashboard (budgets, spend by model/team) ---
-      cost-management: true
-      #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
-      cost-management-writes: true
-clickhouse:
-  enabled: true
-  #--- Image override for ClickHouse (no registry key — embed registry in repository if needed) ---
-  #image:
-  #  repository: clickhouse/clickhouse-server
-  #  tag: ""
-tracing:
-  verbose: true
-EOF
-```
-
-Check that the Solo UI components are running:
-
-```bash
-kubectl get pods -n agentgateway-system | awk 'NR==1 || /solo-enterprise|clickhouse/'
-```
-
-Expected Output:
-
-```
-NAME                                                   READY   STATUS    RESTARTS   AGE
-management-clickhouse-shard0-0                         1/1     Running   0          51s
-solo-enterprise-k8sobjects-collector-d4d9774bb-rqptk   1/1     Running   0          51s
-solo-enterprise-telemetry-collector-57448bc4b5-gmvkl   1/1     Running   0          51s
-solo-enterprise-ui-7dbf5c9c5c-zj7z2                    3/3     Running   0          51s
-```
-
-### Step 3: Apply the model cost catalog
-
-```bash
-kubectl create configmap model-cost-catalog -n agentgateway-system \
-  --from-file=catalog.json=lib/observability/model-catalog-v2026.8.2.json \
-  --dry-run=client -o yaml | kubectl apply -f -
-kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
-  --type merge -p '{"spec":{"modelCatalog":{"sources":[{"configMap":{"name":"model-cost-catalog","key":"catalog.json"}}]}}}'
-kubectl rollout status deploy/agentgateway-proxy -n agentgateway-system
-```
+- Install the AgentGateway Grafana dashboard
 
 ## Deploy metrics
 
@@ -232,17 +136,6 @@ grafana-prometheus-kube-state-metrics-7c6d5ff8f6-77hkl   1/1     Running   0    
 prometheus-grafana-prometheus-kube-pr-prometheus-0       2/2     Running   0          2m50s
 ```
 
-## Access Solo UI
-
-To access the Solo UI and view traces:
-
-1. Port-forward to the Solo UI service:
-```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
-```
-
-2. Open your browser and navigate to `http://localhost:4000`
-
 ## Access Grafana
 
 To access Grafana and view the AgentGateway dashboard:
@@ -358,21 +251,7 @@ The dashboard is organized into the following metric categories:
 
 ![usage-tracking-by-org-v2-1.png](images/grafana-dashboard/usage-tracking-by-org-v2-1.png)
 
-## (Optional) Fine-Grained RBAC for the Solo UI
-
-The UI installs with coarse roles (Admin, Writer, Reader) that apply to every resource. To scope budgets, virtual keys, and HTTPRoutes per team with `EnterpriseAgentgatewayRBACPolicy`, see the [Solo UI Fine-Grained RBAC lab](labs/observability/solo-ui-fine-grained-rbac.md).
-
 ## Uninstall
-
-Remove the Solo UI:
-
-```bash
-helm uninstall management -n agentgateway-system
-helm uninstall management-crds -n agentgateway-system
-kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
-  --type merge -p '{"spec":{"modelCatalog":null}}'
-kubectl delete configmap model-cost-catalog -n agentgateway-system --ignore-not-found
-```
 
 Remove Grafana and Prometheus:
 

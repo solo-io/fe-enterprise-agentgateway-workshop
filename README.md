@@ -37,7 +37,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 > **Start here.** All other labs depend on these two.
 
 - [001 — Install Enterprise Agentgateway](001-install-enterprise-agentgateway.md)
-- [002 — Set Up UI and Monitoring Tools](002-set-up-ui-and-monitoring-tools.md)
+- [002 — Set Up Monitoring Tools](002-set-up-monitoring-tools.md)
 
 > **OpenShift users:** Use the OpenShift-specific versions instead:
 >
@@ -341,7 +341,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Validated on
 - Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway v2026.9.3
+- Enterprise Agentgateway v2026.10.1
 
 
 ## User Stories / Acceptance Criteria

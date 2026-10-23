@@ -146,7 +146,7 @@ e2e_wait() {
 # Port-forward helpers, available to lab blocks and probes (blocks are sourced
 # into this shell, so these functions are in scope).
 #
-#   e2e_pf agentgateway-system svc/solo-enterprise-ui 14000:80
+#   e2e_pf agentgateway-system svc/enterprise-agentgateway-ui 14000:80
 #   ... curl localhost:14000 ...
 #   e2e_pf_stop
 #
