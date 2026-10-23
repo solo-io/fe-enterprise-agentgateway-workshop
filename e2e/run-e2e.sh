@@ -37,6 +37,18 @@ if (( BASH_VERSINFO[0] < 4 )); then
   exit 1
 fi
 
+# labdoc.py needs PyYAML, and the python3 first on PATH can lack it (a fresh
+# Homebrew python, for example). Use the first interpreter that imports yaml.
+PYTHON=""
+for py in "${E2E_PYTHON:-}" python3 python3.13 python3.12 python3.11 /usr/bin/python3; do
+  [[ -n "$py" ]] && command -v "$py" >/dev/null 2>&1 && "$py" -c 'import yaml' 2>/dev/null \
+    && { PYTHON="$py"; break; }
+done
+if [[ -z "$PYTHON" ]]; then
+  printf "${RED}ERROR: no python3 with PyYAML found. Run 'python3 -m pip install pyyaml' or set E2E_PYTHON${NC}\n" >&2
+  exit 1
+fi
+
 # shellcheck source=lib/creds.sh
 source "${E2E_DIR}/lib/creds.sh"
 
@@ -170,7 +182,7 @@ run_lab() {
   local key; key="$(spec_key "$spec")"
 
   local meta
-  meta="$(python3 "$LABDOC" meta "$spec")" || { printf "${RED}✗ %s — bad spec${NC}\n" "$key"; TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); return; }
+  meta="$("$PYTHON" "$LABDOC" meta "$spec")" || { printf "${RED}✗ %s — bad spec${NC}\n" "$key"; TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); return; }
   eval "$meta"
 
   local lab="${REPO_ROOT}/${E2E_SPEC_LAB}"
@@ -193,7 +205,7 @@ run_lab() {
   rm -rf "$workdir"; mkdir -p "$workdir/blocks"
 
   local driver="${workdir}/driver.sh"
-  if ! python3 "$LABDOC" plan "$lab" "$spec" "$workdir" >"$driver" 2>"${workdir}/plan.err"; then
+  if ! "$PYTHON" "$LABDOC" plan "$lab" "$spec" "$workdir" >"$driver" 2>"${workdir}/plan.err"; then
     printf "  ${RED}✗${NC} %-58s ${RED}FAIL${NC}\n" "$key"
     sed 's/^/      /' "${workdir}/plan.err"
     TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); return
@@ -262,7 +274,7 @@ run_lab() {
 if [[ "$LIST_ONLY" == "true" ]]; then
   printf "${BOLD}%-46s %-10s %s${NC}\n" "LAB" "TIER" "REQUIRES"
   while IFS= read -r spec; do
-    eval "$(python3 "$LABDOC" meta "$spec")"
+    eval "$("$PYTHON" "$LABDOC" meta "$spec")"
     printf "%-46s %-10s %s\n" "$(spec_key "$spec")" "$E2E_SPEC_TIER" "${E2E_SPEC_REQUIRES:--}"
   done < <(discover_specs)
   exit 0
@@ -271,13 +283,13 @@ fi
 if [[ "$LINT_ONLY" == "true" ]]; then
   lint_fail=0
   while IFS= read -r spec; do
-    eval "$(python3 "$LABDOC" meta "$spec")"
+    eval "$("$PYTHON" "$LABDOC" meta "$spec")"
     lab="${REPO_ROOT}/${E2E_SPEC_LAB}"
     if [[ ! -f "$lab" ]]; then
       printf "${RED}✗ %s — lab not found: %s${NC}\n" "$(spec_key "$spec")" "$E2E_SPEC_LAB"
       lint_fail=1; continue
     fi
-    if out="$(python3 "$LABDOC" lint "$lab" "$spec" 2>&1)"; then
+    if out="$("$PYTHON" "$LABDOC" lint "$lab" "$spec" 2>&1)"; then
       printf "${GREEN}✓${NC} %s\n" "$out"
     else
       printf "${RED}✗ %s${NC}\n" "$(spec_key "$spec")"
@@ -295,7 +307,7 @@ if [[ "$LINT_ONLY" == "true" ]]; then
   printf "  %s lab(s) uncovered\n" "$missing"
 
   printf "\n${BOLD}Conventions:${NC}\n"
-  python3 "${E2E_DIR}/lib/conventions.py" "${REPO_ROOT}" || lint_fail=1
+  "$PYTHON" "${E2E_DIR}/lib/conventions.py" "${REPO_ROOT}" || lint_fail=1
 
   exit "$lint_fail"
 fi
@@ -382,7 +394,7 @@ else
   while IFS= read -r spec; do
     [[ "$spec" == *"/_base/"* ]] && continue
     if [[ -n "$TIER_FILTER" ]]; then
-      eval "$(python3 "$LABDOC" meta "$spec")"
+      eval "$("$PYTHON" "$LABDOC" meta "$spec")"
       [[ "$E2E_SPEC_TIER" == "$TIER_FILTER" ]] || continue
     fi
     RUN_SPECS+=("$spec")
@@ -392,7 +404,7 @@ fi
 # Resolve every credential the run needs, up front, in one prompt batch.
 declare -A NEEDED=()
 for spec in "${RUN_SPECS[@]}"; do
-  eval "$(python3 "$LABDOC" meta "$spec")"
+  eval "$("$PYTHON" "$LABDOC" meta "$spec")"
   [[ "$E2E_SPEC_TIER" == "excluded" || "$E2E_SPEC_TIER" == "t5-manual" ]] && continue
   for v in $E2E_SPEC_REQUIRES; do NEEDED["$v"]=1; done
 done
