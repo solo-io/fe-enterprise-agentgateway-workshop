@@ -175,7 +175,7 @@ When a request arrives, the proxy evaluates the CEL expression, sends the result
 | Client IP | `source.address` | Source IP of the downstream connection |
 | Request path | `request.path` | The request URI path |
 | Request method | `request.method` | HTTP method |
-| Header value | `request.headers["name"]` | Value of a specific header (case-insensitive) |
+| Header value | `request.headers.join()["name"]` | Value of a specific header (case-insensitive). `join()` returns repeated headers as one comma-separated string |
 | JWT standard claim | `jwt.sub` | `sub` claim from a validated JWT (requires JWT auth policy) |
 | JWT custom claim | `jwt.<claim_name>` | Any custom claim, e.g. `jwt.plan`, `jwt.org`, `jwt.team` |
 | Static value | `"constant"` | Fixed string, used for the global shared counter |
@@ -247,7 +247,9 @@ done
 Once the 10 input tokens are spent, further requests in the same hour return `HTTP 429`.
 
 ## Configure header-based token rate limiting
-Now let's configure a rate limit based on a custom header (`X-User-ID`) instead of a generic counter. The `cel` action evaluates `request.headers["X-User-ID"]` per request: each distinct header value becomes its own counter bucket, giving each user their own quota.
+Now let's configure a rate limit based on a custom header (`X-User-ID`) instead of a generic counter. The `cel` action evaluates the header per request: each distinct header value becomes its own counter bucket, giving each user their own quota.
+
+The expression reads the header through `request.headers.join()` and wraps it in `default()`. A plain `request.headers["x-user-id"]` returns a list when a client sends the header twice, and a list is not a valid descriptor value, so the proxy sends no rate-limit request and the call goes through unlimited. A request with no header has the same effect. `join()` turns repeated headers into one string, and `default()` puts requests without the header into a shared `anonymous` bucket.
 
 First, delete the previous rate limit config:
 ```bash
@@ -272,7 +274,7 @@ spec:
     rateLimits:
     - actions:
       - cel:
-          expression: 'request.headers["X-User-ID"]'
+          expression: 'default(request.headers.join()["x-user-id"], "anonymous")'
           key: "X-User-ID"
       type: TOKEN
 EOF
@@ -361,10 +363,10 @@ spec:
     rateLimits:
     - actions:
       - cel:
-          expression: 'request.headers["X-User-ID"]'
+          expression: 'default(request.headers.join()["x-user-id"], "anonymous")'
           key: "X-User-ID"
       - cel:
-          expression: 'request.headers["X-Tenant-ID"]'
+          expression: 'default(request.headers.join()["x-tenant-id"], "anonymous")'
           key: "X-Tenant-ID"
       type: TOKEN
 EOF

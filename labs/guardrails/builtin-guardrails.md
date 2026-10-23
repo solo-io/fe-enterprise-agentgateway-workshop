@@ -479,7 +479,7 @@ Open http://localhost:3000 and navigate to **Dashboards > AgentGateway Dashboard
 
 Port-forward the Solo UI:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 Open http://localhost:4000 and click **Tracing** in the left navigation. Blocked requests produce short spans that terminate at the gateway, while requests that pass the guards carry the full LLM attribute set (`gen_ai.request.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`).

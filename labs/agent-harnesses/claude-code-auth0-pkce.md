@@ -732,7 +732,7 @@ Open http://localhost:3000 and navigate to **Dashboards > AgentGateway Dashboard
 Port-forward the Solo UI:
 
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 Open http://localhost:4000 and click **Tracing** in the left navigation.

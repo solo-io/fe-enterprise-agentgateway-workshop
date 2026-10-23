@@ -310,7 +310,7 @@ For metrics, use the AgentGateway Grafana dashboard set up in the [monitoring to
    - Username: `admin`
    - Password: Value of `$GRAFANA_ADMIN_PASSWORD` (default: `prom-operator`)
 4. Navigate to **Dashboards > AgentGateway Dashboard** to view metrics.
-5. For traces, port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80`, open <http://localhost:4000>, and click **Tracing** in the left navigation to find spans that include the InferencePool backend selection.
+5. For traces, port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80`, open <http://localhost:4000>, and click **Tracing** in the left navigation to find spans that include the InferencePool backend selection.
 
 ## Cleanup
 

@@ -17,12 +17,14 @@ steps:
       - contains: "successfully rolled out"
   # Block 2 is a foreground port-forward; the probes open their own.
 
-  - probe: "the management release is in fine-grained mode with userClaim=sub"
+  # The built-in IdP maps users from `sub` whatever userClaim says, so the lab
+  # leaves userClaim at its default and the probes below prove per-user scoping.
+  - probe: "the ui subchart is in fine-grained mode"
     script: |
-      helm get values management -n agentgateway-system -a -o json \
-        | jq -r '"mode=\(.rbac.mode) userClaim=\(.rbac.subjectMapping.userClaim)"'
+      helm get values enterprise-agentgateway -n agentgateway-system -a -o json \
+        | jq -r '"mode=\(.ui.rbac.mode) userClaim=\(.ui.rbac.subjectMapping.userClaim)"'
     assert:
-      - contains: "mode=fine-grained userClaim=sub"
+      - contains: "mode=fine-grained userClaim=preferred_username"
 
   - section: "Create Two Team Namespaces"
     run: [1]
@@ -94,7 +96,7 @@ steps:
       }
       COST=rpc.agentgateway.solo.io.AgentgatewayCostAPI
       ROUTES=rpc.agentgateway.solo.io.GatewayAPI/ListHTTPRoutes
-      e2e_pf agentgateway-system svc/solo-enterprise-ui ${UI_PORT}:80
+      e2e_pf agentgateway-system svc/enterprise-agentgateway-ui ${UI_PORT}:80
       for p in admin writer reader; do
         echo "$p: $(ui_rpc $p rpc.common.solo.io.UserService/GetCurrentUser)"
       done
@@ -107,7 +109,7 @@ steps:
   # "Review the Default Access" has no bash; this is its table, per profile.
   - probe: "default access: Admin sees nothing, owners see only their own"
     script: |
-      e2e_pf agentgateway-system svc/solo-enterprise-ui ${UI_PORT}:80
+      e2e_pf agentgateway-system svc/enterprise-agentgateway-ui ${UI_PORT}:80
       keys() { ui_rpc "$1" $COST/ListVirtualKeys | grep -oE 'vk-[a-z]+' | sort -u | tr '\n' ' '; }
       entries() { ui_rpc "$1" $COST/ListBudgets "$(ui_frame 2=$2)" | grep -oE '[a-z-]+-daily-tokens' | sort -u | tr '\n' ' '; }
       echo "admin keys=[$(keys admin)] budgets_a=[$(entries admin team-a)]"
@@ -128,7 +130,7 @@ steps:
   # The lab's post-policy table. Writer must lose sight of team-b everywhere.
   - probe: "granted access matches the per-profile table"
     script: |
-      e2e_pf agentgateway-system svc/solo-enterprise-ui ${UI_PORT}:80
+      e2e_pf agentgateway-system svc/enterprise-agentgateway-ui ${UI_PORT}:80
       keys() { ui_rpc "$1" $COST/ListVirtualKeys | grep -oE 'vk-[a-z]+' | sort -u | tr '\n' ' '; }
       entries() { ui_rpc "$1" $COST/ListBudgets "$(ui_frame 2=$2)" | grep -oE '[a-z-]+-daily-tokens' | sort -u | tr '\n' ' '; }
       routes() { ui_rpc "$1" $ROUTES | grep -oE 'team-[ab]-llm' | sort -u | tr '\n' ' '; }
@@ -145,7 +147,7 @@ steps:
   # The lab does this in the Create Virtual API Key form; same RPC, same denial.
   - probe: "Writer is denied a key in team-b and allowed one in team-a"
     script: |
-      e2e_pf agentgateway-system svc/solo-enterprise-ui ${UI_PORT}:80
+      e2e_pf agentgateway-system svc/enterprise-agentgateway-ui ${UI_PORT}:80
       echo "team-b: $(ui_rpc writer $COST/CreateVirtualKey "$(ui_vk_frame vk-carol team-b carol team-b-keys)")"
       echo "team-a: $(ui_rpc writer $COST/CreateVirtualKey "$(ui_vk_frame vk-carol team-a carol team-a-keys)")"
       e2e_pf_stop

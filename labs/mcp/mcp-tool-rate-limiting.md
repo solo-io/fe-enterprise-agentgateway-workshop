@@ -259,8 +259,6 @@ rate limit exceeded (retry after 60s; limit 3, remaining 0)
 
 The gateway answers a rate-limited `tools/call` itself, and the request never reaches the MCP server. The response is HTTP `200` with a JSON-RPC result that sets `isError: true`, so the client hands it to the model as a failed tool call, and the model can read the retry time. The `retry-after` and `x-ratelimit-*` response headers carry the same limit and reset values. Dashboards and alerts that count HTTP 429 responses miss these denials, because the status is `200`.
 
-> **Note:** On Enterprise Agentgateway `v2026.8.x` and earlier, the gateway rejects a rate-limited `tools/call` with HTTP `429 Too Many Requests` and the same `retry-after` and `x-ratelimit-*` headers. The MCP Inspector shows that as a transport error: `MCP error -32001: Streamable HTTP error: Error POSTing to endpoint`.
-
 ### Verify independent counters with a standard tool
 
 Even though `get-env` has hit its 3/min limit, `echo` is unaffected and should still succeed. The CEL expression resolves `echo` to `tool_name=echo`, which matches no descriptor in the `RateLimitConfig`, so it is never counted:

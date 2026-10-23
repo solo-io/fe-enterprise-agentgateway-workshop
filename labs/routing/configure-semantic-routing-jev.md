@@ -6,7 +6,7 @@ In this lab, you'll route LLM requests by prompt content instead of by the model
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics and traces.
-- An OpenAI API key with access to three models of different price. This lab uses `gpt-5-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier.
+- An OpenAI API key with access to three models of different price. This lab uses `gpt-5.4-nano` as the economy tier, `gpt-5.6-luna` as the mid tier, and `gpt-5.6-terra` as the high tier.
 - A TypeSafe API key from the [TypeSafe console](https://console.typesafe.ai), exported as `TYPESAFE_AI_API_KEY`.
 - Egress from the cluster to `pypi.org`. The adapter pod installs its two Python packages at startup.
 
@@ -34,7 +34,7 @@ jev-extproc adapter
     │  POST https://api.typesafe.ai/v1/systemone
     │  one choice question: economy | mid | high, with probabilities and confidence
     │  confidence or margin below threshold?  → fallback tier
-    │  rewrites body model: auto_model → gpt-5-nano | gpt-5.6-luna | gpt-5.6-terra
+    │  rewrites body model: auto_model → gpt-5.4-nano | gpt-5.6-luna | gpt-5.6-terra
     ▼
 HTTPRoute /semantic  →  EnterpriseAgentgatewayBackend (openai-all-models)
     │  no model override, so the rewritten name passes straight through
@@ -115,7 +115,7 @@ data:
       "minMargin": 0.2,
       "fallbackTier": "mid",
       "tiers": {
-        "economy": "gpt-5-nano",
+        "economy": "gpt-5.4-nano",
         "mid": "gpt-5.6-luna",
         "high": "gpt-5.6-terra"
       },
@@ -463,7 +463,7 @@ kubectl logs -n agentgateway-system deploy/jev-extproc -c adapter --tail=1
 ```
 
 ```json
-{"event": "started", "port": 50051, "tiers": {"economy": "gpt-5-nano", "mid": "gpt-5.6-luna", "high": "gpt-5.6-terra"}}
+{"event": "started", "port": 50051, "tiers": {"economy": "gpt-5.4-nano", "mid": "gpt-5.6-luna", "high": "gpt-5.6-terra"}}
 ```
 
 ## Create the OpenAI backend and route
@@ -517,11 +517,11 @@ echo $GATEWAY_IP
 
 curl -s "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-5-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
+  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
 ```
 
 ```
-"gpt-5-nano-2025-08-07"
+"gpt-5.4-nano-2026-03-17"
 ```
 
 ## Call the adapter from the gateway
@@ -612,7 +612,7 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 ```
 
 ```
-"gpt-5-nano-2025-08-07"
+"gpt-5.4-nano-2026-03-17"
 ```
 
 A routine coding task goes to the mid tier:
@@ -661,13 +661,13 @@ kubectl logs -n agentgateway-system deploy/jev-extproc -c adapter --tail=4 \
 ```
 
 ```json
-{"selected_model":"gpt-5-nano","jev_choice":"economy","reason":"classified","confidence":1.0,"margin":1.0,"probabilities":{"mid":0.0,"high":0.0,"economy":1.0},"jev_latency_ms":344}
+{"selected_model":"gpt-5.4-nano","jev_choice":"economy","reason":"classified","confidence":1.0,"margin":1.0,"probabilities":{"mid":0.0,"high":0.0,"economy":1.0},"jev_latency_ms":344}
 {"selected_model":"gpt-5.6-luna","jev_choice":"mid","reason":"classified","confidence":1.0,"margin":1.0,"probabilities":{"high":0.0,"economy":0.0,"mid":1.0},"jev_latency_ms":135}
 {"selected_model":"gpt-5.6-terra","jev_choice":"high","reason":"classified","confidence":0.91,"margin":0.88,"probabilities":{"mid":0.0,"economy":0.06,"high":0.94},"jev_latency_ms":130}
 {"selected_model":"gpt-5.6-luna","jev_choice":"mid","reason":"low_confidence","confidence":0.35,"margin":0.12,"probabilities":{"economy":0.44,"high":0.0,"mid":0.56},"jev_latency_ms":161}
 ```
 
-The last line is the regex prompt. Jev picked `mid`, but with a margin of about 0.1 against a `minMargin` of 0.2, so the adapter recorded `reason=low_confidence` and served the fallback tier. If you set `fallbackTier` to `economy`, the same prompt would be served by `gpt-5-nano`. Exact probabilities vary slightly between runs.
+The last line is the regex prompt. Jev picked `mid`, but with a margin of about 0.1 against a `minMargin` of 0.2, so the adapter recorded `reason=low_confidence` and served the fallback tier. If you set `fallbackTier` to `economy`, the same prompt would be served by `gpt-5.4-nano`. Exact probabilities vary slightly between runs.
 
 ### Requests that name a real model
 
@@ -676,11 +676,11 @@ A request that names a real model skips classification. This proof request would
 ```bash
 curl -s "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-5-nano","messages":[{"role":"user","content":"Prove that sqrt(2) is irrational."}]}' | jq '.model'
+  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Prove that sqrt(2) is irrational."}]}' | jq '.model'
 ```
 
 ```
-"gpt-5-nano-2025-08-07"
+"gpt-5.4-nano-2026-03-17"
 ```
 
 > **Clients can still name a premium model.** This lab makes `auto_model` the cheap default without taking choice away from clients. To require routing for every request, reject other model names on this route.
@@ -734,7 +734,7 @@ curl -s -o /dev/null -w 'auto_model: %{http_code}\n' "$GATEWAY_IP:8080/semantic"
   -d '{"model":"auto_model","messages":[{"role":"user","content":"say hi"}]}'
 curl -s -o /dev/null -w 'named model: %{http_code}\n' "$GATEWAY_IP:8080/semantic" \
   -H "content-type: application/json" \
-  -d '{"model":"gpt-5-nano","messages":[{"role":"user","content":"say hi"}]}'
+  -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}'
 curl -s -o /dev/null -w 'other path: %{http_code}\n' "$GATEWAY_IP:8080/other"
 ```
 
@@ -744,7 +744,7 @@ named model: 200
 other path: 404
 ```
 
-The `auto_model` request fails closed with `reason=ExtProc` in the access log. With the default condition, the request that names `gpt-5-nano` skips the adapter and OpenAI answers it. `/other` returns the gateway's normal `404` for an unmatched path. With the path-only condition, the named-model request would also return `500`.
+The `auto_model` request fails closed with `reason=ExtProc` in the access log. With the default condition, the request that names `gpt-5.4-nano` skips the adapter and OpenAI answers it. `/other` returns the gateway's normal `404` for an unmatched path. With the path-only condition, the named-model request would also return `500`.
 
 Restore the key and the adapter:
 
@@ -769,13 +769,13 @@ kubectl logs -n agentgateway-system -l gateway.networking.k8s.io/gateway-name=ag
 ```
 
 ```
-gpt-5-nano 0.153301555s
+gpt-5.4-nano 0.153301555s
 gpt-5.6-luna 0.144004706s
 gpt-5.6-terra 0.139670353s
-gpt-5-nano 0.000178177s
+gpt-5.4-nano 0.000178177s
 ```
 
-The `auto_model` requests spent about 145ms in the adapter at the median and 200ms at the 90th percentile, nearly all of it the Jev call. An occasional request takes closer to 430ms. The adapter keeps its connections to Jev open between requests, so only the first call after the adapter starts pays for the TLS handshake. Opening a new connection for every call added about 30ms at the median from the test cluster, and more on a network with a longer round trip to `api.typesafe.ai`. The request that named `gpt-5-nano` directly skipped the adapter and spent under 1ms. Jev charges for input tokens only. With this profile, a decision costs about 530 input tokens, roughly $0.00002 at the [published Jev rate](https://docs.typesafe.ai/models).
+The `auto_model` requests spent about 145ms in the adapter at the median and 200ms at the 90th percentile, nearly all of it the Jev call. An occasional request takes closer to 430ms. The adapter keeps its connections to Jev open between requests, so only the first call after the adapter starts pays for the TLS handshake. Opening a new connection for every call added about 30ms at the median from the test cluster, and more on a network with a longer round trip to `api.typesafe.ai`. The request that named `gpt-5.4-nano` directly skipped the adapter and spent under 1ms. Jev charges for input tokens only. With this profile, a decision costs about 530 input tokens, roughly $0.00002 at the [published Jev rate](https://docs.typesafe.ai/models).
 
 #### Compare the three routers
 
@@ -811,7 +811,7 @@ done | sort -u
 ```
 
 ```
-gen_ai_request_model="gpt-5-nano",gen_ai_response_model="gpt-5-nano-2025-08-07"
+gen_ai_request_model="gpt-5.4-nano",gen_ai_response_model="gpt-5.4-nano-2026-03-17"
 gen_ai_request_model="gpt-5.6-luna",gen_ai_response_model="gpt-5.6-luna"
 gen_ai_request_model="gpt-5.6-terra",gen_ai_response_model="gpt-5.6-terra"
 ```

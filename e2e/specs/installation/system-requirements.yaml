@@ -60,13 +60,16 @@ steps:
     assert:
       - contains: "helm_ok=yes"
 
-  - probe: "the documented Solo UI version matches the installed release"
+  - probe: "the documented Solo UI row matches the bundled ui subchart"
     script: |
       DOC=labs/installation/system-requirements.md
-      UI_DOC="$(grep -E '^\| *Solo UI *\|' "$DOC" | head -1 | awk -F'|' '{print $3}' | sed 's/^ *//; s/ *$//')"
-      LIVE="$(helm list -n agentgateway-system -o json | jq -r '.[] | select(.name=="management") | .chart' | sed 's/^management-//')"
-      echo "documented=$UI_DOC installed=$LIVE"
-      if [ "$UI_DOC" = "$LIVE" ]; then echo "ui_match=yes"; else echo "ui_match=no"; fi
+      UI_DOC="$(grep -E '^\| *Solo UI *\|' "$DOC" | head -1 | awk -F'|' '{print $3}')"
+      echo "documented=$UI_DOC"
+      APP="$(helm list -n agentgateway-system -o json | jq -r '.[] | select(.name=="enterprise-agentgateway") | .app_version')"
+      IMG="$(kubectl get deploy enterprise-agentgateway-ui -n agentgateway-system \
+        -o jsonpath='{.spec.template.spec.containers[?(@.name=="ui-backend")].image}')"
+      echo "app_version=$APP ui_image=$IMG"
+      if [[ "$UI_DOC" == *'`ui` subchart'* && "$IMG" == *":$APP" ]]; then echo "ui_match=yes"; else echo "ui_match=no"; fi
     assert:
       - contains: "ui_match=yes"
 

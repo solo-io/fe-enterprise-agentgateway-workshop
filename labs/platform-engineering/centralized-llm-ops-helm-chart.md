@@ -489,7 +489,7 @@ modelCatalog:
     apiPath: /v1/chat/completions
   - alias: chat-real
     provider: openai
-    model: gpt-4.1-nano
+    model: gpt-5.4-mini
     auth:
       secretRef: openai-secret
 grants:
@@ -535,12 +535,12 @@ curl -s "http://${GATEWAY_IP}:8080/llm/chat-real" \
 Expected output:
 
 ```
-gpt-4.1-nano
+gpt-5.4-mini-2026-03-17
 ```
 
-(OpenAI may return a dated variant of this model name; either confirms the swap took effect.)
+OpenAI returns the dated snapshot ID for `gpt-5.4-mini`.
 
-Team alpha's request body still says `gpt-5.4-nano`, byte for byte the string it sent in Step 2, and the answer came back from `gpt-4.1-nano`. The `EnterpriseAgentgatewayBackend`'s pinned model wins: the gateway never consults the request body's `model` field for routing, so the platform can move an alias to a different model or provider while a team's request stays as it was. Swapping the *provider* takes the same one-line edit (`provider: anthropic` plus a different platform-held `secretRef`); this lab swaps the model because a second provider credential is more than most readers have on hand.
+Team alpha's request body still says `gpt-5.4-nano`, byte for byte the string it sent in Step 2, and the answer came back from `gpt-5.4-mini`. The `EnterpriseAgentgatewayBackend`'s pinned model wins: the gateway never consults the request body's `model` field for routing, so the platform can move an alias to a different model or provider while a team's request stays as it was. Swapping the *provider* takes the same one-line edit (`provider: anthropic` plus a different platform-held `secretRef`); this lab swaps the model because a second provider credential is more than most readers have on hand.
 
 ---
 
@@ -567,7 +567,7 @@ modelCatalog:
     apiPath: /v1/chat/completions
   - alias: chat-real
     provider: openai
-    model: gpt-4.1-nano
+    model: gpt-5.4-mini
     auth:
       secretRef: openai-secret
 grants:

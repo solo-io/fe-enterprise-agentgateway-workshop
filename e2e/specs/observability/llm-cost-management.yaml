@@ -22,15 +22,15 @@ steps:
 
   # 002 turns Cost Management on, so the lab no longer enables it. Assert the
   # prerequisite anyway: without the flag the whole lab has nowhere to render.
-  - probe: "002 left Cost Management enabled on the management release"
+  - probe: "002 left Cost Management enabled on the ui subchart"
     script: |
-      helm get values management -n agentgateway-system -a -o json \
-        | jq -r '.products.agentgateway.features["cost-management"] // "unset"' \
+      helm get values enterprise-agentgateway -n agentgateway-system -a -o json \
+        | jq -r '.ui.features.costManagement // "unset"' \
         | sed 's/^/cost_management=/'
     assert:
       - contains: "cost_management=true"
 
-  - resource: deploy/solo-enterprise-ui
+  - resource: deploy/enterprise-agentgateway-ui
     jsonpath: .status.readyReplicas
     expect: "1"
     name: the Solo UI 002 installed is ready to render Cost Management
@@ -74,9 +74,6 @@ steps:
       # the last block prints the resulting resource.
       - contains: "modelCatalog"
       - contains: "logging"
-      # The merge patch replaces the whole sources list, so it must restate
-      # 002's base source ahead of the overlay.
-      - contains: "model-cost-catalog"
       - contains: "llm-model-costs"
 
   # Three separately-owned budget resources, all enforced at once. The lab's
@@ -155,26 +152,33 @@ steps:
       - matches: 'cost\.total=[0-9]*\.?[0-9]*[1-9]'
 
   # The gpt-5.6 traffic above is priced by the built-in base catalog, so it
-  # passes with or without the overlay. gpt-4.1-nano is absent from the base
-  # and priced only by llm-model-costs, so a nonzero cost on it proves the
-  # overlay reached the proxy.
-  - probe: "the overlay prices a model the base catalog lacks"
+  # passes with or without the overlay. gpt-5.5 is priced by both: list is
+  # $5.00/$30.00 per 1M, the overlay is $2.50/$15.00. The probe recomputes the
+  # logged cost at both rates, so only the overlay rate passes.
+  - probe: "the overlay overrides the base rate for gpt-5.5"
     script: |
       curl -s -o /dev/null "http://$GATEWAY_IP:8080/openai" \
         -H 'content-type: application/json' \
         -H 'Authorization: Bearer sk-alice-abc123def456' \
-        -d '{"model":"gpt-4.1-nano","messages":[{"role":"user","content":"Hello!"}]}'
+        -d '{"model":"gpt-5.5","messages":[{"role":"user","content":"Hello!"}]}'
       sleep 2
-      kubectl logs -n agentgateway-system \
+      LINE="$(kubectl logs -n agentgateway-system \
         -l app.kubernetes.io/name=agentgateway-proxy --tail 300 \
-        | grep 'gen_ai.request.model=gpt-4.1-nano' \
-        | grep -oE 'agw.ai.usage.cost.total=[0-9.e-]+' | tail -1
+        | grep 'gen_ai.request.model=gpt-5.5 ' | sort | tail -1)"
+      IN="$(grep -oE 'gen_ai.usage.input_tokens=[0-9]+' <<<"$LINE" | cut -d= -f2)"
+      OUT="$(grep -oE 'gen_ai.usage.output_tokens=[0-9]+' <<<"$LINE" | cut -d= -f2)"
+      COST="$(grep -oE 'agw.ai.usage.cost.total=[0-9.e-]+' <<<"$LINE" | cut -d= -f2)"
+      awk -v i="${IN:-0}" -v o="${OUT:-0}" -v c="${COST:-0}" 'BEGIN {
+        ov = (i*2.5 + o*15)/1e6; li = (i*5 + o*30)/1e6
+        d = c - ov; if (d < 0) d = -d
+        printf "in=%s out=%s cost=%s override=%.8f list=%.8f rate=%s\n", i, o, c, ov, li, (c > 0 && d < 1e-7) ? "override" : "other"
+      }'
     retry:
       attempts: 12
       delay: 15
-      until: 'cost.total=[0-9]*\.?[0-9]*[1-9]'
+      until: 'rate=override'
     assert:
-      - matches: 'cost\.total=[0-9]*\.?[0-9]*[1-9]'
+      - contains: "rate=override"
 
   # Enforcement, end to end: bob's 2,000-token cap rejects, and the
   # exact-subject entry debits only him.

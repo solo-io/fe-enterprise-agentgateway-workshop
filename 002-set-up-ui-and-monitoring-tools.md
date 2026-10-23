@@ -11,98 +11,67 @@ This lab assumes that you have completed the setup in `001`
 
 ## Deploy Solo UI
 
-The Solo UI includes a built-in OpenTelemetry collector (`solo-enterprise-telemetry-collector`) that receives traces from AgentGateway and surfaces them in the UI.
+The Solo UI ships as the `ui` subchart of the `enterprise-agentgateway` chart installed in `001`. It includes a built-in OpenTelemetry collector (`enterprise-agentgateway-ui-telemetry-collector`) that receives traces from Agentgateway and surfaces them in the UI, plus a ClickHouse database that stores them. The UI reads the license key from the Secret that `001` created.
 
 ### Set required variables
 
-Export your Solo license key (same key used in lab 001):
+Use the same Enterprise Agentgateway version as lab `001`:
 ```bash
-export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export AGW_UI_VERSION=0.5.11
+export ENTERPRISE_AGW_VERSION=v2026.10.1
 ```
 
-### Step 1: Install/upgrade CRDs
+### Enable the UI subchart
+
+Upgrade the `enterprise-agentgateway` release with the `ui` values. `--reuse-values` keeps the values you set in `001`:
 
 ```bash
-helm upgrade -i management-crds oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management-crds \
-  --namespace agentgateway-system \
-  --create-namespace \
-  --version "$AGW_UI_VERSION"
-```
-
-### Step 2: Install/upgrade the chart
-
-The `management-crds` subchart is bundled inside `management` and enabled by default. Since we installed it separately in Step 1, disable it here to avoid ownership conflicts:
-
-```bash
-helm upgrade -i management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
---namespace agentgateway-system \
---create-namespace \
---version "$AGW_UI_VERSION" \
+helm upgrade -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+--version "$ENTERPRISE_AGW_VERSION" \
+--reuse-values \
 -f - <<EOF
-management-crds:
-  enabled: false
-licensing:
-  licenseKey: "${SOLO_TRIAL_LICENSE_KEY}"
-global:
-  imagePullPolicy: IfNotPresent
-  #--- imagePullSecrets for private registry (propagated to all subcharts) ---
-  #imagePullSecrets:
-  #- name: my-registry-secret
-  imagePullSecrets: []
-  #--- Image overrides for all Solo-owned images (UI, OTEL collector) ---
-  #image:
-  #  registry: my-registry.example.com
-  #  repository: solo-enterprise
-  #  tag: ""
-service:
-  type: ClusterIP
-  clusterIP: ""
-products:
-  agentgateway:
-    enabled: true
-    namespace: agentgateway-system
-    features:
-      #--- Cost Management dashboard (budgets, spend by model/team) ---
-      cost-management: true
-      #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
-      cost-management-writes: true
-clickhouse:
+ui:
   enabled: true
-  #--- Image override for ClickHouse (no registry key — embed registry in repository if needed) ---
-  #image:
-  #  repository: clickhouse/clickhouse-server
-  #  tag: ""
-tracing:
-  verbose: true
+  #--- imagePullSecrets and registry override for the UI images (UI backend, autoauth, OTEL collectors) ---
+  #global:
+  #  imagePullSecrets:
+  #  - name: my-registry-secret
+  #  imageRegistry: my-registry.example.com
+  service:
+    type: ClusterIP
+  features:
+    #--- Cost Management dashboard (budgets, spend by model/team) ---
+    costManagement: true
+    #--- Set to false to make the dashboard read-only (no budget or dimension edits from the UI) ---
+    costManagementWrites: true
+  traces:
+    verbose: true
+  clickhouse:
+    enabled: true
+    #--- Image override for ClickHouse (no registry key, embed registry in repository if needed) ---
+    #image:
+    #  repository: clickhouse/clickhouse-server
+    #  tag: ""
 EOF
 ```
+
+> [!NOTE]
+> Later labs that re-run `helm upgrade` on `enterprise-agentgateway` pass `--reuse-values` so the `ui` values stay in place. If you run your own upgrade without it, include the `ui` block above or Helm removes the UI.
 
 Check that the Solo UI components are running:
 
 ```bash
-kubectl get pods -n agentgateway-system | awk 'NR==1 || /solo-enterprise|clickhouse/'
+kubectl rollout status deploy/enterprise-agentgateway-ui -n agentgateway-system --timeout=300s
+kubectl get pods -n agentgateway-system | awk 'NR==1 || /-ui|clickhouse/'
 ```
 
 Expected Output:
 
 ```
-NAME                                                   READY   STATUS    RESTARTS   AGE
-management-clickhouse-shard0-0                         1/1     Running   0          51s
-solo-enterprise-k8sobjects-collector-d4d9774bb-rqptk   1/1     Running   0          51s
-solo-enterprise-telemetry-collector-57448bc4b5-gmvkl   1/1     Running   0          51s
-solo-enterprise-ui-7dbf5c9c5c-zj7z2                    3/3     Running   0          51s
-```
-
-### Step 3: Apply the model cost catalog
-
-```bash
-kubectl create configmap model-cost-catalog -n agentgateway-system \
-  --from-file=catalog.json=lib/observability/model-catalog-v2026.8.2.json \
-  --dry-run=client -o yaml | kubectl apply -f -
-kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
-  --type merge -p '{"spec":{"modelCatalog":{"sources":[{"configMap":{"name":"model-cost-catalog","key":"catalog.json"}}]}}}'
-kubectl rollout status deploy/agentgateway-proxy -n agentgateway-system
+NAME                                                              READY   STATUS    RESTARTS   AGE
+enterprise-agentgateway-clickhouse-shard0-0                       1/1     Running   0          60s
+enterprise-agentgateway-ui-d77d84fc4-md7n8                        2/2     Running   0          60s
+enterprise-agentgateway-ui-k8sobjects-collector-cc6948cbc-d6t95   1/1     Running   0          60s
+enterprise-agentgateway-ui-telemetry-collector-0                  1/1     Running   0          60s
 ```
 
 ## Deploy metrics
@@ -238,7 +207,7 @@ To access the Solo UI and view traces:
 
 1. Port-forward to the Solo UI service:
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 2. Open your browser and navigate to `http://localhost:4000`
@@ -367,11 +336,10 @@ The UI installs with coarse roles (Admin, Writer, Reader) that apply to every re
 Remove the Solo UI:
 
 ```bash
-helm uninstall management -n agentgateway-system
-helm uninstall management-crds -n agentgateway-system
-kubectl patch enterpriseagentgatewayparameters agentgateway-config -n agentgateway-system \
-  --type merge -p '{"spec":{"modelCatalog":null}}'
-kubectl delete configmap model-cost-catalog -n agentgateway-system --ignore-not-found
+helm upgrade -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+--version "$ENTERPRISE_AGW_VERSION" \
+--reuse-values \
+--set ui.enabled=false
 ```
 
 Remove Grafana and Prometheus:

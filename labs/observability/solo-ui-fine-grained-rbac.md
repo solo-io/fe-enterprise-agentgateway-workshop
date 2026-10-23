@@ -1,7 +1,7 @@
 # Scope Solo UI Access per Team with Fine-Grained RBAC
 
 ## Pre-requisites
-This lab assumes that you have completed the setup in `001` and `002`. It needs Solo UI **0.5.11** or later, the version `002` installs.
+This lab assumes that you have completed the setup in `001` and `002`.
 
 ## Lab Objectives
 - Switch the Solo UI from coarse roles to fine-grained RBAC
@@ -31,29 +31,29 @@ To switch profiles, open the account menu at the bottom of the sidebar (click th
 
 ## Turn On Fine-Grained Mode
 
-Upgrade the `management` release in place:
+Upgrade the `enterprise-agentgateway` release in place:
 
 ```bash
-helm upgrade management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
+export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
+helm upgrade enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --namespace agentgateway-system \
-  --version "$AGW_UI_VERSION" \
+  --version "$ENTERPRISE_AGW_VERSION" \
   --reuse-values \
   -f - <<EOF
-rbac:
-  mode: fine-grained
-  subjectMapping:
-    userClaim: sub
+ui:
+  rbac:
+    mode: fine-grained
 EOF
-kubectl rollout status deploy/solo-enterprise-ui -n agentgateway-system
+kubectl rollout status deploy/enterprise-agentgateway-ui -n agentgateway-system
 ```
 
-- `rbac.mode: fine-grained` makes the UI backend evaluate `EnterpriseAgentgatewayRBACPolicy` grants on budget, virtual key, and HTTPRoute calls. The default, `coarse`, ignores those policies.
-- `rbac.subjectMapping.userClaim` names the token claim that identifies the user. The default is `preferred_username`, and the built-in profiles leave that claim out. Keep the default with an external OIDC provider; with the built-in profiles, set `sub`. If the claim is missing, every page fails with `authenticated identity is not usable for fine-grained management RBAC`.
+- `ui.rbac.mode: fine-grained` makes the UI backend evaluate `EnterpriseAgentgatewayRBACPolicy` grants on budget, virtual key, and HTTPRoute calls. The default, `coarse`, ignores those policies.
+- With the built-in profiles, the UI identifies each user by the token's `sub` claim. With an external OIDC provider, `ui.rbac.subjectMapping.userClaim` names the claim instead (default `preferred_username`); see [Use Your Identity Provider in Production](#use-your-identity-provider-in-production).
 
 Port-forward the UI if it is not already open, and browse to `http://localhost:4000`:
 
 ```bash
-kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80
+kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80
 ```
 
 ## Create Two Team Namespaces
@@ -417,22 +417,22 @@ writer
 The built-in profiles are for demos. In production, point the UI at your OIDC provider (see [Expose the UI via HTTPS](https://docs.solo.io/agentgateway/latest/install/ui/https/) for the client setup) and map its groups to coarse roles. A user needs a coarse role to load the UI; fine-grained policies then scope what they see:
 
 ```yaml
-oidc:
-  issuer: https://idp.example.com/realms/example
 ui:
+  oidc:
+    issuer: https://idp.example.com/realms/example
   backend:
     oidc:
       secretRef: ui-backend-oidc-secret
-rbac:
-  mode: fine-grained
-  subjectMapping:
-    userClaim: preferred_username
-    groupsClaim: Groups
-  roleMapping:
-    roleMappings:
-      platform-team: global.Admin
-      team-a: global.Reader
-      team-b: global.Reader
+  rbac:
+    mode: fine-grained
+    subjectMapping:
+      userClaim: preferred_username
+      groupsClaim: Groups
+    roleMapping:
+      roleMappings:
+        platform-team: global.Admin
+        team-a: global.Reader
+        team-b: global.Reader
 ```
 
 Then write policy `principals` against your real groups (for example `groups: team-a`) and keep virtual key `user` metadata equal to each user's `preferred_username`, so the owner default applies.
@@ -445,15 +445,15 @@ Remove the demo resources and return the UI to coarse mode. Other labs assume co
 kubectl delete enterpriseagentgatewayrbacpolicy platform-admins team-a-leads -n agentgateway-system --ignore-not-found
 kubectl delete enterpriseagentgatewaypolicy budget-enforcement -n agentgateway-system --ignore-not-found
 kubectl delete namespace team-a team-b --ignore-not-found
-helm upgrade management oci://us-docker.pkg.dev/solo-public/solo-enterprise-helm/charts/management \
+export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n agentgateway-system | awk '/^VERSION:/ {print $2}')
+helm upgrade enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
   --namespace agentgateway-system \
-  --version "$AGW_UI_VERSION" \
+  --version "$ENTERPRISE_AGW_VERSION" \
   --reuse-values \
   -f - <<EOF
-rbac:
-  mode: coarse
-  subjectMapping:
-    userClaim: preferred_username
+ui:
+  rbac:
+    mode: coarse
 EOF
-kubectl rollout status deploy/solo-enterprise-ui -n agentgateway-system
+kubectl rollout status deploy/enterprise-agentgateway-ui -n agentgateway-system
 ```

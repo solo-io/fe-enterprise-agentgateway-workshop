@@ -121,7 +121,7 @@ ordinals: `run: [1, 2]`.
 ```yaml
   - probe: "the UI answers over its Service"
     script: |
-      e2e_pf agentgateway-system svc/solo-enterprise-ui 14000:80
+      e2e_pf agentgateway-system svc/enterprise-agentgateway-ui 14000:80
       echo "code=$(curl -s -o /dev/null -w '%{http_code}' localhost:14000)"
       e2e_pf_stop
     assert:

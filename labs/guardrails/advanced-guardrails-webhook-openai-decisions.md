@@ -1186,7 +1186,7 @@ The Decisions API calls go from the webhook straight to OpenAI, so their tokens 
 
 ### View traces
 
-Port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/solo-enterprise-ui 4000:80`, open http://localhost:4000, and click **Tracing** in the left navigation. Spans carry the first user message as `llm.prompt.user` and the response text as `llm.completion.output`, so you can read the masked prompt and the masked completion there. Rejected requests carry `http.status=403`, `reason=Guardrail`, and `error="request rejected by webhook guardrail"`, and have no `gen_ai.*` attributes because the request never reached OpenAI's completion endpoint.
+Port-forward the Solo UI with `kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:80`, open http://localhost:4000, and click **Tracing** in the left navigation. Spans carry the first user message as `llm.prompt.user` and the response text as `llm.completion.output`, so you can read the masked prompt and the masked completion there. Rejected requests carry `http.status=403`, `reason=Guardrail`, and `error="request rejected by webhook guardrail"`, and have no `gen_ai.*` attributes because the request never reached OpenAI's completion endpoint.
 
 ### View AgentGateway access logs
 

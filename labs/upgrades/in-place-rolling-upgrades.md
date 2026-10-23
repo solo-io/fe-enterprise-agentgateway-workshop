@@ -603,7 +603,10 @@ kubectl rollout status deployment/enterprise-agentgateway -n agentgateway-system
 kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system --timeout=300s
 ```
 
-> Pass your values with `-f`, not `--reuse-values`: `--reuse-values` does not merge the new chart's defaults and can fail to template across a version bump (`<.Values.externalSecrets.stores>: nil pointer`). Also remove any per-component image tag you pinned (Helm `controller.image`, or `spec.image` and `spec.sharedExtensions.<name>.image` on the `EnterpriseAgentgatewayParameters`). A pinned tag keeps that component on the old version after the chart moves.
+> Pass your values with `-f`, not `--reuse-values`: `--reuse-values` does not merge the new chart's defaults and can fail to template across a version bump (`<.Values.externalSecrets.stores>: nil pointer`). Also remove any per-component image tag you pinned (Helm `controller.image`, or `spec.image` and `spec.sharedExtensions.<name>.image` on the `EnterpriseAgentgatewayParameters`). A pinned tag keeps that component on the old version after the chart moves. If you enabled the Solo UI in `002`, put its `ui` block in `your-values.yaml`, or the upgrade removes the UI.
+
+> [!NOTE]
+> An upgrade to `v2026.10.1` or later encrypts the OAuth flow state and the upstream dynamic client registrations that the token exchange server stores. The upgrade deletes the existing upstream registrations, and agentgateway registers again on first use. Users of eager-OAuth MCP backends must authorize again, and logins in progress must restart.
 
 Run any of the k6 Jobs above during the upgrade to confirm the same zero-downtime behavior end-to-end.
 

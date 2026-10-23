@@ -48,7 +48,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.9.3
+export ENTERPRISE_AGW_VERSION=v2026.10.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -472,6 +472,8 @@ kubectl delete gateway agentgateway-proxy -n agentgateway-system --ignore-not-fo
 kubectl delete enterpriseagentgatewayparameters agentgateway-config agentgateway-shared-extensions -n agentgateway-system --ignore-not-found
 helm uninstall enterprise-agentgateway -n agentgateway-system
 helm uninstall enterprise-agentgateway-crds -n agentgateway-system
+# The CRDs chart keeps the RBAC policy CRD on uninstall; delete it explicitly
+kubectl delete crd enterpriseagentgatewayrbacpolicies.enterpriseagentgateway.solo.io --ignore-not-found
 kubectl delete gatewayclass enterprise-agentgateway enterprise-agentgateway-waypoint --ignore-not-found
 kubectl delete namespace agentgateway-system
 # (Optional) Remove the Kubernetes Gateway API CRDs only if nothing else on the cluster uses them

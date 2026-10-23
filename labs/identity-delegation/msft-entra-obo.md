@@ -82,7 +82,7 @@ export ENTRA_DOWNSTREAM_SCOPE="$ENTRA_DOWNSTREAM_SCOPE"  # e.g. "api://ffffffff-
 export ENTRA_OBO_CLIENT_SECRET="$ENTRA_OBO_CLIENT_SECRET"
 
 # Controller version and license (set these to match your environment)
-export ENTERPRISE_AGW_VERSION=v2026.9.3
+export ENTERPRISE_AGW_VERSION=v2026.10.1
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
 ```
 
@@ -105,6 +105,7 @@ Upgrade the controller Helm release with a `tokenExchange` block. The `subjectVa
 helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
 --create-namespace \
 --version $ENTERPRISE_AGW_VERSION \
+--reuse-values \
 --set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY \
 -f -<<EOF
 tokenExchange:
@@ -564,8 +565,10 @@ kubectl patch enterpriseagentgatewayparameters agentgateway-config \
 kubectl delete secret -n agentgateway-system entra-obo-client-secret
 
 # Restore controller to its original configuration (no tokenExchange)
-helm upgrade -i -n agentgateway-system enterprise-agentgateway oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
---create-namespace \
---version $ENTERPRISE_AGW_VERSION \
---set-string licensing.licenseKey=$SOLO_TRIAL_LICENSE_KEY
+helm get values enterprise-agentgateway -n agentgateway-system -o json \
+  | jq 'del(.tokenExchange)' \
+  | helm upgrade -n agentgateway-system enterprise-agentgateway \
+      oci://us-docker.pkg.dev/solo-public/enterprise-agentgateway/charts/enterprise-agentgateway \
+      --version $ENTERPRISE_AGW_VERSION \
+      --reset-values -f -
 ```

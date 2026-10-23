@@ -82,6 +82,22 @@ steps:
     assert:
       - matches: 'HTTP/[0-9.]+ (200|429)'
 
+  # A bare request.headers["x-user-id"] lookup returns a list for a repeated
+  # header, the descriptor is dropped and the call is never limited. The lab's
+  # join() form must still trip the 100-token budget when the header repeats.
+  - probe: "a repeated X-User-ID header is still rate limited"
+    script: |
+      U="dup-$RANDOM"; CODES=""
+      for i in $(seq 1 20); do
+        CODES="$CODES $(curl -s -o /dev/null -w '%{http_code}' "$GATEWAY_IP:8080/openai" \
+          -H 'content-type: application/json' -H "X-User-ID: $U" -H "X-User-ID: $U" \
+          -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Whats your favorite poem?"}]}')"
+        [[ "$CODES" == *429* ]] && break
+      done
+      echo "codes=$CODES"
+    assert:
+      - contains: "429"
+
   # ---- Multi-header composite descriptor ----
   - section: "Configure multi-header based token rate limiting"
     run: all

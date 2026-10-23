@@ -1,5 +1,28 @@
 # Changelog
 
+0.15.0 - (10-23-26)
+---
+- Bump Enterprise Agentgateway from `v2026.9.3` to `v2026.10.1`. Update the image list, the system requirements, the README and the `appVersion` of the three charts
+- `001`: the CRD list now includes `EnterpriseAgentgatewayRBACPolicy`
+- **Breaking:** `002` installs the Solo UI as the `ui` subchart of the `enterprise-agentgateway` release (`ui.enabled: true` with `--reuse-values`) instead of the `management` and `management-crds` charts. The UI resources are renamed: `svc/enterprise-agentgateway-ui`, `deploy/enterprise-agentgateway-ui`, `enterprise-agentgateway-ui-telemetry-collector`, `enterprise-agentgateway-clickhouse-shard0-0`, ClickHouse database `agentgateway`. Every lab's port-forward and tracing reference uses the new names
+- `002`: remove Step 3 (the `model-cost-catalog` ConfigMap) and `lib/observability/model-catalog-v2026.8.2.json`. From `v2026.10.1` the Model Cost Catalog tab shows the built-in catalog (787 models) as the base with no `modelCatalog` sources set
+- Labs that re-run `helm upgrade` on `enterprise-agentgateway` (eager-auth MCP labs, Figma labs, OBO labs, CrewAI OBO) pass `--reuse-values` so the `ui` values stay in place
+- `llm-cost-management.md`: the overlay is the only `modelCatalog` source, and it overrides `gpt-5.5` only. OpenAI retired `gpt-4.1-nano` (`404 model_not_found`), and every current OpenAI chat model is in the built-in catalog. The lab switches Cost Management off through `ui.features.costManagement`. The e2e probe checks that `gpt-5.5` prices at the override rate, not list
+- `solo-ui-fine-grained-rbac.md`: set `ui.rbac.*` on the `enterprise-agentgateway` release. The built-in profiles identify users by `sub`, so the lab no longer sets `userClaim`
+- `solo-ui-fine-grained-rbac.md` and `llm-cost-management.md` read `ENTERPRISE_AGW_VERSION` from the installed release before `helm upgrade`
+- Mirror the `v2026.10.1` images and `solo-enterprise-ui-backend:2026.10.1` to `docker.io/ably7` (multi-arch)
+- Air-gap lab: the UI values set `registry` and `repository` per image. `ui.global.imageRegistry` keeps each image's repository path
+- `global-rate-limiting.md`: the header-based limits use `default(request.headers.join()["x-user-id"], "anonymous")`. With a plain `request.headers["X-User-ID"]`, a client that sends the header twice, or not at all, is never rate limited on `v2026.10.1`
+- Eager-auth MCP labs (Auth0, Auth0 pre-issuance, Okta, Entra, Keycloak) and both Figma labs: the issuer config sets `incoming_clients.allowed_redirect_uris` for MCP Inspector, Claude Code and VS Code
+- Eager-auth Auth0, Auth0 pre-issuance and Okta labs: the Step 2 and Cleanup Gateway manifests keep `infrastructure.parametersRef`. Without it the shared Gateway lost the `001` parameters and the proxy dropped to one replica
+- `in-place-rolling-upgrades.md`: carry the `ui` block in `your-values.yaml`, and add a note that an upgrade to `v2026.10.1` re-registers upstream OAuth clients and resets completed elicitations
+- `mcp-tool-rate-limiting.md`: remove the `v2026.8.x` note about HTTP `429` denials
+- `centralized-llm-ops-helm-chart.md`: the Step 5 backend pin moves from `gpt-4.1-nano` to `gpt-5.4-mini`
+- Semantic routing labs (vSR, Jev, Decisions API): the economy tier moves from `gpt-5-nano` to `gpt-5.4-nano`
+- `seed-cost-data.sh`: write to `agentgateway.agw_spans_typed` on `enterprise-agentgateway-clickhouse-shard0-0`
+- `networking-architecture.md`: the telemetry collector runs in `agentgateway-system`, not `solo-ui`
+- e2e: update the `002`, cost, RBAC and system-requirements specs for the `ui` subchart
+
 0.14.9 - (10-16-26)
 ---
 - Bump the Solo UI (`management`, `management-crds`) from `0.5.8` to `0.5.11` in `002`.
