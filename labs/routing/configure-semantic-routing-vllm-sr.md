@@ -33,7 +33,7 @@ vLLM Semantic Router
     │  IntelligentPool:  which models is this client allowed to reach?
     │  rewrites body model: auto_model → gpt-5.4-nano | gpt-5.6-luna | gpt-5.6-terra
     ▼
-HTTPRoute /semantic  →  EnterpriseAgentgatewayBackend (openai-all-models)
+HTTPRoute /semantic  →  AgentgatewayModel (openai-all-models)
     │  no model override, so the rewritten name passes straight through
     ▼
 OpenAI
@@ -317,7 +317,7 @@ kubectl wait --for=condition=Ready \
   -n semantic-router-config --timeout=180s
 ```
 
-## Create the OpenAI backend and route
+## Create the OpenAI model and route
 
 The completion path authenticates with its own Secret, in the header format the gateway forwards to OpenAI:
 
@@ -327,7 +327,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-One route and one backend serve both tiers. The `EnterpriseAgentgatewayBackend` sets **no** model override, so OpenAI serves whatever model name is in the request body when the gateway forwards it, including the name vSR just wrote there.
+One route and one model serve both tiers. The `openai-all-models` model matches any name (`match.model: "*"`) and does **not** pin a model, so OpenAI serves whatever model name is in the request body when the gateway forwards it, including the name vSR just wrote there.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -346,21 +346,25 @@ spec:
             type: PathPrefix
             value: /semantic
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: semantic
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
@@ -374,7 +378,7 @@ Confirm the plain path works before adding the router, so that a later failure h
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 echo $GATEWAY_IP
 
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
 ```
@@ -443,7 +447,7 @@ The requests below differ only in their prompt text, and all name `auto_model`.
 An easy prompt scores well below both thresholds, so it falls to the pool's `defaultModel`:
 
 ```bash
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"auto_model","messages":[{"role":"user","content":"Summarize this email in one sentence: lunch moved to noon."}]}' | jq '.model'
 ```
@@ -455,7 +459,7 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 A routine coding task matches the `moderate` signal and reaches the mid tier:
 
 ```bash
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"auto_model","messages":[{"role":"user","content":"Write a Python function that parses a CSV file and returns the sum of each numeric column."}]}' | jq '.model'
 ```
@@ -467,7 +471,7 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 A proof request escalates to the high tier even though it shares no words with the candidate phrases; the match is on meaning:
 
 ```bash
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"auto_model","messages":[{"role":"user","content":"Show that there are infinitely many primes."}]}' | jq '.model'
 ```
@@ -600,7 +604,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system semantic-router --ignore-not-found
 kubectl delete httproute -n agentgateway-system semantic --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-embedding-key --ignore-not-found
 kubectl delete intelligentroute -n semantic-router-config workshop-routing --ignore-not-found

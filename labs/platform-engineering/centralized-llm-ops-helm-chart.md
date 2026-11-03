@@ -145,9 +145,7 @@ modelCatalog:
   - alias: chat-mock
     provider: openai
     model: mock-model
-    host: mock-model-svc.agentgateway-system.svc.cluster.local
-    port: 8000
-    apiPath: /v1/chat/completions
+    baseURL: http://mock-model-svc.agentgateway-system.svc.cluster.local:8000/v1
   - alias: chat-real
     provider: openai
     model: gpt-5.4-nano
@@ -178,7 +176,7 @@ REVISION: 1
 Verify the catalog rendered: a `Gateway`, one route and one auth policy per alias, and the access-log policy:
 
 ```bash
-kubectl get gateway,httproute,enterpriseagentgatewaybackend,enterpriseagentgatewaypolicy \
+kubectl get gateway,httproute,agentgatewaymodel,enterpriseagentgatewaypolicy \
   -n agentgateway-system -l app.kubernetes.io/part-of=agentgateway-llm-ops
 ```
 
@@ -192,9 +190,9 @@ NAME                                                  HOSTNAMES   AGE
 httproute.gateway.networking.k8s.io/llm-chat-mock                 5s
 httproute.gateway.networking.k8s.io/llm-chat-real                 5s
 
-NAME                                                                            ACCEPTED   AGE
-enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/llm-chat-mock      True       5s
-enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/llm-chat-real      True       5s
+NAME                                               MODEL MATCH   AGE
+agentgatewaymodel.agentgateway.dev/llm-chat-mock   *             5s
+agentgatewaymodel.agentgateway.dev/llm-chat-real   *             5s
 
 NAME                                                                                 ACCEPTED   ATTACHED   AGE
 enterpriseagentgatewaypolicy.enterpriseagentgateway.solo.io/agw-llm-ops-access-log   True       True       5s
@@ -232,10 +230,10 @@ GATEWAY_IP=172.18.255.251
 The catalog is live, and both aliases have empty key sets. Neither a missing key nor a made-up one gets past auth:
 
 ```bash
-curl -s -o /dev/null -w "chat-mock no-key:  %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock" \
+curl -s -o /dev/null -w "chat-mock no-key:  %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"mock-model","messages":[{"role":"user","content":"ping"}]}'
-curl -s -o /dev/null -w "chat-real bad-key: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-real" \
+curl -s -o /dev/null -w "chat-real bad-key: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-real/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer not-a-real-key" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"ping"}]}'
@@ -268,9 +266,7 @@ modelCatalog:
   - alias: chat-mock
     provider: openai
     model: mock-model
-    host: mock-model-svc.agentgateway-system.svc.cluster.local
-    port: 8000
-    apiPath: /v1/chat/completions
+    baseURL: http://mock-model-svc.agentgateway-system.svc.cluster.local:8000/v1
   - alias: chat-real
     provider: openai
     model: gpt-5.4-nano
@@ -319,7 +315,7 @@ The new key takes a few seconds to propagate to the proxy fleet. Send a request;
 
 ```bash
 sleep 10
-curl -s "http://${GATEWAY_IP}:8080/llm/chat-real" \
+curl -s "http://${GATEWAY_IP}:8080/llm/chat-real/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer alpha-key-8f3a" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"One-line haiku about gateways"}]}' | jq -r '.model'
@@ -338,7 +334,7 @@ gpt-5.4-nano
 The same key works on both granted aliases:
 
 ```bash
-curl -s -o /dev/null -w "alpha chat-mock: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock" \
+curl -s -o /dev/null -w "alpha chat-mock: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer alpha-key-8f3a" \
   -d '{"model":"mock-model","messages":[{"role":"user","content":"ping"}]}'
@@ -366,9 +362,7 @@ modelCatalog:
   - alias: chat-mock
     provider: openai
     model: mock-model
-    host: mock-model-svc.agentgateway-system.svc.cluster.local
-    port: 8000
-    apiPath: /v1/chat/completions
+    baseURL: http://mock-model-svc.agentgateway-system.svc.cluster.local:8000/v1
   - alias: chat-real
     provider: openai
     model: gpt-5.4-nano
@@ -413,13 +407,13 @@ Beta's new key takes a few seconds to propagate to the proxy fleet, so the loop 
 ```bash
 sleep 10
 for i in 1 2; do
-  curl -s -o /dev/null -w "beta-$i: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock" \
+  curl -s -o /dev/null -w "beta-$i: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock/v1/chat/completions" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer beta-key-2c71" \
     -d '{"model":"mock-model","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
   sleep 2
 done
-curl -s -o /dev/null -w "alpha:  %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock" \
+curl -s -o /dev/null -w "alpha:  %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer alpha-key-8f3a" \
   -d '{"model":"mock-model","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
@@ -444,7 +438,7 @@ Both teams hit the same URL with the same request body; the budget comes from th
 Team beta's key passes auth on `chat-mock` and fails it on `chat-real`:
 
 ```bash
-curl -s -o /dev/null -w "beta on chat-real: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-real" \
+curl -s -o /dev/null -w "beta on chat-real: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-real/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer beta-key-2c71" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"ping"}]}'
@@ -467,7 +461,7 @@ A team holds no chart and no CRDs in this model, and the provider credentials st
 | Call an alias the team wasn't granted | `401` | The alias's key set (a Secret label selector) never includes that team's key |
 | Send more requests than the budget allows | `429` | The per-team `RateLimitConfig` descriptor caps tokens/minute at the gateway |
 | Ask for a bigger budget | Nothing to edit | Budgets live in a platform-held values file; the team holds no chart and no values file of its own |
-| Send a different model name in the request body | No effect on routing or policy | The alias's backend pins the platform-chosen model server-side; the request body's `model` field never selects a different provider or model |
+| Send a different model name in the request body | No effect on routing or policy | The alias's model pins the platform-chosen model server-side; the request body's `model` field never selects a different provider or model |
 | Install a competing gateway, route, or policy | No standing to try | The team has no chart, no CRDs, and no release; it has nothing to install |
 
 ---
@@ -484,9 +478,7 @@ modelCatalog:
   - alias: chat-mock
     provider: openai
     model: mock-model
-    host: mock-model-svc.agentgateway-system.svc.cluster.local
-    port: 8000
-    apiPath: /v1/chat/completions
+    baseURL: http://mock-model-svc.agentgateway-system.svc.cluster.local:8000/v1
   - alias: chat-real
     provider: openai
     model: gpt-5.4-mini
@@ -526,7 +518,7 @@ The catalog change takes a few seconds to propagate to the proxy fleet. Rerun th
 
 ```bash
 sleep 10
-curl -s "http://${GATEWAY_IP}:8080/llm/chat-real" \
+curl -s "http://${GATEWAY_IP}:8080/llm/chat-real/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer alpha-key-8f3a" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"One-line haiku about gateways"}]}' | jq -r '.model'
@@ -540,7 +532,7 @@ gpt-5.4-mini-2026-03-17
 
 OpenAI returns the dated snapshot ID for `gpt-5.4-mini`.
 
-Team alpha's request body still says `gpt-5.4-nano`, byte for byte the string it sent in Step 2, and the answer came back from `gpt-5.4-mini`. The `EnterpriseAgentgatewayBackend`'s pinned model wins: the gateway never consults the request body's `model` field for routing, so the platform can move an alias to a different model or provider while a team's request stays as it was. Swapping the *provider* takes the same one-line edit (`provider: anthropic` plus a different platform-held `secretRef`); this lab swaps the model because a second provider credential is more than most readers have on hand.
+Team alpha's request body still says `gpt-5.4-nano`, byte for byte the string it sent in Step 2, and the answer came back from `gpt-5.4-mini`. The alias's `AgentgatewayModel` pins the model: its body transformation overwrites the request's `model` field before the request leaves the gateway, so the platform can move an alias to a different model or provider while a team's request stays as it was. Swapping the *provider* takes the same one-line edit (`provider: anthropic` plus a different platform-held `secretRef`); this lab swaps the model because a second provider credential is more than most readers have on hand.
 
 ---
 
@@ -562,9 +554,7 @@ modelCatalog:
   - alias: chat-mock
     provider: openai
     model: mock-model
-    host: mock-model-svc.agentgateway-system.svc.cluster.local
-    port: 8000
-    apiPath: /v1/chat/completions
+    baseURL: http://mock-model-svc.agentgateway-system.svc.cluster.local:8000/v1
   - alias: chat-real
     provider: openai
     model: gpt-5.4-mini
@@ -599,7 +589,7 @@ With the grant out of the values file, beta's key stops working, which confirms 
 
 ```bash
 sleep 10
-curl -s -o /dev/null -w "beta mid-migration: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock" \
+curl -s -o /dev/null -w "beta mid-migration: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer beta-key-2c71" \
   -d '{"model":"mock-model","messages":[{"role":"user","content":"ping"}]}'
@@ -650,7 +640,7 @@ The new key takes a few seconds to propagate to the proxy fleet. The 5 tokens/mi
 ```bash
 sleep 10
 for i in 1 2; do
-  curl -s -o /dev/null -w "beta-$i: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock" \
+  curl -s -o /dev/null -w "beta-$i: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock/v1/chat/completions" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer beta-key-2c71" \
     -d '{"model":"mock-model","messages":[{"role":"user","content":"Whats your favorite poem?"}]}'
@@ -715,7 +705,7 @@ And confirm team beta's key no longer works, even on the alias it used to reach.
 
 ```bash
 sleep 10
-curl -s -o /dev/null -w "beta after offboarding: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock" \
+curl -s -o /dev/null -w "beta after offboarding: %{http_code}\n" "http://${GATEWAY_IP}:8080/llm/chat-mock/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer beta-key-2c71" \
   -d '{"model":"mock-model","messages":[{"role":"user","content":"ping"}]}'

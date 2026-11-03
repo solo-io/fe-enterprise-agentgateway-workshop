@@ -167,25 +167,27 @@ BASELINE_PARAMS=agentgateway-config
 declare -a BASELINE_DRIFT=()
 
 baseline_fingerprint() {
-  # Three fields: the Gateway's own spec surface, then the inventory of
-  # HTTPRoutes and enterprise policies in the baseline namespace. A lab that
-  # leaves a stray route or policy behind corrupts later labs just as surely
-  # as one that rewrites the Gateway — the inventory makes that visible.
-  local gw routes pols
+  # Four fields: the Gateway's own spec surface, then the inventory of
+  # HTTPRoutes, enterprise policies and AgentgatewayModels in the baseline
+  # namespace. A lab that leaves a stray route, policy or model behind corrupts
+  # later labs just as surely as one that rewrites the Gateway — the inventory
+  # makes that visible.
+  local gw routes pols models
   gw="$(kubectl get gateway "$BASELINE_GW" -n "$BASELINE_NS" \
     -o jsonpath='{.spec.listeners[*].port}|{.spec.infrastructure.parametersRef.name}' 2>/dev/null)"
   routes="$(kubectl get httproutes -n "$BASELINE_NS" -o name 2>/dev/null | sort | paste -sd, -)"
   pols="$(kubectl get enterpriseagentgatewaypolicies -n "$BASELINE_NS" -o name 2>/dev/null | sort | paste -sd, -)"
+  models="$(kubectl get agentgatewaymodels -n "$BASELINE_NS" -o name 2>/dev/null | sort | paste -sd, -)"
   # Unit separator (0x1f): a single byte that can't appear in resource names,
-  # so the drift report can split the three fields reliably.
-  printf '%s\x1f%s\x1f%s' "$gw" "$routes" "$pols"
+  # so the drift report can split the four fields reliably.
+  printf '%s\x1f%s\x1f%s\x1f%s' "$gw" "$routes" "$pols" "$models"
 }
 
 baseline_exists() {
-  # The fingerprint always carries its two separator bytes, so it is never the
+  # The fingerprint always carries its three separator bytes, so it is never the
   # empty string — test the Gateway field instead.
   local gw
-  IFS=$'\x1f' read -r gw _ _ <<<"$1"
+  IFS=$'\x1f' read -r gw _ _ _ <<<"$1"
   [[ -n "$gw" ]]
 }
 
@@ -259,12 +261,13 @@ run_lab() {
   if [[ "$is_base" == "false" ]] && baseline_exists "$base_before" &&
      [[ "$base_after" != "$base_before" ]]; then
     printf "  ${RED}✗${NC} %-58s ${RED}BASELINE DRIFT${NC}\n" "$key"
-    local gw_b routes_b pols_b gw_a routes_a pols_a
-    IFS=$'\x1f' read -r gw_b routes_b pols_b <<<"$base_before"
-    IFS=$'\x1f' read -r gw_a routes_a pols_a <<<"$base_after"
+    local gw_b routes_b pols_b models_b gw_a routes_a pols_a models_a
+    IFS=$'\x1f' read -r gw_b routes_b pols_b models_b <<<"$base_before"
+    IFS=$'\x1f' read -r gw_a routes_a pols_a models_a <<<"$base_after"
     [[ "$gw_b"     != "$gw_a"     ]] && printf "      gateway:  %s -> %s\n" "$gw_b" "$gw_a"
     [[ "$routes_b" != "$routes_a" ]] && printf "      routes:   %s -> %s\n" "${routes_b:-none}" "${routes_a:-none}"
     [[ "$pols_b"   != "$pols_a"   ]] && printf "      policies: %s -> %s\n" "${pols_b:-none}" "${pols_a:-none}"
+    [[ "$models_b" != "$models_a" ]] && printf "      models:   %s -> %s\n" "${models_b:-none}" "${models_a:-none}"
     if [[ "$gw_b" != "$gw_a" ]] && baseline_restore; then
       printf "      ${YELLOW}restored the 001 Gateway so the run can continue${NC}\n"
     fi

@@ -40,7 +40,7 @@ decisions-guardrail-webhook
     │  any rule probability >= threshold  → 403 with the rule's message
     │  any value probability >= threshold → mask that value, e.g. <EMAIL_ADDRESS>
     ▼
-HTTPRoute /openai  →  EnterpriseAgentgatewayBackend (openai-all-models)  →  OpenAI
+HTTPRoute /openai  →  AgentgatewayModel (openai-all-models)  →  OpenAI
     │
     ▼
 EnterpriseAgentgatewayPolicy (backend.ai.promptGuard.response.webhook)
@@ -101,7 +101,7 @@ kubectl create secret generic openai-decisions-key -n agentgateway-system \
 
 ---
 
-## Create OpenAI route and backend
+## Create OpenAI route and model
 
 ```bash
 kubectl apply -f - <<EOF
@@ -120,25 +120,33 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
@@ -156,7 +164,7 @@ echo "Gateway IP: $GATEWAY_IP"
 Send a request before the guardrail is in place to confirm the route works:
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -620,7 +628,7 @@ guardrail-log() {
 Every rule scores near 0, so the request reaches OpenAI unchanged.
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -644,7 +652,7 @@ The answer contains no email, phone, card, or SSN, so the `/response` hook finds
 ## Test: harassment, rejected by a rule
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -676,7 +684,7 @@ The request never reached OpenAI's completion endpoint, so the `/response` hook 
 ## Test: jailbreak attempt, rejected by a rule
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -710,12 +718,12 @@ The requests in this section and the next include a system message that tells Op
 The webhook masks the card number:
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
     "messages": [
-      {"role": "system", "content": "You are an echo service. Reply with the user'\''s message exactly as written, character for character, and nothing else."},
+      {"role": "system", "content": "You are an echo service. Repeat each user message back word for word."},
       {"role": "user", "content": "Here is my number: 4111 1111 1111 1111."}
     ]
   }' | jq '.choices[0].message.content'
@@ -726,12 +734,12 @@ curl -s "http://$GATEWAY_IP:8080/openai" \
 ```
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
     "messages": [
-      {"role": "system", "content": "You are an echo service. Reply with the user'\''s message exactly as written, character for character, and nothing else."},
+      {"role": "system", "content": "You are an echo service. Repeat each user message back word for word."},
       {"role": "user", "content": "My personal email is jordan.lee@example.com and my SSN is 123-45-6789."}
     ]
   }' | jq '.choices[0].message.content'
@@ -746,8 +754,8 @@ guardrail-log | grep '"request"' | tail -2
 ```
 
 ```json
-{"hook":"request","action":"MASK","rule":null,"scores":{"prompt_injection":0.12,"harassment":0.0,"harmful_instructions":0.0},"candidates":[{"label":"CREDIT_CARD","value":"4111 1111 1111 1111","score":1.0}],"decisions_latency_ms":380}
-{"hook":"request","action":"MASK","rule":null,"scores":{"prompt_injection":0.02,"harassment":0.0,"harmful_instructions":0.0},"candidates":[{"label":"EMAIL_ADDRESS","value":"jordan.lee@example.com","score":1.0},{"label":"SSN","value":"123-45-6789","score":1.0}],"decisions_latency_ms":232}
+{"hook":"request","action":"MASK","rule":null,"scores":{"prompt_injection":0.0,"harassment":0.0,"harmful_instructions":0.0},"candidates":[{"label":"CREDIT_CARD","value":"4111 1111 1111 1111","score":0.99}],"decisions_latency_ms":419}
+{"hook":"request","action":"MASK","rule":null,"scores":{"prompt_injection":0.0,"harassment":0.0,"harmful_instructions":0.0},"candidates":[{"label":"EMAIL_ADDRESS","value":"jordan.lee@example.com","score":1.0},{"label":"SSN","value":"123-45-6789","score":1.0}],"decisions_latency_ms":225}
 ```
 
 The webhook replaced only the matched values. The rest of the prompt reached OpenAI as the client sent it.
@@ -759,12 +767,12 @@ The webhook replaced only the matched values. The rest of the prompt reached Ope
 A regex detector matches the help desk email and phone number below, the same as it matched the personal values above. The Decisions API reads them as an organization's published contact and scores them low, so the webhook keeps them:
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
     "messages": [
-      {"role": "system", "content": "You are an echo service. Reply with the user'\''s message exactly as written, character for character, and nothing else."},
+      {"role": "system", "content": "You are an echo service. Repeat each user message back word for word."},
       {"role": "user", "content": "For billing questions, contact our help desk at billing@acme.com or call 1-800-555-0199."}
     ]
   }' | jq '.choices[0].message.content'
@@ -779,7 +787,7 @@ guardrail-log | grep '"request"' | tail -1
 ```
 
 ```json
-{"hook":"request","action":"PASS","rule":null,"scores":{"prompt_injection":0.04,"harassment":0.0,"harmful_instructions":0.0},"candidates":[{"label":"EMAIL_ADDRESS","value":"billing@acme.com","score":0.28},{"label":"PHONE_NUMBER","value":"1-800-555-0199","score":0.24}],"decisions_latency_ms":230}
+{"hook":"request","action":"PASS","rule":null,"scores":{"prompt_injection":0.0,"harassment":0.0,"harmful_instructions":0.0},"candidates":[{"label":"EMAIL_ADDRESS","value":"billing@acme.com","score":0.03},{"label":"PHONE_NUMBER","value":"1-800-555-0199","score":0.11}],"decisions_latency_ms":263}
 ```
 
 A static mask on every email and phone pattern would hide these too, and a support assistant would then answer with `<PHONE_NUMBER>` where the help desk number belongs.
@@ -791,7 +799,7 @@ A static mask on every email and phone pattern would hide these too, and a suppo
 The `/request` hook only sees values a detector can match. This prompt spells out the contact details in words, so no detector matches and the request passes. OpenAI writes them in standard form, and the `/response` hook masks them before the client receives the answer:
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -822,7 +830,7 @@ OpenAI saw the spelled-out details, because the request held no value a detector
 A keyword rule that blocks "prompt injection" would reject this defensive question. The Decisions API scores `harmful_instructions` low, because the rule's instructions say to answer no when a prompt asks how an attack class works to build defenses:
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -833,7 +841,7 @@ curl -s "http://$GATEWAY_IP:8080/openai" \
 This message uses the same researcher framing, but asks for a working payload:
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -866,7 +874,7 @@ guardrail-log | grep '"request"' | tail -2
 This message avoids the words "DAN" and "ignore instructions". It asks the assistant to play a character with no restrictions, which the `prompt_injection` question names as an example:
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -1029,7 +1037,7 @@ Add a rule against medication dosage advice. The change is one new entry in the 
 ### Sub-step A: Confirm the current policy allows dosage questions
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -1074,7 +1082,7 @@ kubectl logs -n agentgateway-system deploy/decisions-guardrail-webhook --tail=1 
 ### Sub-step C: Confirm the new rule is enforced
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -1092,7 +1100,7 @@ Request blocked: this assistant does not give medication dosage advice.
 The rule targets dosage advice. A general question about the same drug still passes:
 
 ```bash
-curl -s -o /dev/null -w '%{http_code}\n' "http://$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w '%{http_code}\n' "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -1126,7 +1134,7 @@ kubectl create secret generic openai-decisions-key -n agentgateway-system \
 kubectl rollout restart deployment/decisions-guardrail-webhook -n agentgateway-system
 kubectl rollout status deployment/decisions-guardrail-webhook -n agentgateway-system --timeout=120s
 
-curl -s -w ' %{http_code}\n' "http://$GATEWAY_IP:8080/openai" \
+curl -s -w ' %{http_code}\n' "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}'
 ```
@@ -1197,7 +1205,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 A rejected request logs the guardrail as the reason it never reached the provider:
 
 ```
-http.path=/openai http.status=403 protocol=llm error="request rejected by webhook guardrail" reason=Guardrail duration=203ms
+http.path=/openai/v1/chat/completions http.status=403 protocol=llm error="request rejected by webhook guardrail" reason=Guardrail duration=203ms
 ```
 
 ---
@@ -1209,7 +1217,7 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system decisions-pro
 kubectl delete deployment,service -n agentgateway-system decisions-guardrail-webhook --ignore-not-found
 kubectl delete configmap -n agentgateway-system decisions-guardrail-code decisions-guardrail-policy --ignore-not-found
 kubectl delete httproute -n agentgateway-system openai --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret openai-decisions-key --ignore-not-found
 rm -f /tmp/decisions-guardrail-policy.json
 ```

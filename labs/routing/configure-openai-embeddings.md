@@ -1,13 +1,13 @@
 # Configure OpenAI Embeddings
-Configure access to multiple OpenAI API endpoints such as for chat completions, embeddings, and models through the EnterpriseAgentgatewayBackend.
+Configure access to multiple OpenAI API endpoints, such as chat completions, embeddings, and the model list, through one `AgentgatewayModel`.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using a `Backend` and `HTTPRoute`
-- Configure AI routes to handle different OpenAI API endpoints (chat completions, embeddings, models)
+- Create a route to OpenAI as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
+- Serve the chat completions, embeddings, and models endpoints from the same model
 - Test both chat completions and embeddings through the agentgateway proxy
 - Validate the requests went through the gateway in Grafana UI
 
@@ -24,7 +24,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create openai route and backend with AI routes configuration
+Create openai route and model
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -37,42 +37,39 @@ spec:
     - name: agentgateway-proxy
       namespace: agentgateway-system
   rules:
-    - backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+    - name: default
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
-        #--- Uncomment to configure model override ---
-        #model: ""
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+      sectionName: default
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
-    ai:
-      routes:
-        "/v1/chat/completions": "Completions"
-        "/v1/embeddings": "Passthrough"
-        "/v1/models": "Passthrough"
-        "*": "Passthrough"
 EOF
 ```
 
-The `policies.ai.routes` configuration allows you to route different OpenAI API endpoints through the gateway:
-- `/v1/chat/completions`: `"Completions"` - The completions API is currently supported for AI gateway processing (metrics, logging, guardrails, prompt engineering)
-- `/v1/embeddings`: `"Passthrough"` - Proxies embeddings requests through the gateway
-- `/v1/models`: `"Passthrough"` - Proxies model listing requests through the gateway
-- `*`: `"Passthrough"` - Default passthrough for any other paths
+The rule has no path match, so it serves every path on the Gateway. The gateway recognizes each OpenAI API from the request path, so one model serves all three endpoints:
+- `/v1/chat/completions`: processed as LLM traffic, with token counts, cost, and guardrail support
+- `/v1/embeddings`: processed as LLM traffic, with input token counts and cost
+- `/v1/models`: answered by the gateway itself with the models this route can reach
 
 ## Test OpenAI Chat Completions and Embeddings
 
@@ -144,22 +141,17 @@ Agentgateway enterprise automatically logs information about the LLM request to 
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-Example output for chat completions, which the backend maps to `Completions`:
+Example output for chat completions:
 ```
-2026-07-29T22:48:02.532619Z	info	request gateway=agentgateway-system/agentgateway-proxy listener=http route=agentgateway-system/openai endpoint=api.openai.com:443 src.addr=10.244.0.0:1599 http.method=POST http.host=172.18.255.254 http.path=/v1/chat/completions http.version=HTTP/1.1 http.status=200 trace.id=789dc792d6aa18f780f31bb03f4be6c4 span.id=1379e8fbe67f388a protocol=llm gen_ai.operation.name=chat gen_ai.provider.name=openai gen_ai.request.model=gpt-5.4-nano gen_ai.response.model=gpt-5.4-nano-2026-03-17 gen_ai.usage.input_tokens=11 gen_ai.usage.cache_read.input_tokens=0 gen_ai.usage.output_tokens=82 agw.ai.usage.cost.total=0.0001047 gen_ai.usage.output_audio_tokens=0 duration=1128ms llm.streaming=false llm.cached_tokens=0 llm.reasoning_tokens=0 llm.prompt=[{"role": "user", "content": "Whats your favorite poem?"}] llm.completion="..."
-```
-
-Example output for embeddings, which the backend maps to `Passthrough`:
-```
-2026-07-29T22:48:03.41909Z	info	request gateway=agentgateway-system/agentgateway-proxy listener=http route=agentgateway-system/openai endpoint=api.openai.com:443 src.addr=10.244.1.1:61033 http.method=POST http.host=172.18.255.254 http.path=/v1/embeddings http.version=HTTP/1.1 http.status=200 trace.id=8540d5f05bd8bc668d3d39007058ae88 span.id=96a543cf0942ec24 protocol=llm duration=463ms
+2026-10-29T17:30:37.258513Z	info	request gateway=agentgateway-system/agentgateway-proxy listener=http route_rule=default route=agentgateway-system/openai endpoint=api.openai.com:443 src.addr=10.244.0.0:19691 http.method=POST http.host=172.22.255.254 http.path=/v1/chat/completions http.version=HTTP/1.1 http.status=200 trace.id=b24cbccac4883ad33f3e6d76755117a7 span.id=32d7563fd4cfb4d1 protocol=llm gen_ai.operation.name=chat gen_ai.provider.name=openai gen_ai.request.model=gpt-5.4-nano gen_ai.response.model=gpt-5.4-nano-2026-03-17 agw.ai.original_model=gpt-5.4-nano gen_ai.usage.input_tokens=8 gen_ai.usage.cache_read.input_tokens=0 gen_ai.usage.output_tokens=14 gen_ai.usage.reasoning_tokens=0 agw.ai.usage.cost.total=0.0000191 gen_ai.usage.input_audio_tokens=0 gen_ai.usage.output_audio_tokens=0 duration=843ms request_path="/v1/chat/completions" status_code="200" llm_duration="0.842581376s" request_proc_duration="0.000229708s" response_proc_duration="0.000168375s" provider="openai" model="gpt-5.4-nano-2026-03-17" prompt_tokens="8" completion_tokens="14" total_cost_usd="0.0000191" llm_streaming=false llm_cached_tokens="0" llm_reasoning_tokens="0" client_ip="10.244.0.0" user_id="anonymous" jwt_all={}
 ```
 
-The route type you assign in `policies.ai.routes` decides how much the gateway records:
+Example output for embeddings:
+```
+2026-10-29T17:30:33.029599Z	info	request gateway=agentgateway-system/agentgateway-proxy listener=http route_rule=default route=agentgateway-system/openai endpoint=api.openai.com:443 src.addr=10.244.2.1:34061 http.method=POST http.host=172.22.255.254 http.path=/v1/embeddings http.version=HTTP/1.1 http.status=200 trace.id=23736b938cdebf28d759d64074dc903b span.id=f575d3685c0e42c1 protocol=llm gen_ai.operation.name=embeddings gen_ai.provider.name=openai gen_ai.request.model=text-embedding-3-small gen_ai.response.model=text-embedding-3-small agw.ai.original_model=text-embedding-3-small gen_ai.usage.input_tokens=10 agw.ai.usage.cost.total=0.0000002 duration=627ms request_path="/v1/embeddings" status_code="200" llm_duration="0.613805792s" request_proc_duration="0.00036675s" response_proc_duration="0.013347791s" provider="openai" model="text-embedding-3-small" prompt_tokens="10" completion_tokens="0" total_cost_usd="0.0000002" llm_streaming=false llm_cached_tokens="0" llm_reasoning_tokens="0" client_ip="10.244.2.1" user_id="anonymous" jwt_all={}
+```
 
-- `Completions` routes are parsed as LLM traffic, so the log line carries `gen_ai.operation.name=chat`, the requested and served models, input and output token counts, per-request cost under `agw.ai.usage.cost.total`, and the prompt and completion text as `llm.prompt` and `llm.completion`.
-- `Passthrough` routes are proxied without LLM parsing, so their log lines carry only the HTTP fields: method, path, status, and duration. Token usage for embeddings is still returned to the client in the response body's `usage` object, but the gateway does not extract it.
-
-Use `Passthrough` when you want the gateway to front an endpoint for auth, routing, and TLS, and `Completions` when you also want token accounting, cost attribution, and guardrails.
+Both requests are logged as LLM traffic (`protocol=llm`). The chat line carries `gen_ai.operation.name=chat`, the requested and served models, input and output token counts, and per-request cost under `agw.ai.usage.cost.total`. The embeddings line carries `gen_ai.operation.name=embeddings`, the input token count, and its cost. The `/v1/models` request is answered by the gateway, so its line shows `reason=DirectResponse` and no upstream `endpoint`.
 
 ## Observability
 
@@ -173,11 +165,11 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 
 The log line carries the model and token counts, plus a `trace.id` you can search for in the Solo UI's **Tracing** view.
 
-## Advanced: Using Path Rewrites
+## Advanced: Serve the APIs Under a Path Prefix
 
-The previous configuration requires clients to use the exact OpenAI API paths (`/v1/chat/completions`, `/v1/embeddings`). You can use path rewrites to create custom paths that get rewritten to the correct OpenAI endpoints.
+The previous configuration serves the OpenAI paths at the root of the Gateway. To serve them under your own prefix, add a rule with a `PathPrefix` match. The gateway strips the matched prefix and forwards the rest of the path, so `/openai/v1/embeddings` reaches OpenAI as `/v1/embeddings`. Attach the model to both rules with one `parentRefs` entry per rule.
 
-Update the existing HTTPRoute with path rewrite rules:
+Update the existing HTTPRoute and model:
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -190,74 +182,57 @@ spec:
     - name: agentgateway-proxy
       namespace: agentgateway-system
   rules:
-    # Custom path for chat completions: /openai/chat -> /v1/chat/completions
-    - matches:
+    # Custom prefix: /openai/v1/... -> /v1/...
+    - name: prefixed
+      matches:
         - path:
             type: PathPrefix
-            value: /openai/chat
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /v1/chat/completions
+            value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    # Custom path for embeddings: /openai/embeddings -> /v1/embeddings
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /openai/embeddings
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /v1/embeddings
+    # Default rule for the standard OpenAI paths
+    - name: default
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    # Custom path for models: /openai/models -> /v1/models
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /openai/models
-      filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /v1/models
-      backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
-      timeouts:
-        request: "120s"
-    # Default route for standard OpenAI paths (no rewrite needed)
-    - backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
-      timeouts:
-        request: "120s"
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: openai-all-models
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+      sectionName: prefixed
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+      sectionName: default
+  match:
+    model: "*"
+  provider: OpenAI
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
 EOF
 ```
 
-### Test with Rewritten Paths
+### Test with Prefixed Paths
 
-Now you can use the simplified custom paths:
-
-Test chat completions using `/openai/chat`:
+Test chat completions using `/openai/v1/chat/completions`:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai/chat" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -270,9 +245,9 @@ curl -i "$GATEWAY_IP:8080/openai/chat" \
   }'
 ```
 
-Test embeddings using `/openai/embeddings`:
+Test embeddings using `/openai/v1/embeddings`:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai/embeddings" \
+curl -i "$GATEWAY_IP:8080/openai/v1/embeddings" \
   -H "content-type: application/json" \
   -d '{
     "model": "text-embedding-3-small",
@@ -280,13 +255,11 @@ curl -i "$GATEWAY_IP:8080/openai/embeddings" \
   }'
 ```
 
-Test models listing using `/openai/models`:
+Test models listing using `/openai/v1/models`:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai/models" \
+curl -i "$GATEWAY_IP:8080/openai/v1/models" \
   -H "content-type: application/json"
 ```
-
-The gateway will rewrite these paths to the correct OpenAI API endpoints before forwarding the requests. The AI routes configuration in the backend will still match on the rewritten paths (`/v1/chat/completions`, `/v1/embeddings`, etc.).
 
 You can also still use the standard OpenAI paths directly thanks to the default rule:
 ```bash
@@ -298,9 +271,11 @@ curl -i "$GATEWAY_IP:8080/v1/chat/completions" \
   }'
 ```
 
+> **Note:** Model rules do not support the `URLRewrite` or `RequestRedirect` filters. Use a path prefix, as above, to give clients a custom path.
+
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 ```

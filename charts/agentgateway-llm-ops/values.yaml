@@ -57,9 +57,7 @@ modelCatalog: []
 #  - alias: chat-mock          # LLM-shaped endpoint for tests/CI; no provider cost
 #    provider: openai
 #    model: mock-model
-#    host: mock-model-svc.agentgateway-system.svc.cluster.local
-#    port: 8000
-#    apiPath: /v1/chat/completions
+#    baseURL: http://mock-model-svc.agentgateway-system.svc.cluster.local:8000/v1
 #  - alias: chat-real          # real completions; provider is a platform decision
 #    provider: openai
 #    model: gpt-5.4-nano

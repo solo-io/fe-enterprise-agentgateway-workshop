@@ -1,6 +1,6 @@
 # Admission Control with Kyverno
 
-Agentgateway decides whether a *request* is allowed. Kyverno decides whether the *configuration* is allowed. In this lab you put four governance policies in front of the Kubernetes API server, so the API server rejects unsafe `EnterpriseAgentgatewayBackend` manifests before the controller translates them.
+Agentgateway decides whether a *request* is allowed. Kyverno decides whether the *configuration* is allowed. In this lab you put four governance policies in front of the Kubernetes API server, so the API server rejects unsafe `EnterpriseAgentgatewayBackend` and `AgentgatewayModel` manifests before the controller translates them.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
@@ -10,10 +10,10 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Install Kyverno and grant it the RBAC it needs to see Agentgateway custom resources
-- Require every backend to be an `EnterpriseAgentgatewayBackend` by denying the OSS `AgentgatewayBackend` kind
-- Restrict LLM traffic to an approved provider list with a `ClusterPolicy`
+- Require every MCP and static backend to be an `EnterpriseAgentgatewayBackend` by denying the OSS `AgentgatewayBackend` kind
+- Restrict LLM traffic to an approved provider list by validating `AgentgatewayModel` resources with a `ClusterPolicy`
 - Constrain which hosts an MCP backend may reach, so no one can point an agent at an unvetted tool server
-- Forbid inline plaintext credentials at all three paths the backend schema accepts them
+- Forbid inline plaintext credentials at every path the model and backend schemas accept them
 
 ---
 
@@ -111,7 +111,7 @@ EOF
 
 ## Policy 1: Enterprise Backends Only
 
-This `ClusterPolicy` denies admission of the OSS `AgentgatewayBackend` kind:
+LLM providers are declared as `AgentgatewayModel` resources, and MCP servers and other upstreams as backends. This `ClusterPolicy` denies admission of the OSS `AgentgatewayBackend` kind, so every backend is an `EnterpriseAgentgatewayBackend`:
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -123,8 +123,9 @@ metadata:
     policies.kyverno.io/title: Enterprise Backend CRDs Only
     policies.kyverno.io/category: AI Governance
     policies.kyverno.io/description: >-
-      Denies the OSS AgentgatewayBackend kind so every backend on the cluster is
-      declared as an EnterpriseAgentgatewayBackend and one policy set governs it.
+      Denies the OSS AgentgatewayBackend kind so every MCP and static backend on
+      the cluster is declared as an EnterpriseAgentgatewayBackend and one policy
+      set governs it.
 spec:
   background: true
   rules:
@@ -164,13 +165,12 @@ kubectl apply -f - <<'EOF'
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
-  name: oss-openai-backend
+  name: oss-static-backend
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        model: gpt-5.6-luna
+  static:
+    host: search.solo.io
+    port: 443
 EOF
 ```
 
@@ -179,7 +179,7 @@ Expected output:
 ```
 Error from server: error when creating "STDIN": admission webhook "validate.kyverno.svc-fail" denied the request:
 
-resource AgentgatewayBackend/agentgateway-system/oss-openai-backend was blocked due to the following policies
+resource AgentgatewayBackend/agentgateway-system/oss-static-backend was blocked due to the following policies
 
 agentgateway-enterprise-crds-only:
   block-oss-backend-kind: AgentgatewayBackend (agentgateway.dev) is not allowed on
@@ -194,20 +194,19 @@ kubectl apply -f - <<'EOF'
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayBackend
 metadata:
-  name: ent-openai-backend
+  name: ent-static-backend
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        model: gpt-5.6-luna
+  static:
+    host: search.solo.io
+    port: 443
 EOF
 ```
 
 Expected output:
 
 ```
-enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/ent-openai-backend created
+enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/ent-static-backend created
 ```
 
 ---
@@ -216,7 +215,7 @@ enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/ent-openai-backend 
 
 Routing to an unapproved provider sends prompts and completions to a vendor without a vetted contract or data-processing agreement.
 
-This `ClusterPolicy` allows only `openai` and `bedrock` as LLM providers:
+Each `AgentgatewayModel` names its provider in `spec.provider`. This `ClusterPolicy` allows only `OpenAI` and `Bedrock`. Virtual models have no `provider` (they route to other models), so the precondition skips them:
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -238,24 +237,24 @@ spec:
         any:
           - resources:
               kinds:
-                - enterpriseagentgateway.solo.io/v1alpha1/EnterpriseAgentgatewayBackend
+                - agentgateway.dev/v1alpha1/AgentgatewayModel
       preconditions:
         all:
-          - key: "{{ request.object.spec.ai.provider || '' }}"
+          - key: "{{ request.object.spec.provider || '' }}"
             operator: NotEquals
             value: ""
       validate:
         failureAction: Enforce
         message: >-
-          Only approved LLM providers are allowed (openai, bedrock).
+          Only approved LLM providers are allowed (OpenAI, Bedrock).
         deny:
           conditions:
             all:
-              - key: "{{ keys(request.object.spec.ai.provider) }}"
-                operator: AllNotIn
+              - key: "{{ request.object.spec.provider }}"
+                operator: AnyNotIn
                 value:
-                  - openai
-                  - bedrock
+                  - OpenAI
+                  - Bedrock
 EOF
 ```
 
@@ -276,16 +275,19 @@ Now try an unapproved provider:
 
 ```bash
 kubectl apply -f - <<'EOF'
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: anthropic-backend
+  name: anthropic-model
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      anthropic:
-        model: claude-3-5-sonnet-20241022
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: llm
+  match:
+    model: claude-sonnet-4-6
+  provider: Anthropic
 EOF
 ```
 
@@ -294,34 +296,38 @@ Expected output:
 ```
 Error from server: error when creating "STDIN": admission webhook "validate.kyverno.svc-fail" denied the request:
 
-resource EnterpriseAgentgatewayBackend/agentgateway-system/anthropic-backend was blocked due to the following policies
+resource AgentgatewayModel/agentgateway-system/anthropic-model was blocked due to the following policies
 
 agentgateway-restrict-providers:
-  validate-provider: Only approved LLM providers are allowed (openai, bedrock).
+  validate-provider: Only approved LLM providers are allowed (OpenAI, Bedrock).
 ```
 
-The API server never created the backend, so the controller never saw it. `bedrock` is approved, so it goes through:
+The API server never created the model, so the controller never saw it. `Bedrock` is approved, so it goes through. The `llm` route it attaches to does not need to exist for admission:
 
 ```bash
 kubectl apply -f - <<'EOF'
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: bedrock-backend
+  name: bedrock-model
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      bedrock:
-        region: us-east-1
-        model: anthropic.claude-3-sonnet-20240229-v1:0
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: llm
+  match:
+    model: us.anthropic.claude-sonnet-4-6
+  provider: Bedrock
+  bedrock:
+    region: us-east-1
 EOF
 ```
 
 Expected output:
 
 ```
-enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/bedrock-backend created
+agentgatewaymodel.agentgateway.dev/bedrock-model created
 ```
 
 ---
@@ -449,12 +455,12 @@ enterpriseagentgatewaybackend.enterpriseagentgateway.solo.io/soloio-docs-mcp-bac
 
 ## Policy 4: No Plaintext Credentials in Manifests
 
-Backend auth accepts a `secretRef` or a literal `key`. The `key` form embeds the token in the manifest, where it lands in Git history and in the terminal scrollback of whoever applied it, and the controller admits it without a warning.
+Model and backend auth accept a `secretRef` or a literal `key`. The `key` form embeds the token in the manifest, where it lands in Git history and in the terminal scrollback of whoever applied it, and the controller admits it without a warning.
 
-Confirm both forms exist:
+Confirm both forms exist on a model:
 
 ```bash
-kubectl explain enterpriseagentgatewaybackends.spec.policies.auth | grep -E "^  (key|secretRef)"
+kubectl explain agentgatewaymodels.spec.policies.auth | grep -E "^  (key|secretRef)"
 ```
 
 Expected output:
@@ -464,15 +470,16 @@ Expected output:
   secretRef	<Object>
 ```
 
-The schema accepts an inline `key` at three independent paths:
+The schemas accept an inline `key` at four independent paths:
 
 | Path | Applies to |
 |---|---|
-| `spec.policies.auth.key` | AI backends (and any backend-level auth) |
+| `AgentgatewayModel` `spec.policies.auth.key` | LLM models |
+| `EnterpriseAgentgatewayBackend` `spec.policies.auth.key` | Backend-level auth |
 | `spec.mcp.targets[].static.policies.auth.key` | OSS-protocol MCP targets (`StreamableHTTP`, `SSE`) |
 | `spec.entMcp.targets[].static.policies.auth.key` | Enterprise MCP targets (OpenAPI-protocol) |
 
-This `ClusterPolicy` forbids inline credentials at all three paths, one rule per path:
+This `ClusterPolicy` forbids inline credentials at all four paths, one rule per path:
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -489,6 +496,23 @@ metadata:
 spec:
   background: true
   rules:
+    - name: no-inline-key-model
+      match:
+        any:
+          - resources:
+              kinds:
+                - agentgateway.dev/v1alpha1/AgentgatewayModel
+      validate:
+        failureAction: Enforce
+        message: >-
+          Inline plaintext credentials are forbidden at spec.policies.auth.key.
+          Use spec.policies.auth.secretRef instead.
+        deny:
+          conditions:
+            all:
+              - key: "{{ request.object.spec.policies.auth.key || '' }}"
+                operator: NotEquals
+                value: ""
     - name: no-inline-key-backend
       match:
         any:
@@ -592,19 +616,23 @@ agentgateway-no-plaintext-credentials:
     forbidden on MCP static targets. Use static.policies.auth.secretRef instead.'
 ```
 
-Now make the same mistake one level up, on an AI backend; a different rule in the same policy catches it:
+Now make the same mistake on an LLM model; a different rule in the same policy catches it:
 
 ```bash
 kubectl apply -f - <<'EOF'
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: inline-key-ai-backend
+  name: inline-key-model
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: llm
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       key: sk-openai-plaintext-token
@@ -616,14 +644,14 @@ Expected output:
 ```
 Error from server: error when creating "STDIN": admission webhook "validate.kyverno.svc-fail" denied the request:
 
-resource EnterpriseAgentgatewayBackend/agentgateway-system/inline-key-ai-backend was blocked due to the following policies
+resource AgentgatewayModel/agentgateway-system/inline-key-model was blocked due to the following policies
 
 agentgateway-no-plaintext-credentials:
-  no-inline-key-backend: Inline plaintext credentials are forbidden at spec.policies.auth.key.
+  no-inline-key-model: Inline plaintext credentials are forbidden at spec.policies.auth.key.
     Use spec.policies.auth.secretRef instead.
 ```
 
-The two messages name different rules: `no-inline-key-mcp-target` and `no-inline-key-backend`. Kyverno reports the rule name alongside the policy, so you can tell which path tripped a multi-rule policy.
+The two messages name different rules: `no-inline-key-mcp-target` and `no-inline-key-model`. Kyverno reports the rule name alongside the policy, so you can tell which path tripped a multi-rule policy.
 
 ---
 
@@ -684,14 +712,16 @@ kubectl delete clusterpolicy \
   agentgateway-restrict-mcp-hosts \
   agentgateway-no-plaintext-credentials --ignore-not-found
 
-# 2. Test backends admitted during the lab
+# 2. Test models and backends admitted during the lab
+kubectl delete agentgatewaymodel -n agentgateway-system \
+  bedrock-model --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system \
-  ent-openai-backend bedrock-backend soloio-docs-mcp-backend --ignore-not-found
+  ent-static-backend soloio-docs-mcp-backend --ignore-not-found
 
 # 3. The OSS backend from the Policy 1 denial test, in case it was applied
 #    before the policy was Ready
 kubectl delete agentgatewaybackend -n agentgateway-system \
-  oss-openai-backend --ignore-not-found
+  oss-static-backend --ignore-not-found
 
 # 4. RBAC grant
 kubectl delete clusterrole kyverno:agentgateway-backends --ignore-not-found
@@ -700,12 +730,12 @@ kubectl delete clusterrole kyverno:agentgateway-backends --ignore-not-found
 Confirm the lab left nothing behind. Run this **before** uninstalling Kyverno, while its CRDs still exist:
 
 ```bash
-kubectl get enterpriseagentgatewaybackend -A
+kubectl get enterpriseagentgatewaybackend,agentgatewaymodel -A
 kubectl get clusterpolicy
 kubectl get policyreport -A
 ```
 
-Expected output: `No resources found` for all three.
+Expected output: `No resources found` for each command.
 
 Now remove Kyverno itself:
 

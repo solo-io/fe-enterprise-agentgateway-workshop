@@ -252,23 +252,31 @@ kubectl create secret generic openai-secret -n agentgateway-system \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Apply the OpenAI backend and HTTPRoute:
+Apply the OpenAI model and HTTPRoute:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -287,9 +295,9 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
@@ -425,7 +433,7 @@ echo "GATEWAY_IP=${GATEWAY_IP}"
 Confirm the route rejects requests that carry no OBO token:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
@@ -543,7 +551,7 @@ Look for `error=authentication failure` on rejected requests and `http.status=20
 
 ```
 request gateway=default/agentgateway-proxy listener=http route=default/openai src.addr=127.0.0.1:59068
-http.method=POST http.host=localhost http.path=/openai http.version=HTTP/1.1 http.status=401
+http.method=POST http.host=localhost http.path=/openai/v1/chat/completions http.version=HTTP/1.1 http.status=401
 error=authentication failure: no bearer token found duration=0ms
 ```
 
@@ -558,7 +566,8 @@ pkill -f "port-forward.*7777" 2>/dev/null || true
 
 # Remove gateway resources
 kubectl delete httproute -n agentgateway-system openai copilot-mcp
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models copilot-mcp-backend
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system copilot-mcp-backend
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system sts-jwks
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system openai-obo-jwt-policy copilot-mcp-obo-jwt-policy
 kubectl delete secret -n agentgateway-system openai-secret

@@ -259,7 +259,7 @@ spec:
 EOF
 ```
 
-Create the HTTPRoute and EnterpriseAgentgatewayBackend:
+Create the HTTPRoute and `AgentgatewayModel`:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -278,28 +278,32 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: mock-llm-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: mock-llm-backend
+  name: mock-llm
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-      port: 8000
-      path: "/v1/chat/completions"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-llm
+  match:
+    model: "*"
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000/v1
   policies:
     auth:
       passthrough: {}
+    transformations:
+      - field: model
+        expression: '"mock-gpt-4o"'
 EOF
 ```
 
@@ -308,7 +312,7 @@ Verify the route is accessible before adding auth:
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{"model": "mock-gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
@@ -376,7 +380,7 @@ Verify the route now rejects requests without a token:
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{"model": "mock-gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
@@ -495,7 +499,7 @@ The OBO token is now signed by the STS key (not Keycloak). The `sub` is the orig
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $OBO_JWT" \
   -d '{"model": "mock-gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
@@ -513,7 +517,7 @@ content-type: application/json
 Verify that the raw Keycloak JWT is rejected (it is not signed by the STS):
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $USER_JWT" \
   -d '{"model": "mock-gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
@@ -714,7 +718,7 @@ The delegated token embeds both the user identity (`sub`) and the agent identity
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $DELEGATED_TOKEN" \
   -d '{"model": "mock-gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
@@ -732,7 +736,7 @@ content-type: application/json
 Verify that the raw Keycloak JWT is still rejected:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $USER_JWT" \
   -d '{"model": "mock-gpt-4o", "messages": [{"role": "user", "content": "Hello"}]}'
@@ -759,7 +763,7 @@ pkill -f "port-forward.*7777" 2>/dev/null || true
 
 # Remove gateway resources
 kubectl delete httproute -n agentgateway-system mock-llm
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-llm-backend
+kubectl delete agentgatewaymodel -n agentgateway-system mock-llm
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system sts-jwks
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system obo-jwt-policy
 kubectl delete serviceaccount -n agentgateway-system obo-agent

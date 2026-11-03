@@ -1,31 +1,26 @@
 # Configure Body-Based Routing
 
-In this lab, you'll configure **body-based routing** to automatically dispatch incoming LLM requests to different backends based on the `model` field in the JSON request body. An `EnterpriseAgentgatewayPolicy` extracts the model name at request time and promotes it to a request header; a standard `HTTPRoute` then uses header matching to route to either OpenAI or a local mock LLM server, with no client-side changes.
+In this lab, you'll configure **body-based routing** to dispatch incoming LLM requests to different providers based on the `model` field in the JSON request body. Each `AgentgatewayModel` declares the model name it serves in `match.model`, and the gateway reads the request body and sends the request to the model whose name matches. A catch-all model handles every other name. Clients change only the `model` value they already send.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
 - Deploy a mock LLM server to act as a second backend
-- Create an OpenAI secret and per-model `EnterpriseAgentgatewayBackend` resources
-- Configure an `EnterpriseAgentgatewayPolicy` to extract the `model` field from the request body and promote it to a request header
-- Create an `HTTPRoute` that uses header matching to route requests to either OpenAI or the mock LLM based on the extracted model name
+- Create an OpenAI secret and one `AgentgatewayModel` per routing target
+- Create an `HTTPRoute` whose rule selects the models attached to it
 - Curl the gateway with different model values to observe routing behavior
 
 ## Architecture
 
 ```
 Client Request
-    │  body: { "model": "gpt-5.4-nano" | "mock-gpt-4o" | <missing> }
+    │  body: { "model": "gpt-5.4-nano" | "mock-gpt-4o" | <any other name> }
     ▼
-AgentgatewayPolicy (phase: PreRouting, Request Transformation)
-    │  X-Gateway-Model-Name   = json(request.body).model
-    │  X-Gateway-Model-Status = "specified" | "unspecified"
-    ▼
-HTTPRoute (header match)
-    ├─ X-Gateway-Model-Name: gpt-5.4-nano    →  OpenAI (gpt-5.4-nano)
-    ├─ X-Gateway-Model-Name: mock-gpt-4o    →  Mock LLM Server
-    └─ X-Gateway-Model-Status: unspecified  →  Mock LLM Server (fallback)
+HTTPRoute body-based-routing (/openai) → AgentgatewayModel match.model
+    ├─ gpt-5.4-nano   →  OpenAI (gpt-5.4-nano)
+    ├─ mock-gpt-4o    →  Mock LLM Server
+    └─ *              →  Mock LLM Server (fallback for any other name)
 ```
 
 ## Deploy the Mock LLM Server
@@ -107,86 +102,15 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-## Create EnterpriseAgentgatewayBackend Resources
+## Create the Route and Models
 
-Create one backend for each routing target: OpenAI (`gpt-5.4-nano`) and the mock LLM server.
+Create one `HTTPRoute` rule on `/openai` and three models attached to it:
 
-```bash
-kubectl apply -f - <<EOF
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
-metadata:
-  name: openai-gpt-5.4-nano
-  namespace: agentgateway-system
-spec:
-  ai:
-    provider:
-      openai:
-        model: "gpt-5.4-nano"
-  policies:
-    auth:
-      secretRef:
-        name: openai-secret
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
-metadata:
-  name: mock-gpt-4o
-  namespace: agentgateway-system
-spec:
-  ai:
-    provider:
-      openai:
-        model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-      port: 8000
-      path: "/v1/chat/completions"
-  policies:
-    auth:
-      passthrough: {}
-EOF
-```
+1. `openai-gpt-5.4-nano` serves requests for `gpt-5.4-nano` from OpenAI
+2. `mock-gpt-4o` serves requests for `mock-gpt-4o` from the mock server
+3. `fallback-mock` matches every other model name with `match.model: "*"` and sends it to the mock server, pinned to `mock-gpt-4o`
 
-## Configure Body-Based Routing
-
-### Step 1: Extract Model from Request Body
-
-Apply an `AgentgatewayPolicy` with `phase: PreRouting` that reads the `model` field from the JSON request body using CEL expressions and injects two headers. The `PreRouting` phase ensures the headers are set before the `HTTPRoute` makes its matching decision.
-
-- `x-gateway-model-name`: the value of `model` from the request body
-- `x-gateway-model-status`: `specified` if the `model` field is present, `unspecified` if it is missing
-
-```bash
-kubectl apply -f - <<EOF
-apiVersion: agentgateway.dev/v1alpha1
-kind: AgentgatewayPolicy
-metadata:
-  name: extract-model-from-body
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-    - name: agentgateway-proxy
-      group: gateway.networking.k8s.io
-      kind: Gateway
-  traffic:
-    phase: PreRouting
-    transformation:
-      request:
-        set:
-          - name: x-gateway-model-name
-            value: "default(json(request.body).model, '')"
-          - name: x-gateway-model-status
-            value: "default(json(request.body).model, '') == '' ? 'unspecified' : 'specified'"
-EOF
-```
-
-### Step 2: Route on the Extracted Headers
-
-Create the `HTTPRoute` with three rules:
-1. Known model `gpt-5.4-nano` → OpenAI
-2. Known model `mock-gpt-4o` → Mock LLM
-3. `x-gateway-model-status: unspecified` → Mock LLM (fallback for requests with no `model` field)
+An exact `match.model` takes precedence over the `*` wildcard, so the fallback only receives names that no other model claims.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -204,44 +128,69 @@ spec:
         - path:
             type: PathPrefix
             value: /openai
-          headers:
-            - type: Exact
-              name: x-gateway-model-name
-              value: gpt-5.4-nano
       backendRefs:
-        - name: openai-gpt-5.4-nano
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /openai
-          headers:
-            - type: Exact
-              name: x-gateway-model-name
-              value: mock-gpt-4o
-      backendRefs:
-        - name: mock-gpt-4o
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
-      timeouts:
-        request: "120s"
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /openai
-          headers:
-            - type: Exact
-              name: x-gateway-model-status
-              value: unspecified
-      backendRefs:
-        - name: mock-gpt-4o
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
-      timeouts:
-        request: "120s"
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: openai-gpt-5.4-nano
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: body-based-routing
+  match:
+    model: gpt-5.4-nano
+  provider: OpenAI
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: mock-gpt-4o
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: body-based-routing
+  match:
+    model: mock-gpt-4o
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000/v1
+  policies:
+    auth:
+      passthrough: {}
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: fallback-mock
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: body-based-routing
+  match:
+    model: "*"
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000/v1
+  policies:
+    auth:
+      passthrough: {}
+    transformations:
+      - field: model
+        expression: '"mock-gpt-4o"'
 EOF
 ```
 
@@ -255,10 +204,10 @@ echo "Gateway IP: $GATEWAY_IP"
 
 ### Route to OpenAI
 
-Send a request with `"model": "gpt-5.4-nano"`. The gateway extracts this value from the body and routes to the OpenAI backend.
+Send a request with `"model": "gpt-5.4-nano"`. The `openai-gpt-5.4-nano` model matches the name and sends the request to OpenAI.
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -275,10 +224,10 @@ The response `model` field should show `gpt-5.4-nano-2026-03-17` (the OpenAI res
 
 ### Route to Mock LLM
 
-Send a request with `"model": "mock-gpt-4o"`. The gateway routes this to the local mock server instead.
+Send a request with `"model": "mock-gpt-4o"`. The `mock-gpt-4o` model sends it to the local mock server instead.
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -291,16 +240,17 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-The response `model` field should show `mock-gpt-4o`: the mock LLM backend served the request.
+The response `model` field should show `mock-gpt-4o`: the mock LLM server served the request.
 
-### Fallback — No Model in Body
+### Fallback: Unknown Model
 
-Send a request with no `model` field. The policy sets `x-gateway-model-status: unspecified`, and the fallback rule routes it to the mock LLM.
+Send a request for a model that no exact `match.model` claims. The `fallback-mock` model matches it through `*` and sends it to the mock server.
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
+    "model": "my-unlisted-model",
     "messages": [
       {
         "role": "user",
@@ -310,7 +260,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
   }'
 ```
 
-The response `model` field should show `mock-gpt-4o`: the fallback rule matched on `x-gateway-model-status: unspecified`.
+The response `model` field should show `mock-gpt-4o`: the fallback model rewrote the unknown name. A request with no `model` field at all gets `HTTP 400` with `missing_model`, because the gateway needs the field to pick a model.
 
 ## Observability
 
@@ -385,10 +335,10 @@ Navigate to http://localhost:16686 in your browser to see the traces. Each span 
 
 ## Cleanup
 ```bash
-kubectl delete agentgatewaypolicy -n agentgateway-system extract-model-from-body
+kubectl delete agentgatewaymodel -n agentgateway-system fallback-mock
+kubectl delete agentgatewaymodel -n agentgateway-system mock-gpt-4o
+kubectl delete agentgatewaymodel -n agentgateway-system openai-gpt-5.4-nano
 kubectl delete httproute -n agentgateway-system body-based-routing
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-5.4-nano
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-gpt-4o
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete svc -n agentgateway-system mock-gpt-4o-svc
 kubectl delete deploy -n agentgateway-system mock-gpt-4o

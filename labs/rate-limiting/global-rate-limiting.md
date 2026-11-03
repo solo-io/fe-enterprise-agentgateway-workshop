@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Configure a global REQUEST-based rate limit using a simple per-call counter
 - Create an initial RateLimitConfig to implement token-based rate limiting (input tokens) using a shared global counter
 - Use CEL expressions to key rate limits on request headers, JWT claims, client IP, and plan tiers
@@ -18,7 +18,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create openai route and backend
+Create openai route and model
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -36,27 +36,33 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
-        #--- Uncomment to configure model override ---
-        #model: ""
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
@@ -64,7 +70,7 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -137,7 +143,7 @@ The limit is 5 requests per hour, so send six:
 ```bash
 for i in $(seq 1 6); do
   echo -n "request $i: "
-  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "content-type: application/json" \
     -d '{
       "model": "gpt-5.4-nano",
@@ -231,7 +237,7 @@ Note that the following user prompt "Whats your favorite poem" contains 5 tokens
 ```bash
 for i in $(seq 1 4); do
   echo -n "request $i: "
-  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "content-type: application/json" \
     -d '{
       "model": "gpt-5.4-nano",
@@ -304,7 +310,7 @@ EOF
 ## Test header-based rate limiting
 Now curl with the X-User-ID header to test per-user rate limiting:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "X-User-ID: user-123" \
   -d '{
@@ -321,7 +327,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 Each user (identified by their X-User-ID header value) will have their own token quota of 100 input tokens per minute. Try using different user IDs to see separate rate limit counters:
 ```bash
 # Test with different user
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "X-User-ID: user-456" \
   -d '{
@@ -396,7 +402,7 @@ EOF
 ## Test multi-header rate limiting
 Test with user-123 in tenant-A:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "X-User-ID: user-123" \
   -H "X-Tenant-ID: tenant-A" \
@@ -413,7 +419,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 
 Now test the same user-123 but in a different tenant (tenant-B). This should have a separate quota:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "X-User-ID: user-123" \
   -H "X-Tenant-ID: tenant-B" \
@@ -537,7 +543,7 @@ echo "$USER_A_TOKEN" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null; echo
 
 Requests without a valid JWT are now rejected before they ever reach the rate limiter. Try without a token:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -555,7 +561,7 @@ Now send requests as **User A**. The prompt `"Whats your favorite poem?"` is abo
 ```bash
 for i in $(seq 1 4); do
   echo -n "User A request $i: "
-  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer $USER_A_TOKEN" \
     -d '{
@@ -576,7 +582,7 @@ The later requests return `HTTP 429`: User A (`sub=analyst-user`) has exhausted 
 User B (`sub=economist-user`) has a separate counter. The rate limiter counts in fixed clock-minute windows, so User A's quota comes back at the start of each minute. The next block sends two requests as User A, which leaves User A rate limited in the current minute, then one request as User B:
 ```bash
 echo -n "User A request 1: "
-curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $USER_A_TOKEN" \
   -d '{
@@ -589,7 +595,7 @@ curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
     ]
   }'
 echo -n "User A request 2: "
-curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $USER_A_TOKEN" \
   -d '{
@@ -602,7 +608,7 @@ curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
     ]
   }'
 echo -n "User B: "
-curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $USER_B_TOKEN" \
   -d '{
@@ -622,7 +628,7 @@ User A request 2 returns `HTTP 429` and User B returns `HTTP 200`. Each user (id
 With the header-based config, a client could change `X-User-ID` to escape their quota. Here the counter follows the verified `jwt.sub`, not any header the client sends. The next block first sends a plain User A request, which spends whatever is left of User A's quota for the current minute. It then sends User A's token again with an arbitrary `X-User-ID`, which lands in the **same** counter because the descriptor value comes from the signed claim:
 ```bash
 echo -n "User A: "
-curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $USER_A_TOKEN" \
   -d '{
@@ -635,7 +641,7 @@ curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
     ]
   }'
 echo -n "User A with X-User-ID: someone-else: "
-curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $USER_A_TOKEN" \
   -H "X-User-ID: someone-else" \
@@ -794,7 +800,7 @@ for i in $(seq 1 25); do
     -H "content-type: application/json" \
     -H "Authorization: Bearer $STANDARD_TOKEN" \
     -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}' \
-    "$GATEWAY_IP:8080/openai")
+    "$GATEWAY_IP:8080/openai/v1/chat/completions")
   echo "Request $i: HTTP $STATUS"
 done
 ```
@@ -802,7 +808,7 @@ You will see `200` responses until the standard user's 20-token budget is exhaus
 
 While the standard user is rate limited, the premium user's counter is independent; switch tokens to confirm the premium budget is untouched:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $PREMIUM_TOKEN" \
   -d '{
@@ -881,7 +887,7 @@ for i in $(seq 1 25); do
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "content-type: application/json" \
     -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}' \
-    "$GATEWAY_IP:8080/openai")
+    "$GATEWAY_IP:8080/openai/v1/chat/completions")
   echo "Request $i: HTTP $STATUS"
 done
 ```
@@ -997,7 +1003,7 @@ for i in $(seq 1 25); do
     -H "content-type: application/json" \
     -H "Authorization: Bearer $USER_TOKEN" \
     -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}' \
-    "$GATEWAY_IP:8080/openai")
+    "$GATEWAY_IP:8080/openai/v1/chat/completions")
   echo "Request $i: HTTP $STATUS"
 done
 ```
@@ -1015,7 +1021,7 @@ for i in $(seq 1 10); do
     -H "content-type: application/json" \
     -H "Authorization: Bearer $USER_TOKEN" \
     -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}' \
-    "$GATEWAY_IP:8080/openai")
+    "$GATEWAY_IP:8080/openai/v1/chat/completions")
   echo "Request $i: HTTP $STATUS"
 done
 ```
@@ -1025,7 +1031,7 @@ You'll see `200` responses again briefly: the minute bucket has reset. But the h
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system token-based-rate-limit
 kubectl delete rlc -n agentgateway-system \

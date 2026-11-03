@@ -44,9 +44,9 @@ steps:
   - probe: "a path with no matching rule is not served by the Option A route"
     script: |
       curl -s -o /dev/null -w '%{http_code}\n' \
-        "http://$GATEWAY_IP:8080/openai/gpt-4o" \
+        "http://$GATEWAY_IP:8080/openai/gpt-4o/v1/chat/completions" \
         -H 'content-type: application/json' \
-        -d '{"messages":[{"role":"user","content":"hi"}]}'
+        -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}'
     assert:
       - contains: "404"
 
@@ -83,9 +83,9 @@ steps:
     script: |
       for hdr in "model: gpt-4o" "x-none: x"; do
         printf '%s -> ' "$hdr"
-        curl -s -o /dev/null -w '%{http_code}\n' "http://$GATEWAY_IP:8080/openai" \
+        curl -s -o /dev/null -w '%{http_code}\n' "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
           -H 'content-type: application/json' -H "$hdr" \
-          -d '{"messages":[{"role":"user","content":"hi"}]}'
+          -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}'
       done
     assert:
       - contains: "model: gpt-4o -> 404"
@@ -118,9 +118,9 @@ steps:
       - matches: '"model": *"gpt-5\.6-terra'
 
   # The Setup prose promises the override wins over a client-supplied model.
-  - probe: "the backend model override replaces a client-supplied model"
+  - probe: "the model pin replaces a client-supplied model"
     script: |
-      curl -s "http://$GATEWAY_IP:8080/openai?model=gpt-5.4-nano" \
+      curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions?model=gpt-5.4-nano" \
         -H 'content-type: application/json' \
         -d '{"model":"gpt-5.6-terra","messages":[{"role":"user","content":"hi"}]}' \
         | grep -o '"model": *"[^"]*"' | head -1

@@ -59,6 +59,7 @@ def test_default_render():
     # empty modelCatalog/grants: no routes, backends, secrets, or rate limits
     assert not by_kind(docs, "HTTPRoute")
     assert not by_kind(docs, "EnterpriseAgentgatewayBackend")
+    assert not by_kind(docs, "AgentgatewayModel")
     assert not by_kind(docs, "Secret")
     assert not by_kind(docs, "RateLimitConfig")
 
@@ -82,9 +83,7 @@ modelCatalog:
   - alias: chat-mock
     provider: openai
     model: mock-model
-    host: mock-model-svc.agentgateway-system.svc.cluster.local
-    port: 8000
-    apiPath: /v1/chat/completions
+    baseURL: http://mock-model-svc.agentgateway-system.svc.cluster.local:8000/v1
   - alias: chat-real
     provider: openai
     model: gpt-5.4-nano
@@ -92,20 +91,57 @@ modelCatalog:
       secretRef: openai-secret
 """
 
-def test_catalog_backends():
+def test_catalog_models():
     docs = render(values=values_file(CATALOG_VALUES))
-    bes = {d["metadata"]["name"]: d for d in by_kind(docs, "EnterpriseAgentgatewayBackend")}
-    assert set(bes) == {"llm-chat-mock", "llm-chat-real"}, f"got {set(bes)}"
-    mock = bes["llm-chat-mock"]["spec"]
-    assert mock["ai"]["provider"]["openai"]["model"] == "mock-model"
-    assert mock["ai"]["provider"]["host"] == "mock-model-svc.agentgateway-system.svc.cluster.local"
-    assert mock["ai"]["provider"]["port"] == 8000
-    assert mock["ai"]["provider"]["path"] == "/v1/chat/completions"
+    assert not by_kind(docs, "EnterpriseAgentgatewayBackend")
+    models = {d["metadata"]["name"]: d for d in by_kind(docs, "AgentgatewayModel")}
+    assert set(models) == {"llm-chat-mock", "llm-chat-real"}, f"got {set(models)}"
+    assert models["llm-chat-mock"]["apiVersion"] == "agentgateway.dev/v1alpha1"
+    mock = models["llm-chat-mock"]["spec"]
+    assert mock["parentRefs"] == [{
+        "group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "llm-chat-mock"}]
+    assert mock["match"] == {"model": "*"}
+    assert mock["provider"] == "OpenAI"
+    assert mock["baseURL"] == "http://mock-model-svc.agentgateway-system.svc.cluster.local:8000/v1"
     assert mock["policies"]["auth"] == {"passthrough": {}}
-    real = bes["llm-chat-real"]["spec"]
-    assert real["ai"]["provider"]["openai"]["model"] == "gpt-5.4-nano"
-    assert "host" not in real["ai"]["provider"]
+    # the alias pins its model, whatever the client sends
+    assert mock["policies"]["transformations"] == [{"field": "model", "expression": '"mock-model"'}]
+    real = models["llm-chat-real"]["spec"]
+    assert real["policies"]["transformations"] == [{"field": "model", "expression": '"gpt-5.4-nano"'}]
+    assert "baseURL" not in real
     assert real["policies"]["auth"] == {"secretRef": {"name": "openai-secret"}}
+
+def test_catalog_anthropic_provider():
+    docs = render(values=values_file("""
+modelCatalog:
+  - alias: claude
+    provider: anthropic
+    model: claude-haiku-4-5
+    auth:
+      secretRef: anthropic-secret
+"""))
+    m = by_kind(docs, "AgentgatewayModel")[0]["spec"]
+    assert m["provider"] == "Anthropic"
+
+def test_catalog_rejects_unsupported_provider():
+    err = render_error(values=values_file("""
+modelCatalog:
+  - alias: br
+    provider: bedrock
+    model: x
+"""))
+    assert "provider" in err, err
+
+def test_catalog_rejects_legacy_host_keys():
+    err = render_error(values=values_file("""
+modelCatalog:
+  - alias: m
+    provider: openai
+    model: x
+    host: mock
+    port: 8000
+"""))
+    assert "host" in err or "additional" in err.lower(), err
 
 def test_catalog_routes():
     docs = render(values=values_file(CATALOG_VALUES))
@@ -115,8 +151,7 @@ def test_catalog_routes():
     assert r["parentRefs"] == [{"name": "agw-llm-ops"}]
     assert r["rules"][0]["matches"][0]["path"] == {"type": "PathPrefix", "value": "/llm/chat-mock"}
     assert r["rules"][0]["backendRefs"][0] == {
-        "name": "llm-chat-mock", "group": "enterpriseagentgateway.solo.io",
-        "kind": "EnterpriseAgentgatewayBackend"}
+        "group": "agentgateway.dev", "kind": "AgentgatewayModel", "name": "*"}
 
 def test_catalog_auth_policies():
     docs = render(values=values_file(CATALOG_VALUES))
@@ -253,6 +288,7 @@ def test_grant_only_mode():
     assert not by_kind(docs, "EnterpriseAgentgatewayParameters")
     assert not by_kind(docs, "HTTPRoute")
     assert not by_kind(docs, "EnterpriseAgentgatewayBackend")
+    assert not by_kind(docs, "AgentgatewayModel")
 
     secs = by_kind(docs, "Secret")
     assert len(secs) == 1

@@ -75,11 +75,9 @@
         "required": ["alias", "provider", "model"],
         "properties": {
           "alias": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", "maxLength": 57},
-          "provider": {"enum": ["openai", "anthropic", "bedrock", "vertexai", "azureopenai"]},
+          "provider": {"enum": ["openai", "anthropic"]},
           "model": {"type": "string"},
-          "host": {"type": "string"},
-          "port": {"type": "integer"},
-          "apiPath": {"type": "string"},
+          "baseURL": {"type": "string", "pattern": "^https?://"},
           "auth": {
             "type": "object",
             "additionalProperties": false,

@@ -159,21 +159,26 @@ spec:
         namespaces:
           from: All
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: ${color}-llm
   namespace: agentgateway-${color}
 spec:
-  ai:
-    provider:
-      openai:
-        model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-      port: 8000
-      path: "/v1/chat/completions"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: ${color}-proxy-route
+  match:
+    model: "*"
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000/v1
   policies:
-    auth: { passthrough: {} }
+    auth:
+      passthrough: {}
+    transformations:
+      - field: model
+        expression: '"mock-gpt-4o"'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -196,9 +201,9 @@ spec:
               - name: x-gateway-color
                 value: ${color}
       backendRefs:
-        - name: ${color}-llm
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
@@ -215,7 +220,7 @@ for color in blue green; do
   ip=$(kubectl get svc agentgateway-${color} -n agentgateway-${color} \
     -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}')
   echo "== ${color} @ ${ip} =="
-  curl -s -D - -o /dev/null -X POST "http://${ip}:8080/openai" \
+  curl -s -D - -o /dev/null -X POST "http://${ip}:8080/openai/v1/chat/completions" \
     -H 'Content-Type: application/json' \
     -d '{"model":"mock-gpt-4o","messages":[{"role":"user","content":"hi"}]}' \
     | grep -iE 'HTTP/|x-gateway-color'
@@ -226,10 +231,38 @@ Expected: each prints `HTTP/1.1 200` and `x-gateway-color: <color>`. Both proxie
 
 ## Step 3 — Wire delegation and the weighted parent route
 
-Give each color a small delegate route that forwards to its proxy `Service`, then attach a parent route to the edge that delegates `/openai` to those two delegates, starting at 100% blue, 0% green:
+Give each color a small delegate route that forwards to its proxy `Service`, then attach a parent route to the edge that delegates `/openai` to those two delegates, starting at 100% blue, 0% green. The parent lives in `agentgateway-system` and the delegates in the color namespaces, so each color namespace also needs a `ReferenceGrant` that lets HTTPRoutes in `agentgateway-system` reference its HTTPRoutes:
 
 ```bash
 kubectl apply -f - <<'EOF'
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-edge-delegation
+  namespace: agentgateway-blue
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: agentgateway-system
+  to:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: allow-edge-delegation
+  namespace: agentgateway-green
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: agentgateway-system
+  to:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -292,7 +325,7 @@ kubectl get httproute bluegreen-parent -n agentgateway-system \
 
 export EDGE_IP=$(kubectl get svc bluegreen-edge -n agentgateway-system \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}')
-curl -s -D - -o /dev/null -X POST "http://${EDGE_IP}:8080/openai" \
+curl -s -D - -o /dev/null -X POST "http://${EDGE_IP}:8080/openai/v1/chat/completions" \
   -H 'Content-Type: application/json' \
   -d '{"model":"mock-gpt-4o","messages":[{"role":"user","content":"hi"}]}' \
   | grep -iE 'HTTP/|x-gateway-color'
@@ -329,7 +362,7 @@ data:
       thresholds: { http_req_failed: ['rate==0'], checks: ['rate==1.0'] },
     };
     export default function () {
-      const res = http.post(`${BASE}/openai`,
+      const res = http.post(`${BASE}/openai/v1/chat/completions`,
         JSON.stringify({ model: 'mock-gpt-4o', messages: [{ role: 'user', content: 'hi' }] }),
         { headers: { 'Content-Type': 'application/json' } });
       const color = res.headers['X-Gateway-Color'] || res.headers['x-gateway-color'] || '';
@@ -371,7 +404,7 @@ In a second terminal, watch the color flip live as you change weights:
 ```bash
 export EDGE_IP=$(kubectl get svc bluegreen-edge -n agentgateway-system \
   -o jsonpath='{.status.loadBalancer.ingress[0].ip}{.status.loadBalancer.ingress[0].hostname}')
-while true; do curl -s -D - -o /dev/null -X POST "http://${EDGE_IP}:8080/openai" \
+while true; do curl -s -D - -o /dev/null -X POST "http://${EDGE_IP}:8080/openai/v1/chat/completions" \
   -H 'Content-Type: application/json' \
   -d '{"model":"mock-gpt-4o","messages":[{"role":"user","content":"hi"}]}' \
   | grep -i '^x-gateway-color:'; sleep 1; done
@@ -428,4 +461,4 @@ kubectl delete gateway bluegreen-edge -n agentgateway-system --ignore-not-found
 kubectl delete enterpriseagentgatewayparameters edge-config -n agentgateway-system --ignore-not-found
 ```
 
-Deleting the two color namespaces removes their Gateways, routes, and backends. The base install (`agentgateway-proxy`) and the shared mock LLM are untouched.
+Deleting the two color namespaces removes their Gateways, routes, models, and ReferenceGrants. The base install (`agentgateway-proxy`) and the shared mock LLM are untouched.

@@ -19,8 +19,17 @@ steps:
     assert:
       - contains: "successfully rolled out"
 
-  - section: "Set up the OpenAI backend"
+  - section: "Set up the OpenAI model"
     run: all
+    retry:
+      attempts: 6
+      delay: 3
+      until: "ResolvedRefs=True"
+
+  - resource: agentgatewaymodel/openai-all-models
+    jsonpath: '.status.parents[0].conditions[?(@.type=="Accepted")].status'
+    expect: "True"
+    name: the openai-all-models model is accepted, as the lab states
 
   - section: "Create per-user API keys"
     run: all
@@ -58,7 +67,7 @@ steps:
   # from the client. If a client could set it, the whole budget model is bypassable.
   - probe: "user_id comes from the key, not from a client-supplied header"
     script: |
-      curl -s -o /dev/null -w 'spoofed_header=%{http_code}\n' "http://$GATEWAY_IP:8080/openai" \
+      curl -s -o /dev/null -w 'spoofed_header=%{http_code}\n' "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
         -H 'content-type: application/json' \
         -H 'Authorization: Bearer sk-invalid-key' \
         -H 'x-user-id: alice' \

@@ -66,7 +66,7 @@ steps:
   # The lab only tests the missing-header case.
   - probe: "an incorrect api-key is denied, not merely a missing one"
     script: |
-      curl -s -o /dev/null -w 'wrong_key=%{http_code}\n' "http://$GATEWAY_IP:8080/openai" \
+      curl -s -o /dev/null -w 'wrong_key=%{http_code}\n' "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
         -H 'content-type: application/json' \
         -H 'api-key: not-the-right-key' \
         -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Say hi"}],"max_tokens":5}'

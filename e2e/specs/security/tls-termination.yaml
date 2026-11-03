@@ -108,7 +108,7 @@ steps:
   - probe: "the plaintext baseline still works alongside TLS"
     script: |
       curl -s -o /dev/null -w 'plaintext_8080=%{http_code}\n' \
-        "http://$GATEWAY_IP:8080/openai" \
+        "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
         -H 'content-type: application/json' \
         -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Hello!"}]}'
     assert:

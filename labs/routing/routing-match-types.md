@@ -4,7 +4,7 @@
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
-- Configure an `EnterpriseAgentgatewayBackend` per model using the model override parameter
+- Configure an `AgentgatewayModel` per model that pins requests to that model
 - Configure LLM routing using three `HTTPRoute` match types: path, header, and query parameter
 - Curl OpenAI endpoints through the agentgateway proxy for each match type
 - Validate path to model mapping
@@ -19,69 +19,88 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Our default `EnterpriseAgentgatewayBackend` allows the user to specify any `model` parameter in the request body. To restrict access to specific models, configure a model override in the `EnterpriseAgentgatewayBackend`:
+A catch-all `AgentgatewayModel` (`match.model: "*"`) forwards whatever `model` the client puts in the request body. To restrict a route to one model, pin it with a body transformation that overwrites the `model` field:
 ```
-provider:
-  openai:
-    model: "gpt-5.4-nano"
+match:
+  model: "*"
+provider: OpenAI
+policies:
+  transformations:
+    - field: model
+      expression: '"gpt-5.4-nano"'
 ```
-When a model override is configured, the gateway overrides any user-input `model` parameter in the request body (e.g. if the user supplies `model: gpt-5-2025-08-07`, the gateway overrides it to `gpt-5.4-nano`).
+With a pin in place, the gateway replaces any client-supplied `model` (e.g. if the user supplies `model: gpt-5-2025-08-07`, the gateway sends `gpt-5.4-nano`). The request body still needs a `model` field, because the gateway reads it before applying the pin.
 
-Create an `EnterpriseAgentgatewayBackend` per model for finer-grained control over which models clients can access.
+Create one `AgentgatewayModel` per model for finer-grained control over which models clients can access. Each model attaches to one rule of the `openai` `HTTPRoute` through `sectionName`, so the rule decides which requests reach the model. Every option below names its rules `gpt-5.4-mini`, `gpt-5.4-nano` and `gpt-5.6-terra`, so these models work with all three options. A model reports `Accepted` once the route with its rule exists.
 
-When model overrides are specified, the client does not need to supply a `model` parameter in the request body, since the gateway injects it. A client-supplied model is accepted but overwritten.
-
-Lets create an OpenAI `EnterpriseAgentgatewayBackend` per specific-model if you haven't already
+Create an OpenAI `AgentgatewayModel` per specific model:
 ```bash
 kubectl apply -f - <<EOF
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-gpt-5.4-mini
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        #--- Uncomment to configure model override ---
-        model: "gpt-5.4-mini"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+      sectionName: gpt-5.4-mini
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    transformations:
+      - field: model
+        expression: '"gpt-5.4-mini"'
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-gpt-5.4-nano
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        #--- Uncomment to configure model override ---
-        model: "gpt-5.4-nano"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+      sectionName: gpt-5.4-nano
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    transformations:
+      - field: model
+        expression: '"gpt-5.4-nano"'
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-gpt-5.6-terra
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        #--- Uncomment to configure model override ---
-        model: "gpt-5.6-terra"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+      sectionName: gpt-5.6-terra
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    transformations:
+      - field: model
+        expression: '"gpt-5.6-terra"'
 EOF
 ```
 
@@ -89,7 +108,7 @@ EOF
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
-Each option below configures the same `openai` `HTTPRoute` with a different match type. Applying a later option's `HTTPRoute` replaces the previous one, so you can try them one at a time against the backends created above.
+Each option below configures the same `openai` `HTTPRoute` with a different match type. Applying a later option's `HTTPRoute` replaces the previous one, so you can try them one at a time against the models created above.
 
 ## Option A: Path-per-Model Matching
 
@@ -106,34 +125,37 @@ spec:
     - name: agentgateway-proxy
       namespace: agentgateway-system
   rules:
-    - matches:
+    - name: gpt-5.4-mini
+      matches:
         - path:
             type: PathPrefix
             value: /openai/gpt-5.4-mini
       backendRefs:
-        - name: openai-gpt-5.4-mini
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: gpt-5.4-nano
+      matches:
         - path:
             type: PathPrefix
             value: /openai/gpt-5.4-nano
       backendRefs:
-        - name: openai-gpt-5.4-nano
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: gpt-5.6-terra
+      matches:
         - path:
             type: PathPrefix
             value: /openai/gpt-5.6-terra
       backendRefs:
-        - name: openai-gpt-5.6-terra
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
@@ -141,9 +163,10 @@ EOF
 
 curl each model's path:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai/gpt-5.4-mini" \
+curl -i "$GATEWAY_IP:8080/openai/gpt-5.4-mini/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
+    "model": "gpt-5.4-mini",
     "messages": [
       {
         "role": "user",
@@ -155,9 +178,10 @@ curl -i "$GATEWAY_IP:8080/openai/gpt-5.4-mini" \
 The response shows the model used: `gpt-5.4-mini-2026-03-17`
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai/gpt-5.4-nano" \
+curl -i "$GATEWAY_IP:8080/openai/gpt-5.4-nano/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -169,9 +193,10 @@ curl -i "$GATEWAY_IP:8080/openai/gpt-5.4-nano" \
 The response shows the model used: `gpt-5.4-nano-2026-03-17`
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai/gpt-5.6-terra" \
+curl -i "$GATEWAY_IP:8080/openai/gpt-5.6-terra/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
+    "model": "gpt-5.6-terra",
     "messages": [
       {
         "role": "user",
@@ -197,7 +222,8 @@ spec:
     - name: agentgateway-proxy
       namespace: agentgateway-system
   rules:
-    - matches:
+    - name: gpt-5.4-mini
+      matches:
         - path:
             type: PathPrefix
             value: /openai
@@ -206,12 +232,13 @@ spec:
             name: model
             value: gpt-5.4-mini
       backendRefs:
-        - name: openai-gpt-5.4-mini
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: gpt-5.4-nano
+      matches:
         - path:
             type: PathPrefix
             value: /openai
@@ -220,12 +247,13 @@ spec:
             name: model
             value: gpt-5.4-nano
       backendRefs:
-        - name: openai-gpt-5.4-nano
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: gpt-5.6-terra
+      matches:
         - path:
             type: PathPrefix
             value: /openai
@@ -234,9 +262,9 @@ spec:
             name: model
             value: gpt-5.6-terra
       backendRefs:
-        - name: openai-gpt-5.6-terra
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
@@ -244,10 +272,11 @@ EOF
 
 curl `/openai` with the `model` header set:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "model: gpt-5.4-mini" \
   -d '{
+    "model": "gpt-5.4-mini",
     "messages": [
       {
         "role": "user",
@@ -259,10 +288,11 @@ curl -i "$GATEWAY_IP:8080/openai" \
 The response shows the model used: `gpt-5.4-mini-2026-03-17`
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "model: gpt-5.4-nano" \
   -d '{
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -274,10 +304,11 @@ curl -i "$GATEWAY_IP:8080/openai" \
 The response shows the model used: `gpt-5.4-nano-2026-03-17`
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "model: gpt-5.6-terra" \
   -d '{
+    "model": "gpt-5.6-terra",
     "messages": [
       {
         "role": "user",
@@ -303,7 +334,8 @@ spec:
     - name: agentgateway-proxy
       namespace: agentgateway-system
   rules:
-    - matches:
+    - name: gpt-5.4-mini
+      matches:
         - path:
             type: PathPrefix
             value: /openai
@@ -312,12 +344,13 @@ spec:
             name: model
             value: gpt-5.4-mini
       backendRefs:
-        - name: openai-gpt-5.4-mini
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: gpt-5.4-nano
+      matches:
         - path:
             type: PathPrefix
             value: /openai
@@ -326,12 +359,13 @@ spec:
             name: model
             value: gpt-5.4-nano
       backendRefs:
-        - name: openai-gpt-5.4-nano
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: gpt-5.6-terra
+      matches:
         - path:
             type: PathPrefix
             value: /openai
@@ -340,9 +374,9 @@ spec:
             name: model
             value: gpt-5.6-terra
       backendRefs:
-        - name: openai-gpt-5.6-terra
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
@@ -350,9 +384,10 @@ EOF
 
 curl `/openai` with the `model` query parameter set:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai?model=gpt-5.4-mini" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions?model=gpt-5.4-mini" \
   -H "content-type: application/json" \
   -d '{
+    "model": "gpt-5.4-mini",
     "messages": [
       {
         "role": "user",
@@ -364,9 +399,10 @@ curl -i "$GATEWAY_IP:8080/openai?model=gpt-5.4-mini" \
 The response shows the model used: `gpt-5.4-mini-2026-03-17`
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai?model=gpt-5.4-nano" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions?model=gpt-5.4-nano" \
   -H "content-type: application/json" \
   -d '{
+    "model": "gpt-5.4-nano",
     "messages": [
       {
         "role": "user",
@@ -378,9 +414,10 @@ curl -i "$GATEWAY_IP:8080/openai?model=gpt-5.4-nano" \
 The response shows the model used: `gpt-5.4-nano-2026-03-17`
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai?model=gpt-5.6-terra" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions?model=gpt-5.6-terra" \
   -H "content-type: application/json" \
   -d '{
+    "model": "gpt-5.6-terra",
     "messages": [
       {
         "role": "user",
@@ -466,7 +503,7 @@ Navigate to http://localhost:16686 in your browser to see the traces. Each span 
 ```bash
 kubectl delete httproute -n agentgateway-system openai
 kubectl delete secret -n agentgateway-system openai-secret
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-5.6-terra
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-5.4-nano
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-gpt-5.4-mini
+kubectl delete agentgatewaymodel -n agentgateway-system openai-gpt-5.6-terra
+kubectl delete agentgatewaymodel -n agentgateway-system openai-gpt-5.4-nano
+kubectl delete agentgatewaymodel -n agentgateway-system openai-gpt-5.4-mini
 ```

@@ -7,7 +7,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 - Configure `AmazonBedrockLimitedAccess` IAM permission for AWS Bedrock access (required for short-term API keys)
 - Generate an AWS Bedrock API key (short-term or long-term)
 - Create a Kubernetes secret that contains the API key as a Bearer token
-- Create a route to AWS Bedrock as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to AWS Bedrock as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Curl AWS Bedrock through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
@@ -100,92 +100,136 @@ stringData:
 EOF
 ```
 
-## Create AWS Bedrock Route and AgentgatewayBackends
-Create AWS Bedrock route and `EnterpriseAgentgatewayBackend` resources. For this setup we will configure multiple `AgentgatewayBackends` using a single provider (AWS Bedrock) in a path-per-model routing configuration.
+## Create AWS Bedrock Route and Models
+Create the AWS Bedrock route and `AgentgatewayModel` resources. For this setup we will configure multiple models using a single provider (AWS Bedrock) in a path-per-model routing configuration.
 
-Note the key difference from the [AWS Bedrock routing lab](configure-routing-aws-bedrock.md): we use `spec.policies.auth.secretRef` instead of `spec.policies.auth.aws` for API key authentication. The resource names below (`bedrock-mistral`, `bedrock-haiku3.5`, etc.) match the other Bedrock labs; clean up previous Bedrock lab resources before starting this one.
+Note the key difference from the [AWS Bedrock routing lab](configure-routing-aws-bedrock.md): we use `spec.policies.auth.secretRef` instead of `spec.policies.auth.aws` for API key authentication. The resource names below (`bedrock-mistral`, `bedrock-haiku4.5`, etc.) match the other Bedrock labs; clean up previous Bedrock lab resources before starting this one.
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: bedrock-mistral
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      bedrock:
-        model: mistral.voxtral-mini-3b-2507
-        region: us-west-2
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: bedrock
+      sectionName: bedrock-mistral
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: bedrock
+      sectionName: bedrock-mistral-2
+  match:
+    model: "*"
+  provider: Bedrock
+  bedrock:
+    region: us-west-2
   policies:
     auth:
       secretRef:
         name: bedrock-apikey-secret
+    transformations:
+      - field: model
+        expression: '"mistral.voxtral-mini-3b-2507"'
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: bedrock-haiku3.5
+  name: bedrock-haiku4.5
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      bedrock:
-        model: us.anthropic.claude-haiku-4-5-20251001-v1:0
-        region: us-west-2
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: bedrock
+      sectionName: bedrock-haiku4.5
+  match:
+    model: "*"
+  provider: Bedrock
+  bedrock:
+    region: us-west-2
   policies:
     auth:
       secretRef:
         name: bedrock-apikey-secret
+    transformations:
+      - field: model
+        expression: '"us.anthropic.claude-haiku-4-5-20251001-v1:0"'
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: bedrock-opus
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      bedrock:
-        model: us.anthropic.claude-opus-4-7
-        region: us-west-2
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: bedrock
+      sectionName: bedrock-opus
+  match:
+    model: "*"
+  provider: Bedrock
+  bedrock:
+    region: us-west-2
   policies:
     auth:
       secretRef:
         name: bedrock-apikey-secret
+    transformations:
+      - field: model
+        expression: '"us.anthropic.claude-opus-4-7"'
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: bedrock-sonnet
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      bedrock:
-        model: us.anthropic.claude-sonnet-4-6
-        region: us-west-2
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: bedrock
+      sectionName: bedrock-sonnet
+  match:
+    model: "*"
+  provider: Bedrock
+  bedrock:
+    region: us-west-2
   policies:
     auth:
       secretRef:
         name: bedrock-apikey-secret
+    transformations:
+      - field: model
+        expression: '"us.anthropic.claude-sonnet-4-6"'
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: bedrock-llama3-8b
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      bedrock:
-        model: meta.llama3-1-8b-instruct-v1:0
-        region: us-west-2
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: bedrock
+      sectionName: bedrock-llama3-8b
+  match:
+    model: "*"
+  provider: Bedrock
+  bedrock:
+    region: us-west-2
   policies:
     auth:
       secretRef:
         name: bedrock-apikey-secret
+    transformations:
+      - field: model
+        expression: '"meta.llama3-1-8b-instruct-v1:0"'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -199,65 +243,71 @@ spec:
     - name: agentgateway-proxy
       namespace: agentgateway-system
   rules:
-    - matches:
+    - name: bedrock-haiku4.5
+      matches:
         - path:
             type: PathPrefix
             value: /bedrock/haiku
       backendRefs:
-        - name: bedrock-haiku3.5
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: bedrock-opus
+      matches:
         - path:
             type: PathPrefix
             value: /bedrock/opus
       backendRefs:
-        - name: bedrock-opus
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: bedrock-sonnet
+      matches:
         - path:
             type: PathPrefix
             value: /bedrock/sonnet
       backendRefs:
-        - name: bedrock-sonnet
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: bedrock-mistral
+      matches:
         - path:
             type: PathPrefix
             value: /bedrock/mistral
       backendRefs:
-        - name: bedrock-mistral
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
-    - matches:
+    - name: bedrock-llama3-8b
+      matches:
         - path:
             type: PathPrefix
             value: /bedrock/llama3-8b
       backendRefs:
-        - name: bedrock-llama3-8b
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
     # catch-all will route to the bedrock mistral upstream
-    - matches:
+    - name: bedrock-mistral-2
+      matches:
         - path:
-            type: Exact
+            type: PathPrefix
             value: /bedrock
       backendRefs:
-        - name: bedrock-mistral
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
@@ -269,7 +319,7 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/bedrock/mistral" \
+curl -i "$GATEWAY_IP:8080/bedrock/mistral/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -284,7 +334,7 @@ curl -i "$GATEWAY_IP:8080/bedrock/mistral" \
 
 ### curl AWS Bedrock Haiku endpoint
 ```bash
-curl -i "$GATEWAY_IP:8080/bedrock/haiku" \
+curl -i "$GATEWAY_IP:8080/bedrock/haiku/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -299,7 +349,7 @@ curl -i "$GATEWAY_IP:8080/bedrock/haiku" \
 
 ### curl AWS Bedrock Opus endpoint
 ```bash
-curl -i "$GATEWAY_IP:8080/bedrock/opus" \
+curl -i "$GATEWAY_IP:8080/bedrock/opus/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -314,7 +364,7 @@ curl -i "$GATEWAY_IP:8080/bedrock/opus" \
 
 ### curl AWS Bedrock Sonnet endpoint
 ```bash
-curl -i "$GATEWAY_IP:8080/bedrock/sonnet" \
+curl -i "$GATEWAY_IP:8080/bedrock/sonnet/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -329,7 +379,7 @@ curl -i "$GATEWAY_IP:8080/bedrock/sonnet" \
 
 ### curl AWS Bedrock llama3-8b endpoint
 ```bash
-curl -i "$GATEWAY_IP:8080/bedrock/llama3-8b" \
+curl -i "$GATEWAY_IP:8080/bedrock/llama3-8b/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -416,10 +466,10 @@ Navigate to http://localhost:16686 in your browser to see the traces. Each span 
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system bedrock
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-mistral
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-haiku3.5
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-opus
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-sonnet
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock-llama3-8b
+kubectl delete agentgatewaymodel -n agentgateway-system bedrock-mistral
+kubectl delete agentgatewaymodel -n agentgateway-system bedrock-haiku4.5
+kubectl delete agentgatewaymodel -n agentgateway-system bedrock-opus
+kubectl delete agentgatewaymodel -n agentgateway-system bedrock-sonnet
+kubectl delete agentgatewaymodel -n agentgateway-system bedrock-llama3-8b
 kubectl delete secret -n agentgateway-system bedrock-apikey-secret
 ```

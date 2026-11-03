@@ -7,14 +7,14 @@ def main():
     if not gateway_ip:
         raise ValueError("GATEWAY_IP environment variable is not set")
 
-    base_url = f"http://{gateway_ip}:8080/openai"
+    base_url = f"http://{gateway_ip}:8080/openai/v1"
     topic = os.environ.get("CREW_TOPIC", "AI Gateway key patterns and concepts")
 
     print(f"Using base_url: {base_url}")
     print(f"Research topic: {topic}")
 
     # agentgateway returns an OpenAI-compatible format, so use provider="openai"
-    # The /openai path prefix is rewritten to /v1/chat/completions by the HTTPRoute
+    # The SDK appends /chat/completions, so requests reach /openai/v1/chat/completions
     agentgateway_proxy = LLM(
         provider="openai",
         base_url=base_url,

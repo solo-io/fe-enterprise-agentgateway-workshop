@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 ## Lab Objectives
 - Choose between Direct API Key or Claude Max / Team Subscription access
 - Create a Kubernetes secret that contains your Anthropic credentials
-- Create a passthrough route to Anthropic as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Create a passthrough route to Anthropic as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Test the route with curl to verify connectivity
 - Configure Claude Desktop's third-party inference settings to route through the gateway
 - Validate Claude Desktop requests in Grafana UI and access logs
@@ -80,41 +80,33 @@ spec:
             type: PathPrefix
             value: /claude
       filters:
-        # required so that /claude/v1/models reaches the upstream as /v1/models
-        # (Claude Desktop's "Model discovery" toggle calls this endpoint)
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /
         - type: RequestHeaderModifier
           requestHeaderModifier:
             remove:
             - x-api-key
             - authorization
       backendRefs:
-        - name: claude-subscription-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: claude-subscription-backend
+  name: claude-subscription-model
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      anthropic: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: claude-subscription-route
+  match:
+    model: "*"
+  provider: Anthropic
   policies:
     auth:
       secretRef:
         name: claude-subscription-token
-    ai:
-      routes:
-        "/v1/messages": "Messages"
-        "/v1/models": "Passthrough"
-        "*": "Passthrough"
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
@@ -184,7 +176,7 @@ kubectl create secret generic claude-direct-apikey -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-### Create Anthropic Route and Backend
+### Create Anthropic Route and Model
 
 ```bash
 kubectl apply -f - <<EOF
@@ -203,41 +195,35 @@ spec:
             type: PathPrefix
             value: /claude
       filters:
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /
         - type: RequestHeaderModifier
           requestHeaderModifier:
             remove:
             - x-api-key
             - authorization
       backendRefs:
-        - name: claude-direct-apikey-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "540s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: claude-direct-apikey-backend
+  name: claude-direct-apikey-model
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      anthropic: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: claude-directapikey-route
+  match:
+    model: "*"
+  provider: Anthropic
   policies:
     auth:
       secretRef:
         name: claude-direct-apikey
-    ai:
-      routes:
-        "/v1/messages": "Messages"
-        "/v1/models": "Passthrough"
-        "*": "Passthrough"
 EOF
 ```
 
@@ -426,7 +412,7 @@ Stop the `kubectl port-forward` process (Ctrl-C) and run the cleanup for whichev
 
 ```bash
 kubectl delete httproute -n agentgateway-system claude-subscription-route
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-subscription-backend
+kubectl delete agentgatewaymodel -n agentgateway-system claude-subscription-model
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system claude-policy
 kubectl delete secret -n agentgateway-system claude-subscription-token
 unset CLAUDE_CODE_OAUTH_TOKEN
@@ -436,7 +422,7 @@ unset CLAUDE_CODE_OAUTH_TOKEN
 
 ```bash
 kubectl delete httproute -n agentgateway-system claude-directapikey-route
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-direct-apikey-backend
+kubectl delete agentgatewaymodel -n agentgateway-system claude-direct-apikey-model
 kubectl delete secret -n agentgateway-system claude-direct-apikey
 unset CLAUDE_API_KEY
 ```

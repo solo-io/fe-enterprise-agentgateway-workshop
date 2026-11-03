@@ -72,5 +72,50 @@ class TestEagbRule(unittest.TestCase):
         self.assertIn("x.md", errs[0])
 
 
+AI_BACKEND = (
+    "```yaml\napiVersion: enterpriseagentgateway.solo.io/v1alpha1\n"
+    "kind: EnterpriseAgentgatewayBackend\nmetadata:\n  name: openai\n"
+    "spec:\n  ai:\n    provider:\n      openai: {}\n```\n\n## Cleanup\n")
+MCP_BACKEND = (
+    "```yaml\napiVersion: enterpriseagentgateway.solo.io/v1alpha1\n"
+    "kind: EnterpriseAgentgatewayBackend\nmetadata:\n  name: mcp\n"
+    "spec:\n  mcp:\n    targets: []\n```\n\n## Cleanup\n")
+
+
+class TestAiBackendRule(unittest.TestCase):
+    def test_ai_backend_reported(self):
+        root = tempfile.mkdtemp()
+        write(root, "labs/x.md", AI_BACKEND)
+        write(root, "labs/y.md", MCP_BACKEND)
+        errs = conventions.check_ai_backend(root, ["labs/x.md", "labs/y.md"], allow=set())
+        self.assertEqual(len(errs), 1)
+        self.assertIn("labs/x.md:3:", errs[0])
+
+    def test_ai_backend_allowlisted(self):
+        root = tempfile.mkdtemp()
+        write(root, "labs/x.md", AI_BACKEND)
+        errs = conventions.check_ai_backend(root, ["labs/x.md"], allow={"labs/x.md"})
+        self.assertEqual(errs, [])
+
+    def test_backendref_kind_not_reported(self):
+        root = tempfile.mkdtemp()
+        write(root, "labs/x.md", (
+            "```yaml\n  rules:\n    - backendRefs:\n        - name: openai\n"
+            "          group: enterpriseagentgateway.solo.io\n"
+            "          kind: EnterpriseAgentgatewayBackend\n"
+            "      ai:\n        x: y\n```\n\n## Cleanup\n"))
+        errs = conventions.check_ai_backend(root, ["labs/x.md"], allow=set())
+        self.assertEqual(errs, [])
+
+    def test_indented_heredoc_backend_reported(self):
+        root = tempfile.mkdtemp()
+        write(root, "labs/x.md", (
+            "```bash\ncat <<EOF\n  apiVersion: enterpriseagentgateway.solo.io/v1alpha1\n"
+            "  kind: EnterpriseAgentgatewayBackend\n  metadata:\n    name: a\n"
+            "  spec:\n    policies:\n      auth: {}\n    ai:\n      provider: {}\nEOF\n```\n\n## Cleanup\n"))
+        errs = conventions.check_ai_backend(root, ["labs/x.md"], allow=set())
+        self.assertEqual(len(errs), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

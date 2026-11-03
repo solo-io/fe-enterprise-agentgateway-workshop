@@ -35,8 +35,17 @@ steps:
     expect: "1"
     name: the Solo UI 001 installed is ready to render Cost Management
 
-  - section: "Set up the OpenAI backend"
+  - section: "Set up the OpenAI model"
     run: all
+    retry:
+      attempts: 6
+      delay: 3
+      until: "ResolvedRefs=True"
+
+  - resource: agentgatewaymodel/openai-all-models
+    jsonpath: '.status.parents[0].conditions[?(@.type=="Accepted")].status'
+    expect: "True"
+    name: the openai-all-models model is accepted, as the lab states
 
   - section: "Create per-user virtual keys"
     run: all
@@ -157,7 +166,7 @@ steps:
   # logged cost at both rates, so only the overlay rate passes.
   - probe: "the overlay overrides the base rate for gpt-5.5"
     script: |
-      curl -s -o /dev/null "http://$GATEWAY_IP:8080/openai" \
+      curl -s -o /dev/null "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
         -H 'content-type: application/json' \
         -H 'Authorization: Bearer sk-alice-abc123def456' \
         -d '{"model":"gpt-5.5","messages":[{"role":"user","content":"Hello!"}]}'

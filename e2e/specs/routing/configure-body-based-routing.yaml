@@ -1,5 +1,5 @@
 lab: labs/routing/configure-body-based-routing.md
-description: PreRouting CEL lifts model from the body into headers the HTTPRoute matches on
+description: AgentgatewayModel match.model routes on the body model; a * model catches unknown names
 tier: t1-key
 requires:
   - OPENAI_API_KEY
@@ -13,15 +13,7 @@ steps:
   - section: "Configure Required Variables"
     run: all
 
-  - section: "Create EnterpriseAgentgatewayBackend Resources"
-    run: all
-
-  # NOTE: the PreRouting policy targets the shared Gateway, so it sets these two
-  # headers on every request the baseline serves until Cleanup removes it.
-  - section: "Step 1: Extract Model from Request Body"
-    run: all
-
-  - section: "Step 2: Route on the Extracted Headers"
+  - section: "Create the Route and Models"
     run: all
 
   - section: "Test Body-Based Routing"
@@ -53,7 +45,7 @@ steps:
       - contains: "mock-gpt-4o"
       - not_contains: "gpt-5.4-nano"
 
-  - section: "Fallback — No Model in Body"
+  - section: "Fallback: Unknown Model"
     run: all
     retry:
       attempts: 6
@@ -61,14 +53,20 @@ steps:
       until: "HTTP/[0-9.]+ 200"
     assert:
       - status: 200
-      # A body with no model must reach the mock via the unspecified fallback
-      # rule rather than 404 on no matching rule.
+      # An unclaimed name must reach the mock through the * model, which also
+      # proves the exact matches take precedence over the wildcard.
       - contains: "mock-gpt-4o"
 
-  # The lab calls the PreRouting phase "critical" but gives the reader no way to
-  # see the headers it injects. Echo them back off the mock's own view of the
-  # request by asserting the route each request actually matched.
-  - probe: "each request matched the rule its body implied"
+  - probe: "a request with no model field is rejected, as the lab states"
+    script: |
+      curl -s -o /dev/null -w 'no-model -> %{http_code}\n' "$GATEWAY_IP:8080/openai/v1/chat/completions" \
+        -H 'content-type: application/json' \
+        -d '{"messages":[{"role":"user","content":"hi"}]}'
+    assert:
+      - contains: "no-model -> 400"
+
+  # Assert the model each request was sent as, from the access log of the route.
+  - probe: "each request matched the model its body implied"
     script: |
       kubectl logs -n agentgateway-system \
         -l app.kubernetes.io/name=agentgateway-proxy --tail 200 \

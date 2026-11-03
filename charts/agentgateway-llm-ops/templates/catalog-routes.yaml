@@ -19,7 +19,7 @@ spec:
             type: PathPrefix
             value: /llm/{{ .alias }}
       backendRefs:
-        - name: llm-{{ .alias }}
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
 {{- end }}

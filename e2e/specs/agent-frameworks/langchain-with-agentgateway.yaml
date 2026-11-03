@@ -12,7 +12,7 @@ steps:
   - section: "Configure Required Variables"
     run: all
 
-  - section: "Create OpenAI Route and Backend"
+  - section: "Create OpenAI Route and Model"
     run: all
 
   - section: "Get the Gateway IP"

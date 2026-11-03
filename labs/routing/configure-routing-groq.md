@@ -1,6 +1,6 @@
 # Configure Routing to Groq
 
-In this lab, you'll route to [Groq](https://console.groq.com/), an OpenAI-compatible inference provider, using the `openai` provider with a host override.
+In this lab, you'll route to [Groq](https://console.groq.com/), an OpenAI-compatible inference provider, using the built-in `Groq` provider.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
@@ -8,24 +8,13 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our Groq api-key credentials
-- Create a route to Groq as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
-- Point the `openai` provider at a non-OpenAI host with `host`, `port`, and `pathPrefix`, and originate TLS to it
+- Create a route to Groq as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Curl Groq through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
-## Why the `openai` Provider?
+## The `Groq` Provider
 
-Groq serves the OpenAI Chat Completions API at `https://api.groq.com/openai/v1/chat/completions`. There is no dedicated `groq` provider. Because the wire format is identical to OpenAI's, you use `provider.openai` and redirect it at Groq's endpoint. The gateway still parses the request and response as OpenAI traffic, so token counts, model names, streaming metrics, and prompt/completion logging work as they do in the [OpenAI lab](configure-routing-openai.md).
-
-These provider fields redirect the traffic:
-
-| Setting | Value | Description |
-|---|---|---|
-| `host` / `port` | `api.groq.com` / `443` | The upstream endpoint. Both must be set together; the CRD rejects one without the other. |
-| `pathPrefix` | `/openai/v1` | Replaces the `openai` provider's built-in `/v1` prefix. The gateway appends the operation suffix (`/chat/completions`), producing `/openai/v1/chat/completions`. |
-| `policies.tls.sni` | `api.groq.com` | Originates TLS to the upstream and sets the SNI server name. Validates against the system trust store, which is correct for a public CA like Groq's. |
-
-> **Both the prefix and the TLS policy are required.** Omit `policies.tls.sni` and the gateway sends cleartext to port `443`, so Cloudflare answers `400 The plain HTTP request was sent to HTTPS port`. Set `pathPrefix: /openai` instead of `/openai/v1` and the `/v1` segment is lost, so Groq answers `404 Unknown request URL: POST /openai/chat/completions`.
+Groq serves the OpenAI Chat Completions API at `https://api.groq.com/openai/v1/chat/completions`. Setting `provider: Groq` on the model fills in that host, the `/openai/v1` base path, and TLS to port `443`, so the model needs only the provider name and the API key. For an OpenAI-compatible service without a built-in provider, set `provider: OpenAI` and point `baseURL` at the service, for example `baseURL: https://api.example.com/v1`.
 
 ### Configure Required Variables
 Replace with a valid Groq API key
@@ -40,7 +29,7 @@ kubectl create secret generic groq-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create groq route and backend
+Create groq route and model
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -58,46 +47,47 @@ spec:
             type: PathPrefix
             value: /groq
       backendRefs:
-        - name: groq-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: groq-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      host: api.groq.com
-      port: 443
-      pathPrefix: /openai/v1
-      openai: {}
-        #--- Uncomment to configure model override ---
-        #model: ""
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: groq
+  match:
+    model: "*"
+  provider: Groq
   policies:
     auth:
       secretRef:
         name: groq-secret
-    tls:
-      sni: api.groq.com
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"openai/gpt-oss-20b"'
 EOF
 ```
 
-Verify that the backend and route were accepted:
+Verify that the model and route were accepted:
 ```bash
-kubectl get enterpriseagentgatewaybackend groq-all-models -n agentgateway-system \
-  -o jsonpath='{.status.conditions[?(@.type=="Accepted")].message}{"\n"}'
+kubectl get agentgatewaymodel groq-all-models -n agentgateway-system \
+  -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].message}{"\n"}'
 kubectl get httproute groq -n agentgateway-system \
   -o jsonpath='{.status.parents[0].conditions[?(@.type=="Accepted")].status}{"\n"}'
 ```
 
 Expected output:
 ```
-Backend successfully accepted
+Successfully accepted AgentgatewayModel
 True
 ```
 
@@ -105,7 +95,7 @@ True
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/groq" \
+curl -i "$GATEWAY_IP:8080/groq/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "openai/gpt-oss-20b",
@@ -130,7 +120,7 @@ x-ratelimit-remaining-tokens: 7921
 
 The client sends no `Authorization` header. The gateway attaches the key from `groq-secret`, so callers reach Groq while the credential stays in the cluster.
 
-The backend routes every model Groq serves. Swap the `model` field to reach another one, for example `llama-3.3-70b-versatile`, or pin the backend to a single model by uncommenting `provider.openai.model`, which overrides whatever the client sends.
+The model routes every model Groq serves. Swap the `model` field to reach another one, for example `llama-3.3-70b-versatile`, or pin the route to a single model by uncommenting the `transformations` block, which overrides whatever the client sends.
 
 Streaming works over the same route: add `"stream": true` to the body and the gateway relays Groq's SSE chunks while recording TTFT and TPOT metrics.
 
@@ -168,7 +158,7 @@ The dashboard provides real-time visualization of:
 - MCP metrics (tool calls, server requests)
 - Connection and runtime metrics
 
-> **Note: Groq traffic is labeled as OpenAI.** Because the backend uses the `openai` provider, metrics carry `gen_ai_system="openai"` and access logs and spans carry `gen_ai.provider.name=openai`, both alongside `gen_ai.request.model=openai/gpt-oss-20b`. To isolate Groq traffic, filter dashboards and queries by model or by `route="agentgateway-system/groq"` rather than by provider. Cost is also reported as `total_cost_usd="0"`: the base model catalog prices OpenAI, Anthropic, and Gemini models, and Groq's model IDs aren't in it. Add them yourself with a custom catalog, as covered in the [LLM Cost Management lab](../observability/llm-cost-management.md).
+> **Note: Groq traffic is labeled `groq`.** Metrics carry `gen_ai_system="groq"` and access logs and spans carry `gen_ai.provider.name=groq`, alongside `gen_ai.request.model=openai/gpt-oss-20b`, so you can filter dashboards and queries by provider. The access log also reports per-request cost under `agw.ai.usage.cost.total` for Groq models in the base model catalog. To price a model the catalog lacks, add it with a custom catalog, as covered in the [LLM Cost Management lab](../observability/llm-cost-management.md).
 
 ### View Traces in the Solo UI
 
@@ -200,7 +190,7 @@ The log line carries the upstream endpoint (`endpoint=api.groq.com:443`), the mo
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system groq --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system groq-all-models --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system groq-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system groq-secret --ignore-not-found
 unset GROQ_API_KEY
 ```

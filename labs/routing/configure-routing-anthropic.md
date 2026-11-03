@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains your Anthropic API key credentials
-- Create a route to Anthropic as your backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to Anthropic as your LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Test the integration with a sample request to Claude
 
 ## Set Environment Variables
@@ -26,29 +26,35 @@ kubectl create secret generic anthropic-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-The `EnterpriseAgentgatewayBackend` object/kind is used to reference the Anthropic API key and specify the Model to be used.
+The `AgentgatewayModel` references the Anthropic API key and pins the model to use. It attaches to the `claude` route created in the next step.
 
 ```bash
 kubectl apply -f- <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: anthropic
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      anthropic:
-        model: "claude-sonnet-5"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: claude
+  match:
+    model: "*"
+  provider: Anthropic
   policies:
     auth:
       secretRef:
         name: anthropic-secret
+    transformations:
+      - field: model
+        expression: '"claude-sonnet-5"'
 EOF
 ```
 
 ```bash
-kubectl get enterpriseagentgatewaybackend -n agentgateway-system
+kubectl get agentgatewaymodel -n agentgateway-system
 ```
 
 Create the route used to interact with the LLM via the Gateway that you created previously.
@@ -72,9 +78,9 @@ spec:
             type: PathPrefix
             value: /anthropic
       backendRefs:
-        - name: anthropic
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
@@ -85,7 +91,7 @@ Retrieve the Gateway address to use for testing purposes in the `curl` command t
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/anthropic" \
+curl -i "$GATEWAY_IP:8080/anthropic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "claude-sonnet-5",
@@ -107,6 +113,6 @@ Expected output should be a successful response from Claude with a paragraph abo
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system claude
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system anthropic
+kubectl delete agentgatewaymodel -n agentgateway-system anthropic
 kubectl delete secret -n agentgateway-system anthropic-secret
 ```

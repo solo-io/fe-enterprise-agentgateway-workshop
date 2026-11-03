@@ -9,7 +9,7 @@ steps:
   - section: "Create the OpenAI API key secret"
     run: all
 
-  - section: "Create the OpenAI route and backend"
+  - section: "Create the OpenAI route and model"
     run: all
 
   - section: "Baseline test (no guardrails)"

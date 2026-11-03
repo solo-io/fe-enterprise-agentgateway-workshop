@@ -91,7 +91,7 @@ steps:
       # log contains no request at all. Assert the request line itself.
       - matches: 'http\.path=/v1/audio/(speech|transcriptions).*http\.status=200'
 
-  # The lab's closing Note tells the reader audio endpoints are Passthrough, so
+  # The lab's closing Note tells the reader audio responses carry no token usage, so
   # token-level metrics are unavailable while request counts and statuses are
   # still tracked. Assert both halves of that.
   - probe: "audio endpoints are proxied but not parsed as LLM completions"

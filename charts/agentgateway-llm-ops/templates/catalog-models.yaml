@@ -5,29 +5,27 @@
 {{- end }}
 {{- $seenAliases = append $seenAliases .alias }}
 {{- end }}
+{{- $providers := dict "openai" "OpenAI" "anthropic" "Anthropic" }}
 {{- range .Values.modelCatalog }}
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: llm-{{ .alias }}
   namespace: {{ $.Release.Namespace }}
   labels:
     {{- include "agentgateway-llm-ops.labels" $ | nindent 4 }}
 spec:
-  ai:
-    provider:
-      {{ .provider }}:
-        model: {{ quote .model }}
-      {{- with .host }}
-      host: {{ . }}
-      {{- end }}
-      {{- with .port }}
-      port: {{ . }}
-      {{- end }}
-      {{- with .apiPath }}
-      path: {{ quote . }}
-      {{- end }}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: llm-{{ .alias }}
+  match:
+    model: "*"
+  provider: {{ get $providers .provider }}
+  {{- with .baseURL }}
+  baseURL: {{ . }}
+  {{- end }}
   policies:
     auth:
       {{- if and .auth .auth.secretRef }}
@@ -36,4 +34,8 @@ spec:
       {{- else }}
       passthrough: {}
       {{- end }}
+    # The alias pins its model, whatever the client sends.
+    transformations:
+      - field: model
+        expression: {{ printf "%q" .model | squote }}
 {{- end }}

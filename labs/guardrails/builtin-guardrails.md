@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI API key credentials
-- Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Configure comprehensive built-in guardrails using `EnterpriseAgentgatewayPolicy`
 - Validate each guardrail category is enforced
 
@@ -20,7 +20,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-### Create the OpenAI route and backend
+### Create the OpenAI route and model
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -38,27 +38,33 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
-        #--- Uncomment to configure model override ---
-        #model: ""
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
@@ -71,7 +77,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 
 Send an innocent request, which should succeed:
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -263,7 +269,7 @@ EOF
 Attackers attempt to override the system prompt with phrases like "ignore all previous instructions".
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -280,7 +286,7 @@ Expected: `HTTP 403` with `Request blocked: prompt injection detected.`
 DAN (Do Anything Now) and similar jailbreaks attempt to convince the model to adopt an unrestricted persona.
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -297,7 +303,7 @@ Expected: `HTTP 403` with `Request blocked: jailbreak attempt detected.`
 Attackers try to reveal the hidden system prompt by asking the model to repeat or encode its internal instructions.
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -314,7 +320,7 @@ Expected: `HTTP 403` with `Request blocked: system prompt extraction attempt det
 The built-in `CreditCard`, `Ssn`, `Email`, `PhoneNumber`, and `CaSin` recognizers detect and block requests containing personal identifiable information.
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -331,7 +337,7 @@ Expected: `HTTP 422` with `Request blocked: personally identifiable information 
 Detects AWS keys, OpenAI API keys, JWTs, private keys, database connection strings, and plaintext passwords.
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -348,7 +354,7 @@ Expected: `HTTP 422` with `Request blocked: credential or secret detected.`
 Catches requests for instructions on hacking, building weapons, synthesizing illegal substances, or generating malware and phishing content.
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -366,7 +372,7 @@ Attackers encode malicious instructions in base64, hex, or other formats to evad
 
 **Encoding evasion:**
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -376,7 +382,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 
 **Delimiter injection:**
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -393,7 +399,7 @@ Expected: `HTTP 403` with `Request blocked: encoding evasion or prompt delimiter
 Blocks requests seeking harmful self-harm guidance, hate speech, and dangerous medical or financial recommendations.
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -413,7 +419,7 @@ The response guards mask sensitive data generated by the LLM before it reaches t
 
 **R1, PII masking (email address in LLM output):**
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -431,7 +437,7 @@ Built-in recognizers mask with their entity type (`<EMAIL_ADDRESS>`, `<CREDIT_CA
 
 **R2, Secret masking (AWS access key in LLM output):**
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -460,8 +466,8 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ```
 
 ```
-http.path=/openai http.status=403 protocol=llm error="request rejected by regex guardrail" reason=Guardrail duration=0ms
-http.path=/openai http.status=422 protocol=llm error="request rejected by regex guardrail" reason=Guardrail duration=14ms
+http.path=/openai/v1/chat/completions http.status=403 protocol=llm error="request rejected by regex guardrail" reason=Guardrail duration=0ms
+http.path=/openai/v1/chat/completions http.status=422 protocol=llm error="request rejected by regex guardrail" reason=Guardrail duration=14ms
 ```
 
 Note the low `duration` values: rejected requests never reach the LLM provider, so you are not billed for blocked traffic. Pattern-only guards evaluate in under a millisecond; the PII guard costs a few milliseconds more because the built-in recognizers scan the full prompt.
@@ -490,6 +496,6 @@ Open http://localhost:4000 and click **Tracing** in the left navigation. Blocked
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system comprehensive-prompt-guard
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 ```

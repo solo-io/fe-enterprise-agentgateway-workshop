@@ -86,22 +86,32 @@ EOF
 Create the EnterpriseAgentgatewayBackend for the mock OpenAI server
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: mock-openai
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-      port: 8000
-      path: "/v1/chat/completions"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai-foo-route
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai-bar-route
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai-baz-route
+  match:
+    model: "*"
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000/v1
   policies:
     auth:
       passthrough: {}
+    transformations:
+      - field: model
+        expression: '"mock-gpt-4o"'
 EOF
 ```
 
@@ -214,9 +224,9 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: mock-openai
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
@@ -237,9 +247,9 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: mock-openai
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
@@ -260,9 +270,9 @@ spec:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: mock-openai
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
@@ -274,7 +284,7 @@ curl mock-openai-foo over https:
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-sni -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -ikv --resolve "mock-openai-foo.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-foo.try-solo.io:443/ \
+curl -ikv --resolve "mock-openai-foo.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-foo.try-solo.io:443/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -309,7 +319,7 @@ We can see the TLS handshake occurring
 
 curl mock-openai-bar over https:
 ```bash
-curl -ikv --resolve "mock-openai-bar.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-bar.try-solo.io:443/ \
+curl -ikv --resolve "mock-openai-bar.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-bar.try-solo.io:443/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -344,7 +354,7 @@ Again we can see the TLS handshake occurring, but this time for `mock-openai-bar
 
 Now curl mock-openai-baz over https:
 ```bash
-curl -ikv --resolve "mock-openai-baz.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-baz.try-solo.io:443/ \
+curl -ikv --resolve "mock-openai-baz.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-baz.try-solo.io:443/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -381,7 +391,7 @@ kubectl delete gateway -n agentgateway-system agentgateway-sni
 kubectl delete httproute -n agentgateway-system mock-openai-bar-route
 kubectl delete httproute -n agentgateway-system mock-openai-baz-route
 kubectl delete httproute -n agentgateway-system mock-openai-foo-route
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-openai
+kubectl delete agentgatewaymodel -n agentgateway-system mock-openai
 kubectl delete secret -n agentgateway-system foo
 kubectl delete secret -n agentgateway-system bar
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc

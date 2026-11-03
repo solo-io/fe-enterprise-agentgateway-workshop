@@ -42,7 +42,7 @@ decisions-extproc adapter
     │  confidence or margin below threshold?  → fallback tier
     │  rewrites body model: auto_model → gpt-5.4-nano | gpt-5.6-luna | gpt-5.6-terra
     ▼
-HTTPRoute /semantic  →  EnterpriseAgentgatewayBackend (openai-all-models)
+HTTPRoute /semantic  →  AgentgatewayModel (openai-all-models)
     │  no model override, so the rewritten name passes straight through
     ▼
 OpenAI
@@ -476,9 +476,9 @@ kubectl logs -n agentgateway-system deploy/decisions-extproc -c adapter --tail=1
 {"event": "started", "port": 50051, "tiers": {"economy": "gpt-5.4-nano", "mid": "gpt-5.6-luna", "high": "gpt-5.6-terra"}}
 ```
 
-## Create the OpenAI backend and route
+## Create the OpenAI model and route
 
-One route and one backend serve all three tiers. The `EnterpriseAgentgatewayBackend` has no model override, so OpenAI serves the model name in the request body, including the name the adapter wrote there.
+One route and one model serve all three tiers. The `openai-all-models` model matches any name (`match.model: "*"`) and does not pin a model, so OpenAI serves the model name in the request body, including the name the adapter wrote there.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -497,21 +497,25 @@ spec:
             type: PathPrefix
             value: /semantic
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: semantic
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
@@ -525,7 +529,7 @@ Confirm the plain path works before adding the adapter, so that a later failure 
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 echo $GATEWAY_IP
 
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}' | jq '.model'
 ```
@@ -616,7 +620,7 @@ The requests below differ only in their prompt text, and all name `auto_model`.
 An everyday language task goes to the economy tier:
 
 ```bash
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"auto_model","messages":[{"role":"user","content":"Summarize this email in one sentence: lunch moved to noon."}]}' | jq '.model'
 ```
@@ -628,7 +632,7 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 A routine coding task goes to the mid tier:
 
 ```bash
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"auto_model","messages":[{"role":"user","content":"Write a Python function that parses a CSV file and returns the sum of each numeric column."}]}' | jq '.model'
 ```
@@ -640,7 +644,7 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 A short proof request goes to the high tier. The prompt has no technical vocabulary, but the `high` description says rigorous reasoning qualifies "even when the prompt is short":
 
 ```bash
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"auto_model","messages":[{"role":"user","content":"Show that there are infinitely many primes."}]}' | jq '.model'
 ```
@@ -652,7 +656,7 @@ curl -s "$GATEWAY_IP:8080/semantic" \
 A request for a regex could be a quick lookup or routine technical work. The Decisions API leans toward `economy` but with low confidence, so the adapter's confidence gate sends the prompt to the fallback tier:
 
 ```bash
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"auto_model","messages":[{"role":"user","content":"Write a regex that matches US phone numbers."}]}' | jq '.model'
 ```
@@ -684,7 +688,7 @@ The last line is the regex prompt. The Decisions API picked `economy` with a con
 A request that names a real model skips classification. This proof request would go to the high tier as `auto_model`, but here it goes to the model the client named:
 
 ```bash
-curl -s "$GATEWAY_IP:8080/semantic" \
+curl -s "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Prove that sqrt(2) is irrational."}]}' | jq '.model'
 ```
@@ -724,7 +728,7 @@ kubectl create secret generic openai-decisions-key -n agentgateway-system \
 kubectl rollout restart deployment/decisions-extproc -n agentgateway-system
 kubectl rollout status deployment/decisions-extproc -n agentgateway-system --timeout=300s
 
-curl -s -w ' %{http_code}\n' "$GATEWAY_IP:8080/semantic" \
+curl -s -w ' %{http_code}\n' "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"auto_model","messages":[{"role":"user","content":"say hi"}]}'
 ```
@@ -739,10 +743,10 @@ To simulate an adapter outage, scale it to zero:
 kubectl scale deployment/decisions-extproc -n agentgateway-system --replicas=0
 kubectl wait --for=delete pod -l app=decisions-extproc -n agentgateway-system --timeout=60s
 
-curl -s -o /dev/null -w 'auto_model: %{http_code}\n' "$GATEWAY_IP:8080/semantic" \
+curl -s -o /dev/null -w 'auto_model: %{http_code}\n' "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"auto_model","messages":[{"role":"user","content":"say hi"}]}'
-curl -s -o /dev/null -w 'named model: %{http_code}\n' "$GATEWAY_IP:8080/semantic" \
+curl -s -o /dev/null -w 'named model: %{http_code}\n' "$GATEWAY_IP:8080/semantic/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"say hi"}]}'
 curl -s -o /dev/null -w 'other path: %{http_code}\n' "$GATEWAY_IP:8080/other"
@@ -858,7 +862,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system decisions-router --ignore-not-found
 kubectl delete httproute -n agentgateway-system semantic --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete deployment,service -n agentgateway-system decisions-extproc --ignore-not-found
 kubectl delete configmap -n agentgateway-system decisions-extproc-code decisions-routing-profile --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret openai-decisions-key --ignore-not-found

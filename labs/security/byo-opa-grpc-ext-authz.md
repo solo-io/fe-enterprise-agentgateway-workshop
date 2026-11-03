@@ -216,25 +216,33 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
@@ -243,7 +251,7 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -286,7 +294,7 @@ EOF
 ### Step 4: Test — request denied without required header
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -311,7 +319,7 @@ You should see a decision-log entry with `"result":false` and the request attrib
 ### Step 5: Test — request allowed with required header
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "x-ext-authz: allow" \
   -d '{
@@ -831,12 +839,12 @@ Re-run the deny/allow tests from Part 1. They should behave identically, because
 
 ```bash
 # Should be 403
-curl -sS -o /dev/null -w "no header: %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -sS -o /dev/null -w "no header: %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}'
 
 # Should be 200
-curl -sS -o /dev/null -w "with header: %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -sS -o /dev/null -w "with header: %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "x-ext-authz: allow" \
   -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}'
@@ -855,7 +863,8 @@ kubectl logs -n agentgateway-system -l app=opa-ext-authz --tail=5 | grep -o '"bu
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system openai-opa-ext-auth-policy mcp-opa-ext-auth-policy
 kubectl delete httproute -n agentgateway-system openai soloio-docs-mcp
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai soloio-docs-mcp
+kubectl delete agentgatewaymodel -n agentgateway-system openai
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system soloio-docs-mcp
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete deployment -n agentgateway-system opa-ext-authz
 kubectl delete service -n agentgateway-system opa-ext-authz

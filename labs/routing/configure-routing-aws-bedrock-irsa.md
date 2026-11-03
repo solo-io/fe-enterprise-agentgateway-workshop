@@ -13,7 +13,7 @@ Additionally, this lab requires:
 - Configure IRSA so the agentgateway pod can assume an IAM role for Bedrock access without storing AWS credentials as Kubernetes secrets
 - Associate the EKS cluster OIDC provider with AWS IAM
 - Create an IAM role with a trust policy scoped to the agentgateway service account
-- Deploy an `EnterpriseAgentgatewayBackend` for Bedrock that relies on IRSA instead of secret-based auth
+- Deploy an `AgentgatewayModel` for Bedrock that relies on IRSA instead of secret-based auth
 - Annotate the data plane service account via `EnterpriseAgentgatewayParameters`
 - Verify end-to-end connectivity with Bedrock using temporary IRSA credentials
 
@@ -162,23 +162,31 @@ aws iam list-attached-role-policies \
   --output table
 ```
 
-## Create the Bedrock Backend
+## Create the Bedrock Model
 
 Note: there is **no** `policies.auth` section. This signals to agentgateway to use the pod's own AWS credentials (provided via IRSA).
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: bedrock
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      bedrock:
-        model: us.amazon.nova-micro-v1:0
-        region: "$BEDROCK_REGION"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: bedrock
+  match:
+    model: "*"
+  provider: Bedrock
+  bedrock:
+    region: $BEDROCK_REGION
+  policies:
+    transformations:
+      - field: model
+        expression: '"us.amazon.nova-micro-v1:0"'
 EOF
 ```
 
@@ -211,7 +219,7 @@ kubectl get sa $SA_NAME -n agentgateway-system \
 
 ## Create the HTTP Route
 
-Route traffic through the agentgateway to the Bedrock backend:
+Route traffic through the agentgateway to the Bedrock model:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -232,9 +240,9 @@ spec:
           type: PathPrefix
           value: /bedrock
     backendRefs:
-      - name: bedrock
-        group: enterpriseagentgateway.solo.io
-        kind: EnterpriseAgentgatewayBackend
+      - group: agentgateway.dev
+        kind: AgentgatewayModel
+        name: "*"
     timeouts:
       request: "120s"
 EOF
@@ -285,7 +293,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 
 ### curl AWS Bedrock via IRSA
 ```bash
-curl -i "$GATEWAY_IP:8080/bedrock" \
+curl -i "$GATEWAY_IP:8080/bedrock/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -300,7 +308,7 @@ curl -i "$GATEWAY_IP:8080/bedrock" \
 
 ### Test with a more complex prompt
 ```bash
-curl -i "$GATEWAY_IP:8080/bedrock" \
+curl -i "$GATEWAY_IP:8080/bedrock/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -392,7 +400,7 @@ Navigate to http://localhost:16686 in your browser to see the traces. Each span 
 ```bash
 # Remove Kubernetes resources
 kubectl delete httproute -n agentgateway-system bedrock
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system bedrock
+kubectl delete agentgatewaymodel -n agentgateway-system bedrock
 
 # Remove IRSA annotation from EnterpriseAgentgatewayParameters
 kubectl patch enterpriseagentgatewayparameters agentgateway-config \

@@ -12,10 +12,7 @@ steps:
   - section: "Configure Required Variables"
     run: all
 
-  - section: "Create the Codex Route and Backend"
-    run: all
-
-  - section: "Serve the Codex Model Catalog"
+  - section: "Create the Codex Route and Model"
     run: all
 
   - section: "Export the Gateway IP"
@@ -60,7 +57,6 @@ steps:
       - contains: "route=agentgateway-system/codex-route"
       - contains: "http.path=/codex/v1/responses"
       - matches: "gen_ai.usage.input_tokens=[1-9]"
-      - matches: "route=agentgateway-system/codex-models-route .*http.status=200"
 
   - section: "View Metrics Endpoint"
     run: all

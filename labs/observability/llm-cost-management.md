@@ -5,7 +5,7 @@
 - A valid OpenAI API key, exported as `OPENAI_API_KEY`.
 
 ## Lab Objectives
-- Issue per-user API keys (virtual keys) and route them to OpenAI through an `EnterpriseAgentgatewayBackend`
+- Issue per-user API keys (virtual keys) and route them to OpenAI through an `AgentgatewayModel`
 - Enable the Cost Management section of the Solo UI
 - Review the dimensions that map each request to a user and group
 - Layer your own model cost catalog over the gateway's base catalog to control per-request USD pricing
@@ -28,7 +28,7 @@ This lab configures each piece behind that dashboard:
 
 The gateway computes spend from its OpenTelemetry spans. The dimensions, catalog, and budgets are ConfigMaps and CRDs, so you can manage them through GitOps.
 
-## Set up the OpenAI backend
+## Set up the OpenAI model
 
 Create the OpenAI credential secret. The gateway uses it to authenticate upstream, and callers don't see it.
 
@@ -38,7 +38,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create the backend and route:
+Create the model and route:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -57,37 +57,46 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
 Verify both resources are accepted:
 
 ```bash
-kubectl get enterpriseagentgatewaybackend openai-all-models -n agentgateway-system
+kubectl get agentgatewaymodel openai-all-models -n agentgateway-system \
+  -o jsonpath='{range .status.parents[*].conditions[*]}{.type}={.status}{"\n"}{end}'
 kubectl get httproute openai -n agentgateway-system \
   -o jsonpath='{range .status.parents[*].conditions[*]}{.type}={.status}{"\n"}{end}'
 ```
 
-The backend shows `ACCEPTED   True`, and the route prints `Accepted=True` and `ResolvedRefs=True`.
+Both the model and the route print `Accepted=True` and `ResolvedRefs=True`.
 
 ## Create per-user virtual keys
 
@@ -206,17 +215,17 @@ Export the gateway IP and confirm alice/bob authenticate while an unknown key is
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -s -o /dev/null -w "alice: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w "alice: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-alice-abc123def456" \
   -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Hello!"}]}'
 
-curl -s -o /dev/null -w "bob: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w "bob: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-bob-xyz789uvw012" \
   -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Hello!"}]}'
 
-curl -s -o /dev/null -w "invalid: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w "invalid: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-invalid-key" \
   -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Hello!"}]}'
@@ -473,14 +482,14 @@ Send a few requests as each user:
 
 ```bash
 for i in {1..5}; do
-  curl -s -o /dev/null -w "alice request $i: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  curl -s -o /dev/null -w "alice request $i: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-alice-abc123def456" \
     -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Whats your favorite poem?"}]}'
 done
 
 for i in {1..3}; do
-  curl -s -o /dev/null -w "bob request $i: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  curl -s -o /dev/null -w "bob request $i: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-bob-xyz789uvw012" \
     -d '{"model": "gpt-5.6-terra", "messages": [{"role": "user", "content": "Whats your favorite poem?"}]}'
@@ -495,7 +504,7 @@ Bob's 2,000-token daily cap is small enough to exhaust deliberately. Send reques
 
 ```bash
 for i in $(seq 1 25); do
-  code=$(curl -s -o /dev/null -w "%{http_code}" "$GATEWAY_IP:8080/openai" \
+  code=$(curl -s -o /dev/null -w "%{http_code}" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-bob-xyz789uvw012" \
     -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Whats your favorite poem?"}]}')
@@ -509,7 +518,7 @@ Expected output: a run of `HTTP 200` followed by a single `HTTP 429`, typically 
 Alice is unaffected: her own entry gives her a separate allowance, and the team budgets are set to `Audit`, so engineering keeps serving traffic while the one over-budget caller is cut off:
 
 ```bash
-curl -s -o /dev/null -w "alice: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+curl -s -o /dev/null -w "alice: HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-alice-abc123def456" \
   -d '{"model": "gpt-5.6-luna", "messages": [{"role": "user", "content": "Hello!"}]}'
@@ -602,9 +611,9 @@ kubectl delete configmap -n agentgateway-system llm-model-costs --ignore-not-fou
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system api-key-auth --ignore-not-found
 kubectl delete secret -n agentgateway-system -l app=llm-virtual-keys --ignore-not-found
 
-# OpenAI backend
+# OpenAI model and route
 kubectl delete httproute -n agentgateway-system openai --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
 ```
 

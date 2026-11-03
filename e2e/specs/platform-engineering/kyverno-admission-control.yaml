@@ -93,7 +93,7 @@ steps:
   - section: "Policy 1: Enterprise Backends Only"
     run: [4]
     assert:
-      - contains: "ent-openai-backend created"
+      - contains: "ent-static-backend created"
       - not_contains: "was blocked"
 
   # ---- Policy 2: Approved LLM Providers Only ---------------------------------
@@ -122,7 +122,7 @@ steps:
   - section: "Policy 2: Approved LLM Providers Only"
     run: [4]
     assert:
-      - contains: "bedrock-backend created"
+      - contains: "bedrock-model created"
       - not_contains: "was blocked"
 
   # ---- Policy 3: MCP Targets Must Point at Approved Hosts --------------------
@@ -174,7 +174,7 @@ steps:
     allow_failure: true
     retry: {attempts: 10, delay: 3, until: "was blocked due to the following policies"}
     assert:
-      - contains: "no-inline-key-backend"
+      - contains: "no-inline-key-model"
 
   # ---- Observability ---------------------------------------------------------
   # Background scan latency: reports for backends admitted earlier in the run

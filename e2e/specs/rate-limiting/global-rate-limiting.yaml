@@ -89,7 +89,7 @@ steps:
     script: |
       U="dup-$RANDOM"; CODES=""
       for i in $(seq 1 20); do
-        CODES="$CODES $(curl -s -o /dev/null -w '%{http_code}' "$GATEWAY_IP:8080/openai" \
+        CODES="$CODES $(curl -s -o /dev/null -w '%{http_code}' "$GATEWAY_IP:8080/openai/v1/chat/completions" \
           -H 'content-type: application/json' -H "X-User-ID: $U" -H "X-User-ID: $U" \
           -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Whats your favorite poem?"}]}')"
         [[ "$CODES" == *429* ]] && break

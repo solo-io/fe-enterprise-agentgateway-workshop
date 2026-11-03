@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains your OpenAI API key credentials
-- Create a route to OpenAI as the backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as the backend LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Run a CrewAI two-agent crew (Researcher + Writer) whose LLM calls route through agentgateway
 - Validate proxied requests in Grafana and access logs
 
@@ -31,24 +31,32 @@ kubectl create secret generic openai-secret -n agentgateway-system \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-## Create OpenAI Route and Backend
+## Create OpenAI Route and Model
 
-Apply the `EnterpriseAgentgatewayBackend` and `HTTPRoute`:
+Apply the `AgentgatewayModel` and `HTTPRoute`:
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -65,15 +73,15 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
 ```
 
-The `HTTPRoute` matches requests on the `/openai` path prefix. The `EnterpriseAgentgatewayBackend` then forwards them to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret, normalizing the path to the provider's `/v1/chat/completions` endpoint. Because the backend handles that normalization, any sub-path under the prefix works, so CrewAI's `base_url` can point at `/openai` directly.
+The `HTTPRoute` matches requests on the `/openai` path prefix. The gateway strips the prefix and sends the rest of the path to the `openai-all-models` model, which forwards it to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret. CrewAI appends `/chat/completions` to whatever `base_url` you give it, so this lab uses `http://$GATEWAY_IP:8080/openai/v1`.
 
 ## Get the Gateway IP
 
@@ -88,7 +96,7 @@ echo "Gateway IP: $GATEWAY_IP"
 Before running the crew, confirm the gateway is routing to OpenAI correctly:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -180,7 +188,7 @@ kubectl port-forward -n agentgateway-system svc/enterprise-agentgateway-ui 4000:
 
 3. Click **Tracing** in the left navigation
 
-Each agent invocation produces a trace listed as `POST /openai/*` against the `agentgateway-system/openai` route, with its duration and input/output token counts. Click a row to open its span details, which carry `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Spans also carry message content: the first user message as `llm.prompt.user` and the response text as `llm.completion.output`. The access logs record tokens and cost but no message text, because `001` ships the `llm_prompt` and `llm_completion` log attributes commented out.
+Each agent invocation produces a trace listed as `POST /openai/v1/chat/completions` against the `agentgateway-system/openai` route, with its duration and input/output token counts. Click a row to open its span details, which carry `gen_ai.request.model`, `gen_ai.response.model`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, and per-request cost under `agw.ai.usage.cost`. Spans also carry message content: the first user message as `llm.prompt.user` and the response text as `llm.completion.output`. The access logs record tokens and cost but no message text, because `001` ships the `llm_prompt` and `llm_completion` log attributes commented out.
 
 ### View the Prometheus metrics endpoint
 
@@ -199,7 +207,7 @@ Useful metrics:
 
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 rm -rf lib/crewai/multi-agent-researcher-writer/.venv
 ```

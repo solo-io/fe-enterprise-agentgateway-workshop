@@ -10,9 +10,9 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 
-- Demonstrate intra-priority-group failover (load balancing across providers within a single group, with per-provider eviction)
+- Demonstrate intra-priority-group failover (load balancing across models that share a priority, with per-model eviction)
 - Trigger eviction on 5XX server errors via a separate mock and CEL expression
-- Combine all behaviors in a single backend: intra-group P2C load balancing, per-provider eviction, and inter-group failover only when the entire current group is evicted
+- Combine all behaviors in a single virtual model: load balancing within a priority, per-model eviction, and failover to the next priority only when every model at the current priority is evicted
 
 ## Base Setup
 
@@ -121,9 +121,9 @@ kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 ```
 
-### Apply the Base Backend, Route, and Health Policy
+### Apply the Base Models and Route
 
-Pattern 1 modifies the backend created here; subsequent patterns create their own. This block bootstraps the shared `mock-ratelimit-backend` + `mock-ratelimit-health` policy that Pattern 1 will mutate.
+Pattern 1 modifies the `resilient` virtual model created here; later patterns create their own. Clients request the model `resilient`, and the virtual model fails over from the mock (priority 0) to OpenAI (priority 1). The health policy lives on the mock model.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -142,79 +142,76 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: mock-ratelimit-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: mock-ratelimit-backend
+  name: mock-gpt-4o
   namespace: agentgateway-system
 spec:
-  ai:
-    groups:
-      - providers:
-          - name: mock-ratelimit-provider
-            openai:
-              model: "mock-gpt-4o"
-            host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-            port: 8000
-            path: "/v1/chat/completions"
-      - providers:
-          - name: openai-provider
-            openai:
-              model: "gpt-5.4-nano"
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: mock-ratelimit-auth-mock
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: mock-ratelimit-backend
-    sectionName: mock-ratelimit-provider
-  backend:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-ratelimit-failover
+  match:
+    model: mock-gpt-4o
+  visibility: Internal
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000/v1
+  policies:
     auth:
       passthrough: {}
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: mock-ratelimit-auth-openai
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: mock-ratelimit-backend
-    sectionName: openai-provider
-  backend:
-    auth:
-      secretRef:
-        name: openai-secret
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: mock-ratelimit-health
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: mock-ratelimit-backend
-  backend:
     health:
       unhealthyCondition: "response.code >= 500 || response.code == 429"
       eviction:
         duration: 60s
         consecutiveFailures: 1
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: openai-gpt-5-4-nano
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-ratelimit-failover
+  match:
+    model: gpt-5.4-nano
+  visibility: Internal
+  provider: OpenAI
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: resilient
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-ratelimit-failover
+  match:
+    model: resilient
+  virtualModel:
+    failover:
+      targets:
+        - modelRef:
+            name: mock-gpt-4o
+          priority: 0
+        - modelRef:
+            name: openai-gpt-5-4-nano
+          priority: 1
 EOF
 ```
 
@@ -222,38 +219,38 @@ EOF
 
 ## Pattern 1: Intra-Priority-Group Failover
 
-The simplest failover case is between priority groups (group 1 to group 2 when group 1 fails). This pattern tests a more nuanced scenario: failover between multiple backends within the same priority group.
+The simplest failover case is between priorities (priority 0 to priority 1 when priority 0 fails). This pattern tests a more nuanced scenario: failover between multiple models that share a priority.
 
 ### Why This Matters
 
-When you have multiple backends in a single priority group:
-- The gateway load balances between all healthy backends
-- When one backend fails, it's ejected from the pool
-- Traffic continues to healthy backends in the same priority group
-- The gateway only moves to a lower priority group when ALL backends in the current group are unhealthy
+When several failover targets share a priority:
+- The gateway load balances between all healthy models at that priority, scoring them by health and latency
+- When one model fails, it's ejected from the pool
+- Traffic continues to healthy models at the same priority
+- The gateway only moves to the next priority when ALL models at the current priority are unhealthy
 
 This enables:
-- Heterogeneous backends: Mix different provider types or model tiers in the same priority group
-- Partial failure handling: Keep serving traffic even when some backends fail
-- Quality preservation: Stay in the preferred tier with better models as long as ANY backend is healthy
+- Heterogeneous models: Mix different provider types or model tiers at the same priority
+- Partial failure handling: Keep serving traffic even when some models fail
+- Quality preservation: Stay in the preferred tier with better models as long as ANY of them is healthy
 - Graceful degradation: Fall back to lower-quality but functional models only when necessary
 
 ### Health Policy
 
-The `EnterpriseAgentgatewayPolicy` (`mock-ratelimit-health`) created in the Base Setup already targets `mock-ratelimit-backend` by name, so it continues to apply here. No additional policy configuration is needed; the same `unhealthyCondition` and `eviction` settings govern this scenario.
+The `mock-gpt-4o` model created in the Base Setup carries the health policy, so it continues to apply here. No additional policy configuration is needed; the same `unhealthyCondition` and `eviction` settings govern this scenario. To make another model evictable, add the same `policies.health` block to it.
 
 ### Test Scenario
 
 This pattern demonstrates a real-world graceful degradation setup:
 
-**Priority Group 1 (Preferred):**
+**Priority 0 (Preferred):**
 1. Mock server (fails with 429)
 2. OpenAI gpt-5.6-terra (healthy, more capable model)
 
-**Priority Group 2 (Degraded Mode):**
+**Priority 1 (Degraded Mode):**
 1. OpenAI gpt-5.4-nano (less capable but faster/cheaper fallback)
 
-Priority Group 2 uses a less proficient model (gpt-5.4-nano) to ensure users get *some* response even if it's lower quality. However, since Priority Group 1 has a healthy backend (gpt-5.6-terra), Priority Group 2 should NOT be reached in this test.
+Priority 1 uses a less proficient model (gpt-5.4-nano) to ensure users get *some* response even if it's lower quality. However, since priority 0 has a healthy model (gpt-5.6-terra), priority 1 should NOT be reached in this test.
 
 ### Update Configuration
 
@@ -264,115 +261,73 @@ kubectl rollout restart deployment/agentgateway-proxy -n agentgateway-system
 kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system
 ```
 
-Now update the backend configuration to have multiple providers in Priority Group 1:
+Now add a gpt-5.6-terra model and put it at priority 0 next to the mock:
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: mock-ratelimit-failover
+  name: openai-gpt-5-6-terra
   namespace: agentgateway-system
 spec:
   parentRefs:
-    - name: agentgateway-proxy
-      namespace: agentgateway-system
-  rules:
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /openai
-      backendRefs:
-        - name: mock-ratelimit-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
-      timeouts:
-        request: "120s"
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
-metadata:
-  name: mock-ratelimit-backend
-  namespace: agentgateway-system
-spec:
-  ai:
-    groups:
-      # Priority Group 1: Mock (fails) + OpenAI (healthy)
-      - providers:
-          # Mock Server (always returns rate limit errors)
-          - name: mock-ratelimit-provider
-            openai:
-              model: "mock-gpt-4o"
-            host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-            port: 8000
-            path: "/v1/chat/completions"
-          # OpenAI (should failover to this within the same priority group)
-          - name: openai-provider-primary
-            openai:
-              model: "gpt-5.6-terra"
-      # Priority Group 2: OpenAI fallback (should NOT be reached)
-      - providers:
-          - name: openai-provider-fallback
-            openai:
-              model: "gpt-5.4-nano"
----
-# Re-apply the per-provider auth policies for the new provider names. The
-# passthrough EAGP from Base Setup still matches; the OpenAI EAGP now needs
-# to target both openai-provider-primary and openai-provider-fallback.
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: mock-ratelimit-auth-mock
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: mock-ratelimit-backend
-    sectionName: mock-ratelimit-provider
-  backend:
-    auth:
-      passthrough: {}
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: mock-ratelimit-auth-openai
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: mock-ratelimit-backend
-    sectionName: openai-provider-primary
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: mock-ratelimit-backend
-    sectionName: openai-provider-fallback
-  backend:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-ratelimit-failover
+  match:
+    model: gpt-5.6-terra
+  visibility: Internal
+  provider: OpenAI
+  policies:
     auth:
       secretRef:
         name: openai-secret
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: resilient
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-ratelimit-failover
+  match:
+    model: resilient
+  virtualModel:
+    failover:
+      targets:
+        - modelRef:
+            name: mock-gpt-4o
+          priority: 0
+        - modelRef:
+            name: openai-gpt-5-6-terra
+          priority: 0
+        - modelRef:
+            name: openai-gpt-5-4-nano
+          priority: 1
 EOF
 ```
 
-**Key differences from the Base Setup backend:**
-- Priority Group 1 now has TWO providers: mock-ratelimit-provider and openai-provider-primary (gpt-5.6-terra)
-- Priority Group 2 uses a less capable model (gpt-5.4-nano) as a "degraded mode" fallback
-- This demonstrates graceful degradation: prefer the more capable model, but ensure users get *some* response (even if lower quality) if all preferred backends fail
-- In this test, Priority Group 2 should never be reached because Priority Group 1 has a healthy gpt-5.6-terra backend
+**Key differences from the Base Setup:**
+- Priority 0 now has TWO models: `mock-gpt-4o` and `openai-gpt-5-6-terra` (gpt-5.6-terra)
+- Priority 1 uses a less capable model (gpt-5.4-nano) as a "degraded mode" fallback
+- This demonstrates graceful degradation: prefer the more capable model, but ensure users get *some* response (even if lower quality) if all preferred models fail
+- In this test, priority 1 should never be reached because priority 0 has a healthy gpt-5.6-terra model
 
 ### Test Intra-Priority-Group Failover
 
-Send three requests to observe the failover pattern within Priority Group 1:
+Send three requests to observe the failover pattern within priority 0:
 
 ```bash
 for i in 1 2 3; do
   echo "=== Request $i ==="
   curl -s -w "\nHTTP Status: %{http_code}\n" \
-    "$GATEWAY_IP:8080/openai" \
+    "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "Content-Type: application/json" \
-    -d '{"model": "", "messages": [{"role": "user", "content": "What is 2+2?"}]}'
+    -d '{"model": "resilient", "messages": [{"role": "user", "content": "What is 2+2?"}]}'
 done
 ```
 
@@ -392,7 +347,7 @@ HTTP Status: 200
 
 ### Verify Failover in Logs
 
-Check the AgentGateway logs to confirm which backends handled each request:
+Check the AgentGateway logs to confirm which models handled each request:
 
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
@@ -401,38 +356,38 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 **Expected log output** (trimmed to the fields that matter):
 
 ```
-endpoint=mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000 http.path=/openai http.status=429 duration=2ms
-endpoint=api.openai.com:443 http.path=/openai http.status=200 duration=861ms
-endpoint=api.openai.com:443 http.path=/openai http.status=200 duration=491ms
+endpoint=mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000 http.path=/openai/v1/chat/completions http.status=429 duration=2ms
+endpoint=api.openai.com:443 http.path=/openai/v1/chat/completions http.status=200 duration=861ms
+endpoint=api.openai.com:443 http.path=/openai/v1/chat/completions http.status=200 duration=491ms
 ```
 
 **Key observations:**
-- Request 1: Routed to `mock-gpt-4o-svc` → returned 429 → backend ejected
-- Requests 2-3: Routed to `api.openai.com` (Priority Group 1's healthy gpt-5.6-terra backend) → returned 200
+- Request 1: Routed to `mock-gpt-4o-svc` → returned 429 → mock ejected
+- Requests 2-3: Routed to `api.openai.com` (priority 0's healthy gpt-5.6-terra model) → returned 200
 - The endpoint does NOT switch back to the mock server
-- Priority Group 2 (with gpt-5.4-nano) is never reached because Priority Group 1 has a healthy backend
+- Priority 1 (with gpt-5.4-nano) is never reached because priority 0 has a healthy model
 - Users get responses from the more capable gpt-5.6-terra model, not the degraded gpt-5.4-nano fallback
 
 ### What This Proves
 
 This pattern demonstrates that:
-1. Intra-pool failover: Failover works between backends within the same priority group
-2. Backend ejection: The gateway ejects an unhealthy backend and skips it on subsequent requests
-3. Priority group preference: The gateway stays within the current priority group as long as ANY backend is healthy
-4. Graceful degradation: The gateway drops to a lower priority group, and its less capable models (gpt-5.4-nano), only when every backend in the higher groups has failed
+1. Intra-pool failover: Failover works between models that share a priority
+2. Model ejection: The gateway ejects an unhealthy model and skips it on subsequent requests
+3. Priority preference: The gateway stays at the current priority as long as ANY model there is healthy
+4. Graceful degradation: The gateway drops to the next priority, and its less capable models (gpt-5.4-nano), only when every model at the preferred priorities has failed
 5. Quality preservation: Users get responses from the more capable model (gpt-5.6-terra) when available
 
-The result trades answer quality for availability only when it has to: Priority Group 1 carries the models you prefer, and Priority Group 2 still returns an answer, at lower quality, once every backend in the preferred tier is down.
+The result trades answer quality for availability only when it has to: priority 0 carries the models you prefer, and priority 1 still returns an answer, at lower quality, once every model in the preferred tier is down.
 
 ---
 
 ## Pattern 2: 5XX Server Error Failover
 
-Pattern 1 demonstrated failover triggered by 429 rate limit errors. This pattern tests failover triggered by 5XX server errors. The `EnterpriseAgentgatewayPolicy` health policy can handle any error condition defined by the CEL expression.
+Pattern 1 demonstrated failover triggered by 429 rate limit errors. This pattern tests failover triggered by 5XX server errors. A model's health policy can handle any error condition defined by the CEL expression.
 
 ### Why This Matters
 
-LLM providers can fail with more than just rate limits. Server errors (500, 502, 503) indicate the backend is experiencing issues and should be temporarily removed from the pool. With the `EnterpriseAgentgatewayPolicy`, you can define exactly which error codes trigger eviction using CEL expressions.
+LLM providers can fail with more than just rate limits. Server errors (500, 502, 503) indicate the backend is experiencing issues and should be temporarily removed from the pool. With a model's health policy, you can define exactly which error codes trigger eviction using CEL expressions.
 
 ### Deploy Mock Server with Server Errors
 
@@ -515,7 +470,7 @@ kubectl get pods -n agentgateway-system -l app=mock-gpt-4o-500
 
 ### Create 5XX Failover Configuration
 
-Configure a separate HTTPRoute, EnterpriseAgentgatewayBackend, and EnterpriseAgentgatewayPolicy for the 5XX failover scenario. Note that this policy uses `unhealthyCondition: "response.code >= 500"` to evict only on server errors:
+Configure a separate HTTPRoute and models for the 5XX failover scenario. The virtual model also matches `resilient`, but it attaches to its own route, so it does not collide with the Base Setup model. Note that the mock's health policy uses `unhealthyCondition: "response.code >= 500"` to evict only on server errors:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -534,87 +489,82 @@ spec:
             type: PathPrefix
             value: /openai-5xx
       backendRefs:
-        - name: mock-5xx-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: mock-5xx-backend
+  name: mock-gpt-4o-500
   namespace: agentgateway-system
 spec:
-  ai:
-    groups:
-      # Priority Group 1: Mock Server (always returns 500 errors)
-      - providers:
-          - name: mock-5xx-provider
-            openai:
-              model: "mock-gpt-4o-500"
-            host: mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local
-            port: 8000
-            path: "/v1/chat/completions"
-      # Priority Group 2: OpenAI (failover when group 1 is evicted)
-      - providers:
-          - name: openai-provider
-            openai:
-              model: "gpt-5.4-nano"
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: mock-5xx-auth-mock
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: mock-5xx-backend
-    sectionName: mock-5xx-provider
-  backend:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-5xx-failover
+  match:
+    model: mock-gpt-4o-500
+  visibility: Internal
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local:8000/v1
+  policies:
     auth:
       passthrough: {}
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: mock-5xx-auth-openai
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: mock-5xx-backend
-    sectionName: openai-provider
-  backend:
-    auth:
-      secretRef:
-        name: openai-secret
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: mock-5xx-health
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: mock-5xx-backend
-  backend:
     health:
       unhealthyCondition: "response.code >= 500"
       eviction:
         duration: 30s
         consecutiveFailures: 1
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: openai-gpt-5-4-nano-5xx
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-5xx-failover
+  match:
+    model: gpt-5.4-nano
+  visibility: Internal
+  provider: OpenAI
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: resilient-5xx
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-5xx-failover
+  match:
+    model: resilient
+  virtualModel:
+    failover:
+      targets:
+        - modelRef:
+            name: mock-gpt-4o-500
+          priority: 0
+        - modelRef:
+            name: openai-gpt-5-4-nano-5xx
+          priority: 1
 EOF
 ```
 
 **Key differences from the 429 example:**
 - The `unhealthyCondition` uses `"response.code >= 500"`: only server errors trigger eviction, not rate limits
-- The policy's `eviction.duration: 30s` controls how long the backend is removed from the pool
+- The `eviction.duration: 30s` controls how long the mock is removed from the pool
 - The route uses `/openai-5xx` so both examples can coexist during testing
 
 ### Test 5XX Failover
@@ -632,9 +582,9 @@ Send three requests to observe the 5XX failover pattern:
 for i in 1 2 3; do
   echo "=== Request $i ==="
   curl -s -w "\nHTTP Status: %{http_code}\n" \
-    "$GATEWAY_IP:8080/openai-5xx" \
+    "$GATEWAY_IP:8080/openai-5xx/v1/chat/completions" \
     -H "Content-Type: application/json" \
-    -d '{"model": "", "messages": [{"role": "user", "content": "What is 2+2?"}]}'
+    -d '{"model": "resilient", "messages": [{"role": "user", "content": "What is 2+2?"}]}'
 done
 ```
 
@@ -645,8 +595,8 @@ done
 
 **What's happening:**
 1. The first request hits the mock server and receives a 503 error
-2. The `EnterpriseAgentgatewayPolicy` evaluates `response.code >= 500` → `true` (503 >= 500), and since `consecutiveFailures: 1`, the backend is evicted immediately for 30 seconds
-3. Subsequent requests are routed to priority group 2 (OpenAI) and receive successful 200 responses
+2. The mock model's health policy evaluates `response.code >= 500` → `true` (503 >= 500), and since `consecutiveFailures: 1`, the mock is evicted immediately for 30 seconds
+3. Subsequent requests are routed to priority 1 (OpenAI) and receive successful 200 responses
 4. After 30 seconds, the gateway will retry the mock server to check if it has recovered
 5. Since the mock server always returns 503, the cycle repeats with the eviction duration increasing via multiplicative backoff
 
@@ -661,32 +611,32 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 **Expected log output** (trimmed to the fields that matter):
 
 ```
-endpoint=mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local:8000 http.path=/openai-5xx http.status=503 duration=2ms
-endpoint=api.openai.com:443 http.path=/openai-5xx http.status=200 duration=861ms
+endpoint=mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local:8000 http.path=/openai-5xx/v1/chat/completions http.status=503 duration=2ms
+endpoint=api.openai.com:443 http.path=/openai-5xx/v1/chat/completions http.status=200 duration=861ms
 ```
 
 **Key observations:**
-- Request 1: Routed to `mock-gpt-4o-500-svc` → returned 503 → backend evicted
+- Request 1: Routed to `mock-gpt-4o-500-svc` → returned 503 → mock evicted
 - Request 2+: Routed to `api.openai.com` → returned 200 (failover successful)
 - The `unhealthyCondition` CEL expression correctly identified the 503 response as unhealthy (`503 >= 500`) and triggered eviction
 
 ### What This Proves
 
 This pattern demonstrates that:
-1. Non-429 failover: The `EnterpriseAgentgatewayPolicy` health policy enables failover for any error condition, not just rate limits
+1. Non-429 failover: The model health policy enables failover for any error condition, not just rate limits
 2. CEL flexibility: The `unhealthyCondition` expression can target specific error ranges (`>= 500`), individual codes (`== 429`), or combinations (`>= 500 || == 429`)
-3. Policy-controlled duration: The policy's `eviction.duration` controls how long the backend is removed from the pool
-4. Multiplicative backoff: Repeated evictions increase the eviction duration automatically, preventing rapid cycling on persistently failing backends
+3. Policy-controlled duration: The health policy's `eviction.duration` controls how long the model is removed from the pool
+4. Multiplicative backoff: Repeated evictions increase the eviction duration automatically, preventing rapid cycling on persistently failing models
 
 ---
 
-## Pattern 3: Combined LB + Per-Provider Eviction + Inter-Group Failover
+## Pattern 3: Combined LB + Per-Model Eviction + Inter-Priority Failover
 
-The previous patterns each demonstrated one piece of the failover model. This pattern combines all three behaviors in a single backend to address a common real-world requirement: running multiple providers in the same priority group, where the platform must load balance across them, evict individual providers that return 429 or 5xx responses, and fail over to a lower-priority group **only** once the current group has no usable providers left.
+The previous patterns each demonstrated one piece of the failover model. This pattern combines all three behaviors in a single virtual model to address a common real-world requirement: running multiple models at the same priority, where the platform must load balance across them, evict individual models that return 429 or 5xx responses, and fail over to the next priority **only** once the current priority has no usable models left.
 
-The piece this pattern clarifies is *where health tracking lives*. Eviction is tracked **per provider**: each entry in `groups[].providers[]` is an individually evictable backend. The decision to move to the next priority group is derived from that per-provider state: it triggers only when every provider in the current group has been evicted. In other words, intra-group P2C load balancing, per-provider eviction, and inter-group failover are the same mechanism observed at different scopes.
+The piece this pattern clarifies is *where health tracking lives*. Eviction is tracked **per model**: each concrete `AgentgatewayModel` with a `policies.health` block is individually evictable. The decision to move to the next priority is derived from that per-model state: it triggers only when every model at the current priority has been evicted. In other words, load balancing within a priority, per-model eviction, and failover across priorities are the same mechanism observed at different scopes.
 
-This pattern proves the behavior end-to-end on the cluster by combining the 429 mock and the 503 mock in a single priority group, with OpenAI as the lower-priority fallback.
+This pattern proves the behavior end-to-end on the cluster by putting the 429 mock and the 503 mock at priority 0, with OpenAI at priority 1 as the fallback.
 
 ### Prerequisites
 
@@ -698,7 +648,7 @@ If you have not, complete those sections before continuing.
 
 ### Apply the Combined Configuration
 
-Create a new HTTPRoute, EnterpriseAgentgatewayBackend, and EnterpriseAgentgatewayPolicy that puts both mocks in Priority Group 1 and OpenAI in Priority Group 2. The route uses `/openai-combo` so it coexists with the earlier examples.
+Create a new HTTPRoute and models that put both mocks at priority 0 and OpenAI at priority 1. The route uses `/openai-combo` so it coexists with the earlier examples.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -717,93 +667,103 @@ spec:
             type: PathPrefix
             value: /openai-combo
       backendRefs:
-        - name: combined-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: combined-backend
+  name: combo-mock-429
   namespace: agentgateway-system
 spec:
-  ai:
-    groups:
-      # Priority Group 1: two providers (mock-429, mock-503)
-      # P2C load balances between them; each is evicted independently
-      - providers:
-          - name: mock-429
-            openai:
-              model: "mock-gpt-4o"
-            host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-            port: 8000
-            path: "/v1/chat/completions"
-          - name: mock-503
-            openai:
-              model: "mock-gpt-4o-500"
-            host: mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local
-            port: 8000
-            path: "/v1/chat/completions"
-      # Priority Group 2: healthy OpenAI fallback
-      # Reached only after BOTH providers in group 1 are evicted
-      - providers:
-          - name: openai-fallback
-            openai:
-              model: "gpt-5.4-nano"
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: combined-auth-mocks
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: combined-backend
-    sectionName: mock-429
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: combined-backend
-    sectionName: mock-503
-  backend:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: combined-failover
+  match:
+    model: mock-gpt-4o
+  visibility: Internal
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000/v1
+  policies:
     auth:
       passthrough: {}
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: combined-auth-openai
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: combined-backend
-    sectionName: openai-fallback
-  backend:
-    auth:
-      secretRef:
-        name: openai-secret
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: combined-health
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-  - group: enterpriseagentgateway.solo.io
-    kind: EnterpriseAgentgatewayBackend
-    name: combined-backend
-  backend:
     health:
       unhealthyCondition: "response.code >= 500 || response.code == 429"
       eviction:
         duration: 60s
         consecutiveFailures: 1
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: combo-mock-503
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: combined-failover
+  match:
+    model: mock-gpt-4o-500
+  visibility: Internal
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-500-svc.agentgateway-system.svc.cluster.local:8000/v1
+  policies:
+    auth:
+      passthrough: {}
+    health:
+      unhealthyCondition: "response.code >= 500 || response.code == 429"
+      eviction:
+        duration: 60s
+        consecutiveFailures: 1
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: combo-openai-gpt-5-4-nano
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: combined-failover
+  match:
+    model: gpt-5.4-nano
+  visibility: Internal
+  provider: OpenAI
+  policies:
+    auth:
+      secretRef:
+        name: openai-secret
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: resilient-combo
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: combined-failover
+  match:
+    model: resilient
+  virtualModel:
+    failover:
+      targets:
+        - modelRef:
+            name: combo-mock-429
+          priority: 0
+        - modelRef:
+            name: combo-mock-503
+          priority: 0
+        - modelRef:
+            name: combo-openai-gpt-5-4-nano
+          priority: 1
 EOF
 ```
 
@@ -821,9 +781,9 @@ Send five requests in sequence:
 ```bash
 for i in 1 2 3 4 5; do
   echo "=== Request $i ==="
-  curl -s -w "\nHTTP_STATUS:%{http_code}\n" "$GATEWAY_IP:8080/openai-combo" \
+  curl -s -w "\nHTTP_STATUS:%{http_code}\n" "$GATEWAY_IP:8080/openai-combo/v1/chat/completions" \
     -H "Content-Type: application/json" \
-    -d '{"model":"","messages":[{"role":"user","content":"Say hi in one word."}]}' \
+    -d '{"model":"resilient","messages":[{"role":"user","content":"Say hi in one word."}]}' \
     | jq -r 'if .model then "model=\(.model)" else "error.type=\(.error.type) error.code=\(.error.code)" end' 2>/dev/null
   sleep 1
 done
@@ -844,7 +804,7 @@ HTTP=200  model=gpt-5.4-nano-2026-03-17
 HTTP=200  model=gpt-5.4-nano-2026-03-17
 ```
 
-The exact provider P2C picks first (mock-429 or mock-503) may vary, but the overall sequence will always be: one failure from the first picked provider, one failure from the second, then group 2 takes over.
+The mock the gateway picks first (429 or 503) may vary, but the overall sequence will always be: one failure from the first picked mock, one failure from the second, then priority 1 takes over.
 
 ### Verify in the Access Logs
 
@@ -867,10 +827,10 @@ endpoint=api.openai.com:443                                              http.st
 
 | Behavior | Observed |
 |---|---|
-| **Intra-group P2C load balancing** | Requests 1 and 2 hit *different* providers in group 1 (different endpoints, different error codes). P2C, not round-robin, but the practical effect is that both providers receive traffic before either is fully written off. |
-| **Per-provider eviction** | Each provider is evicted independently on its first matching failure (`consecutiveFailures: 1`). The 503 and 429 mocks are tracked as separate backends: the policy applied to the backend `combined-backend` evaluates eviction per provider, not per group. |
-| **Inter-group failover gated on whole-group eviction** | Group 2 (`api.openai.com`) is not used until **both** providers in group 1 are evicted. Request 3 is the first request after the second mock is evicted, and it is the first to hit OpenAI. |
-| **CEL `unhealthyCondition` covers both codes** | A single policy with `response.code >= 500 \|\| response.code == 429` correctly classified the 503 from mock-503 and the 429 from mock-429 as unhealthy. |
+| **Load balancing within a priority** | Requests 1 and 2 hit *different* models at priority 0 (different endpoints, different error codes). The gateway scores models by health and latency rather than round-robin, but the practical effect is that both models receive traffic before either is fully written off. |
+| **Per-model eviction** | Each mock is evicted independently on its first matching failure (`consecutiveFailures: 1`). The 503 and 429 mocks are separate `AgentgatewayModel` resources, each with its own health policy and health state. |
+| **Failover gated on whole-priority eviction** | Priority 1 (`api.openai.com`) is not used until **both** models at priority 0 are evicted. Request 3 is the first request after the second mock is evicted, and it is the first to hit OpenAI. |
+| **CEL `unhealthyCondition` covers both codes** | The expression `response.code >= 500 \|\| response.code == 429` classified the 503 from `combo-mock-503` and the 429 from `combo-mock-429` as unhealthy. |
 
 ---
 
@@ -880,25 +840,22 @@ Delete the resources created in this lab. Skip any sections you did not run.
 
 Pattern 2 resources:
 ```bash
+kubectl delete agentgatewaymodel -n agentgateway-system resilient-5xx openai-gpt-5-4-nano-5xx mock-gpt-4o-500
 kubectl delete httproute -n agentgateway-system mock-5xx-failover
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-5xx-backend
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mock-5xx-health mock-5xx-auth-mock mock-5xx-auth-openai
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-500-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o-500
 ```
 
 Pattern 3 resources:
 ```bash
+kubectl delete agentgatewaymodel -n agentgateway-system resilient-combo combo-openai-gpt-5-4-nano combo-mock-503 combo-mock-429
 kubectl delete httproute -n agentgateway-system combined-failover
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system combined-backend
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system combined-health combined-auth-mocks combined-auth-openai
 ```
 
 Base Setup resources (skip if you want to keep them for the [LLM Failover](llm-failover.md) lab):
 ```bash
+kubectl delete agentgatewaymodel -n agentgateway-system resilient openai-gpt-5-6-terra openai-gpt-5-4-nano mock-gpt-4o --ignore-not-found
 kubectl delete httproute -n agentgateway-system mock-ratelimit-failover
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-ratelimit-backend
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system mock-ratelimit-health mock-ratelimit-auth-mock mock-ratelimit-auth-openai
 kubectl delete secret -n agentgateway-system openai-secret
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o

@@ -123,7 +123,7 @@ steps:
       openssl req -x509 -sha256 -nodes -days 1 -newkey rsa:2048 \
         -subj '/O=Rogue/CN=rogue.example.com' \
         -keyout example_certs/rogue.key -out example_certs/rogue.crt 2>/dev/null
-      curl -sk "https://$GATEWAY_IP/openai" \
+      curl -sk "https://$GATEWAY_IP/openai/v1/chat/completions" \
         -H 'content-type: application/json' \
         -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Hello!"}]}' \
         --cert example_certs/rogue.crt --key example_certs/rogue.key 2>&1
@@ -137,7 +137,7 @@ steps:
   - probe: "the plaintext baseline still works alongside mTLS"
     script: |
       curl -s -o /dev/null -w 'plaintext_8080=%{http_code}\n' \
-        "http://$GATEWAY_IP:8080/openai" \
+        "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
         -H 'content-type: application/json' \
         -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Hello!"}]}'
     assert:

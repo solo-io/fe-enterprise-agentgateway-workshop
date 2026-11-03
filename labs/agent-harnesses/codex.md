@@ -7,9 +7,9 @@ You also need the [Codex CLI](https://github.com/openai/codex) installed locally
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains your OpenAI API key
-- Create a route to OpenAI's Responses API using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI's Responses API using an `AgentgatewayModel` and `HTTPRoute`
 - Add retry and token rate limit policies to the route
-- Serve the Codex model catalog request from the gateway with a `directResponse`
+- Let the gateway answer the Codex model catalog request from the models the route serves
 - Test the route with curl to verify connectivity
 - Use the Codex CLI through the agentgateway proxy with a Codex profile
 - Validate Codex requests in Grafana, the Solo UI, and access logs
@@ -37,9 +37,9 @@ kubectl create secret generic codex-openai-apikey -n agentgateway-system \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-## Create the Codex Route and Backend
+## Create the Codex Route and Model
 
-Create the `HTTPRoute`, `EnterpriseAgentgatewayBackend`, and `EnterpriseAgentgatewayPolicy`:
+Create the `HTTPRoute`, `AgentgatewayModel`, and `EnterpriseAgentgatewayPolicy`:
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -62,29 +62,29 @@ spec:
             remove:
             - authorization
       backendRefs:
-        - name: codex-openai-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "540s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: codex-openai-backend
+  name: codex-openai-model
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: codex-route
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: codex-openai-apikey
-    ai:
-      routes:
-        "/v1/responses": "Responses"
-        "*": "Passthrough"
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayPolicy
@@ -112,46 +112,9 @@ spec:
 EOF
 ```
 
-The `RequestHeaderModifier` filter removes any `Authorization` header the client sends, so the only credential that reaches OpenAI is the one in `codex-openai-apikey`. The `"/v1/responses": "Responses"` entry tells the gateway to parse Responses API traffic, which gives you token counts, cost, and model names in metrics, logs, and traces. The policy retries transient upstream failures and caps the route at 5 million LLM tokens per hour.
+The `RequestHeaderModifier` filter removes any `Authorization` header the client sends, so the only credential that reaches OpenAI is the one in `codex-openai-apikey`. The gateway recognizes Responses API traffic from the `/v1/responses` path and parses it, which gives you token counts, cost, and model names in metrics, logs, and traces. The policy retries transient upstream failures and caps the route at 5 million LLM tokens per hour.
 
-## Serve the Codex Model Catalog
-
-At startup Codex requests its model catalog from `<base_url>/models` in a Codex-specific format that OpenAI does not serve. Without this route, OpenAI returns `404` and Codex logs `ERROR codex_models_manager::manager: failed to refresh available models`.
-
-This route answers `/codex/v1/models` at the gateway with an empty catalog, so Codex uses its built-in model metadata. The `Exact` match takes precedence over the `/codex` `PathPrefix` match in `codex-route`:
-```bash
-kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1
-kind: HTTPRoute
-metadata:
-  name: codex-models-route
-  namespace: agentgateway-system
-spec:
-  parentRefs:
-    - name: agentgateway-proxy
-      namespace: agentgateway-system
-  rules:
-    - matches:
-        - path:
-            type: Exact
-            value: /codex/v1/models
----
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayPolicy
-metadata:
-  name: codex-models-response
-  namespace: agentgateway-system
-spec:
-  targetRefs:
-    - group: gateway.networking.k8s.io
-      kind: HTTPRoute
-      name: codex-models-route
-  traffic:
-    directResponse:
-      status: 200
-      body: '{"models":[]}'
-EOF
-```
+At startup Codex requests its model catalog from `<base_url>/models`. The gateway answers `GET /codex/v1/models` itself with the models the route serves, so the request never reaches OpenAI.
 
 ## Export the Gateway IP
 
@@ -283,7 +246,7 @@ Each log line carries:
 
 Codex resends its full conversation on every turn, so after the first turn most input tokens show up as `gen_ai.usage.cache_read.input_tokens`.
 
-Codex's startup catalog request logs as `route=agentgateway-system/codex-models-route http.path=/codex/v1/models?client_version=... http.status=200`. The gateway answers it, so it never reaches OpenAI.
+When Codex refreshes its model catalog, the request logs as `route=agentgateway-system/codex-route http.method=GET http.path=/codex/v1/models?client_version=... http.status=200`, answered by the gateway without an upstream `endpoint`. Codex caches the catalog, so not every session sends this request.
 
 ### View Metrics Endpoint
 
@@ -302,9 +265,9 @@ Look for metrics like:
 ## Cleanup
 
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system codex-policies codex-models-response
-kubectl delete httproute -n agentgateway-system codex-route codex-models-route
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system codex-openai-backend
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system codex-policies
+kubectl delete httproute -n agentgateway-system codex-route
+kubectl delete agentgatewaymodel -n agentgateway-system codex-openai-model
 kubectl delete secret -n agentgateway-system codex-openai-apikey
 rm -f ~/.codex/agentgateway.config.toml
 unset GATEWAY_IP

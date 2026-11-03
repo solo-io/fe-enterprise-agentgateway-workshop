@@ -1,8 +1,8 @@
 # agentgateway-llm-ops
 
 Two install modes share one chart. **Infra mode** (installed once by the LLM
-operations team) owns the `Gateway`, the catalog of AI-model aliases (OpenAI,
-Anthropic, Bedrock, etc.), and, per grant, a team's API key and token
+operations team) owns the `Gateway`, the catalog of AI-model aliases (OpenAI and
+Anthropic), and, per grant, a team's API key and token
 budget. **Grant-only mode** lets a team install just its own key and budget
 into the same namespace as the infra release, without touching the Gateway
 or catalog.
@@ -12,8 +12,8 @@ or catalog.
 Infra mode (`gateway` and `modelCatalog` set) additionally renders: the
 `Gateway` + its `EnterpriseAgentgatewayParameters` (replicas, service type,
 graceful drain), an access-log `EnterpriseAgentgatewayPolicy` on the
-`Gateway`, and per catalog alias an `EnterpriseAgentgatewayBackend` (model
-config, credentials), an `HTTPRoute` at `/llm/<alias>`, and an API-key-auth
+`Gateway`, and per catalog alias an `AgentgatewayModel` (provider,
+pinned model, credentials), an `HTTPRoute` at `/llm/<alias>`, and an API-key-auth
 `EnterpriseAgentgatewayPolicy` whose `secretSelector` discovers Secrets
 labeled `llm-ops.agentgateway.solo.io/alias-<alias>: granted`.
 
@@ -114,9 +114,9 @@ grants:
 
 | Field                                | In                | Purpose                          |
 |--------------------------------------|-------------------|-----------------------------------|
-| `alias` / `provider` / `model`       | `modelCatalog[*]` | Route segment `/llm/<alias>`; vendor (openai, anthropic, bedrock, vertexai, azureopenai); model ID |
+| `alias` / `provider` / `model`       | `modelCatalog[*]` | Route segment `/llm/<alias>`; vendor (openai, anthropic); model ID the alias always sends |
 | `auth.secretRef`                     | `modelCatalog[*]` | Existing Secret with vendor credentials |
-| `host` / `port` / `apiPath`          | `modelCatalog[*]` | Optional self-hosted/mock endpoint override |
+| `baseURL`                            | `modelCatalog[*]` | Optional self-hosted/mock endpoint, as the base path (`http://mock-svc:8000/v1`) |
 | `team` / `key`                      | `grants[*]`       | Team identifier (API key entry id); API key value (min 8 chars, workshop-grade) |
 | `aliases` / `tokensPerMinute`        | `grants[*]`       | Aliases this team can access and is budgeted for; per-team tokens-per-minute limit |
 

@@ -2,5 +2,5 @@ apiVersion: v2
 name: agentgateway-llm-ops
 description: Platform-owned LLM-ops chart for Enterprise Agentgateway — a curated model-alias catalog behind stable /llm/<alias> endpoints, per-team API keys, and per-team token budgets. Dev teams request endpoints; only the platform team installs this chart.
 type: application
-version: 0.1.0
+version: 0.2.0
 appVersion: "v2026.10.1"
