@@ -42,7 +42,8 @@ stringData:
     {
       "key": {{ quote .key }},
       "metadata": {
-        "user_id": {{ quote .team }}
+        "user_id": {{ quote .team }},
+        "budget_tier": {{ quote .budgetTier }}
       }
     }
 {{- end }}

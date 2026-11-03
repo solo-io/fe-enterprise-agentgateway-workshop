@@ -86,12 +86,24 @@
         }
       }
     },
+    "budgetTiers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "tokensPerMinute"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", "maxLength": 63},
+          "tokensPerMinute": {"type": "integer", "minimum": 1}
+        }
+      }
+    },
     "grants": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["team", "key", "aliases", "tokensPerMinute"],
+        "required": ["team", "key", "aliases", "budgetTier"],
         "properties": {
           "team": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", "maxLength": 45},
           "key": {"type": "string", "minLength": 8},
@@ -100,7 +112,7 @@
             "minItems": 1,
             "items": {"type": "string"}
           },
-          "tokensPerMinute": {"type": "integer", "minimum": 1}
+          "budgetTier": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", "maxLength": 63}
         }
       }
     }

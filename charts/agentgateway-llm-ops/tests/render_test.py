@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 """Render tests for agentgateway-llm-ops. Run: python3 charts/agentgateway-llm-ops/tests/render_test.py"""
-import hashlib
 import json
 import subprocess, os, tempfile, yaml
 
 CHART = os.path.join(os.path.dirname(__file__), "..")
-
-def budget_policy_name(alias, release="test-release"):
-    """Mirror of the template's llm-budget-<alias>-<sha256(release)[:8]> naming."""
-    return f"llm-budget-{alias}-{hashlib.sha256(release.encode()).hexdigest()[:8]}"
 
 def render(*sets, values=None, release="test-release"):
     cmd = ["helm", "template", release, CHART, "--namespace", "agentgateway-system"]
@@ -170,20 +165,32 @@ def test_schema_rejects_unknown_keys():
     err = render_error("tiers.gold.rateLimit.tokensPerMinute=999999")
     assert "additional properties" in err and "tiers" in err
 
-FULL_VALUES = CATALOG_VALUES + """
+TIERS = """
+budgetTiers:
+  - name: small
+    tokensPerMinute: 5
+  - name: large
+    tokensPerMinute: 1000
+"""
+
+FULL_VALUES = CATALOG_VALUES + TIERS + """
 grants:
   - team: team-alpha
     key: alpha-key-8f3a
     aliases:
       - chat-real
       - chat-mock
-    tokensPerMinute: 1000
+    budgetTier: large
   - team: team-beta
     key: beta-key-2c71
     aliases:
       - chat-mock
-    tokensPerMinute: 5
+    budgetTier: small
 """
+
+def budget_policies(docs):
+    return {d["metadata"]["name"]: d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
+            if "entRateLimit" in d["spec"].get("traffic", {})}
 
 def test_grant_key_secrets():
     docs = render(values=values_file(FULL_VALUES))
@@ -197,73 +204,114 @@ def test_grant_key_secrets():
     assert "llm-ops.agentgateway.solo.io/alias-chat-real" not in beta_labels
     assert beta_labels["llm-ops.agentgateway.solo.io/alias-chat-mock"] == "granted"
     entry = json.loads(alpha["stringData"]["team-alpha"])
-    assert entry == {"key": "alpha-key-8f3a", "metadata": {"user_id": "team-alpha"}}
+    assert entry == {"key": "alpha-key-8f3a",
+                     "metadata": {"user_id": "team-alpha", "budget_tier": "large"}}
 
-def test_grant_budgets():
-    """Two grants -> two per-team RateLimitConfigs (unchanged), but the budget
-    policy is grouped PER ALIAS, not per team: chat-mock is shared by both
-    teams, so it gets exactly one policy referencing both teams' configs;
-    chat-real is alpha-only, so it gets its own single-ref policy. Verified
-    live: one EnterpriseAgentgatewayPolicy per TEAM, each independently
-    attaching entRateLimit to a shared alias route, made a 2-replica proxy
-    fleet resolve the two competing policies inconsistently -- one replica
-    permanently honored one team's policy for the whole route, the other
-    replica the other team's, so one team's budget silently never applied on
-    however much of its traffic hit the "wrong" replica. Grouping by alias
-    means a shared route only ever has single-targetRef policies attached --
-    the verified-safe shape -- rather than multi-targetRef policies competing
-    on it."""
+def test_budget_tiers_config():
+    """One RateLimitConfig holds every tier: budget_tier -> user_id, so each
+    team keeps its own counter inside its tier. A key with a missing or
+    unknown tier falls back to the FIRST tier listed, never to no limit."""
     docs = render(values=values_file(FULL_VALUES))
-    rlcs = {d["metadata"]["name"]: d for d in by_kind(docs, "RateLimitConfig")}
-    assert set(rlcs) == {"llm-budget-team-alpha", "llm-budget-team-beta"}
+    rlcs = by_kind(docs, "RateLimitConfig")
+    assert [r["metadata"]["name"] for r in rlcs] == ["llm-budget-tiers"]
+    raw = rlcs[0]["spec"]["raw"]
+    assert raw["domain"] == "llm-budget-tiers"
+    assert raw["descriptors"] == [
+        {"key": "budget_tier", "value": "small", "descriptors": [
+            {"key": "user_id", "rateLimit": {"unit": "MINUTE", "requestsPerUnit": 5}}]},
+        {"key": "budget_tier", "value": "large", "descriptors": [
+            {"key": "user_id", "rateLimit": {"unit": "MINUTE", "requestsPerUnit": 1000}}]},
+    ]
+    rl = raw["rateLimits"][0]
+    assert rl["type"] == "TOKEN"
+    assert rl["actions"][0]["cel"] == {
+        "key": "budget_tier",
+        "expression": 'default(apiKey.budget_tier, "") in ["small", "large"] ? apiKey.budget_tier : "small"'}
+    assert rl["actions"][1]["cel"] == {"key": "user_id", "expression": "apiKey.user_id"}
 
-    alpha_raw = rlcs["llm-budget-team-alpha"]["spec"]["raw"]
-    assert alpha_raw["domain"] == "llm-budget-team-alpha"
-    assert alpha_raw["descriptors"] == [{
-        "key": "user_id", "value": "team-alpha",
-        "rateLimit": {"unit": "MINUTE", "requestsPerUnit": 1000}}]
-    alpha_rl = alpha_raw["rateLimits"][0]
-    assert alpha_rl["type"] == "TOKEN"
-    assert alpha_rl["actions"][0]["cel"] == {"expression": "apiKey.user_id", "key": "user_id"}
+def test_budget_policy_per_alias():
+    """Exactly one entRateLimit policy per alias route, owned by the infra
+    release: a route enforces only one entRateLimit policy, so a second
+    release must never attach its own."""
+    docs = render(values=values_file(FULL_VALUES))
+    pols = budget_policies(docs)
+    assert set(pols) == {"llm-chat-mock-budget", "llm-chat-real-budget"}
+    for alias in ("chat-mock", "chat-real"):
+        spec = pols[f"llm-{alias}-budget"]["spec"]
+        assert spec["targetRefs"] == [
+            {"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": f"llm-{alias}"}]
+        assert spec["traffic"]["entRateLimit"]["global"]["rateLimitConfigRefs"] == [
+            {"name": "llm-budget-tiers"}]
 
-    beta_raw = rlcs["llm-budget-team-beta"]["spec"]["raw"]
-    assert beta_raw["domain"] == "llm-budget-team-beta"
-    assert beta_raw["descriptors"] == [{
-        "key": "user_id", "value": "team-beta",
-        "rateLimit": {"unit": "MINUTE", "requestsPerUnit": 5}}]
+def test_tiers_without_grants_still_render_budgets():
+    """Every catalog alias is budgeted even when no grant lives in this
+    release, so isolated grant releases are enforced too."""
+    docs = render(values=values_file(CATALOG_VALUES + TIERS))
+    assert [r["metadata"]["name"] for r in by_kind(docs, "RateLimitConfig")] == ["llm-budget-tiers"]
+    assert set(budget_policies(docs)) == {"llm-chat-mock-budget", "llm-chat-real-budget"}
 
-    pols = {d["metadata"]["name"]: d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
-            if "entRateLimit" in d["spec"].get("traffic", {})}
-    real_name = budget_policy_name("chat-real")
-    mock_name = budget_policy_name("chat-mock")
-    assert set(pols) == {real_name, mock_name}
-
-    real_targets = pols[real_name]["spec"]["targetRefs"]
-    assert {(t["kind"], t["name"]) for t in real_targets} == {("HTTPRoute", "llm-chat-real")}
-    assert all(t["group"] == "gateway.networking.k8s.io" for t in real_targets)
-    assert pols[real_name]["spec"]["traffic"]["entRateLimit"]["global"]["rateLimitConfigRefs"] == [
-        {"name": "llm-budget-team-alpha"}]
-
-    mock_targets = pols[mock_name]["spec"]["targetRefs"]
-    assert {(t["kind"], t["name"]) for t in mock_targets} == {("HTTPRoute", "llm-chat-mock")}
-    assert pols[mock_name]["spec"]["traffic"]["entRateLimit"]["global"]["rateLimitConfigRefs"] == [
-        {"name": "llm-budget-team-alpha"}, {"name": "llm-budget-team-beta"}]
-
-def test_no_grants_no_budget_resources():
+def test_no_tiers_no_budget_resources():
     docs = render(values=values_file(CATALOG_VALUES))
     assert not by_kind(docs, "RateLimitConfig")
     assert not by_kind(docs, "Secret")
-    assert not [d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
-                if "entRateLimit" in d["spec"].get("traffic", {})]
+    assert not budget_policies(docs)
 
-def test_grant_unknown_alias_fails():
+def test_grants_without_tiers_fail():
     bad = CATALOG_VALUES + """
 grants:
   - team: team-alpha
     key: alpha-key-8f3a
     aliases:
-      - chat-nonexistent
+      - chat-mock
+    budgetTier: small
+"""
+    err = render_error(values=values_file(bad))
+    assert "budgetTiers" in err, err
+
+def test_grant_unknown_tier_fails():
+    bad = CATALOG_VALUES + TIERS + """
+grants:
+  - team: team-alpha
+    key: alpha-key-8f3a
+    aliases:
+      - chat-mock
+    budgetTier: huge
+"""
+    err = render_error(values=values_file(bad))
+    assert "unknown budget tier" in err and "huge" in err, err
+
+def test_duplicate_tier_fails():
+    bad = CATALOG_VALUES + """
+budgetTiers:
+  - name: small
+    tokensPerMinute: 5
+  - name: small
+    tokensPerMinute: 50
+"""
+    err = render_error(values=values_file(bad))
+    assert "duplicate budget tier" in err and "small" in err, err
+
+def test_schema_rejects_legacy_tokens_per_minute():
+    bad = CATALOG_VALUES + TIERS + """
+grants:
+  - team: team-alpha
+    key: alpha-key-8f3a
+    aliases:
+      - chat-mock
+    budgetTier: small
     tokensPerMinute: 1000
+"""
+    err = render_error(values=values_file(bad))
+    assert "tokensPerMinute" in err, err
+
+def test_grant_unknown_alias_fails():
+    bad = CATALOG_VALUES + TIERS + """
+grants:
+  - team: team-alpha
+    key: alpha-key-8f3a
+    aliases:
+      - chat-nonexistent
+    budgetTier: large
 """
     err = render_error(values=values_file(bad))
     assert "unknown alias" in err and "chat-nonexistent" in err
@@ -276,37 +324,17 @@ grants:
     key: gamma-secret-key-000
     aliases:
       - chat-real
-    tokensPerMinute: 2000
+    budgetTier: large
 """
 
 def test_grant_only_mode():
-    """Values with only `grants` set (gateway explicitly nulled out of the
-    chart's infra defaults, modelCatalog left at its empty default) render
-    ONLY the per-grant Secret + budget pair -- no infra, no catalog."""
+    """A grant-only release renders ONLY the team's key Secret. Its budget
+    comes from the tier named in the key, enforced by the infra release's
+    per-alias policy, so this release attaches no policy of its own."""
     docs = render(values=values_file(GRANT_ONLY_VALUES))
-    assert not by_kind(docs, "Gateway")
-    assert not by_kind(docs, "EnterpriseAgentgatewayParameters")
-    assert not by_kind(docs, "HTTPRoute")
-    assert not by_kind(docs, "EnterpriseAgentgatewayBackend")
-    assert not by_kind(docs, "AgentgatewayModel")
-
-    secs = by_kind(docs, "Secret")
-    assert len(secs) == 1
-    assert secs[0]["metadata"]["name"] == "llm-key-team-gamma"
-
-    rlcs = by_kind(docs, "RateLimitConfig")
-    assert len(rlcs) == 1
-    assert rlcs[0]["metadata"]["name"] == "llm-budget-team-gamma"
-
-    pols = by_kind(docs, "EnterpriseAgentgatewayPolicy")
-    assert len(pols) == 1, f"expected only the budget policy, got {[p['metadata']['name'] for p in pols]}"
-    assert pols[0]["metadata"]["name"] == budget_policy_name("chat-real")
-    assert pols[0]["spec"]["traffic"]["entRateLimit"]["global"]["rateLimitConfigRefs"] == [
-        {"name": "llm-budget-team-gamma"}]
-    assert "apiKeyAuthentication" not in pols[0]["spec"].get("traffic", {})
-    assert "accessLog" not in pols[0]["spec"].get("frontend", {})
-
-    assert len(docs) == 3, f"expected exactly Secret + RateLimitConfig + Policy, got {len(docs)} docs"
+    assert [(d["kind"], d["metadata"]["name"]) for d in docs] == [("Secret", "llm-key-team-gamma")]
+    entry = json.loads(docs[0]["stringData"]["team-gamma"])
+    assert entry["metadata"] == {"user_id": "team-gamma", "budget_tier": "large"}
 
 def test_grant_only_skips_alias_validation():
     """A grant-only release can't see modelCatalog (it isn't rendering one),
@@ -328,21 +356,21 @@ grants:
       - chat-mock
 """
     err = render_error(values=values_file(bad))
-    assert "tokensPerMinute" in err
+    assert "budgetTier" in err
 
 def test_duplicate_grant_team_fails():
-    bad = CATALOG_VALUES + """
+    bad = CATALOG_VALUES + TIERS + """
 grants:
   - team: team-alpha
     key: alpha-key-8f3a
     aliases:
       - chat-mock
-    tokensPerMinute: 1000
+    budgetTier: large
   - team: team-alpha
     key: alpha-key-second
     aliases:
       - chat-real
-    tokensPerMinute: 500
+    budgetTier: small
 """
     err = render_error(values=values_file(bad))
     assert "duplicate grant" in err and "team-alpha" in err
@@ -361,7 +389,7 @@ modelCatalog:
     assert "duplicate alias" in err and "chat-mock" in err
 
 def test_grant_repeated_alias_dedupes_label():
-    dup = CATALOG_VALUES + """
+    dup = CATALOG_VALUES + TIERS + """
 grants:
   - team: team-alpha
     key: alpha-key-8f3a
@@ -369,7 +397,7 @@ grants:
       - chat-mock
       - chat-mock
       - chat-real
-    tokensPerMinute: 1000
+    budgetTier: large
 """
     docs = render(values=values_file(dup))
     secs = by_kind(docs, "Secret")
@@ -399,88 +427,11 @@ grants:
     key: gamma-secret-key-000
     aliases:
       - chat-real
-    tokensPerMinute: 2000
+    budgetTier: large
 """
     docs = render(values=values_file(only_grants))
     assert len(by_kind(docs, "Gateway")) == 1
     assert len(by_kind(docs, "EnterpriseAgentgatewayParameters")) == 1
-
-def test_budget_targetrefs_dedupe_repeated_alias():
-    """A repeated alias within one grant must not produce a duplicate ref in
-    that alias's policy (each policy is now scoped to a single alias, so
-    dedup shows up as one rateLimitConfigRefs entry rather than one
-    targetRefs entry)."""
-    dup = CATALOG_VALUES + """
-grants:
-  - team: team-alpha
-    key: alpha-key-8f3a
-    aliases:
-      - chat-mock
-      - chat-mock
-      - chat-real
-    tokensPerMinute: 1000
-"""
-    docs = render(values=values_file(dup))
-    pols = {d["metadata"]["name"]: d for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
-            if "entRateLimit" in d["spec"].get("traffic", {})}
-    assert set(pols) == {budget_policy_name("chat-mock"), budget_policy_name("chat-real")}
-    mock_pol = pols[budget_policy_name("chat-mock")]
-    assert mock_pol["spec"]["targetRefs"] == [
-        {"group": "gateway.networking.k8s.io", "kind": "HTTPRoute", "name": "llm-chat-mock"}]
-    assert mock_pol["spec"]["traffic"]["entRateLimit"]["global"]["rateLimitConfigRefs"] == [
-        {"name": "llm-budget-team-alpha"}], "repeated alias must not duplicate the ref"
-
-def test_budget_policy_name_unique_across_releases():
-    """Two releases granting the same alias must render DIFFERENT policy
-    names (Helm ownership would collide otherwise). The name is
-    llm-budget-<alias>-<sha256(releaseName)[:8]>: plain release-name
-    concatenation was rejected because it is ambiguous -- release
-    "grant-team-beta" + alias "chat-mock" and release "grant-team-beta-chat"
-    + alias "mock" would concatenate to the same string. Release identity
-    stays queryable via the app.kubernetes.io/instance label."""
-    grant_only = """
-gateway: null
-
-grants:
-  - team: team-beta
-    key: beta-key-2c71
-    aliases:
-      - chat-mock
-    tokensPerMinute: 5
-"""
-    def policy_names(release):
-        docs = render(values=values_file(grant_only), release=release)
-        return {d["metadata"]["name"] for d in by_kind(docs, "EnterpriseAgentgatewayPolicy")
-                if "entRateLimit" in d["spec"].get("traffic", {})}
-
-    infra = render(values=values_file(FULL_VALUES), release="agw-llm-ops")
-    infra_names = {d["metadata"]["name"] for d in by_kind(infra, "EnterpriseAgentgatewayPolicy")
-                   if "entRateLimit" in d["spec"].get("traffic", {})}
-    beta_names = policy_names("grant-team-beta")
-
-    # same alias (chat-mock) granted by both releases -> disjoint policy names
-    assert beta_names == {budget_policy_name("chat-mock", "grant-team-beta")}
-    assert budget_policy_name("chat-mock", "agw-llm-ops") in infra_names
-    assert not (infra_names & beta_names), f"cross-release collision: {infra_names & beta_names}"
-
-    # the reviewer's ambiguous-concatenation pair stays distinct under hashing
-    mock_alias = """
-gateway: null
-
-grants:
-  - team: team-beta
-    key: beta-key-2c71
-    aliases:
-      - mock
-    tokensPerMinute: 5
-"""
-    beta_chat_mock = policy_names("grant-team-beta")
-    beta_chat_names = {d["metadata"]["name"] for d in
-                       by_kind(render(values=values_file(mock_alias), release="grant-team-beta-chat"),
-                               "EnterpriseAgentgatewayPolicy")
-                       if "entRateLimit" in d["spec"].get("traffic", {})}
-    assert not (beta_chat_mock & beta_chat_names), \
-        f"ambiguous concatenation regression: {beta_chat_mock & beta_chat_names}"
 
 def test_grant_only_empty_grants_renders_nothing():
     empty = """
@@ -511,7 +462,7 @@ grants:
     key: gamma-secret-key-000
     aliases:
       - chat-real
-    tokensPerMinute: 2000
+    budgetTier: large
 """
     err = render_error(values=values_file(bad))
     assert "grant-only releases" in err

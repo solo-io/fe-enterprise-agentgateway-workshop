@@ -2,57 +2,48 @@
 
 Two install modes share one chart. **Infra mode** (installed once by the LLM
 operations team) owns the `Gateway`, the catalog of AI-model aliases (OpenAI and
-Anthropic), and, per grant, a team's API key and token
-budget. **Grant-only mode** lets a team install just its own key and budget
-into the same namespace as the infra release, without touching the Gateway
-or catalog.
+Anthropic), the token budget tiers, and any team grants kept in the shared
+values file. **Grant-only mode** lets the platform install one team's API key
+as its own release, in the same namespace as the infra release, without
+touching the Gateway, the catalog or the tiers.
 
 ## What it renders
 
-Infra mode (`gateway` and `modelCatalog` set) additionally renders: the
-`Gateway` + its `EnterpriseAgentgatewayParameters` (replicas, service type,
-graceful drain), an access-log `EnterpriseAgentgatewayPolicy` on the
-`Gateway`, and per catalog alias an `AgentgatewayModel` (provider,
-pinned model, credentials), an `HTTPRoute` at `/llm/<alias>`, and an API-key-auth
+Infra mode (`gateway` and `modelCatalog` set) renders: the `Gateway` and its
+`EnterpriseAgentgatewayParameters` (replicas, service type, graceful drain),
+an access-log `EnterpriseAgentgatewayPolicy` on the `Gateway`, and per catalog
+alias an `AgentgatewayModel` (provider, pinned model, credentials), an
+`HTTPRoute` at `/llm/<alias>`, and an API-key-auth
 `EnterpriseAgentgatewayPolicy` whose `secretSelector` discovers Secrets
 labeled `llm-ops.agentgateway.solo.io/alias-<alias>: granted`.
 
-Both modes render, per grant in `grants`: a `Secret llm-key-<team>` carrying
-that team's API key (entry id = team name; inline JSON; labeled by all
-granted aliases so auth policies find it), and a `RateLimitConfig
-llm-budget-<team>` defining that team's tokens-per-minute budget. The
-`entRateLimit` policy that attaches those budgets to routes is **not**
-per-team: the chart renders one `EnterpriseAgentgatewayPolicy` per **alias**
-the release's grants touch, named
-`llm-budget-<alias>-<sha256(releaseName)[:8]>`, with a single `targetRef`
-(that alias's `HTTPRoute llm-<alias>`) and a `rateLimitConfigRefs` list
-naming every one of this release's teams granted that alias. Budgets stay
-independent per team (each ref resolves against its own team's
-`RateLimitConfig` descriptor); only the attachment point is shared. The
-8-hex release-name hash keeps policy names unique across releases granting
-the same alias (plain concatenation is ambiguous: release `grant-team-beta`
-+ alias `chat-mock` would collide with release `grant-team-beta-chat` +
-alias `mock`); the owning release remains queryable via the standard
-`app.kubernetes.io/instance` label. Policies target routes, never the
-`Gateway`, so grant-only releases need no reference to the Gateway at all.
+When `budgetTiers` is set, infra mode also renders one `RateLimitConfig
+llm-budget-tiers` that defines every tier, and one `EnterpriseAgentgatewayPolicy
+llm-<alias>-budget` per catalog alias that attaches it to that alias's route.
 
-### Design note: why one policy per alias, not per team
+Both modes render, per grant in `grants`, a `Secret llm-key-<team>` carrying
+that team's API key (entry id = team name, inline JSON, labeled by all
+granted aliases so the auth policies find it). The key's metadata records the
+team as `user_id` and its tier as `budget_tier`.
 
-The chart originally rendered one `entRateLimit` policy per team, and a team
-granted several aliases got a single policy object with a multi-route
-`targetRefs` list. Live testing on a 2-replica proxy fleet (Enterprise
-Agentgateway v2026.6.3) showed that when two teams shared an alias, the two
-independently-attaching policies on that shared route were resolved
-inconsistently **per replica**: one replica permanently enforced team A's
-policy for every request on the route, the other permanently enforced team
-B's, regardless of which team's key authenticated the request. One team's
-budget therefore silently never applied to whichever share of its traffic
-landed on the "wrong" replica: no error, warning, or log line pointed at
-it. Regrouping so that every rendered policy targets exactly one route (per
-alias, refs listing the granted teams) eliminated the inconsistency in every
-retest, including the cross-release case where a grant-only release and the
-infra release each attach their own single-target policy to the same shared
-alias route.
+### Design note: why tiers live in the infra release
+
+A route enforces only one `entRateLimit` policy. When two policies target the
+same `HTTPRoute`, both report `Accepted` and `Attached`, but the proxy applies
+only one of them, with no error or log line. An earlier version of this chart
+gave each release its own budget policy, so a grant-only release and the infra
+release granting the same alias left one team's budget silently unenforced.
+
+The chart therefore keeps exactly one budget policy per alias route, owned by
+the infra release, and moves the per-team decision into the request: the
+`RateLimitConfig` reads `budget_tier` and `user_id` from the authenticated
+key, so each team gets its own counter at its tier's limit. A grant-only
+release carries only a key, so it can change a team's tier without attaching
+anything to a route.
+
+A key whose `budget_tier` is missing or names no defined tier gets the first
+tier's limit, so a typo cannot remove a team's budget. List the smallest tier
+first.
 
 ## Grant-only mode
 
@@ -66,7 +57,7 @@ grants:
     key: gamma-secret-key
     aliases:
       - chat-real
-    tokensPerMinute: 2000
+    budgetTier: large
 ```
 
 `gateway: null` is required: a values file with only `grants:`
@@ -74,9 +65,11 @@ makes helm merge the chart's default `gateway` block back in, rendering a
 second Gateway/parameters/access-log set that fails with `AlreadyExists`
 next to an existing infra release.
 
-This release can't see `modelCatalog`, so an unmatched alias is not an error:
-its label is inert until an infra release with that alias lands in the
-same namespace. Install as a second, team-scoped release there:
+This release can't see `modelCatalog` or `budgetTiers`, so an unmatched alias
+or tier is not a render error. An unmatched alias label is inert until an
+infra release with that alias lands in the same namespace, and an unmatched
+tier gets the first tier's limit. Install as a second, team-scoped release
+there:
 
 ```bash
 helm install llm-team-gamma charts/agentgateway-llm-ops \
@@ -84,10 +77,8 @@ helm install llm-team-gamma charts/agentgateway-llm-ops \
 ```
 
 A team already granted elsewhere in the same namespace surfaces as a Helm
-ownership conflict at install: its per-team `Secret llm-key-<team>` and
-`RateLimitConfig llm-budget-<team>` names collide with the release that
-already grants it (the per-alias budget policies never collide across
-releases; their names carry a release-name hash). Offboard with
+ownership conflict at install, because its `Secret llm-key-<team>` name
+collides with the release that already grants it. Offboard with
 `helm uninstall <release-name>`.
 
 ## The values contract
@@ -104,12 +95,15 @@ modelCatalog:
     model: gpt-5.6-terra
     auth:
       secretRef: openai-secret
+budgetTiers:
+  - name: standard
+    tokensPerMinute: 10000
 grants:
   - team: team-alpha
     key: alpha-secret-key
     aliases:
       - chat-real
-    tokensPerMinute: 10000
+    budgetTier: standard
 ```
 
 | Field                                | In                | Purpose                          |
@@ -118,7 +112,8 @@ grants:
 | `auth.secretRef`                     | `modelCatalog[*]` | Existing Secret with vendor credentials |
 | `baseURL`                            | `modelCatalog[*]` | Optional self-hosted/mock endpoint, as the base path (`http://mock-svc:8000/v1`) |
 | `team` / `key`                      | `grants[*]`       | Team identifier (API key entry id); API key value (min 8 chars, workshop-grade) |
-| `aliases` / `tokensPerMinute`        | `grants[*]`       | Aliases this team can access and is budgeted for; per-team tokens-per-minute limit |
+| `name` / `tokensPerMinute`           | `budgetTiers[*]`  | Tier name; tokens per minute each team on the tier may use. The first tier is the fallback |
+| `aliases` / `budgetTier`             | `grants[*]`       | Aliases this team can access; the tier that sets its budget |
 
 Keys are inline in `grants[*].key`: fine for workshops, but **production
 deployments should source API keys from an external secret manager** (e.g.

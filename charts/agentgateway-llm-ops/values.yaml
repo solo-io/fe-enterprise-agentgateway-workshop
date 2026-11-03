@@ -1,10 +1,9 @@
 # -- Gateway owned by the platform team. All resources render into the release namespace.
 #    Set to `null` (along with leaving modelCatalog unset) for a "grant-only" release: a
-#    team-scoped install that renders ONLY that team's API-key Secret, its per-team
-#    token-budget RateLimitConfig, and one budget policy per granted alias -- no Gateway,
-#    no parameters, no observability, no catalog. Grant-only releases target a platform-owned infra
-#    release's alias routes (llm-<alias>) by name, so they need no gateway reference at
-#    all; they must land in the same namespace as that infra release. Example:
+#    team-scoped install that renders ONLY that team's API-key Secret: no Gateway,
+#    no parameters, no observability, no catalog, no budget resources. The infra
+#    release's per-alias budget policy enforces the tier named in the key, so the
+#    grant-only release must land in the same namespace as that infra release. Example:
 #
 #      gateway: null   # grant-only release: null out the chart's default infra;
 #                      # this release carries only the grant
@@ -14,17 +13,17 @@
 #          key: gamma-secret-key
 #          aliases:
 #            - chat-real
-#          tokensPerMinute: 2000
+#          budgetTier: large
 #
 #    WARNING: `gateway: null` is required, not optional -- a values file with only
 #    `grants:` makes helm merge this default gateway block back in, rendering a second
 #    Gateway/parameters/access-log set that fails with AlreadyExists next to an
 #    existing infra release.
 #
-#    Because a grant-only release doesn't render modelCatalog, it cannot validate its
-#    aliases against a catalog -- an alias with no matching infra-mode catalog entry is
-#    not an error; the resulting alias label is just inert until an infra release with
-#    that alias in its catalog shows up in the same namespace.
+#    Because a grant-only release doesn't render modelCatalog or budgetTiers, it cannot
+#    validate its aliases or tier -- an alias with no matching catalog entry is not an
+#    error (its label is inert until an infra release with that alias shows up in the
+#    same namespace), and a tier with no matching budgetTiers entry gets the first tier.
 gateway:
   name: agw-llm-ops
   gatewayClassName: enterprise-agentgateway
@@ -64,9 +63,19 @@ modelCatalog: []
 #    auth:
 #      secretRef: openai-secret   # platform-held provider credential (pre-created Secret)
 
-# -- Grants: which team may call which aliases, at what token budget.
+# -- Budget tiers: named token-per-minute limits the platform offers. The infra
+#    release renders one RateLimitConfig for all tiers and one budget policy per
+#    alias route. Each team on a tier gets its own counter at that tier's limit.
+#    A key with a missing or unknown tier gets the FIRST tier, so list the smallest first.
+budgetTiers: []
+#  - name: small
+#    tokensPerMinute: 5
+#  - name: large
+#    tokensPerMinute: 1000
+
+# -- Grants: which team may call which aliases, on which budget tier.
 #    Each entry mints the team's API key Secret, adds it to the key set of every
-#    granted alias, and sets the team's tokens-per-minute budget.
+#    granted alias, and records the team's budget tier in the key's metadata.
 #    Keys are inline for workshop use; production platforms source them from an
 #    external secret manager (e.g. External Secrets Operator).
 grants: []
@@ -75,4 +84,4 @@ grants: []
 #    aliases:
 #      - chat-real
 #      - chat-mock
-#    tokensPerMinute: 1000
+#    budgetTier: large

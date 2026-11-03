@@ -21,6 +21,8 @@
 - `blue-green-namespaces.md`: add a `ReferenceGrant` in each color namespace so the edge's delegation stops returning `404`
 - `kyverno-admission-control.md`: validate `AgentgatewayModel` providers and inline keys alongside the backend policies
 - `agentgateway-llm-ops` chart `0.2.0`: render an `AgentgatewayModel` per alias, with `baseURL` replacing `host`/`port`/`apiPath` and `provider` limited to `openai` and `anthropic`
+- **Breaking:** `agentgateway-llm-ops` chart `0.2.0`: grants name a `budgetTier` from the infra release's `budgetTiers` instead of setting `tokensPerMinute`, so each alias route keeps exactly one budget policy
+- `centralized-llm-ops-helm-chart.md`: Step 6 works again, because beta's isolated release carries only its key and the infra release enforces beta's tier
 - `configure-openai-batches.md` and `configure-routing-aws-bedrock-titan-embeddings.md` keep an LLM backend because their requests carry no body `model`
 - Bedrock labs: each path serves a `Bedrock` model, and cleanup now deletes `bedrock-haiku4.5` instead of a nonexistent `bedrock-haiku3.5`
 - Vertex AI labs: a `VertexAI` model pins `google/gemini-2.5-flash-lite`
