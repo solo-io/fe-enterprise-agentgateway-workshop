@@ -8,9 +8,10 @@
 - Backend model overrides become a `*` model with a `model` transformation, and backend-targeted policies move into the model's `spec.policies`
 - `policies.ai.routes` maps are gone because the gateway detects the API from the request path and answers `GET <prefix>/v1/models` itself
 - `llm-failover.md` and `llm-failover-advanced.md`: failover is a `resilient` virtual model over concrete models that carry their own health checks
-- `configure-body-based-routing.md`: route on the body `model` natively instead of extracting it into a header
+- `configure-body-based-routing.md`: retitle the lab "Route by Model Name" and route on the body `model` natively instead of extracting it into a header
 - `configure-openai-embeddings.md`: one model serves chat, embeddings and the model list, and the path-rewrite section becomes a path-prefix rule
 - `routing-match-types.md` and the k6 load-testing lab: each pinned model attaches to a named rule through `sectionName`
+- `llm-load-testing-k6.md`: rename the route to `k6-mock-openai` so it no longer overwrites the mock lab's route, and point the script's fallback endpoint at the gateway service
 - `configure-routing-groq.md`: use the built-in `Groq` provider instead of an OpenAI host override
 - `transformations.md`: `request.path` in a response transformation is the provider path (`/v1/chat/completions`)
 - `codex.md`: remove the `/codex/v1/models` workaround route because Codex accepts the gateway's model list
@@ -27,7 +28,7 @@
 - Claude Desktop labs: serve an `Anthropic` model, and tell SSO readers to leave Custom inference headers empty so the Entra token is sent
 - `lib/crewai` apps and `seed-cost-data.sh` use the `/openai/v1` model route path
 - Style guide: document the model pattern, pins, failover and the request path convention
-- e2e: add an `ai-backend` lint rule (documented in `e2e/README.md`) and update specs for the renamed sections and paths
+- e2e: add an `ai-backend` lint rule (documented in `e2e/README.md`) that also catches manifests with `kind:` first or comments between keys, and update specs for the renamed sections and paths
 
 0.15.0 - (10-23-26)
 ---

@@ -16,7 +16,7 @@ steps:
   - section: "Create the Route and Models"
     run: all
 
-  - section: "Test Body-Based Routing"
+  - section: "Test Model-Name Routing"
     run: all
     assert:
       - contains: "Gateway IP:"

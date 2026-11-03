@@ -56,7 +56,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Configure Mock OpenAI Server](labs/routing/configure-mock-openai-server.md) _(OpenAI)_
 - [Basic Routing to OpenAI](labs/routing/configure-routing-openai.md) _(OpenAI)_
 - [Routing by Match Type (Path, Header, Query Parameter)](labs/routing/routing-match-types.md) _(OpenAI)_
-- [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_
+- [Route by Model Name](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_
 - [Semantic Routing with vLLM Semantic Router](labs/routing/configure-semantic-routing-vllm-sr.md) _(OpenAI + vLLM Semantic Router)_: one virtual model name routed to an economy, mid, or high tier model by prompt content, via ExtProc
 - [Semantic Routing with Jev](labs/routing/configure-semantic-routing-jev.md) _(OpenAI + TypeSafe Jev)_: the same three-tier routing, classified by a Jev `choice` question with a confidence gate, via an ExtProc adapter
 - [Semantic Routing with the OpenAI Decisions API](labs/routing/configure-semantic-routing-openai-decisions.md) _(OpenAI + OpenAI Decisions API)_: the same three-tier routing, classified by a Decisions API `choice` question with a confidence gate, so the prompt goes only to OpenAI

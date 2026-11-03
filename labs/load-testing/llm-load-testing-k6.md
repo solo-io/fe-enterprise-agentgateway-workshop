@@ -125,7 +125,7 @@ kubectl rollout status deployment/mock-gpt-5-2 -n agentgateway-system
 
 ## Configure Routing to Mock Backends
 
-Create an `AgentgatewayModel` for each mock service. Each model attaches to one rule of the `mock-openai` route, created next, through `sectionName`:
+Create an `AgentgatewayModel` for each mock service. Each model attaches to one rule of the `k6-mock-openai` route, created next, through `sectionName`:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -138,7 +138,7 @@ spec:
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
-      name: mock-openai
+      name: k6-mock-openai
       sectionName: gpt-4o
   match:
     model: "*"
@@ -160,7 +160,7 @@ spec:
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
-      name: mock-openai
+      name: k6-mock-openai
       sectionName: gpt-5-2
   match:
     model: "*"
@@ -182,7 +182,7 @@ kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: mock-openai
+  name: k6-mock-openai
   namespace: agentgateway-system
 spec:
   parentRefs:
@@ -294,7 +294,7 @@ data:
 
     // Core test parameters (configurable via environment variables)
     const model = __ENV.MODEL || "mock-gpt-4o";
-    const endpoint = __ENV.ENDPOINT || `https://localhost:8080/openai/${model}/v1/chat/completions`;
+    const endpoint = __ENV.ENDPOINT || "http://agentgateway-proxy.agentgateway-system.svc.cluster.local:8080/openai/gpt-4o/v1/chat/completions";
     const timeout = parseInt(__ENV.TIMEOUT) || 30000;
     const rps = parseInt(__ENV.RPS) || 50;
     const duration = __ENV.DURATION || "2m";
@@ -700,7 +700,7 @@ kubectl delete namespace loadgenerator
 Delete the routing configuration:
 
 ```bash
-kubectl delete httproute -n agentgateway-system mock-openai
+kubectl delete httproute -n agentgateway-system k6-mock-openai
 kubectl delete agentgatewaymodel -n agentgateway-system mock-gpt-4o
 kubectl delete agentgatewaymodel -n agentgateway-system mock-gpt-5-2
 ```

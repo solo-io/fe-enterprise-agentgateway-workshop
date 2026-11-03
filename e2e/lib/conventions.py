@@ -151,23 +151,40 @@ def check_ai_backend(root, files, allow=AI_BACKEND_ALLOW):
         for m in EAGB_DOC.finditer(text):
             ind = m.group(1)
             line = text.count("\n", 0, m.start()) + 1
-            # A document's own kind sits next to its apiVersion at the same
-            # indent; a backendRefs entry's kind does not.
-            near = lines[max(0, line - 3):line - 1]
-            if not any(l.startswith(ind + "apiVersion:") for l in near):
+            # A document's own kind has an apiVersion sibling at the same
+            # indent, before or after it; a backendRefs entry's kind does not.
+            before = _siblings(reversed(lines[:line - 1]), ind)
+            after = _siblings(lines[line:], ind)
+            if not any(l.startswith(ind + "apiVersion:") for l in before + after):
                 continue
             spec_child = None
-            for l in lines[line:]:
-                if l.strip() in ("---", "EOF", "```") or (
-                        l.strip() and not l.startswith(ind)):
-                    break
+            for l in after:
                 if l.startswith(ind + "spec:"):
                     spec_child = ind + "  "
+                elif l.startswith(ind) and not l.startswith(ind + " "):
+                    spec_child = None
                 elif spec_child and l.startswith(spec_child + "ai:"):
                     errs.append(f"{rel}:{line}: LLM EnterpriseAgentgatewayBackend "
                                 f"(spec.ai) — use AgentgatewayModel")
                     break
     return errs
+
+
+def _siblings(lines, ind):
+    """Lines of the YAML mapping at `ind`, stopping at the document boundary.
+
+    Blank and comment lines are skipped, so comments anywhere in a manifest
+    do not end the scan.
+    """
+    out = []
+    for l in lines:
+        s = l.strip()
+        if not s or s.startswith("#"):
+            continue
+        if s in ("---", "EOF") or s.startswith("```") or not l.startswith(ind):
+            break
+        out.append(l)
+    return out
 
 
 def main():

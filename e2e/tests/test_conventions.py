@@ -116,6 +116,33 @@ class TestAiBackendRule(unittest.TestCase):
         errs = conventions.check_ai_backend(root, ["labs/x.md"], allow=set())
         self.assertEqual(len(errs), 1)
 
+    def test_kind_before_apiversion_reported(self):
+        root = tempfile.mkdtemp()
+        write(root, "labs/x.md", (
+            "```yaml\nkind: EnterpriseAgentgatewayBackend\n"
+            "apiVersion: enterpriseagentgateway.solo.io/v1alpha1\n"
+            "metadata:\n  name: a\nspec:\n  ai:\n    provider: {}\n```\n\n## Cleanup\n"))
+        errs = conventions.check_ai_backend(root, ["labs/x.md"], allow=set())
+        self.assertEqual(len(errs), 1)
+
+    def test_comments_between_apiversion_and_kind_reported(self):
+        root = tempfile.mkdtemp()
+        write(root, "labs/x.md", (
+            "```yaml\napiVersion: enterpriseagentgateway.solo.io/v1alpha1\n"
+            "# an LLM backend\n# for OpenAI\nkind: EnterpriseAgentgatewayBackend\n"
+            "metadata:\n  name: a\nspec:\n  ai:\n    provider: {}\n```\n\n## Cleanup\n"))
+        errs = conventions.check_ai_backend(root, ["labs/x.md"], allow=set())
+        self.assertEqual(len(errs), 1)
+
+    def test_comment_inside_spec_reported(self):
+        root = tempfile.mkdtemp()
+        write(root, "labs/x.md", (
+            "```bash\nkubectl apply -f - <<EOF\n  apiVersion: enterpriseagentgateway.solo.io/v1alpha1\n"
+            "  kind: EnterpriseAgentgatewayBackend\n  metadata:\n    name: a\n  spec:\n"
+            "# provider settings\n    ai:\n      provider: {}\nEOF\n```\n\n## Cleanup\n"))
+        errs = conventions.check_ai_backend(root, ["labs/x.md"], allow=set())
+        self.assertEqual(len(errs), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

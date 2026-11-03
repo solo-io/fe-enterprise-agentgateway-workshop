@@ -1,6 +1,6 @@
-# Configure Body-Based Routing
+# Route by Model Name
 
-In this lab, you'll configure **body-based routing** to dispatch incoming LLM requests to different providers based on the `model` field in the JSON request body. Each `AgentgatewayModel` declares the model name it serves in `match.model`, and the gateway reads the request body and sends the request to the model whose name matches. A catch-all model handles every other name. Clients change only the `model` value they already send.
+In this lab, you'll route incoming LLM requests to different providers based on the `model` field in the JSON request body. Each `AgentgatewayModel` declares the model name it serves in `match.model`, and the gateway reads the request body and sends the request to the model whose name matches. A catch-all model handles every other name. Clients change only the `model` value they already send.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
@@ -194,7 +194,7 @@ spec:
 EOF
 ```
 
-## Test Body-Based Routing
+## Test Model-Name Routing
 
 Set the gateway IP:
 ```bash
