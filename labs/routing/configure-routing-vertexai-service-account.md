@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our Vertex AI OAuth credentials using a GCP service account
-- Create a route to Vertex AI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to Vertex AI as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Curl Vertex AI through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
@@ -78,7 +78,7 @@ kubectl create secret generic vertex-ai-secret -n agentgateway-system \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-Create vertex ai route and backend
+Create vertex ai route and model
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -96,28 +96,35 @@ spec:
             type: PathPrefix
             value: /vertex
       backendRefs:
-        - name: vertex-ai
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: vertex-ai
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      vertexai:
-        model: "google/gemini-2.5-flash-lite"
-        projectId: "${GCP_PROJECT_ID}"
-        region: "${GCP_REGION}"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: vertex-ai
+  match:
+    model: "*"
+  provider: VertexAI
+  vertexai:
+    projectId: "${GCP_PROJECT_ID}"
+    region: "${GCP_REGION}"
   policies:
     auth:
       secretRef:
         name: vertex-ai-secret
+    transformations:
+      - field: model
+        expression: '"google/gemini-2.5-flash-lite"'
 EOF
 ```
 
@@ -125,7 +132,7 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/vertex" \
+curl -i "$GATEWAY_IP:8080/vertex/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "google/gemini-2.5-flash-lite",
@@ -212,6 +219,6 @@ Navigate to http://localhost:16686 in your browser to see the traces. Each span 
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system vertex-ai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system vertex-ai
+kubectl delete agentgatewaymodel -n agentgateway-system vertex-ai
 kubectl delete secret -n agentgateway-system vertex-ai-secret
 ```

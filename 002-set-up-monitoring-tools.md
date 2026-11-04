@@ -251,6 +251,15 @@ The dashboard is organized into the following metric categories:
 
 ![usage-tracking-by-org-v2-1.png](images/grafana-dashboard/usage-tracking-by-org-v2-1.png)
 
+## Next Steps
+
+With Enterprise Agentgateway installed and monitoring in place, pick a track to continue. Keep Grafana open as you work through the labs to watch the dashboard fill with traffic.
+
+- **[LLM Track](tracks/llm-track.md)**: route traffic to OpenAI, AWS Bedrock, Anthropic, Azure OpenAI, and Google Vertex AI from one endpoint, then add security, guardrails, rate limits, cost attribution, and failover.
+- **[MCP Track](tracks/mcp-track.md)**: put the gateway in front of MCP servers to federate tools, expose REST APIs as MCP tools, enforce OAuth and per-tool rate limits, and connect agent frameworks such as CrewAI, LangChain, and Claude Code.
+
+You can complete both tracks in any order. Each track builds on the install and monitoring labs you just finished.
+
 ## Uninstall
 
 Remove Grafana and Prometheus:

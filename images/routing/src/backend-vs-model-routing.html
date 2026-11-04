@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@600;700&family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+html, body { margin: 0; }
+body { width: 1240px; padding: 40px 0 36px; background: #0B0D18; color: #FFFFFF; }
+.overline { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 13px; letter-spacing: 0.32em; text-transform: uppercase; color: #8C7CF0; text-align: center; }
+h1 { font-family: 'Figtree', sans-serif; font-weight: 700; font-size: 32px; text-align: center; margin: 18px auto 36px; }
+svg { display: block; margin: 0 auto; }
+.panel-title { font-family: 'Figtree', sans-serif; font-weight: 700; font-size: 18px; fill: #E6E8F2; }
+.panel-sub   { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: #8A8EA8; letter-spacing: 0.04em; }
+.node-name { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 13px; fill: #FFFFFF; }
+.node-kind { font-family: 'JetBrains Mono', monospace; font-size: 10px; fill: #B79CFA; letter-spacing: 0.04em; }
+.node-sub  { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; fill: #9DA1BD; }
+.node-code { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; fill: #C9CCDE; }
+.edge-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; fill: #C9CCDE; }
+.edge-pct   { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 11px; fill: #C9A6FF; }
+.note-bad  { font-family: 'DM Sans', sans-serif; font-size: 13px; fill: #F5C26B; }
+.note-good { font-family: 'DM Sans', sans-serif; font-size: 13px; fill: #1FEEB3; }
+.panel-box { fill: rgba(20, 23, 42, 0.5); stroke: rgba(157, 161, 189, 0.5); stroke-width: 1.4; }
+.box-solo  { fill: #1D1440; stroke: #A664F6; stroke-width: 1.4; }
+.box-virtual { fill: #140E30; stroke: #C9A6FF; stroke-width: 1.4; stroke-dasharray: 5 4; }
+.box-internal { fill: #140E30; stroke: rgba(166, 100, 246, 0.45); stroke-width: 1.2; }
+.box-infra { fill: #1A1D2E; stroke: rgba(157, 161, 189, 0.55); stroke-width: 1.4; }
+.box-external { fill: #14172A; stroke: rgba(157, 161, 189, 0.55); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.edge-data { stroke: #9DA1BD; stroke-width: 1.6; fill: none; }
+.edge-virtual { stroke: #C9A6FF; stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; }
+</style>
+</head>
+<body>
+
+<div class="overline">Enterprise Agentgateway</div>
+<h1>Backend-Centric vs Model-Centric LLM Routing</h1>
+
+<svg viewBox="0 0 1152 730" width="1152" height="730">
+  <defs>
+    <marker id="ah-data" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#9DA1BD"/></marker>
+    <marker id="ah-virtual" markerWidth="9" markerHeight="8" refX="8" refY="4" orient="auto"><path d="M0,0 L9,4 L0,8 z" fill="#C9A6FF"/></marker>
+  </defs>
+
+  <!-- ======================= left panel: backend-centric ======================= -->
+  <rect class="panel-box" x="2" y="2" width="530" height="726" rx="12"/>
+  <text class="panel-title" x="267" y="34" text-anchor="middle">Backend-centric</text>
+  <text class="panel-sub" x="267" y="54" text-anchor="middle">EnterpriseAgentgatewayBackend</text>
+
+  <rect class="box-infra" x="97" y="76" width="340" height="66" rx="10"/>
+  <text class="node-name" x="267" y="98" text-anchor="middle">Client</text>
+  <text class="node-code" x="267" y="116" text-anchor="middle">POST /legacy</text>
+  <text class="node-code" x="267" y="132" text-anchor="middle">{"model": "gpt-5.4-mini"}</text>
+
+  <path class="edge-data" d="M267,142 L267,196" marker-end="url(#ah-data)"/>
+  <text class="edge-label" x="279" y="174">path or header match</text>
+
+  <rect class="box-solo" x="97" y="198" width="340" height="66" rx="10"/>
+  <text class="node-kind" x="267" y="218" text-anchor="middle">HTTPRoute</text>
+  <text class="node-name" x="267" y="236" text-anchor="middle">legacy-openai</text>
+  <text class="node-sub"  x="267" y="253" text-anchor="middle">PathPrefix /legacy → one backend</text>
+
+  <path class="edge-data" d="M267,264 L267,318" marker-end="url(#ah-data)"/>
+
+  <rect class="box-solo" x="97" y="320" width="340" height="84" rx="10"/>
+  <text class="node-kind" x="267" y="340" text-anchor="middle">EnterpriseAgentgatewayBackend</text>
+  <text class="node-name" x="267" y="358" text-anchor="middle">legacy-openai</text>
+  <text class="node-sub"  x="267" y="376" text-anchor="middle">provider: openai</text>
+  <text class="node-sub"  x="267" y="392" text-anchor="middle">model: gpt-5.4-nano (pinned)</text>
+
+  <path class="edge-data" d="M267,404 L267,538" marker-end="url(#ah-data)"/>
+  <text class="edge-label" x="279" y="476">body model replaced</text>
+
+  <rect class="box-external" x="97" y="540" width="340" height="56" rx="10"/>
+  <text class="node-name" x="267" y="564" text-anchor="middle">api.openai.com</text>
+  <text class="node-sub"  x="267" y="582" text-anchor="middle">receives gpt-5.4-nano</text>
+
+  <text class="note-bad" x="40" y="640">•  The pin overrides the model the client asked for</text>
+  <text class="note-bad" x="40" y="664">•  GET /legacy/v1/models returns 400</text>
+  <text class="note-bad" x="40" y="688">•  Each new model adds a backend, a route match and often a policy</text>
+
+  <!-- ======================= right panel: model-centric ======================= -->
+  <rect class="panel-box" x="580" y="2" width="570" height="726" rx="12"/>
+  <text class="panel-title" x="865" y="34" text-anchor="middle">Model-centric</text>
+  <text class="panel-sub" x="865" y="54" text-anchor="middle">AgentgatewayModel</text>
+
+  <rect class="box-infra" x="675" y="76" width="380" height="66" rx="10"/>
+  <text class="node-name" x="865" y="98" text-anchor="middle">Client</text>
+  <text class="node-code" x="865" y="116" text-anchor="middle">POST /openai/v1/chat/completions</text>
+  <text class="node-code" x="865" y="132" text-anchor="middle">{"model": "assistant"}</text>
+
+  <path class="edge-data" d="M865,142 L865,196" marker-end="url(#ah-data)"/>
+
+  <rect class="box-solo" x="675" y="198" width="380" height="66" rx="10"/>
+  <text class="node-kind" x="865" y="218" text-anchor="middle">HTTPRoute rule = model router</text>
+  <text class="node-name" x="865" y="236" text-anchor="middle">openai</text>
+  <text class="node-sub"  x="865" y="253" text-anchor="middle">backendRef: AgentgatewayModel "*"</text>
+
+  <!-- bus from router to the model table -->
+  <path class="edge-data" d="M865,264 L865,284"/>
+  <text class="edge-label" x="877" y="280">body "model" lookup</text>
+  <path class="edge-data" d="M661,290 L1081,290"/>
+  <path class="edge-data" d="M865,284 L865,290"/>
+  <path class="edge-data" d="M661,290 L661,316" marker-end="url(#ah-data)"/>
+  <path class="edge-data" d="M801,290 L801,316" marker-end="url(#ah-data)"/>
+  <path class="edge-data" d="M941,290 L941,316" marker-end="url(#ah-data)"/>
+  <path class="edge-data" d="M1081,290 L1081,316" marker-end="url(#ah-data)"/>
+
+  <!-- model table -->
+  <rect class="box-solo" x="602" y="318" width="118" height="62" rx="9"/>
+  <text class="node-name" x="661" y="342" text-anchor="middle">fast</text>
+  <text class="node-sub"  x="661" y="360" text-anchor="middle">→ gpt-5.4-nano</text>
+
+  <rect class="box-solo" x="742" y="318" width="118" height="62" rx="9"/>
+  <text class="node-name" x="801" y="342" text-anchor="middle">smart</text>
+  <text class="node-sub"  x="801" y="360" text-anchor="middle">→ gpt-5.4-mini</text>
+
+  <rect class="box-solo" x="882" y="318" width="118" height="62" rx="9"/>
+  <text class="node-name" x="941" y="342" text-anchor="middle">gpt-*</text>
+  <text class="node-sub"  x="941" y="360" text-anchor="middle">pass-through</text>
+
+  <rect class="box-virtual" x="1022" y="318" width="118" height="62" rx="9"/>
+  <text class="node-name" x="1081" y="342" text-anchor="middle">assistant</text>
+  <text class="node-sub"  x="1081" y="360" text-anchor="middle">virtual model</text>
+
+  <!-- virtual model targets -->
+  <path class="edge-virtual" d="M1081,380 L1081,436" marker-end="url(#ah-virtual)"/>
+  <text class="edge-pct" x="1091" y="414">80%</text>
+  <path class="edge-virtual" d="M1046,380 L1046,412 L690,412 L690,384" marker-end="url(#ah-virtual)"/>
+  <text class="edge-pct" x="700" y="404">20%</text>
+
+  <rect class="box-internal" x="1022" y="438" width="118" height="58" rx="9"/>
+  <text class="node-name" x="1081" y="461" text-anchor="middle">mock</text>
+  <text class="node-sub"  x="1081" y="479" text-anchor="middle">Internal</text>
+
+  <!-- to providers -->
+  <path class="edge-data" d="M661,380 L661,538" marker-end="url(#ah-data)"/>
+  <path class="edge-data" d="M801,380 L801,538" marker-end="url(#ah-data)"/>
+  <path class="edge-data" d="M941,380 L941,538" marker-end="url(#ah-data)"/>
+  <path class="edge-data" d="M1081,496 L1081,538" marker-end="url(#ah-data)"/>
+
+  <rect class="box-external" x="602" y="540" width="398" height="56" rx="10"/>
+  <text class="node-name" x="801" y="564" text-anchor="middle">api.openai.com</text>
+  <text class="node-sub"  x="801" y="582" text-anchor="middle">receives the rewritten model</text>
+
+  <rect class="box-external" x="1022" y="540" width="118" height="56" rx="10"/>
+  <text class="node-name" x="1081" y="564" text-anchor="middle">mock-gpt-4o</text>
+  <text class="node-sub"  x="1081" y="582" text-anchor="middle">in-cluster</text>
+
+  <text class="note-good" x="612" y="640">•  The body model selects the model resource</text>
+  <text class="note-good" x="612" y="664">•  GET /openai/v1/models lists the Public models</text>
+  <text class="note-good" x="612" y="688">•  Unknown names get 404 model_not_found from the gateway</text>
+</svg>
+
+</body>
+</html>

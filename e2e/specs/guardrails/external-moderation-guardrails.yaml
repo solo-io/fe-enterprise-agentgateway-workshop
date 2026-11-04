@@ -43,7 +43,7 @@ steps:
   # secret would read as "the guard works".
   - probe: "a benign prompt still passes the moderation guard"
     script: |
-      curl -s -o /dev/null -w 'benign=%{http_code}\n' "http://$GATEWAY_IP:8080/openai" \
+      curl -s -o /dev/null -w 'benign=%{http_code}\n' "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
         -H 'content-type: application/json' \
         -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"What is the capital of France?"}]}'
     assert:

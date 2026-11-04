@@ -45,7 +45,7 @@ steps:
       # labs/; both eval commands failed for readers until they were corrected.
       - contains: "labs/evaluations/openai_eval_coding.yaml"
       - contains: "labs/evaluations/openai_eval_messaging.yaml"
-      - matches: 'base_url=http://[0-9.]+:8080/openai'
+      - matches: 'base_url=http://[0-9.]+:8080/openai/v1'
 
   # Individual test verdicts come from an llm-as-a-judge, so a specific test
   # failing is not a lab regression, and promptfoo exits nonzero whenever any

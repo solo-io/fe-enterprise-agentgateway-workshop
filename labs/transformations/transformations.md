@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Configure a basic response transformation using `EnterpriseAgentgatewayPolicy`
 - Validate that the transformation occurs
 - Extend our example by enriching response headers with additional context for observability and debugging
@@ -17,7 +17,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create openai route and backend
+Create openai route and model
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -35,27 +35,33 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
-        #--- Uncomment to configure model override ---
-        #model: ""
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
@@ -63,7 +69,7 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -101,7 +107,7 @@ EOF
 
 Make a curl request to the OpenAI endpoint again, this time including the header `x-user-id: bob`
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "x-user-id: bob" \
   -d '{
@@ -156,7 +162,7 @@ Here is the expected behavior of the transformation policy below
 - add `x-llm-request-model` to capture what model the client requested (read from the request body)
 - add `x-llm-response-model` to capture the exact model version the backend used (read from the response body; this may differ from the requested model, e.g. `gpt-5.4-nano` → `gpt-5.4-nano-2026-03-17`)
 - add `x-request-method` for API behavior analysis
-- add `x-request-path` to help distinguish which route processed the call
+- add `x-request-path` to show the API path the gateway sent to the provider (the route prefix `/openai` is stripped, so this is `/v1/chat/completions`)
 
 ```bash
 kubectl apply -f- <<EOF
@@ -189,7 +195,7 @@ EOF
 
 Make a curl request again
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -208,7 +214,7 @@ x-user-id: anonymous
 x-llm-request-model: gpt-5.4-nano
 x-llm-response-model: gpt-5.4-nano-2026-03-17
 x-request-method: POST
-x-request-path: /openai
+x-request-path: /v1/chat/completions
 ```
 
 These fields make debugging and observability easier, especially in multi-model or multi-provider setups, and can later be used for tracing, rate limiting, or chargeback.
@@ -217,6 +223,6 @@ These fields make debugging and observability easier, especially in multi-model 
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system openai-transformation
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 ```

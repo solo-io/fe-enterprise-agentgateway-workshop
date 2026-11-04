@@ -14,7 +14,7 @@ steps:
   - section: "Create OpenAI API secret"
     run: all
 
-  - section: "Create OpenAI route and backend"
+  - section: "Create OpenAI route and model"
     run: all
 
   - section: "Baseline test — no guardrail policy yet"

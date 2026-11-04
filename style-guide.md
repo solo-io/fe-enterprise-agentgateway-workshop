@@ -50,7 +50,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Overview / Background          <- optional; the "why", ASCII diagram, comparison table
 
-## <Setup: secret + backend + HTTPRoute>
+## <Setup: secret + model + HTTPRoute>
 
 ## <Step / task sections>         <- each: prose "why" → command block → test → expected output
 
@@ -64,7 +64,7 @@ Rules:
 - **Title**: H1, Title Case, describes the outcome, no lab number. Verb-first (`# Configure Basic Routing to OpenAI`) or `<Feature> using Agentgateway` (`# Transformations using Agentgateway`) are both established; verb-first preferred for new labs.
 - **Pre-requisites boilerplate** (use verbatim): *"This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana."* Reference labs `001`/`002` by bare backticked number in this sentence; reference all other labs with relative markdown links (`[Mock OpenAI Server lab](configure-mock-openai-server.md)`, `[001 — Install...](../../001-install-enterprise-agentgateway.md)` from two levels deep).
 - **Hard requirements** (architecture, sizing, version gates) go in bold-lead blockquotes right after Pre-requisites: `> **Node architecture (important):** ...`. Labs assume the version `001` installs, so skip version gates for features that version already ships. Add one only for a feature from the last release or two, which users on a slightly older install may lack. State it plainly (*"available in **v2026.9.3 and later**"*), and remove it once the gate is a few releases old.
-- **Lab Objectives**: always present, bulleted, verb-first, e.g. `- Create a route to OpenAI using an `EnterpriseAgentgatewayBackend` and `HTTPRoute``. Multi-part labs may use bold sub-labels: `- **Part A — Impersonation:** ...`.
+- **Lab Objectives**: always present, bulleted, verb-first, e.g. `- Create a route to OpenAI using an `AgentgatewayModel` and `HTTPRoute``. Multi-part labs may use bold sub-labels: `- **Part A — Impersonation:** ...`.
 - **Step headings** (normative): for multi-step runbooks use `## Step N — Title` (em-dash; this is the dominant style; do **not** use `## Step N: Title`). Short labs skip numbering and use plain descriptive `##`/`###` Title Case headings. Use `---` horizontal rules between major sections in long labs.
 - **Runbooks** should state what they were validated against: *"This runbook was validated against controller **v2026.6.1** on a local KinD cluster."*
 - There is no "Next Steps" section convention; cross-link related labs inline instead. `## Key Takeaways` as a closing bullet list is optional.
@@ -130,7 +130,7 @@ export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n age
 
 **Env vars**: `SCREAMING_SNAKE_CASE`, exported. `GATEWAY_IP` is the gateway address, always. IdP/provider vars are prefixed (`AUTH0_*`, `ENTRA_*`, `FIGMA_*`, `KEYCLOAK_*`). Document "you must already have this set" with the self-referential export (`export OPENAI_API_KEY=$OPENAI_API_KEY`) and put placeholder guidance in an inline comment: `export AUTH0_ISSUER=https://YOUR_TENANT.us.auth0.com/     # TRAILING SLASH REQUIRED`.
 
-**curl conventions**: `curl -i "$GATEWAY_IP:8080/openai" -H "content-type: application/json" -d '{...}'` with a pretty-printed JSON body. Use `-v` when demonstrating failover/response codes, and `-s -o /dev/null -w "HTTP %{http_code}\n"` inside `for i in {1..20}` loops for rate-limit/budget exhaustion tests. The house test prompt is `"Whats your favorite poem?"` (deliberately short/countable for token labs).
+**curl conventions**: `curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" -H "content-type: application/json" -d '{...}'` with a pretty-printed JSON body. Use `-v` when demonstrating failover/response codes, and `-s -o /dev/null -w "HTTP %{http_code}\n"` inside `for i in {1..20}` loops for rate-limit/budget exhaustion tests. The house test prompt is `"Whats your favorite poem?"` (deliberately short/countable for token labs). Model routes forward the path under the route prefix to the provider, so every LLM request names the provider API path (`/openai/v1/chat/completions`, `/openai/v1/embeddings`, `/claude/v1/messages`) and every request body carries `"model"`. SDK base URLs end in `/v1`: `http://$GATEWAY_IP:8080/openai/v1`.
 
 ## 7. Verification and expected output
 
@@ -150,13 +150,56 @@ Standard verification tools:
 ## 8. YAML manifest conventions
 
 - **Namespace**: `agentgateway-system` for everything unless the lab is specifically about namespaces (blue/green) or deploys a standalone system (`keycloak`).
-- **The stable resource trio**: `gateway.networking.k8s.io/v1` `HTTPRoute`; `enterpriseagentgateway.solo.io/v1alpha1` `EnterpriseAgentgatewayBackend` and `EnterpriseAgentgatewayPolicy`. Rate limiting: `ratelimit.solo.io/v1alpha1` `RateLimitConfig` (short name `rlc`). Gateway params: `EnterpriseAgentgatewayParameters` named `agentgateway-config`, attached via `spec.infrastructure.parametersRef` on the `Gateway` `agentgateway-proxy`.
-- **Naming**: descriptive kebab-case tied to the lab. Canonical reusable pair: backend `openai-all-models` + route `openai` on path prefix `/openai`. Policies named for their function (`comprehensive-prompt-guard`, `timeout-retry-policy`).
-- **backendRefs to enterprise backends always carry group/kind**:
+- **The stable resource set**: `gateway.networking.k8s.io/v1` `HTTPRoute`; `agentgateway.dev/v1alpha1` `AgentgatewayModel` for LLM providers; `enterpriseagentgateway.solo.io/v1alpha1` `EnterpriseAgentgatewayBackend` for MCP and static backends, and `EnterpriseAgentgatewayPolicy`. Rate limiting: `ratelimit.solo.io/v1alpha1` `RateLimitConfig` (short name `rlc`). Gateway params: `EnterpriseAgentgatewayParameters` named `agentgateway-config`, attached via `spec.infrastructure.parametersRef` on the `Gateway` `agentgateway-proxy`.
+- **Naming**: descriptive kebab-case tied to the lab. Canonical reusable pair: model `openai-all-models` (`match.model: "*"`) + route `openai` on path prefix `/openai`. A catch-all model is named `<provider>-all-models`. Policies named for their function (`comprehensive-prompt-guard`, `timeout-retry-policy`).
+- **LLM routes select models.** The route rule's `backendRefs` points at the models attached to it, and each model attaches to the route through `parentRefs`:
+
+  ```yaml
+  # HTTPRoute rule
+  backendRefs:
+    - group: agentgateway.dev
+      kind: AgentgatewayModel
+      name: "*"
+  ---
+  apiVersion: agentgateway.dev/v1alpha1
+  kind: AgentgatewayModel
+  metadata:
+    name: openai-all-models
+    namespace: agentgateway-system
+  spec:
+    parentRefs:
+      - group: gateway.networking.k8s.io
+        kind: HTTPRoute
+        name: openai
+    match:
+      model: "*"
+    provider: OpenAI
+    policies:
+      auth:
+        secretRef:
+          name: openai-secret
+  ```
+
+  Path matches on a model rule use `PathPrefix`. When the HTTPRoute has more than one rule, name every rule and set `sectionName: <rule name>` on each model's parentRef; a model on a multi-rule route without `sectionName` is rejected.
+- **Per-model settings live on the model.** Auth, TLS, tunnel, headers, health, prompt guards, authorization and body transformations go in `AgentgatewayModel.spec.policies`. `EnterpriseAgentgatewayPolicy` cannot target a model; attach route-wide policies to the `HTTPRoute`.
+- **Pin a model** (always send one model regardless of the request) with a catch-all match and a body transformation. The request body still needs a `model` field:
+
+  ```yaml
+  match:
+    model: "*"
+  provider: OpenAI
+  policies:
+    transformations:
+      - field: model
+        expression: '"gpt-5.4-mini"'
+  ```
+
+- **Failover** uses `Internal` concrete models with inline `policies.health` and one public model with `virtualModel.failover.targets` (`priority: 0` is the primary). Clients request the virtual model by name.
+- **backendRefs to enterprise backends (MCP, static) always carry group/kind**:
 
   ```yaml
   backendRefs:
-    - name: openai-all-models
+    - name: mcp-backend
       group: enterpriseagentgateway.solo.io
       kind: EnterpriseAgentgatewayBackend
   ```
@@ -166,9 +209,12 @@ Standard verification tools:
 - **Comment style**: the house "uncomment to enable" marker is `#---`:
 
   ```yaml
-  openai: {}
-    #--- Uncomment to configure model override ---
-    #model: ""
+  provider: OpenAI
+  #--- Uncomment to always send one model ---
+  #policies:
+  #  transformations:
+  #    - field: model
+  #      expression: '"gpt-5.4-mini"'
   ```
 
   Plain `#` lines for explanatory comments; numbered `# 1.` / `# 2.` comment headers to structure multi-part cleanup blocks.
@@ -194,7 +240,7 @@ Always the final section, `## Cleanup`, a single bash block (or numbered blocks 
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system comprehensive-prompt-guard --ignore-not-found
 kubectl delete httproute -n agentgateway-system openai --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
 ```
 
@@ -299,7 +345,7 @@ Also watch for: stale relative links after files move (update `lib/*/README.md` 
 - [ ] Skeleton: Title → Pre-requisites (boilerplate sentence) → Lab Objectives → steps → Observability → Cleanup (§3)
 - [ ] Every step: why-prose → command → verification with `Expected output:` (§5, §7)
 - [ ] Heredocs quoted correctly (`<<'EOF'` only for literal-`$` bodies); standard `GATEWAY_IP` / secret / version idioms copied verbatim (§6)
-- [ ] Manifests: `agentgateway-system` namespace, kebab-case names, group/kind on backendRefs, `#---` uncomment markers (§8)
+- [ ] Manifests: `agentgateway-system` namespace, kebab-case names, LLM routes select `AgentgatewayModel` (`name: "*"`), group/kind on backendRefs, `#---` uncomment markers (§8)
 - [ ] Cleanup deletes in reverse order with `--ignore-not-found` and restores all mutated global state (§10)
 - [ ] Shared/reusable assets placed in `lib/<concern>/`, referenced root-relative; secrets gitignored, never committed populated (§4, §11)
 - [ ] **(required)** README.md: category bullet + provider italics + reciprocal `_(see also:)_` + Use Cases bullets (§15)

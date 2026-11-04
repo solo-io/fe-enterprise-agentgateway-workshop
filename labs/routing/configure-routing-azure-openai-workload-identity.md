@@ -12,7 +12,7 @@ This lab also requires:
 ## Lab Objectives
 - Configure Azure Workload Identity so the agentgateway pod can obtain Microsoft Entra ID tokens for a user-assigned managed identity, without storing an API key as a Kubernetes secret
 - Create a federated identity credential linking the AKS OIDC issuer and the agentgateway service account to the managed identity
-- Deploy an `EnterpriseAgentgatewayBackend` for Azure OpenAI that relies on Workload Identity instead of secret-based auth
+- Deploy an `AgentgatewayModel` for Azure OpenAI that relies on Workload Identity instead of secret-based auth
 - Annotate the data plane service account and pod template via `EnterpriseAgentgatewayParameters`
 - Verify end-to-end connectivity with Azure OpenAI using federated Workload Identity credentials
 
@@ -49,7 +49,6 @@ export LOCATION="<your-azure-region>"
 export NAMESPACE="agentgateway-system"
 export SA_NAME="agentgateway-proxy"
 export UMI_NAME="agentgateway-azure-openai-umi"
-export ENDPOINT="<AZURE-OPENAI-ENDPOINT>"  # Just the hostname, no https://
 export AZURE_OPENAI_RESOURCE_NAME="<your-azure-openai-resource-name>"
 
 export SUBSCRIPTION_ID=$(az account show --query id --output tsv)
@@ -144,22 +143,28 @@ az identity federated-credential create \
   --audience api://AzureADTokenExchange
 ```
 
-## Create the Azure OpenAI Backend
+## Create the Azure OpenAI Model
 
 Note: the missing `policies.auth` section tells agentgateway to use the pod's own Entra ID credentials, provided via Workload Identity and resolved through `DefaultAzureCredential`.
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: azure-openai-wi
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      azureopenai:
-        endpoint: "${ENDPOINT}"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: azure-openai-wi
+  match:
+    model: "*"
+  provider: Azure
+  azure:
+    resourceName: "${AZURE_OPENAI_RESOURCE_NAME}"
+    resourceType: OpenAI
 EOF
 ```
 
@@ -228,9 +233,9 @@ spec:
           type: PathPrefix
           value: /azure
     backendRefs:
-      - name: azure-openai-wi
-        group: enterpriseagentgateway.solo.io
-        kind: EnterpriseAgentgatewayBackend
+      - group: agentgateway.dev
+        kind: AgentgatewayModel
+        name: "*"
     timeouts:
       request: "120s"
 EOF
@@ -281,7 +286,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 
 ### curl Azure OpenAI via Workload Identity
 ```bash
-curl -i "$GATEWAY_IP:8080/azure" \
+curl -i "$GATEWAY_IP:8080/azure/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "<YOUR-MODEL-NAME>",
@@ -359,7 +364,7 @@ Example output includes the model name, token usage, and trace ID for correlatin
 ```bash
 # Remove Kubernetes resources
 kubectl delete httproute -n agentgateway-system azure-openai-wi
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system azure-openai-wi
+kubectl delete agentgatewaymodel -n agentgateway-system azure-openai-wi
 
 # Remove Workload Identity annotation and label from EnterpriseAgentgatewayParameters
 kubectl patch enterpriseagentgatewayparameters agentgateway-config \

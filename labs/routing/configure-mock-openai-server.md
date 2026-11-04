@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Configure a mock LLM server that serves the OpenAI spec
-- Create a route to our mock server as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Create a route to our mock server as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Curl mock server through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
@@ -81,7 +81,7 @@ spec:
 EOF
 ```
 
-Create mock server route and backend
+Create mock server route and model. The model sends requests for `mock-gpt-4o` to the mock Service through `baseURL`, which sets the provider address and the `/v1` base path.
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -99,25 +99,26 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: mock-openai
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: mock-openai
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-      port: 8000
-      path: "/v1/chat/completions"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai
+  match:
+    model: mock-gpt-4o
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000/v1
   policies:
     auth:
       passthrough: {}
@@ -128,7 +129,7 @@ EOF
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -215,7 +216,7 @@ Navigate to http://localhost:16686 in your browser to see the traces. Each span 
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system mock-openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-openai
+kubectl delete agentgatewaymodel -n agentgateway-system mock-openai
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```

@@ -12,7 +12,7 @@ steps:
     run: all
     wait: "--for=condition=Available deploy/mock-gpt-4o -n agentgateway-system --timeout=300s"
 
-  - section: "Configure Route and Backend"
+  - section: "Configure Route and Model"
     run: all
 
   - section: "Scale AgentGateway to 1 Replica"

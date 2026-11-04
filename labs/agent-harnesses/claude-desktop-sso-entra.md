@@ -101,7 +101,7 @@ kubectl create secret generic claude-sso-upstream-credential -n agentgateway-sys
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create the route, the Anthropic backend, the Entra JWKS backend, and the JWT authentication policy:
+Create the route, the Anthropic model, the Entra JWKS backend, and the JWT authentication policy:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -120,42 +120,34 @@ spec:
             type: PathPrefix
             value: /claude
       filters:
-        # required so that /claude/v1/models reaches the upstream as /v1/models
-        # (Claude Desktop's "Model discovery" toggle calls this endpoint)
-        - type: URLRewrite
-          urlRewrite:
-            path:
-              type: ReplacePrefixMatch
-              replacePrefixMatch: /
         - type: RequestHeaderModifier
           requestHeaderModifier:
             remove:
             - x-api-key
       backendRefs:
-        - name: claude-sso-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "540s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: claude-sso-backend
+  name: claude-sso-model
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      anthropic: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: claude-sso-route
+  match:
+    model: "*"
+  provider: Anthropic
   policies:
     auth:
       secretRef:
         name: claude-sso-upstream-credential
-    ai:
-      routes:
-        "/v1/messages": "Messages"
-        "/v1/models": "Passthrough"
-        "*": "Passthrough"
 ---
 apiVersion: enterpriseagentgateway.solo.io/v1alpha1
 kind: EnterpriseAgentgatewayBackend
@@ -203,7 +195,7 @@ EOF
 
 > **No leading slash on `jwksPath`.** The controller joins the JWKS backend's URL and `jwksPath` with a `/`; a leading slash produces a double slash and a 404 from Entra.
 
-> **`jwtAuthentication` strips the JWT after validating it.** The ID token never reaches Anthropic: the backend's `auth.secretRef` injects the real Anthropic credential in its place. The route filter also removes any `x-api-key` a client might send.
+> **`jwtAuthentication` strips the JWT after validating it.** The ID token never reaches Anthropic: the model's `auth.secretRef` injects the real Anthropic credential in its place. The route filter also removes any `x-api-key` a client might send.
 
 ## Verify the Gateway Requires Authentication
 
@@ -263,6 +255,8 @@ Leave the remaining OIDC fields (**Bearer token**, **Additional redirect referre
 
 ![claude-sso-1-config.png](../../images/claude-desktop-sso/claude-sso-1-config.png)
 
+> **Leave Custom inference headers empty.** An `Authorization` entry there replaces the sign-in token on every request, and the gateway rejects it with `authentication failure: the token header is malformed`. Claude Desktop reports this as *Your credentials were rejected by the inference provider*. Remove any `Authorization` header left over from the [Claude Desktop lab](claude-desktop.md).
+
 > **Issuer URL is the base URL only.** Enter `https://login.microsoftonline.com/<tenant>/v2.0` without the `/.well-known/openid-configuration` suffix; the app appends that path itself to discover the authorization and token endpoints.
 
 4. Click **Apply Changes**. Claude Desktop now runs against your gateway configuration and presents a **Sign in with your organization** button; no Claude.ai account is involved:
@@ -317,7 +311,7 @@ Stop the `kubectl port-forward` process (Ctrl-C), then remove the gateway resour
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system claude-sso-jwt-policy --ignore-not-found
 kubectl delete httproute -n agentgateway-system claude-sso-route --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-sso-backend --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system claude-sso-model --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system entra-jwks --ignore-not-found
 kubectl delete secret -n agentgateway-system claude-sso-upstream-credential --ignore-not-found
 unset CLAUDE_CODE_OAUTH_TOKEN

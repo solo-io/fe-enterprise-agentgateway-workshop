@@ -81,7 +81,7 @@ steps:
     script: |
       # The model wraps JSON in a markdown fence, so drop the fence lines before
       # asking jq whether what is left is really JSON.
-      curl -s "http://$GATEWAY_IP:8080/openai" \
+      curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
         -H 'content-type: application/json' \
         -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Whats your favorite poem?"}]}' \
         | jq -r '.choices[0].message.content' \

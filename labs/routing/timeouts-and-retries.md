@@ -81,9 +81,9 @@ spec:
 EOF
 ```
 
-## Configure Route and Backend
+## Configure Route and Model
 
-Create the HTTPRoute and EnterpriseAgentgatewayBackend:
+Create the HTTPRoute and the `AgentgatewayModel` for the mock server:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -102,26 +102,30 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: mock-openai
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: mock-openai
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        model: "mock-gpt-4o"
-      host: mock-gpt-4o-svc.agentgateway-system.svc.cluster.local
-      port: 8000
-      path: "/v1/chat/completions"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai
+  match:
+    model: "*"
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-svc.agentgateway-system.svc.cluster.local:8000/v1
   policies:
     auth:
       passthrough: {}
+    transformations:
+      - field: model
+        expression: '"mock-gpt-4o"'
 EOF
 ```
 
@@ -187,7 +191,7 @@ Verify the mock server is working:
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -219,7 +223,7 @@ kubectl scale deployment/mock-gpt-4o -n agentgateway-system --replicas=0
 Make a request:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -291,7 +295,7 @@ The longer 2s timeout leaves room for several 200ms backoff delays before the re
 Make another request with the mock server still scaled to 0:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -342,7 +346,7 @@ Delete the lab resources:
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system timeout-retry-policy
 kubectl delete httproute -n agentgateway-system mock-openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-openai
+kubectl delete agentgatewaymodel -n agentgateway-system mock-openai
 kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
 kubectl delete -n agentgateway-system deploy/mock-gpt-4o
 ```

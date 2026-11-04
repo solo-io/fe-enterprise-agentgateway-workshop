@@ -24,7 +24,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 
 ---
 
-## Create OpenAI route and backend
+## Create OpenAI route and model
 
 ```bash
 kubectl apply -f - <<EOF
@@ -45,27 +45,36 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
-        #--- Uncomment to configure model override ---
-        #model: ""
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: guardrail-classifier
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
@@ -83,7 +92,7 @@ echo "Gateway IP: $GATEWAY_IP"
 Send a request before any webhook policy is in place to confirm the route is working:
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -314,7 +323,7 @@ EOF
 The LLM classifier sees benign content and returns `PASS`, so the request flows through unchanged.
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -351,7 +360,7 @@ INFO:     10.244.2.8:52934 - "POST /response HTTP/1.1" 200 OK
 The LLM recognises hate speech and returns `REJECT` without a keyword list.
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -394,7 +403,7 @@ No `/response` webhook call follows because the request never reached OpenAI.
 The LLM classifier catches explicit prompt injection using the "DAN" pattern.
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -427,7 +436,7 @@ INFO:     10.244.2.8:52100 - "POST /request HTTP/1.1" 200 OK
 The LLM detects the credit card pattern, masks it in the request before it reaches OpenAI, and the model echoes back the masked version.
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -469,7 +478,7 @@ The card was masked on the way *in*, so OpenAI never saw it: what the model echo
 ## Test: PII masking — email address
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -491,7 +500,7 @@ This test shows where LLM-based classification outperforms static regex.
 A regex pattern matching "prompt injection" would block the request below. The LLM recognises the defensive, research-oriented intent and allows it through.
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -518,7 +527,7 @@ INFO:     10.244.2.8:54800 - "POST /request HTTP/1.1" 200 OK
 Now send a superficially similar message that is an actual attack: the phrasing borrows from security research language but the intent is to extract a working exploit.
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -564,7 +573,7 @@ A keyword list can encode *what words are present*; a language model can evaluat
 Attackers avoid explicit trigger words and use roleplay or fictional framing instead. The message below contains neither "DAN" nor "ignore instructions", so a keyword filter would allow it through. The LLM recognises the persona-based manipulation pattern regardless.
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -617,9 +626,9 @@ spec:
             type: PathPrefix
             value: /guardrail-classifier
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
 EOF
 ```
 
@@ -748,7 +757,7 @@ This section adds a new domain-specific rule in plain English, with no code chan
 Send a medical dosage question. It currently passes because the default policy has no rule about medical advice.
 
 ```bash
-curl -s "http://$GATEWAY_IP:8080/openai" \
+curl -s "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -850,7 +859,7 @@ kubectl rollout status deployment/ai-guardrail-webhook -n agentgateway-system --
 Send the exact same medical question again:
 
 ```bash
-curl -si "http://$GATEWAY_IP:8080/openai" \
+curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -926,7 +935,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 A rejected request logs the guardrail as the reason it never reached the provider:
 
 ```
-http.path=/openai http.status=403 protocol=llm error="request rejected by webhook guardrail" reason=Guardrail duration=1389ms
+http.path=/openai/v1/chat/completions http.status=403 protocol=llm error="request rejected by webhook guardrail" reason=Guardrail duration=1389ms
 ```
 
 The access log records tokens and cost, not message text, so the masked completion is not visible here. To see what the provider returned after masking, read the response body as in the PII masking tests above, or open the span in the Solo UI and read its `llm.completion.output` attribute.
@@ -950,6 +959,6 @@ kubectl delete deployment -n agentgateway-system ai-guardrail-webhook
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system openai-prompt-guard
 kubectl delete httproute -n agentgateway-system openai
 kubectl delete httproute -n agentgateway-system guardrail-classifier --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 ```

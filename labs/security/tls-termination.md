@@ -92,7 +92,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create OpenAI route and backend
+Create OpenAI route and model
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -110,25 +110,33 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
@@ -139,7 +147,7 @@ Try to access the route over plaintext HTTP on port 80. This fails because the g
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -ik "http://$GATEWAY_IP/openai" \
+curl -ik "http://$GATEWAY_IP/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -163,7 +171,7 @@ curl OpenAI over HTTPS using the gateway certificate
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -ik "https://$GATEWAY_IP/openai" \
+curl -ik "https://$GATEWAY_IP/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -231,7 +239,7 @@ kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy
 ```bash
 rm -rf example_certs
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret https
 ```
 

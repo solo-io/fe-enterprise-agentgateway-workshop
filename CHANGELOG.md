@@ -1,5 +1,38 @@
 # Changelog
 
+0.15.1 - (11-3-26)
+---
+- `002`: add a `Next Steps` section
+- Add `labs/routing/migrate-agentgatewaybackend-to-agentgatewaymodel.md`: why LLM providers move from `EnterpriseAgentgatewayBackend` to `AgentgatewayModel`, with a side-by-side cutover, pros and cons, migration steps and an industry comparison
+- **Breaking:** LLM labs declare providers as `AgentgatewayModel` resources attached to their HTTPRoute, while MCP, static, JWKS and tunnel backends stay `EnterpriseAgentgatewayBackend`
+- **Breaking:** clients call the provider API path under the route prefix (`/openai/v1/chat/completions`, SDK base URL `/openai/v1`), and every request body must carry `model`
+- Backend model overrides become a `*` model with a `model` transformation, and backend-targeted policies move into the model's `spec.policies`
+- `policies.ai.routes` maps are gone because the gateway detects the API from the request path and answers `GET <prefix>/v1/models` itself
+- `llm-failover.md` and `llm-failover-advanced.md`: failover is a `resilient` virtual model over concrete models that carry their own health checks
+- `configure-body-based-routing.md`: retitle the lab "Route by Model Name" and route on the body `model` natively instead of extracting it into a header
+- `configure-openai-embeddings.md`: one model serves chat, embeddings and the model list, and the path-rewrite section becomes a path-prefix rule
+- `routing-match-types.md` and the k6 load-testing lab: each pinned model attaches to a named rule through `sectionName`
+- `llm-load-testing-k6.md`: rename the route to `k6-mock-openai` so it no longer overwrites the mock lab's route, and point the script's fallback endpoint at the gateway service
+- `configure-routing-groq.md`: use the built-in `Groq` provider instead of an OpenAI host override
+- `transformations.md`: `request.path` in a response transformation is the provider path (`/v1/chat/completions`)
+- `codex.md`: remove the `/codex/v1/models` workaround route because Codex accepts the gateway's model list
+- `claude-code.md`: add a preflight route that answers Claude Code's `HEAD /claude/api/hello` with `200`
+- `advanced-guardrails-webhook-openai-decisions.md`: reword the echo system prompt so the masking tests mask instead of rejecting it as prompt injection
+- `in-place-rolling-upgrades.md`: write the slow-stream route in block style
+- `blue-green-namespaces.md`: add a `ReferenceGrant` in each color namespace so the edge's delegation stops returning `404`
+- `kyverno-admission-control.md`: validate `AgentgatewayModel` providers and inline keys alongside the backend policies
+- `agentgateway-llm-ops` chart `0.2.0`: render an `AgentgatewayModel` per alias, with `baseURL` replacing `host`/`port`/`apiPath` and `provider` limited to `openai` and `anthropic`
+- **Breaking:** `agentgateway-llm-ops` chart `0.2.0`: grants name a `budgetTier` from the infra release's `budgetTiers` instead of setting `tokensPerMinute`, so each alias route keeps exactly one budget policy
+- `centralized-llm-ops-helm-chart.md`: Step 6 works again, because beta's isolated release carries only its key and the infra release enforces beta's tier
+- `configure-openai-batches.md` and `configure-routing-aws-bedrock-titan-embeddings.md` keep an LLM backend because their requests carry no body `model`
+- Bedrock labs: each path serves a `Bedrock` model, and cleanup now deletes `bedrock-haiku4.5` instead of a nonexistent `bedrock-haiku3.5`
+- Vertex AI labs: a `VertexAI` model pins `google/gemini-2.5-flash-lite`
+- Azure OpenAI labs: use the `Azure` provider with `AZURE_RESOURCE_NAME` in place of `ENDPOINT`, and pin Option B's model to `DEPLOYMENT_NAME`
+- Claude Desktop labs: serve an `Anthropic` model, and tell SSO readers to leave Custom inference headers empty so the Entra token is sent
+- `lib/crewai` apps and `seed-cost-data.sh` use the `/openai/v1` model route path
+- Style guide: document the model pattern, pins, failover and the request path convention
+- e2e: add an `ai-backend` lint rule (documented in `e2e/README.md`) that also catches manifests with `kind:` first or comments between keys, and update specs for the renamed sections and paths
+
 0.15.0 - (10-23-26)
 ---
 - Bump Enterprise Agentgateway from `v2026.9.3` to `v2026.10.1`. Update the image list, the system requirements, the README and the `appVersion` of the three charts

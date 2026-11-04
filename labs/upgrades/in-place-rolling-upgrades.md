@@ -9,7 +9,7 @@ To take an entire cluster out of service for an upgrade while a peer keeps servi
 ## Pre-requisites
 - [001 — Install Enterprise Agentgateway](../../001-install-enterprise-agentgateway.md)
 - [002 — Set Up Monitoring Tools](../../002-set-up-monitoring-tools.md)
-- [Configure Mock OpenAI Server](../routing/configure-mock-openai-server.md): provides the `mock-gpt-4o` backend on the `/openai` route
+- [Configure Mock OpenAI Server](../routing/configure-mock-openai-server.md): provides the `mock-openai` model on the `/openai` route
 - A cluster with **at least 2 proxy replicas** (this lab configures that in the first section)
 
 ## Lab Objectives
@@ -136,7 +136,7 @@ data:
       thresholds: { http_req_failed: ['rate==0'], checks: ['rate==1.0'] },
     };
     export default function () {
-      const res = http.post(`${BASE}/openai`,
+      const res = http.post(`${BASE}/openai/v1/chat/completions`,
         JSON.stringify({ model: 'mock-gpt-4o', messages: [{ role: 'user', content: 'hi' }] }),
         { headers: { 'Content-Type': 'application/json' } });
       check(res, { 'status is 200': r => r.status === 200 });
@@ -236,20 +236,26 @@ spec:
   ports: [{ protocol: TCP, port: 8000, targetPort: 8000, name: http }]
   type: ClusterIP
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: mock-openai-slow
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: { model: "mock-gpt-4o" }
-      host: mock-gpt-4o-slow-svc.agentgateway-system.svc.cluster.local
-      port: 8000
-      path: "/v1/chat/completions"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai-slow
+  match:
+    model: "*"
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-slow-svc.agentgateway-system.svc.cluster.local:8000/v1
   policies:
-    auth: { passthrough: {} }
+    auth:
+      passthrough: {}
+    transformations:
+      - field: model
+        expression: '"mock-gpt-4o"'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -257,11 +263,20 @@ metadata:
   name: mock-openai-slow
   namespace: agentgateway-system
 spec:
-  parentRefs: [{ name: agentgateway-proxy, namespace: agentgateway-system }]
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
   rules:
-  - matches: [{ path: { type: PathPrefix, value: /openai-slow } }]
-    backendRefs: [{ name: mock-openai-slow, group: enterpriseagentgateway.solo.io, kind: EnterpriseAgentgatewayBackend }]
-    timeouts: { request: "180s" }
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai-slow
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
+      timeouts:
+        request: "180s"
 EOF
 kubectl rollout status deploy/mock-gpt-4o-slow -n agentgateway-system --timeout=120s
 ```
@@ -289,7 +304,7 @@ data:
       thresholds: { 'http_req_failed': ['rate<0.05'] },
     };
     export default function () {
-      const res = http.post(`${BASE}/openai-slow`,
+      const res = http.post(`${BASE}/openai-slow/v1/chat/completions`,
         JSON.stringify({ model: 'mock-gpt-4o', stream: true, messages: [{ role: 'user', content: 'tell me a long story' }] }),
         { headers: { 'Content-Type': 'application/json' }, timeout: '120s' });
       const ok = res.status === 200 && String(res.body).includes('finish_reason":"stop');
@@ -635,7 +650,8 @@ The minimum recipe for zero-downtime in-place upgrades: two or more replicas, a 
 kubectl delete job -n loadgenerator --all
 kubectl delete configmap -n loadgenerator k6-zdt-short k6-zdt-stream k6-zdt-mcp --ignore-not-found
 kubectl delete httproute -n agentgateway-system mock-openai-slow fast-mcp --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mock-openai-slow fast-mcp-backend --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system mock-openai-slow --ignore-not-found
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system fast-mcp-backend --ignore-not-found
 kubectl delete deploy -n agentgateway-system mock-gpt-4o-slow fast-mcp --ignore-not-found
 kubectl delete svc -n agentgateway-system mock-gpt-4o-slow-svc fast-mcp-svc --ignore-not-found
 kubectl delete configmap -n agentgateway-system fast-mcp-script --ignore-not-found

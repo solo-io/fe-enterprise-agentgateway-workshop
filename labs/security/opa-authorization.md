@@ -86,20 +86,26 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 Create the OpenAI backend and HTTPRoute
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai:
-        model: gpt-5.4-nano
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    transformations:
+      - field: model
+        expression: '"gpt-5.4-nano"'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -116,10 +122,9 @@ spec:
         type: PathPrefix
         value: /openai
     backendRefs:
-    - name: openai
-      namespace: agentgateway-system
-      group: enterpriseagentgateway.solo.io
-      kind: EnterpriseAgentgatewayBackend
+    - group: agentgateway.dev
+      kind: AgentgatewayModel
+      name: "*"
 EOF
 ```
 
@@ -127,7 +132,7 @@ Verify the route works before adding OPA
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -250,7 +255,7 @@ No `backendRef` is needed: it defaults to the provisioned ext-auth service.
 **Denied -- no api-key:**
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -275,7 +280,7 @@ Access denied: missing or invalid API key
 **Allowed -- valid api-key:**
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "api-key: authorized-user-key" \
   -d '{
@@ -514,6 +519,7 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system llm-opa-polic
 kubectl delete authconfig -n agentgateway-system llm-opa
 kubectl delete configmap -n agentgateway-system llm-opa-policy
 kubectl delete httproute -n agentgateway-system openai soloio-docs-mcp
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai soloio-docs-mcp
+kubectl delete agentgatewaymodel -n agentgateway-system openai
+kubectl delete enterpriseagentgatewaybackend -n agentgateway-system soloio-docs-mcp
 kubectl delete secret -n agentgateway-system openai-secret
 ```

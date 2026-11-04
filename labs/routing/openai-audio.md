@@ -1,12 +1,12 @@
 # OpenAI Audio (Text-to-Speech & Speech-to-Text)
 
-In this lab, you'll proxy OpenAI's Audio API through AgentGateway to generate speech from text and transcribe audio back to text. This demonstrates AgentGateway's ability to handle audio payloads using the `Passthrough` route type.
+In this lab, you'll proxy OpenAI's Audio API through AgentGateway to generate speech from text and transcribe audio back to text. This demonstrates AgentGateway's ability to handle audio payloads, both JSON and `multipart/form-data`, through the same `AgentgatewayModel` that serves chat completions.
 
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
-- Configure an AgentGateway backend with Passthrough routes for OpenAI Audio endpoints
+- Configure an `AgentgatewayModel` and `HTTPRoute` that serve the OpenAI Audio endpoints
 - Generate speech audio from text using `/v1/audio/speech` (Text-to-Speech)
 - Transcribe audio back to text using `/v1/audio/transcriptions` (Speech-to-Text)
 - Complete a round-trip: text → audio → text
@@ -22,7 +22,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create the backend and route. The Audio endpoints use the `Passthrough` route type since they are not standard chat completions:
+Create the route and model:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -37,39 +37,33 @@ spec:
       namespace: agentgateway-system
   rules:
     - backendRefs:
-        - name: openai-audio
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-audio
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
-    ai:
-      routes:
-        "/v1/chat/completions": "Completions"
-        "/v1/audio/speech": "Passthrough"
-        "/v1/audio/transcriptions": "Passthrough"
-        "*": "Passthrough"
 EOF
 ```
 
-The `policies.ai.routes` configuration routes each endpoint:
-- `/v1/chat/completions`: `"Completions"`, standard chat with full AI gateway processing (metrics, guardrails)
-- `/v1/audio/speech`: `"Passthrough"`, proxies TTS requests to OpenAI
-- `/v1/audio/transcriptions`: `"Passthrough"`, proxies STT requests to OpenAI
-- `*`: `"Passthrough"`, default passthrough for any other paths
+The rule has no path match, so the OpenAI paths are served at the root of the Gateway. The gateway reads the `model` from each request to pick the model: from the JSON body for `/v1/audio/speech`, and from the `model` form field for the `multipart/form-data` upload to `/v1/audio/transcriptions`.
 
 Get the Gateway IP:
 ```bash
@@ -208,10 +202,11 @@ Check AgentGateway logs for the audio request details:
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
 
-For Passthrough requests, you'll see:
+For audio requests, you'll see:
 - `http.path`: `/v1/audio/speech` or `/v1/audio/transcriptions`
 - `http.status`: `200`
 - `protocol`: `llm`
+- `agw.ai.original_model`: the requested model, such as `whisper-1`
 
 ### View Metrics in Grafana
 
@@ -226,14 +221,14 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 
 3. Navigate to **Dashboards > AgentGateway Dashboard** to view request metrics
 
-> **Note:** Since audio endpoints use the `Passthrough` route type, token-level metrics are not available. AgentGateway still tracks request counts, latencies, and status codes.
+> **Note:** OpenAI's audio responses carry no token usage, so token-level metrics are not available for these requests. AgentGateway still tracks request counts, latencies, and status codes.
 
 ## Cleanup
 
 Delete the lab resources:
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-audio
+kubectl delete agentgatewaymodel -n agentgateway-system openai-audio
 kubectl delete secret -n agentgateway-system openai-secret
 rm -f speech.mp3 speech-nova.mp3 speech.wav
 ```

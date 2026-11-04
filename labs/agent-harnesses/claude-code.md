@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 ## Lab Objectives
 - Choose between Direct API Key or Claude Max / Team Subscription access
 - Create a Kubernetes secret that contains your Anthropic credentials
-- Create a passthrough route to Anthropic as our backend LLM provider using a `Backend` and `HTTPRoute`
+- Create a passthrough route to Anthropic as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Test the route with curl to verify connectivity
 - Use Claude Code CLI through the agentgateway proxy
 - Validate Claude Code requests in Grafana UI and access logs
@@ -83,28 +83,27 @@ spec:
             - x-api-key
             - authorization
       backendRefs:
-        - name: claude-subscription-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: claude-subscription-backend
+  name: claude-subscription-model
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      anthropic: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: claude-subscription-route
+  match:
+    model: "*"
+  provider: Anthropic
   policies:
     auth:
       secretRef:
         name: claude-subscription-token
-    ai:
-      routes:
-        "/v1/messages": "Messages"
-        "/v1/models": "Passthrough"
-        "*": "Passthrough"
 ---
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
@@ -127,8 +126,40 @@ spec:
       local:
       - tokens: 5000000
         unit: Hours
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: claude-subscription-preflight
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /claude/api/hello
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: claude-subscription-preflight-response
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: claude-subscription-preflight
+  traffic:
+    directResponse:
+      status: 200
+      body: '{}'
 EOF
 ```
+
+Claude Code checks that it can reach the API with a `HEAD` request to `/claude/api/hello`, which carries no model. The `claude-subscription-preflight` route answers that check at the gateway with a `200`, so it never reaches the model route.
 
 ### Export the Gateway IP
 
@@ -173,7 +204,9 @@ unset CLAUDE_CODE_USE_VERTEX
 
 ```bash
 kubectl delete httproute -n agentgateway-system claude-subscription-route
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-subscription-backend
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system claude-subscription-preflight-response
+kubectl delete httproute -n agentgateway-system claude-subscription-preflight
+kubectl delete agentgatewaymodel -n agentgateway-system claude-subscription-model
 kubectl delete agentgatewaypolicy -n agentgateway-system claude-subscription-policies
 kubectl delete secret -n agentgateway-system claude-subscription-token
 unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY CLAUDE_OAUTH_TOKEN GATEWAY_IP
@@ -197,9 +230,9 @@ kubectl create secret generic claude-direct-apikey -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-### Create Anthropic Route and Backend
+### Create Anthropic Route and Model
 
-Create the HTTPRoute and EnterpriseAgentgatewayBackend with passthrough configuration:
+Create the HTTPRoute and `AgentgatewayModel`:
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -223,32 +256,63 @@ spec:
             - x-api-key
             - authorization
       backendRefs:
-        - name: claude-direct-apikey-backend
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "540s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
-  name: claude-direct-apikey-backend
+  name: claude-direct-apikey-model
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      anthropic: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: claude-directapikey-route
+  match:
+    model: "*"
+  provider: Anthropic
   policies:
     auth:
       secretRef:
         name: claude-direct-apikey
-    ai:
-      routes:
-        "/v1/messages": "Messages"
-        "/v1/models": "Passthrough"
-        "*": "Passthrough"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: claude-directapikey-preflight
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /claude/api/hello
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: claude-directapikey-preflight-response
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: claude-directapikey-preflight
+  traffic:
+    directResponse:
+      status: 200
+      body: '{}'
 EOF
 ```
+
+Claude Code checks that it can reach the API with a `HEAD` request to `/claude/api/hello`, which carries no model. The `claude-directapikey-preflight` route answers that check at the gateway with a `200`, so it never reaches the model route.
 
 ### Export the Gateway IP
 
@@ -285,7 +349,9 @@ claude
 
 ```bash
 kubectl delete httproute -n agentgateway-system claude-directapikey-route
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-direct-apikey-backend
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system claude-directapikey-preflight-response
+kubectl delete httproute -n agentgateway-system claude-directapikey-preflight
+kubectl delete agentgatewaymodel -n agentgateway-system claude-direct-apikey-model
 kubectl delete secret -n agentgateway-system claude-direct-apikey
 unset ANTHROPIC_BASE_URL CLAUDE_API_KEY GATEWAY_IP
 ```

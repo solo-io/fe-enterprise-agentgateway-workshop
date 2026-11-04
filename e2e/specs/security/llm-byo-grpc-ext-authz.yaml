@@ -103,12 +103,30 @@ steps:
                     - name: x-e2e-probe
                       value: reached
             backendRefs:
-              - name: openai-all-models
-                group: enterpriseagentgateway.solo.io
-                kind: EnterpriseAgentgatewayBackend
+              - group: agentgateway.dev
+                kind: AgentgatewayModel
+                name: "*"
+      ---
+      apiVersion: agentgateway.dev/v1alpha1
+      kind: AgentgatewayModel
+      metadata:
+        name: e2e-ungated-probe
+        namespace: agentgateway-system
+      spec:
+        parentRefs:
+          - group: gateway.networking.k8s.io
+            kind: HTTPRoute
+            name: e2e-ungated-probe
+        match:
+          model: "*"
+        provider: OpenAI
+        policies:
+          auth:
+            secretRef:
+              name: openai-secret
       YAML
       for i in $(seq 1 10); do
-        out=$(curl -si "http://$GATEWAY_IP:8080/e2e-ungated" \
+        out=$(curl -si "http://$GATEWAY_IP:8080/e2e-ungated/v1/chat/completions" \
           -H 'content-type: application/json' \
           -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"Hello!"}]}')
         grep -q 'x-e2e-probe: reached' <<<"$out" && break
@@ -118,7 +136,7 @@ steps:
       grep -q 'x-ext-authz-check-result' <<<"$out" \
         && echo "ext-authz applied to other route" \
         || echo "ext-authz not applied to other route"
-      kubectl delete httproute e2e-ungated-probe -n agentgateway-system >/dev/null
+      kubectl delete httproute,agentgatewaymodel e2e-ungated-probe -n agentgateway-system >/dev/null
     assert:
       - contains: "ungated_route=200"
       - contains: "ext-authz not applied to other route"

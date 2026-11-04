@@ -21,7 +21,7 @@ Agentgateway achieves virtual keys by composing three capabilities:
 
 The key security advantage over header-based rate limiting: the budget key (`user_id`) is extracted from the API key credential by the gateway; the client cannot forge or override it.
 
-## Set up the OpenAI backend
+## Set up the OpenAI model
 
 Create the OpenAI credential secret. The gateway uses this to authenticate upstream; callers never see it.
 
@@ -31,7 +31,7 @@ kubectl create secret generic openai-secret -n agentgateway-system \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create the backend and route:
+Create the model and route:
 
 ```bash
 kubectl apply -f- <<EOF
@@ -50,37 +50,46 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
 Verify both resources are accepted:
 
 ```bash
-kubectl get enterpriseagentgatewaybackend openai-all-models -n agentgateway-system
+kubectl get agentgatewaymodel openai-all-models -n agentgateway-system \
+  -o jsonpath='{range .status.parents[*].conditions[*]}{.type}={.status}{"\n"}{end}'
 kubectl get httproute openai -n agentgateway-system \
   -o jsonpath='{range .status.parents[*].conditions[*]}{.type}={.status}{"\n"}{end}'
 ```
 
-The backend should show `ACCEPTED   True`. The route (which has no status column in plain `kubectl get`) should print `Accepted=True` and `ResolvedRefs=True`.
+Both the model and the route print `Accepted=True` and `ResolvedRefs=True`.
 
 ## Create per-user API keys
 
@@ -166,7 +175,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 Send a request as alice:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-alice-abc123def456" \
   -d '{
@@ -178,7 +187,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 Send a request as bob:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-bob-xyz789uvw012" \
   -d '{
@@ -190,7 +199,7 @@ curl -i "$GATEWAY_IP:8080/openai" \
 Both should return `HTTP 200`. Verify that an unknown key is rejected:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-invalid-key" \
   -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Hello!"}]}'
@@ -274,7 +283,7 @@ Send multiple requests as alice until her 100-token hourly budget is exhausted:
 ```bash
 for i in {1..20}; do
   echo "--- Alice request $i ---"
-  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-alice-abc123def456" \
     -d '{
@@ -289,7 +298,7 @@ You should see `HTTP 200` responses until the 100-token budget is exhausted, the
 Verify bob still has his full budget:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-bob-xyz789uvw012" \
   -d '{
@@ -437,7 +446,7 @@ EOF
 # Exhaust charlie's 50-token free budget
 for i in {1..15}; do
   echo "--- Charlie request $i ---"
-  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-charlie-ghi345jkl678" \
     -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "What is 1+1?"}]}'
@@ -447,7 +456,7 @@ done
 Charlie hits `429` after her free-tier budget is exhausted. Verify alice's premium budget is untouched:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-alice-abc123def456" \
   -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Still working?"}]}'
@@ -540,14 +549,14 @@ Exhaust alice's budget in `tenant-a`, then verify requests using `tenant-b` stil
 # Exhaust alice in tenant-a
 for i in {1..20}; do
   echo "--- Alice (tenant-a) request $i ---"
-  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai" \
+  curl -s -o /dev/null -w "HTTP %{http_code}\n" "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     -H "content-type: application/json" \
     -H "Authorization: Bearer sk-alice-abc123def456" \
     -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "What is 1+1?"}]}'
 done
 
 # Alice in tenant-b still has her full budget
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer sk-alice-tenant-b-000111" \
   -d '{"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "Hello from tenant-b!"}]}'
@@ -567,8 +576,8 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system api-key-auth 
 kubectl delete ratelimitconfig -n agentgateway-system token-budgets --ignore-not-found
 kubectl delete secret -n agentgateway-system -l app=llm-virtual-keys --ignore-not-found
 
-# Backend resources set up at the start of this lab
+# Model and route set up at the start of this lab
 kubectl delete httproute -n agentgateway-system openai --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
 ```

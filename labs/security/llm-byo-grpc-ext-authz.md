@@ -6,7 +6,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 ## Lab Objectives
 - Deploy a custom gRPC ext-authz server to the cluster
 - Create a Kubernetes secret that contains our OpenAI api-key credentials
-- Create a route to OpenAI as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Create an `EnterpriseAgentgatewayPolicy` to enforce external authorization on the Gateway
 - Validate that requests without the required header are denied with 403
 - Validate that requests with the required header are allowed through
@@ -114,25 +114,33 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
@@ -142,7 +150,7 @@ Send a test request to confirm the OpenAI route is working before we lock it dow
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -191,7 +199,7 @@ EOF
 
 Send the same request as before, but now the ext-authz policy is in place. The request should be denied with a 403 because it is missing the `x-ext-authz: allow` header.
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -222,7 +230,7 @@ kubectl logs -n agentgateway-system -l app=grpc-ext-authz --tail=10
 
 Send the request again with the `x-ext-authz: allow` header. The ext-authz server recognizes this header and allows the request through.
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "x-ext-authz: allow" \
   -d '{
@@ -257,6 +265,6 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system openai-ext-au
 kubectl delete deployment -n agentgateway-system grpc-ext-authz
 kubectl delete service -n agentgateway-system grpc-ext-authz
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 ```

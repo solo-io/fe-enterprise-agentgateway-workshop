@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains our Azure api-key credentials
-- Create a route to Azure OpenAI or Azure AI Foundry as our backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to Azure OpenAI or Azure AI Foundry as our LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Curl your provider through the agentgateway proxy
 - Validate the request went through the gateway in the Grafana UI
 
@@ -13,11 +13,11 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 Set the following environment variables to match your Azure resource.
 
-**Note:** The ENDPOINT should be just the hostname without the `https://` scheme (e.g., `my-endpoint.openai.azure.com`)
+**Note:** The resource name is the first label of your endpoint hostname. For `my-resource.openai.azure.com`, it is `my-resource`. The gateway builds the hostname from it.
 
 ```bash
 export AZURE_OPENAI_API_KEY="<API-KEY>"
-export ENDPOINT="<AZURE-ENDPOINT>"  # Just the hostname, no https://
+export AZURE_RESOURCE_NAME="<AZURE-RESOURCE-NAME>"
 ```
 
 Create azure api-key secret
@@ -34,7 +34,7 @@ stringData:
 EOF
 ```
 
-Create the route to the backend (shared by both options below):
+Create the route (shared by both options below):
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: gateway.networking.k8s.io/v1
@@ -52,32 +52,38 @@ spec:
             type: PathPrefix
             value: /azure
       backendRefs:
-        - name: azure-openai
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
 ```
 
-Then create the backend using whichever option matches your Azure resource.
+Then create the model using whichever option matches your Azure resource.
 
 ## Option A: Azure AI Foundry (v1 API)
 
-Use this option if your resource is an Azure AI Foundry resource, or any resource exposing Azure's unified `v1` inference API, with no deployments to reference. `apiVersion` defaults to `v1`, which routes to `/openai/v1/chat/completions` and reads the model directly from the request body.
+Use this option if your resource is an Azure AI Foundry resource, or any resource exposing Azure's unified `v1` inference API, with no deployments to reference. `apiVersion` defaults to `v1`, which routes to `https://<resource>.openai.azure.com/openai/v1/chat/completions` and reads the model directly from the request body.
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: azure-openai
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      azureopenai:
-        endpoint: "${ENDPOINT}"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: azure-openai
+  match:
+    model: "*"
+  provider: Azure
+  azure:
+    resourceName: "${AZURE_RESOURCE_NAME}"
+    resourceType: OpenAI
   policies:
     auth:
       secretRef:
@@ -89,7 +95,7 @@ curl azure ai foundry
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/azure" \
+curl -i "$GATEWAY_IP:8080/azure/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "<YOUR-FOUNDRY-MODEL-NAME>",
@@ -106,8 +112,8 @@ Skip ahead to [Observability](#observability).
 
 ## Option B: Classic Deployment-Based Azure OpenAI
 
-Use this option if your resource uses named deployments and a dated `api-version`. For reference, an endpoint typically follows this format:
-`https://${ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-01`
+Use this option if your resource uses named deployments and a dated `api-version`. With a dated `apiVersion`, the gateway sends each request to the deployment named by its `model`, so the model's transformation sets `model` to your deployment name:
+`https://${AZURE_RESOURCE_NAME}.openai.azure.com/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-01`
 
 ```bash
 export DEPLOYMENT_NAME="<DEPLOYMENT-NAME>"
@@ -115,21 +121,30 @@ export DEPLOYMENT_NAME="<DEPLOYMENT-NAME>"
 
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: azure-openai
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      azureopenai:
-        endpoint: "${ENDPOINT}"
-        deploymentName: "${DEPLOYMENT_NAME}"
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: azure-openai
+  match:
+    model: "*"
+  provider: Azure
+  azure:
+    resourceName: "${AZURE_RESOURCE_NAME}"
+    resourceType: OpenAI
+    apiVersion: "2024-02-01"
   policies:
     auth:
       secretRef:
         name: azureopenai-secret
+    transformations:
+      - field: model
+        expression: '"${DEPLOYMENT_NAME}"'
 EOF
 ```
 
@@ -137,10 +152,10 @@ curl azure openai
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/azure" \
+curl -i "$GATEWAY_IP:8080/azure/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
-    "model": "gpt-5.4-nano",
+    "model": "",
     "messages": [
       {
         "role": "user",
@@ -224,6 +239,6 @@ Navigate to http://localhost:16686 in your browser to see the traces. Each span 
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system azure-openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system azure-openai
+kubectl delete agentgatewaymodel -n agentgateway-system azure-openai
 kubectl delete secret -n agentgateway-system azureopenai-secret
 ```

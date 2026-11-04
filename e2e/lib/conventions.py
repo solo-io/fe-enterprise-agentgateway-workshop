@@ -13,6 +13,8 @@ Rules:
               per-option lab keeps its cleanups under H3; allowlist below)
   eagb        no bare `kind: AgentgatewayBackend` — Enterprise CRDs only
               (allowlist: the Kyverno lab's deliberate negative example)
+  ai-backend  no LLM (`spec.ai`) EnterpriseAgentgatewayBackend — LLM labs
+              use AgentgatewayModel (allowlist: endpoints with no body model)
 
 Usage: conventions.py <repo_root>     exit 1 on any violation
 """
@@ -45,6 +47,16 @@ CLEANUP_ALLOW = {
 # policy REJECTS — that one is the point, not drift.
 EAGB_ALLOW = {"labs/platform-engineering/kyverno-admission-control.md"}
 
+# Labs that keep an LLM backend because their requests carry no `model` in the
+# body, which AgentgatewayModel needs: /v1/files and /v1/batches, and the native
+# Bedrock InvokeModel call (which also relies on a URLRewrite model rules reject).
+AI_BACKEND_ALLOW = {
+    # shows the backend-centric pattern as the "before" side of the migration
+    "labs/routing/migrate-agentgatewaybackend-to-agentgatewaymodel.md",
+    "labs/routing/configure-openai-batches.md",
+    "labs/routing/configure-routing-aws-bedrock-titan-embeddings.md",
+}
+
 # Labs whose GATEWAY_IP block legitimately differs from the canonical form
 # (a different Gateway/selector, not accidental drift). One-line reason each.
 GATEWAY_IP_ALLOW = {
@@ -59,6 +71,7 @@ GATEWAY_IP_ALLOW = {
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 GW_PREFIX = "export GATEWAY_IP=$(kubectl get svc"
 EAGB_BARE = re.compile(r"kind:\s*AgentgatewayBackend\b")
+EAGB_DOC = re.compile(r"^( *)kind:\s*EnterpriseAgentgatewayBackend\s*$", re.MULTILINE)
 
 
 def md_files(root):
@@ -130,11 +143,58 @@ def check_eagb(root, files, allow=EAGB_ALLOW):
     return errs
 
 
+def check_ai_backend(root, files, allow=AI_BACKEND_ALLOW):
+    errs = []
+    for rel in files:
+        if rel in allow:
+            continue
+        text = open(os.path.join(root, rel), encoding="utf-8").read()
+        lines = text.splitlines()
+        for m in EAGB_DOC.finditer(text):
+            ind = m.group(1)
+            line = text.count("\n", 0, m.start()) + 1
+            # A document's own kind has an apiVersion sibling at the same
+            # indent, before or after it; a backendRefs entry's kind does not.
+            before = _siblings(reversed(lines[:line - 1]), ind)
+            after = _siblings(lines[line:], ind)
+            if not any(l.startswith(ind + "apiVersion:") for l in before + after):
+                continue
+            spec_child = None
+            for l in after:
+                if l.startswith(ind + "spec:"):
+                    spec_child = ind + "  "
+                elif l.startswith(ind) and not l.startswith(ind + " "):
+                    spec_child = None
+                elif spec_child and l.startswith(spec_child + "ai:"):
+                    errs.append(f"{rel}:{line}: LLM EnterpriseAgentgatewayBackend "
+                                f"(spec.ai) — use AgentgatewayModel")
+                    break
+    return errs
+
+
+def _siblings(lines, ind):
+    """Lines of the YAML mapping at `ind`, stopping at the document boundary.
+
+    Blank and comment lines are skipped, so comments anywhere in a manifest
+    do not end the scan.
+    """
+    out = []
+    for l in lines:
+        s = l.strip()
+        if not s or s.startswith("#"):
+            continue
+        if s in ("---", "EOF") or s.startswith("```") or not l.startswith(ind):
+            break
+        out.append(l)
+    return out
+
+
 def main():
     root = sys.argv[1] if len(sys.argv) > 1 else "."
     files = md_files(root)
     errs = (check_links(root, files) + check_gateway_ip(root, files)
-            + check_cleanup(root, files) + check_eagb(root, files))
+            + check_cleanup(root, files) + check_eagb(root, files)
+            + check_ai_backend(root, files))
     for e in errs:
         print(f"  ✗ {e}")
     print(f"conventions: {len(files)} file(s), {len(errs)} violation(s)")

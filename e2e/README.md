@@ -28,12 +28,15 @@ passing assertions than the last one, with nothing removed, means coverage
 stopped running.
 
 `--lint` also runs `e2e/lib/conventions.py` against every README/tracks/labs
-markdown file. It checks four things: relative `.md` links resolve, every
+markdown file. It checks five things: relative `.md` links resolve, every
 `export GATEWAY_IP=$(kubectl get svc ...)` block matches the canonical form in
 style-guide.md §6 byte-for-byte (labs with a legitimate different Gateway are
 allowlisted in `GATEWAY_IP_ALLOW`), every lab has a `Cleanup` section at heading level 2 or 3
-(reference docs and installers are allowlisted in `CLEANUP_ALLOW`), and no lab
-uses a bare `kind: AgentgatewayBackend` instead of the Enterprise CRD.
+(reference docs and installers are allowlisted in `CLEANUP_ALLOW`), no lab
+uses a bare `kind: AgentgatewayBackend` instead of the Enterprise CRD, and no
+lab declares an LLM provider as an `EnterpriseAgentgatewayBackend` with `spec.ai`
+instead of an `AgentgatewayModel` (labs whose requests carry no body `model` are
+allowlisted in `AI_BACKEND_ALLOW`).
 
 Requires bash ≥ 4, `python3` + PyYAML, `kubectl`, `helm`, `jq` (`k6` for the
 load-testing labs).

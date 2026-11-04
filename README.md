@@ -56,7 +56,8 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Configure Mock OpenAI Server](labs/routing/configure-mock-openai-server.md) _(OpenAI)_
 - [Basic Routing to OpenAI](labs/routing/configure-routing-openai.md) _(OpenAI)_
 - [Routing by Match Type (Path, Header, Query Parameter)](labs/routing/routing-match-types.md) _(OpenAI)_
-- [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_ _(see also: Transformations)_
+- [Route by Model Name](labs/routing/configure-body-based-routing.md) _(OpenAI + Mock LLM)_
+- [Migrate from AgentgatewayBackend to AgentgatewayModel](labs/routing/migrate-agentgatewaybackend-to-agentgatewaymodel.md) _(OpenAI + Mock LLM)_: why the LLM labs moved to models, pros and cons, a field mapping and migration steps, virtual models, and how other LLM gateways model a model
 - [Semantic Routing with vLLM Semantic Router](labs/routing/configure-semantic-routing-vllm-sr.md) _(OpenAI + vLLM Semantic Router)_: one virtual model name routed to an economy, mid, or high tier model by prompt content, via ExtProc
 - [Semantic Routing with Jev](labs/routing/configure-semantic-routing-jev.md) _(OpenAI + TypeSafe Jev)_: the same three-tier routing, classified by a Jev `choice` question with a confidence gate, via an ExtProc adapter
 - [Semantic Routing with the OpenAI Decisions API](labs/routing/configure-semantic-routing-openai-decisions.md) _(OpenAI + OpenAI Decisions API)_: the same three-tier routing, classified by a Decisions API `choice` question with a confidence gate, so the prompt goes only to OpenAI
@@ -65,7 +66,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [AWS Bedrock with IRSA](labs/routing/configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_
 - [AWS Bedrock Titan Embeddings](labs/routing/configure-routing-aws-bedrock-titan-embeddings.md) _(AWS Bedrock)_
 - [Routing to Anthropic](labs/routing/configure-routing-anthropic.md) _(Anthropic)_
-- [Routing to Groq](labs/routing/configure-routing-groq.md) _(Groq)_: OpenAI-compatible provider via `host` / `pathPrefix` override
+- [Routing to Groq](labs/routing/configure-routing-groq.md) _(Groq)_: OpenAI-compatible provider through the built-in `Groq` provider
 - [Routing to Azure OpenAI and Azure AI Foundry](labs/routing/configure-routing-azure-openai.md) _(Azure OpenAI / Azure AI Foundry)_
 - [Azure OpenAI with Workload Identity](labs/routing/configure-routing-azure-openai-workload-identity.md) _(Azure OpenAI / AKS)_
 - [Routing to Google Vertex AI](labs/routing/configure-routing-vertexai.md) _(Google Vertex AI)_
@@ -133,7 +134,6 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [Prompt Enrichment](labs/transformations/prompt-enrichment.md)
 - [Request/Response Transformations](labs/transformations/transformations.md)
-- [Body-Based Routing](labs/routing/configure-body-based-routing.md) _(see also: Routing)_
 
 ---
 
@@ -246,7 +246,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
         - Anthropic (Claude)
         - Azure OpenAI (API key and AKS Workload Identity)
         - Google Vertex AI (user auth and GCP service account)
-        - Groq (and any other OpenAI-compatible provider, via a `host` / `pathPrefix` override)
+        - Groq (built-in provider), and any other OpenAI-compatible provider through `baseURL`
     - OpenAI Embeddings support
     - AWS Bedrock Titan embeddings support
     - OpenAI Batches API support (asynchronous batch processing)
@@ -318,7 +318,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
     - Retry policies on specific error codes (503, etc.)
     - Observing how timeouts and retries interact together
 - LLM Failover
-    - Priority group failover between LLM providers
+    - Priority failover between LLM providers with a virtual `AgentgatewayModel`
     - Health-based routing across multiple backends
     - Failover on rate limit errors (429)
     - Intra-priority-group failover with per-provider eviction and P2C load balancing

@@ -34,7 +34,7 @@ steps:
   - section: "Export the Gateway IP"
     run: all
 
-  - section: "Apply the Base Backend, Route, and Health Policy"
+  - section: "Apply the Base Models and Route"
     run: all
 
   # ---- Pattern 1: failover *within* a priority group ----
@@ -96,13 +96,13 @@ steps:
       - contains: "api.openai.com:443"
 
   # The lab's claim is that one CEL expression classifies both 503 and 429.
-  - resource: enterpriseagentgatewaypolicy/mock-5xx-health
-    jsonpath: .spec.backend.health.unhealthyCondition
+  - resource: agentgatewaymodel/mock-gpt-4o-500
+    jsonpath: .spec.policies.health.unhealthyCondition
     expect: "response.code >= 500"
     name: a single unhealthyCondition covers both error classes
 
-  - resource: enterpriseagentgatewaypolicy/mock-5xx-health
-    jsonpath: .spec.backend.health.eviction.duration
+  - resource: agentgatewaymodel/mock-gpt-4o-500
+    jsonpath: .spec.policies.health.eviction.duration
     expect: "30s"
     name: the 5XX eviction duration matches the doc
 

@@ -165,7 +165,7 @@ EOF
 
 ## Configure Basic Routing
 
-Create the OpenAI secret, backend, and route that JWT auth will protect:
+Create the OpenAI secret, model, and route that JWT auth will protect:
 
 ```bash
 kubectl create secret generic openai-secret -n agentgateway-system \
@@ -190,25 +190,33 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 EOF
 ```
 
@@ -253,7 +261,7 @@ export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.ne
 ### curl with no token
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -273,7 +281,7 @@ Expected output: the request fails with `authentication failure: no bearer token
 ```bash
 export VALID_TOKEN="$VALID_TOKEN"
 
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -H "Authorization: Bearer $VALID_TOKEN" \
   -d '{
@@ -320,7 +328,7 @@ For metrics on this traffic, see `002`. For traces, use the Solo UI from `001`.
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system agentgateway-jwt-auth-tunnel --ignore-not-found
 kubectl delete httproute -n agentgateway-system openai --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models --ignore-not-found
 kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system okta-jwks --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system corporate-proxy --ignore-not-found

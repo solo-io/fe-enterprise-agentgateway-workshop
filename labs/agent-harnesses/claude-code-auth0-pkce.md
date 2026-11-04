@@ -43,7 +43,7 @@ Configure three settings:
 
 ## Lab Objectives
 
-- Route Claude Code to Anthropic through the gateway using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Route Claude Code to Anthropic through the gateway using an `AgentgatewayModel` and `HTTPRoute`
 - Validate per-user Auth0 JWTs on that route with `jwtAuthentication` and a remote JWKS backend
 - Obtain a user token with the Authorization Code flow + PKCE, with no client secret on the laptop
 - Wire the token into Claude Code's `apiKeyHelper` for one session, leaving your own configuration untouched, so it renews from the refresh token
@@ -127,7 +127,7 @@ kubectl create secret generic claude-secret -n agentgateway-system \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-Create the route and backend:
+Create the route and model:
 
 ```bash
 kubectl apply -f - <<'EOF'
@@ -152,34 +152,33 @@ spec:
               - x-api-key
               - authorization
       backendRefs:
-        - name: claude-anthropic
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "540s"
 ---
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: claude-anthropic
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      anthropic: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: claude
+  match:
+    model: "*"
+  provider: Anthropic
   policies:
     auth:
       secretRef:
         name: claude-secret
-    ai:
-      routes:
-        "/v1/messages": "Messages"
-        "/v1/models": "Passthrough"
-        "*": "Passthrough"
 EOF
 ```
 
-> **Stripping `authorization` and `x-api-key`.** The developer's Auth0 JWT arrives in those headers and must **not** reach Anthropic. It isn't an Anthropic credential, and forwarding it would hand a user token to a third party. The `RequestHeaderModifier` removes both headers, then the backend's `auth.secretRef` attaches the real Anthropic key. JWT validation runs **before** the strip, so removing the header doesn't defeat authentication.
+> **Stripping `authorization` and `x-api-key`.** The developer's Auth0 JWT arrives in those headers and must **not** reach Anthropic. It isn't an Anthropic credential, and forwarding it would hand a user token to a third party. The `RequestHeaderModifier` removes both headers, then the model's `auth.secretRef` attaches the real Anthropic key. JWT validation runs **before** the strip, so removing the header doesn't defeat authentication.
 
 The long `540s` timeout accommodates extended thinking and long tool-use turns.
 
@@ -768,7 +767,7 @@ Open http://localhost:4000 and click **Tracing** in the left navigation.
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system claude-auth0-jwt --ignore-not-found
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system auth0-jwks --ignore-not-found
 kubectl delete httproute -n agentgateway-system claude --ignore-not-found
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system claude-anthropic --ignore-not-found
+kubectl delete agentgatewaymodel -n agentgateway-system claude-anthropic --ignore-not-found
 kubectl delete secret -n agentgateway-system claude-secret --ignore-not-found
 ```
 

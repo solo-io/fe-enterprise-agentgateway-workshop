@@ -41,7 +41,7 @@ steps:
   # The lab states this in prose but gives the reader no block to run it with.
   - probe: "the default() expression falls back to anonymous with no x-user-id"
     script: |
-      curl -si "http://$GATEWAY_IP:8080/openai" \
+      curl -si "http://$GATEWAY_IP:8080/openai/v1/chat/completions" \
         -H 'content-type: application/json' \
         -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}' \
         | grep -i '^x-user-id:'
@@ -56,13 +56,13 @@ steps:
     retry:
       attempts: 8
       delay: 3
-      until: "x-request-path: /openai"
+      until: "x-request-path: /v1/chat/completions"
     assert:
       - status: 200
       - contains: "x-user-id: anonymous"
       - contains: "x-llm-request-model: gpt-5.4-nano"
       - contains: "x-request-method: POST"
-      - contains: "x-request-path: /openai"
+      - contains: "x-request-path: /v1/chat/completions"
       # The lab's point is that the response model is the dated build, not the
       # alias the client asked for. Assert the difference, not just presence.
       - matches: 'x-llm-response-model: gpt-5\.4-nano-[0-9]{4}-[0-9]{2}-[0-9]{2}'

@@ -5,7 +5,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 
 ## Lab Objectives
 - Create a Kubernetes secret that contains your OpenAI API key credentials
-- Create a route to OpenAI as the backend LLM provider using an `EnterpriseAgentgatewayBackend` and `HTTPRoute`
+- Create a route to OpenAI as the backend LLM provider using an `AgentgatewayModel` and `HTTPRoute`
 - Run a LangChain two-agent pipeline (Researcher → Writer) whose LLM calls route through agentgateway
 - Validate proxied requests in Grafana and access logs
 
@@ -31,24 +31,32 @@ kubectl create secret generic openai-secret -n agentgateway-system \
   --dry-run=client -oyaml | kubectl apply -f -
 ```
 
-## Create OpenAI Route and Backend
+## Create OpenAI Route and Model
 
-Apply the `EnterpriseAgentgatewayBackend` and `HTTPRoute`:
+Apply the `AgentgatewayModel` and `HTTPRoute`:
 ```bash
 kubectl apply -f - <<EOF
-apiVersion: enterpriseagentgateway.solo.io/v1alpha1
-kind: EnterpriseAgentgatewayBackend
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
 metadata:
   name: openai-all-models
   namespace: agentgateway-system
 spec:
-  ai:
-    provider:
-      openai: {}
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: openai
+  match:
+    model: "*"
+  provider: OpenAI
   policies:
     auth:
       secretRef:
         name: openai-secret
+    #--- Uncomment to always send one model, whatever the client requests ---
+    #transformations:
+    #  - field: model
+    #    expression: '"gpt-5.4-nano"'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -65,15 +73,15 @@ spec:
             type: PathPrefix
             value: /openai
       backendRefs:
-        - name: openai-all-models
-          group: enterpriseagentgateway.solo.io
-          kind: EnterpriseAgentgatewayBackend
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
       timeouts:
         request: "120s"
 EOF
 ```
 
-The `HTTPRoute` matches requests on the `/openai` path prefix. The `EnterpriseAgentgatewayBackend` then forwards them to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret, normalizing the path to the provider's `/v1/chat/completions` endpoint. LangChain's `ChatOpenAI` appends `/chat/completions` to whatever `base_url` you give it, so this lab uses `http://$GATEWAY_IP:8080/openai/v1`.
+The `HTTPRoute` matches requests on the `/openai` path prefix. The gateway strips the prefix and sends the rest of the path to the `openai-all-models` model, which forwards it to `api.openai.com` with the API key injected from the `openai-secret` Kubernetes Secret. LangChain's `ChatOpenAI` appends `/chat/completions` to whatever `base_url` you give it, so this lab uses `http://$GATEWAY_IP:8080/openai/v1`.
 
 ## Get the Gateway IP
 
@@ -88,7 +96,7 @@ echo "Gateway IP: $GATEWAY_IP"
 Before running the pipeline, confirm the gateway is routing to OpenAI correctly:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai" \
+curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "gpt-5.4-nano",
@@ -192,7 +200,7 @@ Useful metrics:
 
 ```bash
 kubectl delete httproute -n agentgateway-system openai
-kubectl delete enterpriseagentgatewaybackend -n agentgateway-system openai-all-models
+kubectl delete agentgatewaymodel -n agentgateway-system openai-all-models
 kubectl delete secret -n agentgateway-system openai-secret
 rm -rf lib/langchain/multi-agent-researcher-writer/.venv
 ```

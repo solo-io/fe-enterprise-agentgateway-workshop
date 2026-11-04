@@ -18,7 +18,7 @@ steps:
   - section: "Configure Required Variables"
     run: all
 
-  - section: "Create OpenAI Route and Backend"
+  - section: "Create OpenAI Route and Model"
     run: all
 
   - section: "Get the Gateway IP"
@@ -51,7 +51,7 @@ steps:
   - section: "Run the CrewAI Two-Agent Crew"
     run: [3]
     assert:
-      - matches: 'Using base_url: http://[0-9.]+:8080/openai'
+      - matches: 'Using base_url: http://[0-9.]+:8080/openai/v1'
       - contains: "AI Gateway key patterns and concepts"
       - contains: "FINAL BLOG POST:"
       - not_contains: "Traceback"

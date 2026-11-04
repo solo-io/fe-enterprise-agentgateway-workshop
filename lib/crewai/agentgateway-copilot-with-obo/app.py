@@ -131,7 +131,7 @@ with st.sidebar:
         st.caption("Verify token enforcement")
         gateway_ip_sidebar = os.environ.get("GATEWAY_IP", "")
         if st.button("Probe gateway with both tokens") and gateway_ip_sidebar:
-            probe_url = f"http://{gateway_ip_sidebar}:8080/openai"
+            probe_url = f"http://{gateway_ip_sidebar}:8080/openai/v1/chat/completions"
             probe_body = {"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "hi"}]}
             col1, col2 = st.columns(2)
             with col1:
@@ -196,7 +196,7 @@ if submitted:
             # Fire an unauthenticated request to show the JWT policy rejecting it live.
             try:
                 probe = requests.post(
-                    f"http://{gateway_ip}:8080/openai",
+                    f"http://{gateway_ip}:8080/openai/v1/chat/completions",
                     headers={"Content-Type": "application/json"},
                     json={"model": "gpt-5.4-nano", "messages": [{"role": "user", "content": "hello"}]},
                     timeout=5,
@@ -277,10 +277,10 @@ if submitted:
             from crewai_tools import MCPServerAdapter
 
             # OBO token is validated by the JWT policy on the gateway;
-            # agentgateway injects the real OpenAI API key from the backend secretRef.
+            # agentgateway injects the real OpenAI API key from the model's secretRef.
             llm = LLM(
                 provider="openai",
-                base_url=f"http://{gateway_ip}:8080/openai",
+                base_url=f"http://{gateway_ip}:8080/openai/v1",
                 model="gpt-5.4-nano",
                 api_key=obo_jwt,
             )

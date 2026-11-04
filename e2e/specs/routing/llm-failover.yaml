@@ -1,5 +1,5 @@
 lab: labs/routing/llm-failover.md
-description: priority-group failover — a 429 evicts group 1, later requests land on OpenAI
+description: virtual-model failover, a 429 evicts priority 0 and later requests land on OpenAI
 tier: t1-key
 timeout: 600
 requires:
@@ -65,20 +65,20 @@ steps:
 
   # The lab explains eviction is what enables failover. Prove the mechanism, not
   # just the outcome: the health policy's CEL condition is what classifies 429.
-  - resource: enterpriseagentgatewaypolicy/mock-ratelimit-health
-    jsonpath: .spec.backend.health.unhealthyCondition
+  - resource: agentgatewaymodel/mock-gpt-4o
+    jsonpath: .spec.policies.health.unhealthyCondition
     expect: "response.code >= 500 || response.code == 429"
-    name: the health policy is what evicts the group-1 provider
+    name: the mock model's health policy is what evicts it
 
-  - resource: enterpriseagentgatewaypolicy/mock-ratelimit-health
-    jsonpath: .spec.backend.health.eviction.duration
+  - resource: agentgatewaymodel/mock-gpt-4o
+    jsonpath: .spec.policies.health.eviction.duration
     expect: "60s"
-    name: the group-1 eviction duration matches the doc
+    name: the priority-0 eviction duration matches the doc
 
-  - resource: enterpriseagentgatewaypolicy/mock-ratelimit-health
-    jsonpath: .spec.backend.health.eviction.consecutiveFailures
+  - resource: agentgatewaymodel/mock-gpt-4o
+    jsonpath: .spec.policies.health.eviction.consecutiveFailures
     expect: "1"
-    name: the group-1 eviction trips after one failure
+    name: the priority-0 eviction trips after one failure
 
   - section: "View Metrics in Grafana"
     run: none
