@@ -21,10 +21,8 @@ steps:
       - contains: "choices"
       - contains: "completion_tokens"
 
-  # The lab's one-liner port-forwards to a single proxy pod, but 001 runs
-  # replicas: 2 — the request may have been served by the other one. So assert
-  # only what this section claims (the endpoint serves agentgateway metrics),
-  # and check the request counter across every replica in the probe below.
+  # The lab scrapes every proxy replica (001 runs replicas: 2), so the request
+  # counter shows up in this section's output whichever replica served it.
   - section: "View Metrics Endpoint"
     run: all
     retry:
@@ -33,20 +31,7 @@ steps:
       until: "agentgateway_"
     assert:
       - matches: 'agentgateway_[a-z_]+[{ ]'
-
-  - probe: "the LLM request was counted on some proxy replica"
-    script: |
-      found=0
-      for pod in $(kubectl get pods -n agentgateway-system \
-                     -l app.kubernetes.io/name=agentgateway-proxy -o name); do
-        e2e_pf agentgateway-system "$pod" 15099:15020 || continue
-        curl -s localhost:15099/metrics | grep -q 'agentgateway_requests_total{' && found=1
-        e2e_pf_stop
-        [ "$found" = 1 ] && break
-      done
-      echo "requests_total_found=$found"
-    assert:
-      - contains: "requests_total_found=1"
+      - contains: 'agentgateway_requests_total{'
 
   - section: "View Metrics and Traces in Grafana"
     run: none

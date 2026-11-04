@@ -283,7 +283,7 @@ for pod in $(kubectl get pods -n agentgateway-system \
 done
 ```
 
-If this returns empty, retry: the agentgateway proxy runs with multiple replicas and `port-forward` connects to one of them. Send another inference request and rerun.
+If this returns empty, send another inference request and rerun. Counters appear on a replica only after it serves an inference-routed request.
 
 ### EPP startup logs
 

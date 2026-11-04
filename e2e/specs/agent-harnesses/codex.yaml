@@ -60,8 +60,12 @@ steps:
 
   - section: "View Metrics Endpoint"
     run: all
+    retry:
+      attempts: 3
+      delay: 3
+      until: 'route="agentgateway-system/codex-route"'
     assert:
-      - contains: "agentgateway_"
+      - contains: 'route="agentgateway-system/codex-route"'
 
 cleanup:
   section: "Cleanup"

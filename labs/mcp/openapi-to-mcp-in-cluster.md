@@ -401,7 +401,7 @@ You should see MCP request counters, including:
 - `agentgateway_requests_total{...protocol="mcp"...}`: overall request counter, labeled with `protocol="mcp"` for this backend
 - `agentgateway_request_duration_seconds_*`: request latency histogram (also carries the `protocol="mcp"` label)
 
-> **Multiple replicas:** `/metrics` is scraped **per pod**. If your gateway runs more than one replica, the `port-forward` above lands on a single pod, and because OpenAPI-to-MCP is stateless the tool calls load-balance across replicas, so the counts you see reflect only that one pod's share and will likely be lower than the number of calls you made. For an aggregate across all replicas, use the Grafana/Prometheus view below.
+> **Multiple replicas:** `/metrics` is scraped **per pod**. OpenAPI-to-MCP is stateless, so tool calls load-balance across replicas and each pod's counters show only its share. Add the per-pod values above to get the total, or use the Grafana/Prometheus view below for the aggregate.
 
 ### View in Grafana
 1. Port-forward Grafana:

@@ -1,5 +1,12 @@
 # Changelog
 
+0.15.2 - (11-4-26)
+---
+- "View Metrics Endpoint" in 18 routing, agent-harness, agent-framework and guardrail labs: scrape every proxy replica instead of port-forwarding to one pod of the deployment
+- `production-observability-alerting-and-scaling.md`: the post-upgrade version check reads `agentgateway_build_info` from every proxy replica
+- `openapi-to-mcp-in-cluster.md` and `configure-inference-routing-with-vllm.md`: drop notes that said the metrics block reaches only one replica
+- e2e: `codex` asserts the `codex-route` series appears in the metrics output
+
 0.15.1 - (11-3-26)
 ---
 - `002`: add a `Next Steps` section

@@ -253,8 +253,16 @@ When Codex refreshes its model catalog, the request logs as `route=agentgateway-
 AgentGateway exposes Prometheus metrics at the `/metrics` endpoint:
 
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics | grep codex-route | head -20 && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 2
+  curl -s http://localhost:15020/metrics | grep codex-route | head -20
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 Look for metrics like:
