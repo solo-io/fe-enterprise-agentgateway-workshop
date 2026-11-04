@@ -742,11 +742,17 @@ helm upgrade enterprise-agentgateway solo/enterprise-agentgateway \
 kubectl rollout status deployment/enterprise-agentgateway -n agentgateway-system --timeout=300s
 kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system --timeout=300s
 
-# 3. Verify all pods are on the new version
-kubectl port-forward -n agentgateway-system deploy/agentgateway-proxy 15020:15020 &
-sleep 2
-curl -s http://localhost:15020/metrics
-kill %1 2>/dev/null
+# 3. Verify all pods are on the new version: each proxy replica reports its own
+#    agentgateway_build_info, so check every one
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 2
+  echo "--- $pod"
+  curl -s http://localhost:15020/metrics | grep '^agentgateway_build_info'
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 ### What to Monitor During Upgrade

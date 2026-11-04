@@ -152,8 +152,17 @@ curl -i "$GATEWAY_IP:8080/vertex/v1/chat/completions" \
 AgentGateway exposes Prometheus-compatible metrics at the `/metrics` endpoint. You can curl this endpoint directly:
 
 ```bash
-kubectl port-forward -n agentgateway-system deployment/agentgateway-proxy 15020:15020 & \
-sleep 1 && curl -s http://localhost:15020/metrics && kill $!
+# `001` runs two proxy replicas and a request is only counted on the replica
+# that served it, so scrape both.
+for pod in $(kubectl get pods -n agentgateway-system \
+    -l app.kubernetes.io/name=agentgateway-proxy -o name); do
+  kubectl port-forward -n agentgateway-system "$pod" 15020:15020 >/dev/null 2>&1 &
+  PF=$!
+  sleep 2
+  echo "--- $pod"
+  curl -s http://localhost:15020/metrics
+  kill "$PF" 2>/dev/null; wait "$PF" 2>/dev/null || true
+done
 ```
 
 ### View Metrics and Traces in Grafana
