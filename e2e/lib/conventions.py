@@ -51,6 +51,8 @@ EAGB_ALLOW = {"labs/platform-engineering/kyverno-admission-control.md"}
 # body, which AgentgatewayModel needs: /v1/files and /v1/batches, and the native
 # Bedrock InvokeModel call (which also relies on a URLRewrite model rules reject).
 AI_BACKEND_ALLOW = {
+    # shows the backend-centric pattern as the "before" side of the migration
+    "labs/routing/migrate-agentgatewaybackend-to-agentgatewaymodel.md",
     "labs/routing/configure-openai-batches.md",
     "labs/routing/configure-routing-aws-bedrock-titan-embeddings.md",
 }

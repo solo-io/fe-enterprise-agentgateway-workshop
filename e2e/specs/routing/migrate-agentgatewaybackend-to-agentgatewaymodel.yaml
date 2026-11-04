@@ -1,0 +1,109 @@
+lab: labs/routing/migrate-agentgatewaybackend-to-agentgatewaymodel.md
+description: backend pin vs AgentgatewayModel aliases, /v1/models, errors, weighted and conditional virtual models, cutover
+tier: t1-key
+timeout: 600
+requires:
+  - OPENAI_API_KEY
+
+steps:
+  - section: "Configure Required Variables"
+    run: all
+
+  - section: "Deploy a Mock LLM"
+    run: all
+    assert:
+      - contains: "successfully rolled out"
+
+  - section: "Run the Backend-Centric Pattern"
+    run: [1]
+
+  # The client asks for gpt-5.4-mini; the backend pin answers with nano.
+  - section: "Run the Backend-Centric Pattern"
+    run: [2]
+    retry: {attempts: 8, delay: 3, until: "gpt-5\\.4-nano"}
+    assert:
+      - matches: "^gpt-5\\.4-nano"
+
+  - section: "Run the Backend-Centric Pattern"
+    run: [3]
+    assert:
+      - contains: "HTTP 400"
+      - contains: "failed to parse Completions request"
+
+  - section: "Publish the Same Provider as Models"
+    run: [1]
+
+  - section: "Publish the Same Provider as Models"
+    run: [2]
+    retry: {attempts: 10, delay: 3, until: "smart +<none> +<none> +True"}
+    assert:
+      - matches: "fast +<none> +<none> +True"
+      - matches: "mock +<none> +Internal +True"
+      - matches: "openai-gpt-models +gpt-\\* +<none> +True"
+
+  - section: "List the Models"
+    run: all
+    retry: {attempts: 8, delay: 3, until: "smart"}
+    assert:
+      - contains: "fast"
+      - not_contains: "mock"
+
+  - section: "Request Models by Name"
+    run: all
+    assert:
+      - matches: "fast +-> gpt-5\\.4-nano"
+      - matches: "smart +-> gpt-5\\.4-mini"
+      - matches: "gpt-5\\.4-nano +-> gpt-5\\.4-nano"
+
+  - section: "Get Errors Clients Understand"
+    run: all
+    assert:
+      - contains: "model_not_found"
+      - contains: "HTTP 404"
+      - contains: "missing_model"
+      - contains: "HTTP 400"
+
+  - section: "Canary a Model with Weights"
+    run: [1]
+
+  # 20 requests at 80/20: both targets serve at least one with overwhelming odds.
+  - section: "Canary a Model with Weights"
+    run: [2]
+    retry: {attempts: 4, delay: 3, until: "gpt-5\\.4-nano"}
+    assert:
+      - contains: "mock-gpt-4o"
+      - contains: "gpt-5.4-nano"
+
+  - section: "Tier Traffic with Conditions"
+    run: [1]
+
+  - section: "Tier Traffic with Conditions"
+    run: [2]
+    retry: {attempts: 8, delay: 3, until: "standard +-> mock-gpt-4o"}
+    assert:
+      - matches: "premium +-> gpt-5\\.4-mini"
+      - matches: "standard +-> mock-gpt-4o"
+
+  - section: "Tier Traffic with Conditions"
+    run: [3]
+    assert:
+      - contains: "assistant"
+      - contains: "tiered"
+
+  - section: "Trace a Request to the Name the Client Sent"
+    run: all
+    assert:
+      - contains: "agw.ai.original_model=assistant"
+      - contains: "agw.ai.original_model=tiered"
+
+  - section: "Cut Traffic Over from the Backend"
+    run: [1]
+
+  - section: "Cut Traffic Over from the Backend"
+    run: [2]
+    retry: {attempts: 8, delay: 3, until: "HTTP 404"}
+    assert:
+      - contains: "HTTP 404"
+
+cleanup:
+  section: "Cleanup"

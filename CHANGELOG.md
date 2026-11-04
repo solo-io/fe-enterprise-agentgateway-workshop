@@ -3,6 +3,7 @@
 0.15.1 - (11-3-26)
 ---
 - `002`: add a `Next Steps` section
+- Add `labs/routing/migrate-agentgatewaybackend-to-agentgatewaymodel.md`: why LLM providers move from `EnterpriseAgentgatewayBackend` to `AgentgatewayModel`, with a side-by-side cutover, pros and cons, migration steps and an industry comparison
 - **Breaking:** LLM labs declare providers as `AgentgatewayModel` resources attached to their HTTPRoute, while MCP, static, JWKS and tunnel backends stay `EnterpriseAgentgatewayBackend`
 - **Breaking:** clients call the provider API path under the route prefix (`/openai/v1/chat/completions`, SDK base URL `/openai/v1`), and every request body must carry `model`
 - Backend model overrides become a `*` model with a `model` transformation, and backend-targeted policies move into the model's `spec.policies`
