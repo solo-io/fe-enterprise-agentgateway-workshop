@@ -1,0 +1,38 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "gke-pool-a",
+        "labels": {
+          "kubernetes.io/hostname": "gke-pool-a"
+        }
+      },
+      "spec": {
+        "providerID": "gce://proj/us-central1-a/gke-pool-a"
+      },
+      "status": {
+        "allocatable": {
+          "cpu": "4",
+          "memory": "16000000Ki"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "name": "gke-pool-b",
+        "labels": {
+          "kubernetes.io/hostname": "gke-pool-b"
+        }
+      },
+      "spec": {
+        "providerID": "gce://proj/us-central1-a/gke-pool-b"
+      },
+      "status": {
+        "allocatable": {
+          "cpu": "4",
+          "memory": "16000000Ki"
+        }
+      }
+    }
+  ]
+}

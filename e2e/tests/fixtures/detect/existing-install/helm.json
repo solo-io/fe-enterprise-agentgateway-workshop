@@ -1,0 +1,4 @@
+[
+  {"name": "agw", "namespace": "agw-other", "chart": "enterprise-agentgateway-v2026.10.1"},
+  {"name": "mon", "namespace": "monitoring", "chart": "kube-prometheus-stack-80.4.2"}
+]

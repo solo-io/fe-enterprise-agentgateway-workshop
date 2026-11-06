@@ -1,0 +1,38 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "kind-control-plane",
+        "labels": {
+          "kubernetes.io/hostname": "kind-control-plane"
+        }
+      },
+      "spec": {
+        "providerID": "kind://docker/kind/kind-control-plane"
+      },
+      "status": {
+        "allocatable": {
+          "cpu": "4",
+          "memory": "16000000Ki"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "name": "kind-worker",
+        "labels": {
+          "kubernetes.io/hostname": "kind-worker"
+        }
+      },
+      "spec": {
+        "providerID": "kind://docker/kind/kind-worker"
+      },
+      "status": {
+        "allocatable": {
+          "cpu": "4",
+          "memory": "16000000Ki"
+        }
+      }
+    }
+  ]
+}
