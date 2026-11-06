@@ -1,0 +1,64 @@
+"""Structural checks for rbac/evaluator.yaml. No cluster needed."""
+import os
+import unittest
+
+import yaml
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+RBAC = os.path.join(HERE, "..", "..", "rbac", "evaluator.yaml")
+
+
+def docs():
+    with open(RBAC) as f:
+        return [d for d in yaml.safe_load_all(f) if d]
+
+
+def role():
+    return next(d for d in docs() if d["kind"] == "ClusterRole")
+
+
+class TestEvaluatorRbac(unittest.TestCase):
+    def test_no_wildcard_verbs_resources_or_groups(self):
+        rules = role()["rules"]
+        self.assertTrue(rules)
+        for r in rules:
+            for key in ("apiGroups", "resources", "verbs"):
+                self.assertNotIn("*", r.get(key, []), f"wildcard in {key}: {r}")
+            self.assertTrue(r.get("verbs"), f"rule without verbs: {r}")
+            self.assertTrue(r.get("resources"), f"rule without resources: {r}")
+
+    def test_every_rule_has_a_reason_comment(self):
+        with open(RBAC) as f:
+            lines = f.read().splitlines()
+        idx = [i for i, l in enumerate(lines) if l.strip() == "- apiGroups:"]
+        self.assertEqual(len(idx), len(role()["rules"]))
+        for i in idx:
+            j = i - 1
+            while j >= 0 and not lines[j].strip():
+                j -= 1
+            self.assertTrue(j >= 0 and lines[j].strip().startswith("#"),
+                            f"rule at line {i + 1} has no comment above it")
+
+    def test_escalate_and_bind_are_resource_scoped(self):
+        found = False
+        for r in role()["rules"]:
+            if {"escalate", "bind"} & set(r["verbs"]):
+                found = True
+                self.assertTrue(r.get("resourceNames"), f"unscoped escalate/bind: {r}")
+        self.assertTrue(found, "expected escalate/bind rules for chart ClusterRoles")
+
+    def test_service_account_and_binding_match(self):
+        d = docs()
+        sa = next(x for x in d if x["kind"] == "ServiceAccount")
+        crb = next(x for x in d if x["kind"] == "ClusterRoleBinding")
+        self.assertEqual(sa["metadata"]["name"], "agw-evaluator")
+        self.assertEqual(sa["metadata"]["namespace"], "agw-evaluator")
+        self.assertEqual(role()["metadata"]["name"], "agw-evaluator")
+        self.assertEqual(crb["roleRef"]["kind"], "ClusterRole")
+        self.assertEqual(crb["roleRef"]["name"], role()["metadata"]["name"])
+        self.assertIn({"kind": "ServiceAccount", "name": "agw-evaluator",
+                       "namespace": "agw-evaluator"}, crb["subjects"])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -139,14 +139,18 @@ probe_install() {  # sets EXISTING_INSTALL
 
 preflight_permissions() {  # sets PERMISSIONS (json: "ok", "skipped" or a list)
   if (( SKIP_RBAC )); then PERMISSIONS='"skipped"'; return; fi
-  local missing=() line verb res ans
+  local missing=() line label args ans errf
+  errf="$(mktemp)"
   while IFS= read -r line; do
-    verb="${line%% *}"; res="${line#* }"
-    ans="$(kubectl auth can-i "$verb" "$res" 2>/dev/null)"
+    label="${line%%$'\t'*}"; args="${line#*$'\t'}"
+    # shellcheck disable=SC2086  # args is a deliberate word list: verb resource [--subresource=x]
+    ans="$(kubectl auth can-i $args 2>"$errf")"
     case "$ans" in
       yes) ;;
-      no)  missing+=("$line") ;;
-      *)   SIGNALS+=("can-i-error:${line}"); missing+=("$line") ;;   # fail closed
+      no)  # A resource type whose CRD is not installed yet cannot be checked; the
+           # CRD install is covered by the customresourcedefinitions rule.
+           grep -q "doesn't have a resource type" "$errf" || missing+=("$label") ;;
+      *)   SIGNALS+=("can-i-error:${label}"); missing+=("$label") ;;   # fail closed
     esac
   done < <(python3 -c '
 import sys, yaml
@@ -157,10 +161,17 @@ for doc in yaml.safe_load_all(open(sys.argv[1])):
     for r in doc.get("rules") or []:
         for g in r.get("apiGroups") or [""]:
             for res in r.get("resources") or []:
+                base, _, sub = res.partition("/")
+                full = f"{base}.{g}" if g else base
                 for v in r.get("verbs") or []:
-                    s = f"{v} {res}.{g}" if g else f"{v} {res}"
-                    if s not in seen:
-                        seen.add(s); print(s)' "$RBAC_FILE") || die "cannot parse ${RBAC_FILE}"
+                    label = f"{v} {res}.{g}" if g else f"{v} {res}"
+                    # resourceNames-scoped rules only match a request that names the object.
+                    names = r.get("resourceNames") or []
+                    target = full + "/" + names[0] if names else full
+                    args = f"{v} {target}" + (f" --subresource={sub}" if sub else "")
+                    if label not in seen:
+                        seen.add(label); print(label + "\t" + args)' "$RBAC_FILE") || { rm -f "$errf"; die "cannot parse ${RBAC_FILE}"; }
+  rm -f "$errf"
   if (( ${#missing[@]} )); then
     PERMISSIONS="$(printf '%s\n' "${missing[@]}" | jq -R . | jq -sc .)"
     STOP+=("$(printf 'Apply rbac/evaluator.yaml with an admin identity, or run as an identity that holds these permissions:\n  %s' \

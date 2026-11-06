@@ -19,6 +19,8 @@ case "$args" in
   "auth can-i "*)
     want="${args#auth can-i }"
     if [[ -e "${DETECT_FIXTURE}/can-i-no" ]] && grep -qxF "$want" "${DETECT_FIXTURE}/can-i-no"; then echo no; exit 1; fi
+    if [[ -e "${DETECT_FIXTURE}/can-i-notype" ]] && grep -qxF "$want" "${DETECT_FIXTURE}/can-i-notype"; then
+      echo "Warning: the server doesn't have a resource type 'x' in group 'y'" >&2; echo no; exit 1; fi
     if [[ -e "${DETECT_FIXTURE}/can-i-error" ]] && grep -qxF "$want" "${DETECT_FIXTURE}/can-i-error"; then
       echo "Error from server: apiserver unavailable" >&2; exit 1; fi
     echo yes ;;

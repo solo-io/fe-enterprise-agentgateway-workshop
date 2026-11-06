@@ -56,6 +56,46 @@ test_lb_timeout_exits_2_and_deletes_probe() {
   grep -q 'create' "$DETECT_LOG" && fail "probe created despite stop" || ok "no probe created when skipped"
 }
 
+test_preflight_subresource_resourcenames_and_absent_crd() {
+  local fx="${TMP}/shape" rbac="${TMP}/shape.yaml"; cp -R "${FX}/eks" "$fx"
+  printf '%s\n' "create pods --subresource=portforward" "escalate clusterroles.rbac.authorization.k8s.io/foo" > "${fx}/can-i-no"
+  echo "get widgets.example.io" > "${fx}/can-i-notype"
+  cat > "$rbac" <<'Y'
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: t
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods/portforward
+    verbs:
+      - create
+  - apiGroups:
+      - rbac.authorization.k8s.io
+    resources:
+      - clusterroles
+    resourceNames:
+      - foo
+      - bar
+    verbs:
+      - escalate
+  - apiGroups:
+      - example.io
+    resources:
+      - widgets
+    verbs:
+      - get
+Y
+  : > "$DETECT_LOG"; RC=0
+  OUT="$(DETECT_FIXTURE="$fx" "$DETECT" --out "$JSON" --rbac-file "$rbac" 2>&1)" || RC=$?
+  check "subresource and resourceNames denials exit 2" "$RC" 2
+  [[ "$OUT" == *"create pods/portforward"* ]] && ok "subresource checked with --subresource" || fail "output: $OUT"
+  [[ "$OUT" == *"escalate clusterroles.rbac.authorization.k8s.io"* ]] && ok "resourceNames rule checked by name" || fail "output: $OUT"
+  [[ "$OUT" != *"widgets"* ]] && ok "absent CRD type is not reported" || fail "absent type reported: $OUT"
+}
+
 test_helm_failure_is_unknown_not_clean() {
   local fx="${TMP}/helmfail"; cp -R "${FX}/eks" "$fx"; touch "${fx}/helm-fail"
   detect_dir "$fx" --skip-rbac-check
@@ -170,6 +210,7 @@ test_signals_lists_the_heuristic
 test_json_fields_and_summary
 test_version_out_of_range_exits_2
 test_permission_preflight_names_missing_verb_resource
+test_preflight_subresource_resourcenames_and_absent_crd
 test_helm_failure_is_unknown_not_clean
 test_openshift_wins_over_cloud_providerid
 test_can_i_api_error_fails_closed
