@@ -731,4 +731,6 @@ kubectl delete service -n mcp mcp-stub --ignore-not-found
 kubectl delete configmap -n mcp mcp-stub-script --ignore-not-found
 kubectl delete deployment -n mcp mcp-server-everything --ignore-not-found
 kubectl delete service -n mcp mcp-server-everything --ignore-not-found
+kubectl delete namespace mcp --ignore-not-found
+kubectl wait --for=delete namespace/mcp --timeout=120s
 ```

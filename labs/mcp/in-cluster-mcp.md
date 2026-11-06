@@ -585,4 +585,6 @@ kubectl delete httproute -n agentgateway-system mcp
 kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-backend
 kubectl delete deployment -n mcp mcp-server-everything
 kubectl delete service -n mcp mcp-server-everything
+kubectl delete namespace mcp --ignore-not-found
+kubectl wait --for=delete namespace/mcp --timeout=120s
 ```
