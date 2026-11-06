@@ -8,7 +8,7 @@
 # permissions, no LoadBalancer), 1 own error.
 #
 # Usage: detect-env.sh [--out PATH] [--lb-timeout SECS] [--skip-rbac-check]
-#                      [--rbac-file PATH]
+#                      [--skip-lb-probe] [--rbac-file PATH]
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -16,6 +16,8 @@ REPO="$(cd "${HERE}/../.." && pwd)"
 OUT="${REPO}/e2e/.work/env.json"
 LB_TIMEOUT=120
 SKIP_RBAC=0
+SKIP_LB=0
+PY=""            # first python3 that imports yaml (E2E_PYTHON first, as run-e2e.sh does)
 RBAC_FILE="${REPO}/rbac/evaluator.yaml"
 SYSREQ="${REPO}/labs/installation/system-requirements.md"
 PROBE=e2e-lb-probe
@@ -30,22 +32,35 @@ while (( $# )); do
     --out) OUT="$2"; shift 2 ;;
     --lb-timeout) LB_TIMEOUT="$2"; shift 2 ;;
     --skip-rbac-check) SKIP_RBAC=1; shift ;;
+    --skip-lb-probe) SKIP_LB=1; shift ;;
     --rbac-file) RBAC_FILE="$2"; shift 2 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
 
-probe_clis() {  # fills CLIS_JSON; a missing CLI stops the session
+probe_clis() {  # fills CLIS_JSON and PY; a missing CLI stops the session
   CLIS_JSON='{}'
-  local name ver
-  for name in kubectl helm jq python3; do
-    if command -v "$name" >/dev/null 2>&1; then
+  local name ver py
+  for py in "${E2E_PYTHON:-}" python3 python3.13 python3.12 python3.11 /usr/bin/python3; do
+    [[ -n "$py" ]] && command -v "$py" >/dev/null 2>&1 && "$py" -c 'import yaml' 2>/dev/null \
+      && { PY="$py"; break; }
+  done
+  for name in kubectl helm jq python3 bash pyyaml; do
+    if [[ "$name" != pyyaml ]] && command -v "$name" >/dev/null 2>&1; then
       case "$name" in
         kubectl) ver="$(kubectl version --client -o json 2>/dev/null | jq -r '.clientVersion.gitVersion // "unknown"')" ;;
         helm)    ver="$(helm version --short 2>/dev/null)" ;;
         jq)      ver="$(jq --version 2>/dev/null)" ;;
         python3) ver="$(python3 --version 2>&1 | awk '{print $2}')" ;;
+        bash)    # run-e2e.sh runs under the first bash on PATH and needs 4+.
+                 ver="$(bash -c 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"' 2>/dev/null)"
+                 if [[ "${ver%%.*}" =~ ^[0-9]+$ ]] && (( ${ver%%.*} < 4 )); then
+                   STOP+=("bash ${ver} is first on PATH: install bash 4+ (brew install bash) and make sure it is first on PATH")
+                 fi ;;
       esac
+    elif [[ "$name" == pyyaml ]]; then
+      if [[ -n "$PY" ]]; then ver="$("$PY" -c 'import yaml; print(yaml.__version__)' 2>/dev/null)"
+      else ver=missing; STOP+=("missing PyYAML: python3 -m pip install pyyaml (or set E2E_PYTHON to a python3 that has it)"); fi
     else
       ver=missing; STOP+=("missing CLI: ${name}")
     fi
@@ -88,7 +103,12 @@ check_version() {  # sets SERVER_VERSION, VERSION_SUPPORTED (true/false)
   local range lo hi minor
   range="$(grep -m1 -E '1\.[0-9]+ ?[-–] ?1\.[0-9]+' "$SYSREQ" | grep -oE '1\.[0-9]+ ?[-–] ?1\.[0-9]+' | head -1)"
   VERSION_SUPPORTED=true
-  if [[ -z "$range" ]]; then SIGNALS+=("version-range-unparsed"); return; fi
+  if [[ -z "$range" ]]; then
+    VERSION_SUPPORTED=null; SIGNALS+=("version-range-unparsed")
+    printf 'detect-env: note: cannot read the supported version range from %s; server %s was not checked\n' \
+      "$SYSREQ" "$SERVER_VERSION" >&2
+    return
+  fi
   lo="$(sed -E 's/^1\.([0-9]+).*/\1/' <<<"$range")"
   hi="$(sed -E 's/.*1\.([0-9]+)$/\1/' <<<"$range")"
   minor="$(sed -E 's/^v?1\.([0-9]+).*/\1/' <<<"$SERVER_VERSION")"
@@ -99,7 +119,7 @@ check_version() {  # sets SERVER_VERSION, VERSION_SUPPORTED (true/false)
 }
 
 read_nodes() {  # sets NODE_COUNT CPU MEM_GIB
-  read -r NODE_COUNT CPU MEM_GIB < <(python3 -c '
+  read -r NODE_COUNT CPU MEM_GIB < <("$PY" -c '
 import json, sys, re
 u = {"Ki": 2**10, "Mi": 2**20, "Gi": 2**30, "": 1}
 cpu = mem = 0
@@ -122,7 +142,7 @@ check_sizing() {  # floor = min nodes x min node size from the POC sizing table
   if [[ -z "$nodes_min" || -z "$cpu_min" || -z "$mem_min" ]]; then
     MEETS_SIZING=null; SIGNALS+=("sizing-table-unparsed"); return
   fi
-  MEETS_SIZING="$(python3 -c "print(str(${CPU} >= ${nodes_min}*${cpu_min} and ${MEM_GIB} >= ${nodes_min}*${mem_min}).lower())")"
+  MEETS_SIZING="$("$PY" -c "print(str(${CPU} >= ${nodes_min}*${cpu_min} and ${MEM_GIB} >= ${nodes_min}*${mem_min}).lower())")"
 }
 
 probe_install() {  # sets EXISTING_INSTALL
@@ -152,11 +172,11 @@ preflight_permissions() {  # sets PERMISSIONS (json: "ok", "skipped" or a list)
            if grep -q "doesn't have a resource type" "$errf"; then
              SIGNALS+=("can-i-unchecked:${label}")
            else
-             [[ " ${missing[*]} " == *" ${label} "* ]] || missing+=("$label")
+             [[ " ${missing[*]-} " == *" ${label} "* ]] || missing+=("$label")
            fi ;;
       *)   SIGNALS+=("can-i-error:${label}"); missing+=("$label") ;;   # fail closed
     esac
-  done < <(python3 -c '
+  done < <("$PY" -c '
 import sys, yaml
 seen = set()
 for doc in yaml.safe_load_all(open(sys.argv[1])):
@@ -211,16 +231,23 @@ Y
   STOP+=("No LoadBalancer address after ${LB_TIMEOUT}s. Start cloud-provider-kind (kind/vind) or use a cluster with a cloud LoadBalancer.")
 }
 
+read_namespaces() {  # sets NAMESPACES_JSON; run-e2e.sh --uninstall-base diffs against it
+  NAMESPACES_JSON="$(kubectl get namespaces -o name 2>/dev/null | sed 's#^namespace/##' | sort | jq -R . | jq -sc .)" \
+    || NAMESPACES_JSON='[]'
+  [[ -n "$NAMESPACES_JSON" ]] || NAMESPACES_JSON='[]'
+}
+
 write_json() {
   mkdir -p "$(dirname "$OUT")"
   jq -n --arg class "$CLASS" --arg sv "$SERVER_VERSION" --argjson vs "$VERSION_SUPPORTED" \
     --argjson nodes "$NODE_COUNT" --argjson cpu "$CPU" --argjson mem "$MEM_GIB" \
     --argjson ms "$MEETS_SIZING" --arg lb "$LOADBALANCER" --arg inst "$EXISTING_INSTALL" \
     --arg ident "$IDENTITY" --argjson perms "$PERMISSIONS" --argjson clis "$CLIS_JSON" \
-    --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson sig "$(printf '%s\n' "${SIGNALS[@]}" | jq -R . | jq -sc .)" \
+    --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson ns "$NAMESPACES_JSON" \
+    --argjson sig "$( (( ${#SIGNALS[@]} )) && printf '%s\n' "${SIGNALS[@]}" | jq -R . | jq -sc . || echo '[]')" \
     '{class:$class, server_version:$sv, version_supported:$vs, nodes:$nodes, cpu_allocatable:$cpu,
       memory_allocatable:$mem, meets_sizing:$ms, loadbalancer:$lb, existing_install:$inst,
-      identity:$ident, permissions:$perms, clis:$clis, detected_at:$at, signals:$sig}' >"$OUT"
+      identity:$ident, permissions:$perms, clis:$clis, namespaces:$ns, detected_at:$at, signals:$sig}' >"$OUT"
 }
 
 probe_clis
@@ -233,10 +260,13 @@ check_version
 read_nodes
 check_sizing || die "sizing check failed"
 probe_install
+read_namespaces
 IDENTITY="$(kubectl auth whoami -o json 2>/dev/null | jq -r '.status.userInfo.username // empty')"
 [[ -n "$IDENTITY" ]] || { IDENTITY=unknown; SIGNALS+=("whoami-unsupported"); }
 preflight_permissions
-if (( ${#STOP[@]} )); then
+if (( SKIP_LB )); then
+  LOADBALANCER=skipped
+elif (( ${#STOP[@]} )); then
   LOADBALANCER=none; SIGNALS+=("lb-probe-skipped")
 else
   probe_lb

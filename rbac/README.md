@@ -34,11 +34,14 @@ kubectl apply -f rbac/evaluator.yaml
 ./rbac/mint-kubeconfig.sh
 ```
 
-The script prints an `export KUBECONFIG=...` line. Run it, then run the
+The script embeds the cluster CA in the kubeconfig. It takes the CA from the
+current context, or from the `kube-root-ca.crt` ConfigMap when the context skips
+TLS verification (vind and some kind setups), and `--ca-file <path>` supplies it
+directly. The script prints an `export KUBECONFIG=...` line. Run it, then run the
 evaluation as the `agw-evaluator` identity. Options:
 
 ```bash
-./rbac/mint-kubeconfig.sh --duration 24h --out /path/to/evaluator.kubeconfig
+./rbac/mint-kubeconfig.sh --duration 24h --out /path/to/evaluator.kubeconfig --ca-file /path/to/ca.crt
 ```
 
 The default token lifetime is 8 hours and the default output is

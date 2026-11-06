@@ -210,6 +210,47 @@ Y
   check "placeholder rbac exit" "$RC" 0
 }
 
+test_namespaces_and_skip_lb_probe() {
+  detect eks --skip-rbac-check --skip-lb-probe
+  check "skip-lb-probe exits 0" "$RC" 0
+  check "loadbalancer skipped" "$(field .loadbalancer)" skipped
+  grep -q 'create' "$DETECT_LOG" && fail "probe created despite --skip-lb-probe" || ok "no probe with --skip-lb-probe"
+  check "namespaces snapshot sorted, prefix stripped" "$(field '.namespaces|join(",")')" "agw-evaluator,default,kube-system"
+}
+
+test_old_bash_on_path_stops() {
+  local bin="${TMP}/oldbash"; mkdir -p "$bin"
+  # Answers the version probe as bash 3.2; everything else (the script's own
+  # shebang, the kubectl stub) runs under the real bash.
+  printf '#!/bin/sh\n[ "$1" = -c ] && { echo 3.2; exit 0; }\nexec "%s" "$@"\n' "$(command -v bash)" > "${bin}/bash"
+  chmod +x "${bin}/bash"
+  RC=0; OUT="$(PATH="${bin}:${PATH}" DETECT_FIXTURE="${FX}/eks" "$DETECT" --out "$JSON" --skip-rbac-check 2>&1)" || RC=$?
+  check "bash 3 on PATH exits 2" "$RC" 2
+  [[ "$OUT" == *"install bash 4+"* ]] && ok "bash 3 names the fix" || fail "output: $OUT"
+}
+
+test_unparsable_version_range_is_null() {
+  local repo="${TMP}/repo"
+  mkdir -p "${repo}/e2e/lib" "${repo}/labs/installation" "${repo}/rbac"
+  cp "$DETECT" "${repo}/e2e/lib/"
+  cp "${E2E}/../rbac/evaluator.yaml" "${repo}/rbac/"
+  sed -E 's/1\.[0-9]+ ?[-–] ?1\.[0-9]+/see the release notes/g' "${E2E}/../labs/installation/system-requirements.md" \
+    > "${repo}/labs/installation/system-requirements.md"
+  RC=0; OUT="$(DETECT_FIXTURE="${FX}/eks" "${repo}/e2e/lib/detect-env.sh" --out "$JSON" --skip-rbac-check 2>&1)" || RC=$?
+  check "unparsable range exits 0" "$RC" 0
+  check "version_supported null" "$(field .version_supported)" null
+  [[ "$OUT" == *"was not checked"* ]] && ok "unparsable range prints a note" || fail "output: $OUT"
+}
+
+test_missing_permission_under_system_bash() {
+  [[ -x /bin/bash ]] || { ok "no /bin/bash (skipped)"; return; }
+  local fx="${TMP}/sysbash"; cp -R "${FX}/eks" "$fx"; echo "delete namespaces" > "${fx}/can-i-no"
+  RC=0; OUT="$(DETECT_FIXTURE="$fx" /bin/bash "$DETECT" --out "$JSON" 2>&1)" || RC=$?
+  check "missing permission under $(/bin/bash -c 'echo $BASH_VERSION') exits 2" "$RC" 2
+  [[ "$OUT" != *"unbound variable"* ]] && ok "no unbound variable under /bin/bash" || fail "output: $OUT"
+  [[ "$OUT" == *"delete namespaces"* ]] && ok "/bin/bash names the missing permission" || fail "output: $OUT"
+}
+
 test_classifies_eks_gke_vind
 test_lb_timeout_exits_2_and_deletes_probe
 test_reports_existing_install_namespace
@@ -222,6 +263,10 @@ test_helm_failure_is_unknown_not_clean
 test_openshift_wins_over_cloud_providerid
 test_can_i_api_error_fails_closed
 test_empty_node_list_is_own_error
+test_namespaces_and_skip_lb_probe
+test_old_bash_on_path_stops
+test_unparsable_version_range_is_null
+test_missing_permission_under_system_bash
 
 printf '\n%d passed, %d failed\n' "$T_PASS" "$T_FAIL"
 (( T_FAIL == 0 ))

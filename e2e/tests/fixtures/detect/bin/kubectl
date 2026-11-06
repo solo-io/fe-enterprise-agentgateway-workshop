@@ -11,6 +11,7 @@ case "$args" in
   "version -o json") fx version.json ;;
   "version --client -o json") echo '{"clientVersion": {"gitVersion": "v1.34.0"}}' ;;
   "auth whoami -o json") fx whoami.json ;;
+  "get namespaces -o name") fx namespaces ;;
   api-resources*config.openshift.io*) has openshift && echo "clusteroperators" ;;
   "get crd "*) has crd && echo "customresourcedefinition/x" || { echo "NotFound" >&2; exit 1; } ;;
   "get svc e2e-lb-probe"*)
