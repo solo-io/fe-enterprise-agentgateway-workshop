@@ -9,6 +9,7 @@ import tracks  # noqa: E402
 
 GOOD = os.path.join(HERE, "fixtures", "tracks", "good")
 BAD = os.path.join(HERE, "fixtures", "tracks", "bad")
+STALE = os.path.join(HERE, "fixtures", "tracks", "stale")
 SPECS = os.path.join(GOOD, "specs")
 
 
@@ -60,6 +61,10 @@ class TestLint(unittest.TestCase):
         self.assertIn("missing spec: routing/gone (in t.yaml)", errs)
         self.assertIn("unlisted lab: labs/unlisted.md (linked from t.md)", errs)
         self.assertEqual(len(errs), 2)
+
+    def test_lint_reports_stale_no_spec(self):
+        errs = tracks.lint(STALE, os.path.join(STALE, "specs"), STALE)
+        self.assertEqual(errs, ["stale no-spec: routing/a (in t.yaml)"])
 
     def test_lint_clean_tree_is_empty(self):
         self.assertEqual(tracks.lint(GOOD, SPECS, GOOD), [])

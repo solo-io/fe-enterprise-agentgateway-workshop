@@ -76,11 +76,13 @@ def _track_files(tracks_dir):
 
 
 def _yaml_labs(track, specs_dir, labs_root):
-    """Lab paths (repo-relative) a track YAML lists, plus missing-spec keys."""
-    labs, missing = set(), []
+    """Lab paths (repo-relative) a track YAML lists, plus missing-spec and stale no-spec keys."""
+    labs, missing, stale = set(), [], []
     for uc in track.get("use_cases") or []:
         for lab in uc.get("labs") or []:
             if lab.get("status") == "no-spec":
+                if os.path.isfile(_spec_path(specs_dir, lab["spec"])):
+                    stale.append(lab["spec"])
                 if lab.get("lab"):
                     labs.add(lab["lab"])
                 continue
@@ -89,7 +91,7 @@ def _yaml_labs(track, specs_dir, labs_root):
                 missing.append(lab["spec"])
                 continue
             labs.add(labdoc.load_spec(path).get("lab"))
-    return labs, missing
+    return labs, missing, stale
 
 
 def _prose_labs(md_path, labs_root):
@@ -115,9 +117,11 @@ def lint(tracks_dir, specs_dir, labs_root):
     for yaml_path in _track_files(tracks_dir):
         name = os.path.basename(yaml_path)
         md_name = os.path.splitext(name)[0] + ".md"
-        labs, missing = _yaml_labs(load_track(yaml_path), specs_dir, labs_root)
+        labs, missing, stale = _yaml_labs(load_track(yaml_path), specs_dir, labs_root)
         for key in missing:
             errors.append(f"missing spec: {key} (in {name})")
+        for key in stale:
+            errors.append(f"stale no-spec: {key} (in {name})")
         prose = _prose_labs(os.path.join(tracks_dir, md_name), labs_root)
         for lab in sorted(prose - labs):
             errors.append(f"unlisted lab: {lab} (linked from {md_name})")

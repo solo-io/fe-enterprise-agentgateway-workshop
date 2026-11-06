@@ -5,8 +5,6 @@ use_cases:
     value: Get a running gateway and monitoring stack as the foundation for every subsequent lab.
     labs:
       - spec: installation/system-requirements
-        lab: labs/installation/system-requirements.md
-        status: no-spec
       - spec: installation/openshift/001-set-up-enterprise-agentgateway-ocp
         lab: labs/installation/openshift/001-set-up-enterprise-agentgateway-ocp.md
         status: no-spec
