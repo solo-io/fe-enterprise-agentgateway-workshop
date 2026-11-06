@@ -1,0 +1,86 @@
+"""Static checks for the agent layer: AGENTS.md, CLAUDE.md, .mcp.json, skills, command."""
+import json
+import pathlib
+import re
+import unittest
+
+ROOT = pathlib.Path(__file__).resolve().parents[2]
+SKILLS = ["evaluate", "detect-environment", "explain-lab", "diagnose-failure", "ask-the-docs"]
+INTERNAL = "support-agent-tools"
+
+
+def read(rel):
+    return (ROOT / rel).read_text()
+
+
+def prospect_files():
+    files = [ROOT / "AGENTS.md", ROOT / "CLAUDE.md", ROOT / ".claude/commands/evaluate.md"]
+    files += [ROOT / "skills" / s / "SKILL.md" for s in SKILLS]
+    return files
+
+
+class AgentLayer(unittest.TestCase):
+    def test_mcp_json_has_only_solo_knowledge(self):
+        data = json.loads(read(".mcp.json"))
+        self.assertEqual(list(data["mcpServers"]), ["solo-knowledge"])
+        self.assertEqual(data["mcpServers"]["solo-knowledge"],
+                         {"type": "http", "url": "https://knowledge-base.soloio-field.com/mcp"})
+
+    def test_no_file_mentions_internal_docs_server(self):
+        for f in prospect_files() + [ROOT / ".mcp.json"]:
+            self.assertNotIn(INTERNAL, f.read_text(), str(f))
+
+    def test_each_skill_has_frontmatter_name_and_description(self):
+        for s in SKILLS:
+            text = read(f"skills/{s}/SKILL.md")
+            m = re.match(r"---\n(.*?)\n---\n", text, re.S)
+            self.assertIsNotNone(m, s)
+            self.assertIn(f"name: {s}\n", m.group(1) + "\n")
+            self.assertRegex(m.group(1), r"(?m)^description: \S")
+
+    def test_evaluate_skill_names_every_cli(self):
+        text = read("skills/evaluate/SKILL.md")
+        for needle in ["./e2e/lib/detect-env.sh", "--resolve-creds", "--install-base --only-base",
+                       "--track", "--report", "--report-only", "--uninstall-base", "session-log.sh",
+                       "tracks.py list", "explain-lab", "diagnose-failure", "--no-prompt"]:
+            self.assertIn(needle, text)
+
+    def test_diagnose_skill_lists_four_options_and_deviation_rule(self):
+        text = read("skills/diagnose-failure/SKILL.md")
+        for opt in ["- Retry the lab", "- Skip it and continue", "- Work around it live", "- Stop the session"]:
+            self.assertIn(opt, text)
+        self.assertIn('session-log.sh add deviation <key> "<what was applied and why>"', text)
+        self.assertIn("session-log.sh add decision <key> stop", text)
+        for p in ["e2e/.work/<key>/driver.sh", "blocks/NNNN.sh", "blocks/NNNN.out", "result", "outcome"]:
+            self.assertIn(p, text)
+
+    def test_agents_md_has_four_hard_rules_and_codex_snippet(self):
+        text = read("AGENTS.md")
+        for rule in ["Never leave anything behind.", "Nothing about the cluster leaves the cluster.",
+                     "Least privilege.", "Stop on failure, do not improvise."]:
+            self.assertIn(rule, text)
+        self.assertIn("[mcp_servers.solo-knowledge]", text)
+        self.assertIn('url = "https://knowledge-base.soloio-field.com/mcp"', text)
+        self.assertIn("```toml", text)
+        self.assertLess(len(text.splitlines()), 150)
+
+    def test_agents_md_points_at_rbac_readme(self):
+        text = read("AGENTS.md")
+        self.assertIn("rbac/README.md", text)
+        self.assertIn("skills/evaluate/SKILL.md", text)
+
+    def test_no_em_dashes_in_prospect_prose(self):
+        for f in prospect_files():
+            self.assertNotIn("—", f.read_text(), str(f))
+
+    def test_claude_md_is_one_line(self):
+        self.assertEqual(read("CLAUDE.md").strip(), "Read AGENTS.md and follow it.")
+
+    def test_command_file(self):
+        text = read(".claude/commands/evaluate.md")
+        self.assertIn("description: Evaluate Enterprise Agentgateway on the current cluster", text)
+        self.assertIn("Read skills/evaluate/SKILL.md and follow it. Arguments: $ARGUMENTS", text)
+
+
+if __name__ == "__main__":
+    unittest.main()
