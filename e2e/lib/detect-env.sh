@@ -146,7 +146,7 @@ preflight_permissions() {  # sets PERMISSIONS (json: "ok", "skipped" or a list)
     case "$ans" in
       yes) ;;
       no)  missing+=("$line") ;;
-      *)   SIGNALS+=("can-i-error:${line}") ;;
+      *)   SIGNALS+=("can-i-error:${line}"); missing+=("$line") ;;   # fail closed
     esac
   done < <(python3 -c '
 import sys, yaml

@@ -64,6 +64,15 @@ test_helm_failure_is_unknown_not_clean() {
   [[ "$(field '.signals|index("helm-list-failed")')" != null ]] && ok "helm-list-failed signal" || fail "signal missing"
 }
 
+test_can_i_api_error_fails_closed() {
+  local fx="${TMP}/cierr"; cp -R "${FX}/eks" "$fx"; echo "create namespaces" > "${fx}/can-i-error"
+  detect_dir "$fx"
+  check "can-i error exits 2" "$RC" 2
+  check "errored pair is listed" "$(field '.permissions|index("create namespaces")|type')" number
+  [[ "$(field '.signals|index("can-i-error:create namespaces")')" != null ]] && ok "can-i-error signal" || fail "signal missing"
+  check "other pairs not listed" "$(field '.permissions|length')" 1
+}
+
 test_openshift_wins_over_cloud_providerid() {
   local fx="${TMP}/ocp"; cp -R "${FX}/eks" "$fx"; touch "${fx}/openshift"
   detect_dir "$fx" --skip-rbac-check
@@ -163,6 +172,7 @@ test_version_out_of_range_exits_2
 test_permission_preflight_names_missing_verb_resource
 test_helm_failure_is_unknown_not_clean
 test_openshift_wins_over_cloud_providerid
+test_can_i_api_error_fails_closed
 test_empty_node_list_is_own_error
 
 printf '\n%d passed, %d failed\n' "$T_PASS" "$T_FAIL"
