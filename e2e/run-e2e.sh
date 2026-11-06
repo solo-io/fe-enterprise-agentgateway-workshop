@@ -26,7 +26,7 @@ CYAN='\033[0;36m'; DIM='\033[2m'; BOLD='\033[1m'; NC='\033[0m'
 
 E2E_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${E2E_DIR}/.." && pwd)"
-SPEC_DIR="${E2E_DIR}/specs"
+SPEC_DIR="${E2E_SPEC_DIR:-${E2E_DIR}/specs}"
 WORK_ROOT="${E2E_WORK_ROOT:-${E2E_DIR}/.work}"
 LABDOC="${E2E_DIR}/lib/labdoc.py"
 
@@ -169,7 +169,7 @@ on_interrupt() {
   trap - INT TERM HUP
   local pgid="$E2E_CHILD_PGID" i
   [[ -n "$E2E_CURRENT_KEY" ]] && write_outcome_file "$E2E_CURRENT_KEY" interrupted 130 \
-    "$((SECONDS - E2E_CURRENT_START))" "${E2E_SPEC_REQUIRES:-}"
+    "$((SECONDS - E2E_CURRENT_START))" "$(tr ' ' ',' <<<"${E2E_SPEC_REQUIRES:-}")"
   if [[ -n "$pgid" ]] && kill -0 "-${pgid}" 2>/dev/null; then
     printf "\n${YELLOW}Interrupted: stopping the running lab (pgid %s) and its cleanup${NC}\n" "$pgid" >&2
     kill -TERM "-${pgid}" 2>/dev/null
@@ -263,7 +263,7 @@ run_lab() {
   local meta
   meta="$("$PYTHON" "$LABDOC" meta "$spec")" || { printf "${RED}✗ %s — bad spec${NC}\n" "$key"; TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); write_outcome fail 1; return; }
   eval "$meta"
-  req="$E2E_SPEC_REQUIRES"
+  req="${E2E_SPEC_REQUIRES// /,}"
 
   local lab="${REPO_ROOT}/${E2E_SPEC_LAB}"
   if [[ ! -f "$lab" ]]; then
@@ -482,9 +482,17 @@ fi
 declare -a RUN_SPECS=()
 if [[ -n "$TRACK" ]]; then
   track_rows="$("$PYTHON" "${E2E_DIR}/lib/tracks.py" list "$TRACK" --env "$ENV_CLASS" 2>&1)" || {
-    printf "${RED}no track named %s${NC}\n" "$TRACK" >&2; exit 1; }
+    if [[ "$track_rows" == *"no track '"* ]]; then
+      printf "${RED}no track named %s${NC}\n" "$TRACK" >&2
+    else
+      printf '%s\n' "$track_rows" >&2
+    fi
+    exit 1; }
+  printf "${BOLD}Track: %s | Env: %s${NC}\n" "$TRACK" "$ENV_CLASS"
   while IFS=$'\t' read -r tkey tstatus _; do
     [[ -n "$tkey" ]] || continue
+    # A fresh session must not inherit outcomes from an earlier run.
+    [[ "$RESOLVE_CREDS" == "true" ]] && rm -f "${WORK_ROOT}/${tkey}/outcome"
     case "$tstatus" in
       run)
         [[ -f "${SPEC_DIR}/${tkey}.yaml" ]] || { printf "${RED}track entry %s has no spec file${NC}\n" "$tkey" >&2; exit 1; }
