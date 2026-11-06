@@ -11,6 +11,8 @@
 #   ./e2e/run-e2e.sh --install-base --only-base   # install 001 + 002 and stop
 #   ./e2e/run-e2e.sh routing/direct-response  # one lab
 #   ./e2e/run-e2e.sh --tier t0                # only credential-free labs
+#   ./e2e/run-e2e.sh --track llm --env gke    # every runnable entry of a use-case track
+#   ./e2e/run-e2e.sh --track llm --resolve-creds  # resolve credentials, run nothing
 #   ./e2e/run-e2e.sh --lint                   # validate specs against labs, run nothing
 #   ./e2e/run-e2e.sh --list                   # show coverage table
 #
@@ -59,10 +61,13 @@ LIST_ONLY=false
 TIER_FILTER=""
 SPECIFIC=""
 KEEP_WORK=false
+TRACK=""
+ENV_CLASS=""
+RESOLVE_CREDS=false
 export E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
 usage() {
-  sed -n '2,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 ORIGINAL_ARGS=("$@")
@@ -75,6 +80,9 @@ while [[ $# -gt 0 ]]; do
     --lint)         LINT_ONLY=true; shift ;;
     --list)         LIST_ONLY=true; shift ;;
     --tier)         TIER_FILTER="$2"; shift 2 ;;
+    --track)        TRACK="$2"; shift 2 ;;
+    --env)          ENV_CLASS="$2"; shift 2 ;;
+    --resolve-creds) RESOLVE_CREDS=true; shift ;;
     --no-prompt)    export E2E_PROMPT=0; shift ;;
     --verbose|-v)   export E2E_VERBOSE=1; shift ;;
     --keep-work)    KEEP_WORK=true; shift ;;
@@ -82,6 +90,22 @@ while [[ $# -gt 0 ]]; do
     *)              SPECIFIC="$1"; shift ;;
   esac
 done
+
+if [[ -n "$TRACK" ]]; then
+  [[ -z "$TIER_FILTER" ]] || { printf "${RED}--track and --tier are mutually exclusive${NC}\n" >&2; exit 1; }
+  [[ -z "$SPECIFIC" ]]    || { printf "${RED}--track and a positional spec are mutually exclusive${NC}\n" >&2; exit 1; }
+fi
+
+# --env: the environment class the tracks filter on. Default to what the
+# environment probe recorded, else unknown.
+if [[ -z "$ENV_CLASS" ]]; then
+  ENV_CLASS="unknown"
+  if [[ -f "${WORK_ROOT}/env.json" ]]; then
+    ENV_CLASS="$("$PYTHON" -c 'import json,sys; print(json.load(open(sys.argv[1])).get("class") or "unknown")' \
+      "${WORK_ROOT}/env.json" 2>/dev/null || echo unknown)"
+  fi
+fi
+export E2E_ENV="$ENV_CLASS"
 
 # ---------------------------------------------------------------------------
 # run_with_timeout <secs> <cmd...>
@@ -94,6 +118,23 @@ done
 #   runner, keeps changing the cluster, and writes into the next run's work dir.
 # ---------------------------------------------------------------------------
 E2E_CHILD_PGID=""
+E2E_CURRENT_KEY=""
+E2E_CURRENT_START=0
+
+# write_outcome_file <key> <status> <rc> <duration> <requires> [only_on]
+#   One line per lab at ${WORK_ROOT}/<key>/outcome. The report builder reads it,
+#   so the field names and status values are a contract.
+write_outcome_file() {
+  local key="$1" status="$2" rc="$3" dur="$4" req="$5" only_on="${6:-}"
+  mkdir -p "${WORK_ROOT}/${key}"
+  if [[ -n "$only_on" ]]; then
+    printf 'status=%s rc=%s duration=%s requires=%s only_on=%s\n' \
+      "$status" "$rc" "$dur" "$req" "$only_on" > "${WORK_ROOT}/${key}/outcome"
+  else
+    printf 'status=%s rc=%s duration=%s requires=%s\n' \
+      "$status" "$rc" "$dur" "$req" > "${WORK_ROOT}/${key}/outcome"
+  fi
+}
 
 run_with_timeout() {
   local secs="$1"; shift
@@ -127,6 +168,8 @@ run_with_timeout() {
 on_interrupt() {
   trap - INT TERM HUP
   local pgid="$E2E_CHILD_PGID" i
+  [[ -n "$E2E_CURRENT_KEY" ]] && write_outcome_file "$E2E_CURRENT_KEY" interrupted 130 \
+    "$((SECONDS - E2E_CURRENT_START))" "${E2E_SPEC_REQUIRES:-}"
   if [[ -n "$pgid" ]] && kill -0 "-${pgid}" 2>/dev/null; then
     printf "\n${YELLOW}Interrupted: stopping the running lab (pgid %s) and its cleanup${NC}\n" "$pgid" >&2
     kill -TERM "-${pgid}" 2>/dev/null
@@ -209,25 +252,33 @@ declare -a FAILED=() SKIPPED=() EXCLUDED=()
 run_lab() {
   local spec="$1"
   local key; key="$(spec_key "$spec")"
+  local start="$SECONDS" req=""
+  E2E_CURRENT_KEY="$key"; E2E_CURRENT_START="$start"
+  # <status> <rc>: record the outcome, then clear the in-flight marker.
+  write_outcome() {
+    write_outcome_file "$key" "$1" "$2" "$((SECONDS - start))" "$req"
+    E2E_CURRENT_KEY=""
+  }
 
   local meta
-  meta="$("$PYTHON" "$LABDOC" meta "$spec")" || { printf "${RED}✗ %s — bad spec${NC}\n" "$key"; TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); return; }
+  meta="$("$PYTHON" "$LABDOC" meta "$spec")" || { printf "${RED}✗ %s — bad spec${NC}\n" "$key"; TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); write_outcome fail 1; return; }
   eval "$meta"
+  req="$E2E_SPEC_REQUIRES"
 
   local lab="${REPO_ROOT}/${E2E_SPEC_LAB}"
   if [[ ! -f "$lab" ]]; then
     printf "  ${RED}✗${NC} %-58s ${RED}FAIL${NC} — lab not found: %s\n" "$key" "$E2E_SPEC_LAB"
-    TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); return
+    TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); write_outcome fail 1; return
   fi
 
   if [[ "$E2E_SPEC_TIER" == "excluded" || "$E2E_SPEC_TIER" == "t5-manual" ]]; then
     printf "  ${DIM}—${NC} %-58s ${DIM}EXCLUDED${NC} — %s\n" "$key" "${E2E_SPEC_REASON:-not automatable}"
-    EXCLUDED+=("$key"); return
+    EXCLUDED+=("$key"); write_outcome excluded 0; return
   fi
 
   if [[ -n "$E2E_SPEC_REQUIRES" ]] && ! e2e_keys_present $E2E_SPEC_REQUIRES; then
     printf "  ${YELLOW}⊘${NC} %-58s ${YELLOW}SKIP${NC} — missing: %s\n" "$key" "$E2E_SPEC_REQUIRES"
-    TOTAL_SKIP=$((TOTAL_SKIP+1)); SKIPPED+=("${key} (${E2E_SPEC_REQUIRES})"); return
+    TOTAL_SKIP=$((TOTAL_SKIP+1)); SKIPPED+=("${key} (${E2E_SPEC_REQUIRES})"); write_outcome skip 0; return
   fi
 
   local workdir="${WORK_ROOT}/${key}"
@@ -237,7 +288,7 @@ run_lab() {
   if ! "$PYTHON" "$LABDOC" plan "$lab" "$spec" "$workdir" >"$driver" 2>"${workdir}/plan.err"; then
     printf "  ${RED}✗${NC} %-58s ${RED}FAIL${NC}\n" "$key"
     sed 's/^/      /' "${workdir}/plan.err"
-    TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); return
+    TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); write_outcome fail 1; return
   fi
   chmod +x "$driver"
 
@@ -249,7 +300,7 @@ run_lab() {
   local is_base=false
   [[ "$spec" == *"/_base/"* ]] && is_base=true
 
-  local base_before="" base_after=""
+  local drifted=false base_before="" base_after=""
   [[ "$is_base" == "false" ]] && base_before="$(baseline_fingerprint)"
 
   local rc=0
@@ -271,6 +322,7 @@ run_lab() {
     if [[ "$gw_b" != "$gw_a" ]] && baseline_restore; then
       printf "      ${YELLOW}restored the 001 Gateway so the run can continue${NC}\n"
     fi
+    drifted=true
     BASELINE_DRIFT+=("$key")
     TOTAL_FAIL=$((TOTAL_FAIL + 1))
     FAILED+=("${key} (baseline drift)")
@@ -279,6 +331,7 @@ run_lab() {
   if [[ "$rc" -eq 124 ]]; then
     printf "  ${RED}✗${NC} %-58s ${RED}FAIL${NC} — TIMEOUT (>%ss)\n" "$key" "$E2E_SPEC_TIMEOUT"
     TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("${key} (timeout)")
+    write_outcome timeout 124
     printf "\n"; return
   fi
 
@@ -295,6 +348,11 @@ run_lab() {
   [[ "$f" -gt 0 || "$rc" -ne 0 ]] && FAILED+=("$key")
   [[ "$f" -eq 0 && "$rc" -ne 0 ]] && TOTAL_FAIL=$((TOTAL_FAIL + 1))
 
+  if [[ "$f" -gt 0 || "$rc" -ne 0 || "$drifted" == "true" ]]; then
+    write_outcome fail "$rc"
+  else
+    write_outcome pass 0
+  fi
   printf "\n"
 }
 
@@ -422,7 +480,24 @@ fi
 
 # Build the run list
 declare -a RUN_SPECS=()
-if [[ -n "$SPECIFIC" ]]; then
+if [[ -n "$TRACK" ]]; then
+  track_rows="$("$PYTHON" "${E2E_DIR}/lib/tracks.py" list "$TRACK" --env "$ENV_CLASS" 2>&1)" || {
+    printf "${RED}no track named %s${NC}\n" "$TRACK" >&2; exit 1; }
+  while IFS=$'\t' read -r tkey tstatus _; do
+    [[ -n "$tkey" ]] || continue
+    case "$tstatus" in
+      run)
+        [[ -f "${SPEC_DIR}/${tkey}.yaml" ]] || { printf "${RED}track entry %s has no spec file${NC}\n" "$tkey" >&2; exit 1; }
+        RUN_SPECS+=("${SPEC_DIR}/${tkey}.yaml") ;;
+      no-spec)
+        printf "  ${DIM}—${NC} %-58s ${DIM}NOT AUTOMATED${NC}\n" "$tkey"
+        write_outcome_file "$tkey" no-spec 0 0 "" ;;
+      not-applicable:*)
+        printf "  ${DIM}—${NC} %-58s ${DIM}NOT APPLICABLE (only on %s)${NC}\n" "$tkey" "${tstatus#not-applicable:}"
+        write_outcome_file "$tkey" not-applicable 0 0 "" "${tstatus#not-applicable:}" ;;
+    esac
+  done <<<"$track_rows"
+elif [[ -n "$SPECIFIC" ]]; then
   cand="${SPEC_DIR}/${SPECIFIC%.yaml}.yaml"
   [[ -f "$cand" ]] || { printf "${RED}No spec at %s${NC}\n" "$cand" >&2; exit 1; }
   RUN_SPECS=("$cand")
@@ -455,6 +530,7 @@ if (( ${#NEEDED[@]} > 0 )); then
   done
   printf "\n"
 fi
+[[ "$RESOLVE_CREDS" == "true" ]] && exit 0
 
 printf "${BOLD}═══════════════════════════════════════════════════════════════${NC}\n"
 printf "${BOLD}  Enterprise Agentgateway Workshop — Lab E2E${NC}\n"
