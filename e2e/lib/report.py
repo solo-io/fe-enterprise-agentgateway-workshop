@@ -105,7 +105,7 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status="", stopped=False):
         else:
             result, note = "PASS", ""
     elif status == "fail":
-        result, note = "FAIL", "baseline drift" if outcome.get("drift") == "1" else ""
+        result, note = "FAIL", ""
     elif status == "timeout":
         result, note = "FAIL", "timeout"
     elif status == "interrupted":
@@ -124,6 +124,8 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status="", stopped=False):
         result, note = f"NOT APPLICABLE (only on {outcome.get('only_on', '?')})", ""
     else:
         result, note = "FAIL", f"unknown status {status}"
+    if outcome.get("drift") == "1":
+        note = f"{note}; baseline drift" if note else "baseline drift"
     cleanup = outcome.get("cleanup_fail", "")
     if cleanup and cleanup != "0":
         extra = "cleanup did not finish" if cleanup == "incomplete" else "cleanup block failed"

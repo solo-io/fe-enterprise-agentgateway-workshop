@@ -54,7 +54,7 @@ python3 e2e/lib/tracks.py list <t> --env <class>
 ./e2e/run-e2e.sh --list
 ```
 
-`--resolve-creds` runs nothing and clears outcomes from earlier runs. It does not resolve `SOLO_TRIAL_LICENSE_KEY`; only the base install does. The agent's shell has no terminal, so it cannot prompt for keys. Keys come from the shell environment, a shell rc file, or `KEY=value` lines in `e2e/.env.local`. A paid-lab key that is absent from all three makes those labs skip, which is fine.
+`--resolve-creds` runs nothing and clears outcomes from earlier runs. It does not resolve `SOLO_TRIAL_LICENSE_KEY`; only the base install does. The agent's shell has no terminal, so it cannot prompt for keys. Keys come from the shell environment, a shell rc file, or `KEY=value` lines in `e2e/.env.local`. A paid-lab key that is absent from all three makes those labs skip.
 
 The `tracks.py list` output has one line per lab: `<key>`, `<status>`, `<use-case>`. Show it grouped by use case. Name:
 

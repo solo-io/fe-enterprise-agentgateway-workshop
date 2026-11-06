@@ -178,6 +178,7 @@ build_report() {
 # ---------------------------------------------------------------------------
 E2E_CHILD_PGID=""
 E2E_CURRENT_KEY=""
+E2E_IN_GRACE=0
 E2E_CURRENT_START=0
 
 # write_outcome_file <key> <status> <rc> <duration> <requires> [only_on] [k=v...]
@@ -223,12 +224,17 @@ run_with_timeout() {
       # it time to finish (deleting a namespace takes a while) before SIGKILL.
       kill -TERM "-${pid}" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
       local grace=0
+      E2E_IN_GRACE=1
       while kill -0 "$pid" 2>/dev/null && (( grace < ${E2E_CLEANUP_GRACE:-180} )); do
         sleep 1; grace=$((grace + 1))
       done
+      if kill -0 "$pid" 2>/dev/null; then
+        note_leftover "CLEANUP INCOMPLETE: ${E2E_CURRENT_KEY} (cleanup still running after ${grace}s, killed)"
+      fi
       kill -KILL "-${pid}" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
       wait "$pid" 2>/dev/null
       E2E_CHILD_PGID=""
+      E2E_IN_GRACE=0
       return 124
     fi
     sleep 1
@@ -249,11 +255,17 @@ on_interrupt() {
     "$((SECONDS - E2E_CURRENT_START))" "$(tr ' ' ',' <<<"${E2E_SPEC_REQUIRES:-}")"
   if [[ -n "$pgid" ]] && kill -0 "-${pgid}" 2>/dev/null; then
     printf "\n${YELLOW}Interrupted: stopping the running lab (pgid %s) and its cleanup${NC}\n" "$pgid" >&2
-    kill -TERM "-${pgid}" 2>/dev/null
+    # During the timeout grace the driver already got SIGTERM and is running
+    # Cleanup; a second SIGTERM would kill that Cleanup.
+    [[ "${E2E_IN_GRACE:-0}" == "1" ]] || kill -TERM "-${pgid}" 2>/dev/null
     for i in $(seq 1 30); do
       kill -0 "-${pgid}" 2>/dev/null || break
       sleep 1
     done
+    if kill -0 "-${pgid}" 2>/dev/null; then
+      note_leftover "CLEANUP INCOMPLETE: ${E2E_CURRENT_KEY} (interrupted; cleanup killed after 30s)"
+      printf "${RED}Cleanup for %s did not finish; the report lists it under Leftovers${NC}\n" "$E2E_CURRENT_KEY" >&2
+    fi
     kill -KILL "-${pgid}" 2>/dev/null
   fi
   exit 130
@@ -544,7 +556,7 @@ uninstall_base() {
   # evaluator identity the prospect applied, so it stays.
   local snapshot="${WORK_ROOT}/env.json" before now ns phase waited=0 leftover=()
   if before="$("$PYTHON" -c 'import json,sys; d=json.load(open(sys.argv[1])); print("\n".join(d["namespaces"]))' \
-      "$snapshot" 2>/dev/null)"; then
+      "$snapshot" 2>/dev/null)" && [[ -n "$before" ]]; then
     while :; do
       leftover=()
       now="$(kubectl get namespaces -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{"\n"}{end}' 2>/dev/null)" \
@@ -650,6 +662,11 @@ fi
 
 # Build the run list
 declare -a RUN_SPECS=()
+# A --report run without --track writes a report for this invocation only, so
+# it starts with no leftover lines from earlier runs.
+if [[ -z "$TRACK" && "$REPORT" == "true" ]]; then
+  rm -f "${WORK_ROOT}/leftovers.txt"
+fi
 if [[ -n "$TRACK" ]]; then
   # A track run is a fresh session: drop every earlier outcome and the old
   # leftovers so the report cannot mix runs. Single-lab runs never clear,
