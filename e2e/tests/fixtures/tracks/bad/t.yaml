@@ -1,0 +1,8 @@
+track: t
+title: Bad Track
+use_cases:
+  - name: First
+    value: First value.
+    labs:
+      - spec: routing/a
+      - spec: routing/gone

@@ -339,6 +339,11 @@ if [[ "$LINT_ONLY" == "true" ]]; then
   printf "\n${BOLD}Conventions:${NC}\n"
   "$PYTHON" "${E2E_DIR}/lib/conventions.py" "${REPO_ROOT}" || lint_fail=1
 
+  printf "\n${BOLD}Tracks:${NC}\n"
+  track_out="$("$PYTHON" "${E2E_DIR}/lib/tracks.py" lint)" || lint_fail=1
+  [[ -n "$track_out" ]] && printf '%s\n' "$track_out" | sed 's/^/  /'
+  printf "Tracks: %s problem(s)\n" "$(printf '%s' "$track_out" | grep -c . || true)"
+
   exit "$lint_fail"
 fi
 

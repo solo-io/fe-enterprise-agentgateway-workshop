@@ -1,0 +1,80 @@
+track: mcp
+title: MCP Track
+use_cases:
+  - name: MCP Server Connectivity
+    value: 'Give agents a single, stable gateway endpoint to call regardless of where MCP tool servers physically run: in the cluster, in a remote data center, or dynamically scaled.'
+    labs:
+      - spec: mcp/in-cluster-mcp
+      - spec: mcp/remote-mcp
+  - name: Wrap Existing REST APIs as MCP Tools
+    value: Expose any documented REST API as an MCP tool set. Your agents get structured tool definitions; you get centralized auth and rate limiting, with no MCP server code to write.
+    labs:
+      - spec: mcp/openapi-to-mcp-external-api
+      - spec: mcp/openapi-to-mcp-in-cluster
+  - name: Tool Federation & Specialization
+    value: Aggregate tools from multiple MCP servers behind one endpoint. Filter tool exposure per persona, prefix names to avoid collisions, and specialize how tools are presented to agents.
+    labs:
+      - spec: mcp/mcp-tool-federation
+      - spec: mcp/mcp-tool-mode-search
+      - spec: mcp/mcp-tool-mode-code
+  - name: MCP Security & Authorization
+    value: Enforce zero-trust access at the tool level. Agents must present valid credentials before the gateway forwards any tool call, and you can gate access down to individual tool names.
+    labs:
+      - spec: mcp/mcp-byo-grpc-ext-authz
+      - spec: mcp/mcp-eager-auth-auth0
+        lab: labs/mcp/mcp-eager-auth-auth0.md
+        status: no-spec
+      - spec: mcp/mcp-eager-auth-okta
+        lab: labs/mcp/mcp-eager-auth-okta.md
+        status: no-spec
+      - spec: mcp/mcp-eager-auth-entra
+        lab: labs/mcp/mcp-eager-auth-entra.md
+        status: no-spec
+      - spec: mcp/mcp-eager-auth-auth0-pre-issuance-authz
+        lab: labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md
+        status: no-spec
+      - spec: security/WAF
+      - spec: mcp/mcp-guardrails
+  - name: Per-Tool Rate Limiting
+    value: Prevent tool abuse and enforce fair-use quotas per agent, user, or group, at the individual tool level, not just the connection level.
+    labs:
+      - spec: mcp/mcp-tool-rate-limiting
+  - name: Identity Delegation (On-Behalf-Of)
+    value: When an AI agent calls a tool, the tool should know *which human* initiated the request, not just which service account. OBO token exchange carries the end user's identity through the agent chain so you get real attribution, not service-level attribution.
+    labs:
+      - spec: identity-delegation/obo-token-exchange-fundamentals
+        lab: labs/identity-delegation/obo-token-exchange-fundamentals.md
+        status: no-spec
+      - spec: identity-delegation/msft-entra-obo
+        lab: labs/identity-delegation/msft-entra-obo.md
+        status: no-spec
+      - spec: mcp/obo-crewai-agent-with-mcp
+        lab: labs/mcp/obo-crewai-agent-with-mcp.md
+        status: no-spec
+  - name: Agent Framework & Client Integrations
+    value: Validate that real-world frameworks and developer tools connect cleanly through the gateway, and that policy enforcement works end-to-end from the client to the tool.
+    labs:
+      - spec: agent-frameworks/crewai-with-agentgateway
+      - spec: agent-frameworks/langchain-with-agentgateway
+      - spec: agent-harnesses/claude-code
+        lab: labs/agent-harnesses/claude-code.md
+        status: no-spec
+      - spec: agent-harnesses/claude-desktop
+        lab: labs/agent-harnesses/claude-desktop.md
+        status: no-spec
+      - spec: mcp/mcp-eager-auth-auth0
+        lab: labs/mcp/mcp-eager-auth-auth0.md
+        status: no-spec
+      - spec: mcp/mcp-eager-auth-okta
+        lab: labs/mcp/mcp-eager-auth-okta.md
+        status: no-spec
+      - spec: mcp/mcp-eager-auth-entra
+        lab: labs/mcp/mcp-eager-auth-entra.md
+        status: no-spec
+  - name: Load Testing & Production Observability
+    value: Validate tool throughput, surface bottlenecks under realistic agent traffic, and configure dashboards and alerts before you're in a production incident.
+    labs:
+      - spec: load-testing/mcp-load-testing-k6
+        lab: labs/load-testing/mcp-load-testing-k6.md
+        status: no-spec
+      - spec: observability/production-observability-alerting-and-scaling
