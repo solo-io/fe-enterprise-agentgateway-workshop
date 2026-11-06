@@ -20,7 +20,7 @@ The harness has already stopped the lab. `<key>` is the lab key, for example `mc
    - Work around it live
    - Stop the session
 
-4. Do nothing to the cluster until the prospect picks.
+4. Do nothing to the cluster until the user picks.
 5. The harness already ran the lab's Cleanup when it exited, whatever the choice. Confirm it from the cleanup phase in `e2e/.work/<key>/blocks/*.out`, show any leftovers, and never run cleanup blocks by hand.
 
 ## What each choice does

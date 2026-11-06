@@ -11,7 +11,7 @@ Run from the repo root:
 ./e2e/lib/detect-env.sh
 ```
 
-It prints one `key: value` line per field and writes `e2e/.work/env.json`. Read that file and tell the prospect what it found.
+It prints one `key: value` line per field and writes `e2e/.work/env.json`. Read that file and tell the user what it found.
 
 ## Fields
 
@@ -33,5 +33,5 @@ It prints one `key: value` line per field and writes `e2e/.work/env.json`. Read 
 ## Exit codes
 
 - 0: the session can run. Summarize the fields above in a few sentences.
-- 1: detection could not talk to the cluster. Show the error and ask the prospect to check their kubeconfig and context.
-- 2: the session must stop. Show the message. A missing CLI, missing PyYAML, a bash older than 4 first on PATH, an unsupported server version, or no LoadBalancer is the prospect's to fix. Missing permissions come with the instruction to run `kubectl apply -f rbac/evaluator.yaml`, which needs an admin identity; point at `rbac/README.md`. Do not continue until a re-run exits 0.
+- 1: detection could not talk to the cluster. Show the error and ask the user to check their kubeconfig and context.
+- 2: the session must stop. Show the message. A missing CLI, missing PyYAML, a bash older than 4 first on PATH, an unsupported server version, or no LoadBalancer is the user's to fix. Missing permissions come with the instruction to run `kubectl apply -f rbac/evaluator.yaml`, which needs an admin identity; point at `rbac/README.md`. Do not continue until a re-run exits 0.

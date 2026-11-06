@@ -553,7 +553,7 @@ uninstall_base() {
 
   # Leftover namespaces: anything present now that was not in the namespace
   # snapshot detect-env.sh took before the session. agw-evaluator holds the
-  # evaluator identity the prospect applied, so it stays.
+  # evaluator identity the user applied, so it stays.
   local snapshot="${WORK_ROOT}/env.json" before now ns phase waited=0 leftover=()
   if before="$("$PYTHON" -c 'import json,sys; d=json.load(open(sys.argv[1])); print("\n".join(d["namespaces"]))' \
       "$snapshot" 2>/dev/null)" && [[ -n "$before" ]]; then

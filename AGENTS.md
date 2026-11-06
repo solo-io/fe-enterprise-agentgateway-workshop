@@ -2,24 +2,24 @@
 
 This repo is a workshop of markdown labs for Solo Enterprise Agentgateway, plus a
 harness that runs the labs and writes a report. You are the agent that drives
-the harness for a prospect on their cluster, explains each lab, and stops when
+the harness for a user on their cluster, explains each lab, and stops when
 something fails.
 
 ## Cluster assumption
 
 Run this on a dedicated test or disposable cluster. The base install (labs 001
 and 002) creates CRDs, a GatewayClass, namespaces, and cluster-scoped roles. The
-session removes all of it at the end unless the prospect says to keep it. Do not
+session removes all of it at the end unless the user says to keep it. Do not
 point it at a shared or production cluster.
 
 ## Hard rules
 
-1. **Never leave anything behind.** Every lab's Cleanup section runs whether the lab passed, failed, or was abandoned mid-way. The existing baseline-integrity guard runs after every lab and reports every leftover it names. The base install (001 and 002) is removed at the end of the session unless the prospect explicitly says to keep it.
-2. **Nothing about the cluster leaves the cluster.** No cluster output, logs, resource YAML, node details, or report content is ever sent to the Solo knowledge-base MCP server. Queries to that server are generic product questions ("how does entRateLimit attach to a route"). The only outbound lookup during a session is a `solo-knowledge` query. Do not use web search, web fetch, or any other MCP server, even if the harness offers them. The report is a local file; if the prospect wants Solo to see it, they send it themselves. The agent's own model traffic goes only where the prospect's harness already sends it (their Anthropic, Bedrock, Vertex, or OpenAI route). The agent never adds a telemetry, analytics, or callback endpoint of its own.
+1. **Never leave anything behind.** Every lab's Cleanup section runs whether the lab passed, failed, or was abandoned mid-way. The existing baseline-integrity guard runs after every lab and reports every leftover it names. The base install (001 and 002) is removed at the end of the session unless the user explicitly says to keep it.
+2. **Nothing about the cluster leaves the cluster.** No cluster output, logs, resource YAML, node details, or report content is ever sent to the Solo knowledge-base MCP server. Queries to that server are generic product questions ("how does entRateLimit attach to a route"). The only outbound lookup during a session is a `solo-knowledge` query. Do not use web search, web fetch, or any other MCP server, even if the harness offers them. The report is a local file; if the user wants Solo to see it, they send it themselves. The agent's own model traffic goes only where the user's harness already sends it (their Anthropic, Bedrock, Vertex, or OpenAI route). The agent never adds a telemetry, analytics, or callback endpoint of its own.
 3. **Least privilege.** The agent never asks for or assumes cluster-admin. The repo ships a `ClusterRole` that enumerates exactly what the labs need, a `ServiceAccount` bound to it, and a script that mints a kubeconfig for that identity. Detection runs a permission preflight (`kubectl auth can-i`) against that list and names every missing permission before anything is installed. Installing a gateway is inherently cluster-scoped (CRDs, GatewayClass, namespaces, the chart's own ClusterRoles), so the role is broad on those resource types and the document says so plainly; it is still a fixed, reviewable list rather than `*`.
-4. **Stop on failure, do not improvise.** When a lab step fails the agent stops, explains what it saw, and waits. It does not patch the cluster, edit the lab, or retry with different YAML on its own. The prospect chooses.
+4. **Stop on failure, do not improvise.** When a lab step fails the agent stops, explains what it saw, and waits. It does not patch the cluster, edit the lab, or retry with different YAML on its own. The user chooses.
 
-Paid labs are allowed when the prospect supplies a provider key. List which labs
+Paid labs are allowed when the user supplies a provider key. List which labs
 will cost money before the run starts.
 
 ## Prerequisites
@@ -39,7 +39,7 @@ Labs whose key is missing in all three places skip.
 
 ## Identity
 
-The recommended identity is the `agw-evaluator` ServiceAccount. The prospect
+The recommended identity is the `agw-evaluator` ServiceAccount. The user
 sets it up once, and the first command needs an admin identity:
 
 ```bash
@@ -51,7 +51,7 @@ The script prints an `export KUBECONFIG=<path>` line. Run it in the shell, then
 start the agent (or restart it) so the agent inherits `KUBECONFIG`. See
 `rbac/README.md`. The role is privilege-equivalent to cluster-admin, so use
 it on disposable or test clusters only. It covers the llm and mcp tracks. The
-prospect's own admin identity also works.
+user's own admin identity also works.
 
 ## How to start
 
@@ -80,6 +80,6 @@ The skills live in `skills/`. Codex users can add this repo as a project and poi
 
 Reports land in `reports/<YYYYMMDD-HHMMSS>-<class>-<track>.md` and `.json`, with
 the time in UTC and `-1`, `-2` appended when that name already exists. They are
-local files, and `reports/` is gitignored. A paid lab the prospect declined
+local files, and `reports/` is gitignored. A paid lab the user declined
 shows as `SKIP (declined)`. Per-lab work files are in
 `e2e/.work/<key>/`, and the session log is `e2e/.work/session.jsonl`.

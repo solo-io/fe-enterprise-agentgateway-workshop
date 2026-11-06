@@ -21,7 +21,7 @@ No cluster output, logs, resource YAML, node details, or report content goes int
 
 - IP addresses
 - hostnames and URLs
-- the prospect's company, team, cloud account, project, subscription, or ARN identifiers
+- the user's company, team, cloud account, project, subscription, or ARN identifiers
 - any namespace other than the workshop's own: `agentgateway-system`, `agw-evaluator`, `keycloak`, `loadgenerator`, `mcp`, `monitoring`, `observability`, `postgres`, `procurement`, `semantic-router-config`, `stripe-mcp`, `team-research`
 - the `metadata.name` of any object
 - API keys, tokens, and license keys

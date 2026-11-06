@@ -13,7 +13,7 @@ def read(rel):
     return (ROOT / rel).read_text()
 
 
-def prospect_files():
+def user_files():
     files = [ROOT / "AGENTS.md", ROOT / "CLAUDE.md", ROOT / ".claude/commands/evaluate.md"]
     files += [ROOT / "skills" / s / "SKILL.md" for s in SKILLS]
     return files
@@ -27,7 +27,7 @@ class AgentLayer(unittest.TestCase):
                          {"type": "http", "url": "https://knowledge-base.soloio-field.com/mcp"})
 
     def test_no_file_mentions_internal_docs_server(self):
-        for f in prospect_files() + [ROOT / ".mcp.json"]:
+        for f in user_files() + [ROOT / ".mcp.json"]:
             self.assertNotIn(INTERNAL, f.read_text(), str(f))
 
     def test_each_skill_has_frontmatter_name_and_description(self):
@@ -71,8 +71,8 @@ class AgentLayer(unittest.TestCase):
         self.assertIn("rbac/README.md", text)
         self.assertIn("skills/evaluate/SKILL.md", text)
 
-    def test_no_em_dashes_in_prospect_prose(self):
-        for f in prospect_files():
+    def test_no_em_dashes_in_user_prose(self):
+        for f in user_files():
             self.assertNotIn("—", f.read_text(), str(f))
 
     def test_claude_md_is_one_line(self):
