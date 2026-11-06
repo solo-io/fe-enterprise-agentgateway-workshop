@@ -1,0 +1,16 @@
+lab: 002-set-up-monitoring-tools.md
+description: Remove Grafana, Prometheus, and the agentgateway PodMonitor
+tier: t0
+requires: []
+timeout: 600
+
+# Run only by `--uninstall-base`, before 902. No `cleanup:`.
+steps:
+  # blocks: [1] helm uninstall + delete namespace  [2] delete the PodMonitor
+  # Block 2 fails with NotFound when 001 was uninstalled first (the CRD is gone).
+  - section: "Uninstall"
+    run: [1]
+
+  - section: "Uninstall"
+    run: [2]
+    allow_failure: true

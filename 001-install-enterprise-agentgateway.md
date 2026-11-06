@@ -443,7 +443,11 @@ helm uninstall enterprise-agentgateway-crds -n agentgateway-system
 kubectl delete crd enterpriseagentgatewayrbacpolicies.enterpriseagentgateway.solo.io --ignore-not-found
 kubectl delete gatewayclass enterprise-agentgateway enterprise-agentgateway-waypoint --ignore-not-found
 kubectl delete namespace agentgateway-system
-# (Optional) Remove the Kubernetes Gateway API CRDs only if nothing else on the cluster uses them
+```
+
+Optionally, remove the Kubernetes Gateway API CRDs. This is cluster-wide, so run it only if nothing else on the cluster uses them.
+
+```bash
 kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.5.0/standard-install.yaml
 ```
 

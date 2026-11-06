@@ -9,6 +9,7 @@
 #   ./e2e/run-e2e.sh                          # every lab whose tier is runnable
 #   ./e2e/run-e2e.sh --install-base           # install 001 + 002 first, then run
 #   ./e2e/run-e2e.sh --install-base --only-base   # install 001 + 002 and stop
+#   ./e2e/run-e2e.sh --uninstall-base         # remove 002 + 001, keep the Gateway API CRDs
 #   ./e2e/run-e2e.sh routing/direct-response  # one lab
 #   ./e2e/run-e2e.sh --tier t0                # only credential-free labs
 #   ./e2e/run-e2e.sh --track llm --env gke    # every runnable entry of a use-case track
@@ -64,10 +65,11 @@ KEEP_WORK=false
 TRACK=""
 ENV_CLASS=""
 RESOLVE_CREDS=false
+UNINSTALL_BASE=false
 export E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
 usage() {
-  sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 ORIGINAL_ARGS=("$@")
@@ -77,6 +79,7 @@ while [[ $# -gt 0 ]]; do
     --help|-h)      usage; exit 0 ;;
     --install-base) INSTALL_BASE=true; shift ;;
     --only-base)    ONLY_BASE=true; shift ;;
+    --uninstall-base) UNINSTALL_BASE=true; shift ;;
     --lint)         LINT_ONLY=true; shift ;;
     --list)         LIST_ONLY=true; shift ;;
     --tier)         TIER_FILTER="$2"; shift 2 ;;
@@ -94,6 +97,16 @@ done
 if [[ -n "$TRACK" ]]; then
   [[ -z "$TIER_FILTER" ]] || { printf "${RED}--track and --tier are mutually exclusive${NC}\n" >&2; exit 1; }
   [[ -z "$SPECIFIC" ]]    || { printf "${RED}--track and a positional spec are mutually exclusive${NC}\n" >&2; exit 1; }
+fi
+
+if [[ "$UNINSTALL_BASE" == "true" ]]; then
+  _ub_conflict=""
+  [[ -z "$TRACK" ]]                  || _ub_conflict="--track"
+  [[ "$INSTALL_BASE" != "true" ]]    || _ub_conflict="--install-base"
+  [[ -z "$TIER_FILTER" ]]            || _ub_conflict="--tier"
+  [[ "$RESOLVE_CREDS" != "true" ]]   || _ub_conflict="--resolve-creds"
+  [[ -z "$SPECIFIC" ]]               || _ub_conflict="a positional spec"
+  [[ -z "$_ub_conflict" ]] || { printf "${RED}--uninstall-base and %s are mutually exclusive${NC}\n" "$_ub_conflict" >&2; exit 1; }
 fi
 
 # --env: the environment class the tracks filter on. Default to what the
@@ -423,6 +436,32 @@ install_base() {
 }
 
 # ---------------------------------------------------------------------------
+# --uninstall-base
+#   Removes 002 (monitoring) then 001 (controller, Gateway, enterprise CRDs).
+#   The Gateway API CRDs are cluster-wide and may be shared, so the optional
+#   block in 001 that deletes them is never run. Needs no license key.
+# ---------------------------------------------------------------------------
+uninstall_base() {
+  printf "${BOLD}═══ Uninstalling baseline (002 + 001, Gateway API CRDs kept) ═══${NC}\n\n"
+  local spec
+  for spec in "${SPEC_DIR}/_base/901-uninstall-monitoring.yaml" \
+              "${SPEC_DIR}/_base/902-uninstall-agentgateway.yaml"; do
+    [[ -f "$spec" ]] || { printf "${RED}missing base spec: %s${NC}\n" "$spec"; exit 1; }
+    run_lab "$spec"
+  done
+  local line existing rc=0
+  line="$("${E2E_DIR}/lib/detect-env.sh" --skip-rbac-check 2>/dev/null | grep '^existing_install' || true)"
+  printf '%s\n' "${line:-existing_install: (probe failed)}"
+  existing="${line#existing_install:}"; existing="${existing# }"
+  [[ "$TOTAL_FAIL" -eq 0 ]] || rc=1
+  if [[ -n "$existing" || -z "$line" ]]; then
+    printf "${RED}Something from the baseline remains on the cluster.${NC}\n"; rc=1
+  fi
+  [[ "$rc" -eq 0 ]] && printf "${GREEN}Baseline removed.${NC}\n"
+  exit "$rc"
+}
+
+# ---------------------------------------------------------------------------
 # acquire_run_lock
 #   Labs share one cluster and one Gateway, so two concurrent runs corrupt each
 #   other: a lab races ahead of the baseline install, or a Gateway-scoped policy
@@ -470,6 +509,8 @@ START="$SECONDS"
 mkdir -p "$WORK_ROOT"
 acquire_run_lock
 e2e_load_env_local
+
+[[ "$UNINSTALL_BASE" == "true" ]] && uninstall_base
 
 if [[ "$INSTALL_BASE" == "true" ]]; then
   e2e_resolve_key SOLO_TRIAL_LICENSE_KEY || {

@@ -35,6 +35,16 @@ run "--track and --tier are mutually exclusive" 1 \
 run "--track rejects a positional spec" 1 \
   "mutually exclusive" --track llm routing/direct-response --no-prompt
 run "unknown track" 1 "no track named nope" --track nope --no-prompt
+run "--uninstall-base rejects --track" 1 \
+  "--uninstall-base and --track are mutually exclusive" --uninstall-base --track llm --no-prompt
+run "--uninstall-base rejects --install-base" 1 \
+  "--uninstall-base and --install-base are mutually exclusive" --uninstall-base --install-base --no-prompt
+run "--uninstall-base rejects --tier" 1 \
+  "--uninstall-base and --tier are mutually exclusive" --uninstall-base --tier t0 --no-prompt
+run "--uninstall-base rejects --resolve-creds" 1 \
+  "--uninstall-base and --resolve-creds are mutually exclusive" --uninstall-base --resolve-creds --no-prompt
+run "--uninstall-base rejects a positional spec" 1 \
+  "--uninstall-base and a positional spec are mutually exclusive" --uninstall-base routing/direct-response --no-prompt
 run "--resolve-creds on a track exits 0" 0 "Resolving credentials" \
   --track llm --env gke --resolve-creds --no-prompt
 

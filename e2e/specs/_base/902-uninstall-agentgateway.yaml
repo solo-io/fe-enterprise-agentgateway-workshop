@@ -1,0 +1,18 @@
+lab: 001-install-enterprise-agentgateway.md
+description: Remove the controller, Gateway, and enterprise CRDs; keep the Gateway API CRDs
+tier: t0
+requires: []
+timeout: 600
+
+# Run only by `--uninstall-base`, after 901. No `cleanup:`.
+# blocks: [1] uninstall through `kubectl delete namespace agentgateway-system`
+#         [2] delete the Gateway API CRDs (cluster-wide; deliberately never run)
+steps:
+  - section: "Uninstall"
+    run: [1]
+
+  - probe: "no enterprise-agentgateway Helm release remains"
+    script: |
+      echo "remaining=$(helm list -A -o json | jq -r '[.[] | select(.chart | startswith("enterprise-agentgateway"))] | length')"
+    assert:
+      - contains: "remaining=0"
