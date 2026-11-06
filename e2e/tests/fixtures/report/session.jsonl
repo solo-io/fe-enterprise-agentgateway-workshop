@@ -1,0 +1,3 @@
+{"ts":"2026-11-06T20:00:00Z","kind":"deviation","lab":"routing/a","text":"Used port 8081 because 8080 was taken"}
+{"ts":"2026-11-06T20:01:00Z","kind":"question","lab":"routing/b","text":"Do you have an OpenAI key?"}
+{"ts":"2026-11-06T20:02:00Z","kind":"answer","lab":"routing/b","text":"No, skip it"}

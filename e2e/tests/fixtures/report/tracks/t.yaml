@@ -1,0 +1,19 @@
+track: t
+title: Report Test Track
+use_cases:
+  - name: First
+    value: First value.
+    labs:
+      - spec: routing/a
+      - spec: routing/b
+      - spec: routing/c
+  - name: Second
+    value: Second value.
+    labs:
+      - spec: routing/d
+      - spec: routing/a
+      - spec: routing/e
+        only_on: [eks]
+      - spec: routing/f
+        status: no-spec
+      - spec: routing/g

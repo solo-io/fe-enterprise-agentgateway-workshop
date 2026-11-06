@@ -137,5 +137,21 @@ done
 [[ "$(outcome_of skipme)" == *"requires=NOPE_KEY,NOPE_TWO" ]] \
   && ok "requires is comma-joined" || fail "requires not comma-joined: $(outcome_of skipme)"
 
+# --report / --report-only: flag parsing and the no-run path.
+RPT="${TMP}/reports"
+mkdir -p "${TMP}/work/routing/rpt"
+echo "status=pass rc=0 duration=5 requires=" > "${TMP}/work/routing/rpt/outcome"
+out="$("$RUNNER" --report-only "$RPT" --env vind 2>&1)"; rc=$?
+if [[ $rc == 0 && "$out" == *"-vind-adhoc.md"* && "$out" == *"-vind-adhoc.json"* ]]; then ok "--report-only prints both report paths"
+else fail "--report-only (rc=$rc): $out"; fi
+if [[ -f "$(printf '%s\n' "$out" | grep '\.md$')" ]]; then ok "--report-only wrote the Markdown"; else fail "no markdown written"; fi
+grep -q "routing/rpt" "$(printf '%s\n' "$out" | grep '\.md$')" 2>/dev/null \
+  && ok "--report-only reads existing outcome files" || fail "outcome not in report"
+run "--report-only --track mcp builds the mcp report" 0 "-vind-mcp.md" --report-only "$RPT" --track mcp --env vind
+[[ ! -d "${TMP}/work/.run.lock" ]] && ok "--report-only takes no lock" || fail "lock left behind"
+run "--report with a bare spec keeps the spec positional" 1 "No spec at" --report routing/nope --no-prompt
+run "--report --resolve-creds exits before the report" 0 "Resolving credentials" \
+  --track llm --env gke --report --resolve-creds --no-prompt
+
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 [[ "$T_FAIL" -eq 0 ]]

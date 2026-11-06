@@ -14,6 +14,8 @@
 #   ./e2e/run-e2e.sh --tier t0                # only credential-free labs
 #   ./e2e/run-e2e.sh --track llm --env gke    # every runnable entry of a use-case track
 #   ./e2e/run-e2e.sh --track llm --resolve-creds  # resolve credentials, run nothing
+#   ./e2e/run-e2e.sh --track mcp --no-prompt --report [dir]  # run, then write the report (default dir reports/)
+#   ./e2e/run-e2e.sh --track mcp --report-only [dir]  # rebuild the report from existing outcomes, run nothing
 #   ./e2e/run-e2e.sh --lint                   # validate specs against labs, run nothing
 #   ./e2e/run-e2e.sh --list                   # show coverage table
 #
@@ -66,10 +68,13 @@ TRACK=""
 ENV_CLASS=""
 RESOLVE_CREDS=false
 UNINSTALL_BASE=false
+REPORT=false
+REPORT_ONLY=false
+REPORT_DIR=""
 export E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
 usage() {
-  sed -n '2,23p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 ORIGINAL_ARGS=("$@")
@@ -86,6 +91,14 @@ while [[ $# -gt 0 ]]; do
     --track)        TRACK="$2"; shift 2 ;;
     --env)          ENV_CLASS="$2"; shift 2 ;;
     --resolve-creds) RESOLVE_CREDS=true; shift ;;
+    --report|--report-only)
+      [[ "$1" == "--report" ]] && REPORT=true || REPORT_ONLY=true
+      shift
+      # An optional directory follows. A bare word stays a positional spec
+      # unless it looks like a path or names a directory that exists.
+      if [[ $# -gt 0 && ( "$1" == /* || "$1" == .* || "$1" == "~"* || -d "$1" ) ]]; then
+        REPORT_DIR="$1"; shift
+      fi ;;
     --no-prompt)    export E2E_PROMPT=0; shift ;;
     --verbose|-v)   export E2E_VERBOSE=1; shift ;;
     --keep-work)    KEEP_WORK=true; shift ;;
@@ -119,6 +132,21 @@ if [[ -z "$ENV_CLASS" ]]; then
   fi
 fi
 export E2E_ENV="$ENV_CLASS"
+
+# ---------------------------------------------------------------------------
+# build_report
+#   Calls report.py build with this run's track (adhoc when none), the env
+#   probe output, and the session log. Prints the two file paths.
+# ---------------------------------------------------------------------------
+build_report() {
+  local env_json="${WORK_ROOT}/env.json" out="${REPORT_DIR:-${REPO_ROOT}/reports}"
+  if [[ ! -f "$env_json" ]]; then
+    env_json="${WORK_ROOT}/env-report.json"
+    printf '{"class": "%s"}\n' "$ENV_CLASS" > "$env_json"
+  fi
+  "$PYTHON" "${E2E_DIR}/lib/report.py" build --work "$WORK_ROOT" --track "${TRACK:-adhoc}" \
+    --env-json "$env_json" --session "${WORK_ROOT}/session.jsonl" --out "$out"
+}
 
 # ---------------------------------------------------------------------------
 # run_with_timeout <secs> <cmd...>
@@ -507,6 +535,14 @@ release_run_lock() {
 # ---------------------------------------------------------------------------
 START="$SECONDS"
 mkdir -p "$WORK_ROOT"
+
+# --report-only reads existing outcome files and touches nothing else, so it
+# needs no run list, credentials or lock.
+if [[ "$REPORT_ONLY" == "true" ]]; then
+  build_report
+  exit $?
+fi
+
 acquire_run_lock
 e2e_load_env_local
 
@@ -610,5 +646,14 @@ fi
 printf "${BOLD}═══════════════════════════════════════════════════════════════${NC}\n"
 
 [[ "$KEEP_WORK" == "true" ]] || printf "${DIM}  block output kept in %s${NC}\n" "$WORK_ROOT"
+
+if [[ "$REPORT" == "true" ]]; then
+  # The guard's findings become the report's Leftovers section.
+  : > "${WORK_ROOT}/leftovers.txt"
+  for t in "${BASELINE_DRIFT[@]}"; do
+    printf 'BASELINE DRIFT: %s\n' "$t" >> "${WORK_ROOT}/leftovers.txt"
+  done
+  build_report || printf "${RED}report build failed${NC}\n" >&2
+fi
 
 [[ "$TOTAL_FAIL" -eq 0 ]]
