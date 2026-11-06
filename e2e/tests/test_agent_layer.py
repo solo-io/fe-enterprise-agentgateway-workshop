@@ -131,6 +131,13 @@ class AgentLayer(unittest.TestCase):
         for needle in ["PyYAML", "bash 4", "quote any value", "<YYYYMMDD-HHMMSS>"]:
             self.assertIn(needle, text)
 
+    def test_readme_links_to_agents_md(self):
+        text = read("README.md")
+        self.assertIn("## Evaluate with an agent", text)
+        self.assertIn("[AGENTS.md](AGENTS.md)", text)
+        self.assertIn("`/evaluate`", text)
+        self.assertLess(text.index("## Evaluate with an agent"), text.index("# Table of Contents"))
+
     def test_command_file(self):
         text = read(".claude/commands/evaluate.md")
         self.assertIn("description: Evaluate Enterprise Agentgateway on the current cluster", text)

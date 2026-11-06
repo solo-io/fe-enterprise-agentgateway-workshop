@@ -12,6 +12,10 @@ Before starting this workshop, you will need:
 
 See [System Requirements](labs/installation/system-requirements.md) for detailed cluster sizing, version support, and resource recommendations.
 
+## Evaluate with an agent
+
+An AI agent can run the LLM or MCP track against your own cluster, explain each lab, and write a local report. To start it from the repo root, run `/evaluate` in Claude Code, or tell Codex to read `AGENTS.md` and run the evaluate skill. See [AGENTS.md](AGENTS.md) for prerequisites, the identity to run as, and the hard rules the agent follows.
+
 # Table of Contents
 
 - [Installation](#installation)
