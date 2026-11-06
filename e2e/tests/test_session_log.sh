@@ -34,5 +34,17 @@ d = json.loads(open(sys.argv[1]).read().splitlines()[-1])
 assert d["text"] == 'He said "hi" | then \\ left', d
 assert d["lab"] == "", d
 PY
+# start: rotates the old log aside; the fresh file holds only later events.
+"$LOG" start >/dev/null
+[[ ! -e "$F" ]] && ok "start moves session.jsonl aside" || fail "session.jsonl still present after start"
+rotated=("${E2E_WORK_ROOT}"/session-*.jsonl)
+[[ -f "${rotated[0]}" && "$(wc -l < "${rotated[0]}" | tr -d ' ')" == 7 ]] && ok "rotated log keeps the old events" || fail "rotated: ${rotated[*]}"
+"$LOG" add keep-base - "new session"
+[[ "$(wc -l < "$F" | tr -d ' ')" == 1 ]] && grep -q "new session" "$F" && ok "fresh log holds only later events" || fail "fresh log: $(cat "$F")"
+"$LOG" start >/dev/null; "$LOG" add decision - x; "$LOG" start >/dev/null
+[[ "$(ls "${E2E_WORK_ROOT}"/session-*.jsonl | wc -l | tr -d ' ')" == 3 ]] && ok "two starts in one second keep both logs" || fail "rotations: $(ls "${E2E_WORK_ROOT}")"
+rc=0; "$LOG" start extra >/dev/null 2>&1 || rc=$?
+[[ $rc == 2 ]] && ok "start takes no arguments" || fail "start extra rc=$rc"
+
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 [[ "$T_FAIL" -eq 0 ]]

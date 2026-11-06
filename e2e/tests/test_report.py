@@ -49,7 +49,7 @@ class ReportCase(unittest.TestCase):
 class TestBuild(ReportCase):
     def test_filenames_use_class_and_track(self):
         md, js, _, _ = self.build()
-        self.assertRegex(os.path.basename(md), r"^\d{8}-\d{4}-vind-t\.md$")
+        self.assertRegex(os.path.basename(md), r"^\d{8}-\d{6}-vind-t\.md$")
         self.assertTrue(js.endswith(".json"))
 
     def test_pass_with_deviation_is_marked(self):
@@ -165,15 +165,94 @@ class TestFixRound1(ReportCase):
         self.assertNotIn("Traceback", proc.stderr)
         self.assertIn("cannot read env json", proc.stderr)
 
-    def test_compare_bad_json_exits_0_one_line(self):
+    def test_compare_bad_json_exits_2_one_line(self):
         bad = os.path.join(self.tmp.name, "bad.json")
         with open(bad, "w") as fh:
             fh.write("{not json")
         proc = subprocess.run([sys.executable, os.path.join(LIB, "report.py"), "compare", bad, bad],
                               capture_output=True, text=True)
-        self.assertEqual(proc.returncode, 0)
-        self.assertEqual(len(proc.stdout.strip().splitlines()), 1)
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(proc.stdout, "")
+        self.assertEqual(len(proc.stderr.strip().splitlines()), 1)
         self.assertNotIn("Traceback", proc.stderr)
+
+
+class TestFinalWave(ReportCase):
+    def work_with(self, **outcomes):
+        """outcomes: {'routing/a': 'status=pass ...'}, keys written with / for the slug."""
+        work = os.path.join(self.tmp.name, "w")
+        for key, line in outcomes.items():
+            d = os.path.join(work, *key.split("/"))
+            os.makedirs(d, exist_ok=True)
+            with open(os.path.join(d, "outcome"), "w") as fh:
+                fh.write(line + "\n")
+        os.makedirs(work, exist_ok=True)
+        return work
+
+    def session_with(self, *events):
+        path = os.path.join(self.tmp.name, "s.jsonl")
+        with open(path, "w") as fh:
+            for kind, lab, text in events:
+                fh.write(json.dumps({"ts": "t", "kind": kind, "lab": lab, "text": text}) + "\n")
+        return path
+
+    def test_drift_outcome_notes_baseline_drift(self):
+        work = self.work_with(**{"routing/a": "status=fail rc=0 duration=9 requires= drift=1"})
+        _, _, _, data = self.build(work=work)
+        r = self.row(data, "routing/a")
+        self.assertEqual((r["result"], r["note"]), ("FAIL", "baseline drift"))
+
+    def test_cleanup_block_failed_on_pass_row(self):
+        work = self.work_with(**{"routing/a": "status=pass rc=0 duration=9 requires= cleanup_fail=1",
+                                 "routing/c": "status=timeout rc=124 duration=9 requires= cleanup_fail=incomplete"})
+        _, _, _, data = self.build(work=work, session=self.session_with())
+        r = self.row(data, "routing/a")
+        self.assertEqual((r["result"], r["note"]), ("PASS", "cleanup block failed"))
+        r = self.row(data, "routing/c")
+        self.assertEqual((r["result"], r["note"]), ("FAIL", "timeout; cleanup did not finish"))
+
+    def test_declined_skip(self):
+        work = self.work_with(**{"routing/b": "status=skip rc=0 duration=0 requires= reason=declined"})
+        _, _, _, data = self.build(work=work)
+        self.assertEqual(self.row(data, "routing/b")["result"], "SKIP (declined)")
+
+    def test_sub_second_pass_is_0s(self):
+        work = self.work_with(**{"routing/a": "status=pass rc=0 duration=0 requires="})
+        _, _, _, data = self.build(work=work, session=self.session_with())
+        self.assertEqual(self.row(data, "routing/a")["duration"], "0s")
+        self.assertEqual(self.row(data, "routing/f", 1)["duration"], "-")
+
+    def test_session_stopped_marks_unreached_labs(self):
+        work = self.work_with(**{"routing/a": "status=fail rc=1 duration=9 requires="})
+        s = self.session_with(("failure", "routing/a", "Broke."), ("decision", "routing/a", "stop"))
+        _, _, _, data = self.build(work=work, session=s)
+        self.assertEqual(self.row(data, "routing/c")["note"], "not run: session stopped")
+        self.assertEqual(self.row(data, "routing/a")["note"], "")
+
+    def test_failure_outside_track_is_reported(self):
+        s = self.session_with(("failure", "llm/does-not-exist", "No such lab."))
+        _, _, text, data = self.build(session=s)
+        f = [x for x in data["failures"] if x["lab"] == "llm/does-not-exist"]
+        self.assertEqual(len(f), 1)
+        self.assertEqual(f[0]["note"], "not a track lab")
+        self.assertIn("- llm/does-not-exist (not a track lab): No such lab.", text)
+
+    def test_report_names_never_collide(self):
+        md1 = self.build()[0]
+        md2 = self.build()[0]
+        md3 = self.build()[0]
+        self.assertEqual(len({md1, md2, md3}), 3)
+
+    def test_adhoc_skips_base_keys(self):
+        work = self.work_with(**{"_base/901-uninstall-monitoring": "status=pass rc=0 duration=3 requires=",
+                                 "routing/a": "status=pass rc=0 duration=3 requires="})
+        keys, _ = report.adhoc_use_cases(work)
+        self.assertEqual(keys[0]["keys"], ["routing/a"])
+
+    def test_filename_and_generated_at_share_utc_basis(self):
+        md, _, _, data = self.build()
+        stamp = data["generated_at"].replace("-", "").replace(":", "").replace("T", "-").rstrip("Z")
+        self.assertTrue(os.path.basename(md).startswith(stamp), (md, data["generated_at"]))
 
 
 class TestChartVersion(unittest.TestCase):

@@ -128,7 +128,7 @@ def lint(tracks_dir, specs_dir, labs_root):
     return errors
 
 
-def _resolve_track(tracks_dir, name):
+def resolve_track(tracks_dir, name):
     for cand in (f"{name}-track.yaml", f"{name}.yaml"):
         path = os.path.join(tracks_dir, cand)
         if os.path.isfile(path):
@@ -151,7 +151,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     if args.cmd == "list":
-        track = load_track(_resolve_track(args.tracks_dir, args.track))
+        track = load_track(resolve_track(args.tracks_dir, args.track))
         for e in plan(track, args.env, args.specs_dir):
             print(f"{e.key}\t{e.status}\t{e.use_case}")
         return 0

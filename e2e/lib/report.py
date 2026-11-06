@@ -4,9 +4,11 @@
 Usage:
   report.py build --work DIR --track <llm|mcp|adhoc> --env-json PATH
                   --session PATH --out DIR [--specs-dir D] [--tracks-dir T]
-      writes <out>/<YYYYMMDD-HHMM>-<class>-<track>.md and .json, prints both paths
+      writes <out>/<YYYYMMDD-HHMMSS>-<class>-<track>.md and .json (UTC; -1, -2
+      appended when that name exists), prints both paths
   report.py compare A.json B.json
-      one line per lab whose result differs, after a line naming both environments
+      one line per lab whose result differs, after a line naming both environments;
+      exits 2 when either file cannot be read
 
 Reads only local files. The one external command is
 `helm list -n agentgateway-system -o json`, for the chart version.
@@ -71,13 +73,16 @@ def fmt_duration(value):
         secs = int(float(value))
     except (TypeError, ValueError):
         return "-"
-    if secs <= 0:
+    if secs < 0:
         return "-"
     mins, s = divmod(secs, 60)
     return f"{mins}m{s:02d}s" if mins else f"{s}s"
 
 
-def lab_row(key, outcome, deviations, specs_dir, plan_status=""):
+RAN = ("pass", "fail", "timeout", "interrupted")
+
+
+def lab_row(key, outcome, deviations, specs_dir, plan_status="", stopped=False):
     """Map one outcome to the row dict {key, result, duration, note}."""
     if outcome is None:
         # No outcome file. The track entry says whether that is expected.
@@ -86,11 +91,13 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status=""):
         if plan_status.startswith("not-applicable:"):
             return {"key": key, "result": f"NOT APPLICABLE (only on {plan_status.split(':', 1)[1]})",
                     "duration": "-", "note": ""}
+        if stopped:
+            return {"key": key, "result": "FAIL", "duration": "-", "note": "not run: session stopped"}
         return {"key": key, "result": "FAIL", "duration": "-", "note": "no outcome recorded"}
     if "status" not in outcome:
         return {"key": key, "result": "FAIL", "duration": "-", "note": "malformed outcome"}
     status = outcome.get("status", "")
-    dur = fmt_duration(outcome.get("duration"))
+    dur = fmt_duration(outcome.get("duration")) if status in RAN else "-"
     result, note = "FAIL", status
     if status == "pass":
         if deviations.get(key):
@@ -98,7 +105,7 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status=""):
         else:
             result, note = "PASS", ""
     elif status == "fail":
-        result, note = "FAIL", ""
+        result, note = "FAIL", "baseline drift" if outcome.get("drift") == "1" else ""
     elif status == "timeout":
         result, note = "FAIL", "timeout"
     elif status == "interrupted":
@@ -107,13 +114,20 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status=""):
         result, note = "NOT AUTOMATED", spec_reason(specs_dir, key)
     elif status == "skip":
         req = outcome.get("requires", "")
-        result, note = f"SKIP (missing {req})" if req else "SKIP", ""
+        if outcome.get("reason") == "declined":
+            result, note = "SKIP (declined)", ""
+        else:
+            result, note = f"SKIP (missing {req})" if req else "SKIP", ""
     elif status == "no-spec":
         result, note = "NOT AUTOMATED", "no spec for this lab"
     elif status == "not-applicable":
         result, note = f"NOT APPLICABLE (only on {outcome.get('only_on', '?')})", ""
     else:
         result, note = "FAIL", f"unknown status {status}"
+    cleanup = outcome.get("cleanup_fail", "")
+    if cleanup and cleanup != "0":
+        extra = "cleanup did not finish" if cleanup == "incomplete" else "cleanup block failed"
+        note = f"{note}; {extra}" if note else extra
     return {"key": key, "result": result, "duration": dur, "note": note}
 
 
@@ -138,12 +152,14 @@ def adhoc_use_cases(work):
     keys = []
     for root, _dirs, files in os.walk(work):
         if "outcome" in files:
-            keys.append(os.path.relpath(root, work))
+            key = os.path.relpath(root, work)
+            if not key.startswith("_base" + os.sep):  # --uninstall-base's own steps
+                keys.append(key)
     return [{"name": "Ad hoc run", "keys": sorted(keys)}], {}
 
 
 def track_use_cases(track, env_class, specs_dir, tracks_dir):
-    path = tracks._resolve_track(tracks_dir, track)
+    path = tracks.resolve_track(tracks_dir, track)
     data = tracks.load_track(path)
     statuses = {}
     for entry in tracks.plan(data, env_class, specs_dir):
@@ -170,25 +186,34 @@ def build_data(work, track, env_json, session, specs_dir, tracks_dir):
     else:
         ucs, plan_statuses = track_use_cases(track, env.get("class", "unknown"), specs_dir, tracks_dir)
     use_cases, failures = [], []
-    failed_seen = set()
+    failed_seen, row_keys = set(), set()
     explained, decisions = {}, {}
     for e in events:
         if e.get("kind") == "failure":
             explained.setdefault(e.get("lab", ""), []).append(e.get("text", ""))
         elif e.get("kind") == "decision":
             decisions[e.get("lab", "")] = e.get("text", "")
+    stopped = any(e.get("kind") == "decision" and e.get("text", "").strip() == "stop" for e in events)
     for uc in ucs:
         labs = []
         for key in uc["keys"]:
             row = lab_row(key, parse_outcome(os.path.join(work, key, "outcome")), deviations, specs_dir,
-                           plan_statuses.get(key, ""))
+                           plan_statuses.get(key, ""), stopped)
             labs.append(row)
+            row_keys.add(key)
             if row["result"] == "FAIL" and key not in failed_seen:
                 failed_seen.add(key)
                 failures.append({"lab": key, "note": row["note"],
                                  "explanation": " ".join(explained.get(key, [])) or "no explanation recorded",
                                  "decision": decisions.get(key, "")})
         use_cases.append({"name": uc["name"], "labs": labs})
+    # A failure logged for a lab outside this track (an ad hoc run) still belongs
+    # in the report.
+    for key, texts in explained.items():
+        if key and key not in row_keys and key not in failed_seen:
+            failed_seen.add(key)
+            failures.append({"lab": key, "note": "not a track lab", "explanation": " ".join(texts),
+                             "decision": decisions.get(key, "")})
     dev_list = [{"lab": e.get("lab", ""), "text": e.get("text", "")}
                 for e in events if e.get("kind") == "deviation"]
     questions, pending = [], None
@@ -272,10 +297,14 @@ def render_markdown(data):
 
 def cmd_build(args):
     data = build_data(args.work, args.track, args.env_json, args.session, args.specs_dir, args.tracks_dir)
-    stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+    stamp = datetime.datetime.strptime(data["generated_at"], "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d-%H%M%S")
     base = f"{stamp}-{data['environment'].get('class') or 'unknown'}-{args.track}"
     os.makedirs(args.out, exist_ok=True)
-    md, js = os.path.join(args.out, base + ".md"), os.path.join(args.out, base + ".json")
+    name, n = base, 0
+    while os.path.exists(os.path.join(args.out, name + ".md")) or os.path.exists(os.path.join(args.out, name + ".json")):
+        n += 1
+        name = f"{base}-{n}"
+    md, js = os.path.join(args.out, name + ".md"), os.path.join(args.out, name + ".json")
     with open(md, "w", encoding="utf-8") as fh:
         fh.write(render_markdown(data))
     with open(js, "w", encoding="utf-8") as fh:
@@ -301,8 +330,8 @@ def cmd_compare(args):
         with open(args.b, encoding="utf-8") as fh:
             b = json.load(fh)
     except (OSError, ValueError) as exc:
-        print(f"report.py: cannot compare: {exc}")
-        return 0
+        print(f"report.py: cannot compare: {exc}", file=sys.stderr)
+        return 2
     ea, eb = a.get("environment", {}), b.get("environment", {})
     print(f"environments: {ea.get('class', 'unknown')} ({a.get('chart_version', 'unknown')}) "
           f"-> {eb.get('class', 'unknown')} ({b.get('chart_version', 'unknown')})")
