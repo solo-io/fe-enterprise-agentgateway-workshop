@@ -37,7 +37,7 @@ def parse_outcome(path):
         if "=" in tok:
             k, v = tok.split("=", 1)
             out[k] = v
-    return out if "status" in out else None
+    return out  # no "status" key means a malformed line; lab_row reports it
 
 
 def read_session(path):
@@ -77,10 +77,18 @@ def fmt_duration(value):
     return f"{mins}m{s:02d}s" if mins else f"{s}s"
 
 
-def lab_row(key, outcome, deviations, specs_dir):
+def lab_row(key, outcome, deviations, specs_dir, plan_status=""):
     """Map one outcome to the row dict {key, result, duration, note}."""
     if outcome is None:
+        # No outcome file. The track entry says whether that is expected.
+        if plan_status == "no-spec":
+            return {"key": key, "result": "NOT AUTOMATED", "duration": "-", "note": "no spec for this lab"}
+        if plan_status.startswith("not-applicable:"):
+            return {"key": key, "result": f"NOT APPLICABLE (only on {plan_status.split(':', 1)[1]})",
+                    "duration": "-", "note": ""}
         return {"key": key, "result": "FAIL", "duration": "-", "note": "no outcome recorded"}
+    if "status" not in outcome:
+        return {"key": key, "result": "FAIL", "duration": "-", "note": "malformed outcome"}
     status = outcome.get("status", "")
     dur = fmt_duration(outcome.get("duration"))
     result, note = "FAIL", status
@@ -110,6 +118,9 @@ def lab_row(key, outcome, deviations, specs_dir):
 
 
 def chart_version():
+    override = os.environ.get("E2E_CHART_VERSION")
+    if override:
+        return override
     try:
         proc = subprocess.run(["helm", "list", "-n", "agentgateway-system", "-o", "json"],
                               capture_output=True, text=True, timeout=30)
@@ -128,43 +139,55 @@ def adhoc_use_cases(work):
     for root, _dirs, files in os.walk(work):
         if "outcome" in files:
             keys.append(os.path.relpath(root, work))
-    return [{"name": "Ad hoc run", "keys": sorted(keys)}]
+    return [{"name": "Ad hoc run", "keys": sorted(keys)}], {}
 
 
 def track_use_cases(track, env_class, specs_dir, tracks_dir):
     path = tracks._resolve_track(tracks_dir, track)
     data = tracks.load_track(path)
+    statuses = {}
+    for entry in tracks.plan(data, env_class, specs_dir):
+        if entry.status != "duplicate":
+            statuses[entry.key] = entry.status
     return [{"name": uc["name"], "keys": [lab["spec"] for lab in uc.get("labs") or []]}
-            for uc in data.get("use_cases") or []]
+            for uc in data.get("use_cases") or []], statuses
 
 
 def build_data(work, track, env_json, session, specs_dir, tracks_dir):
-    with open(env_json, encoding="utf-8") as fh:
-        env = json.load(fh)
+    try:
+        with open(env_json, encoding="utf-8") as fh:
+            env = json.load(fh)
+    except (OSError, ValueError) as exc:
+        print(f"report.py: cannot read env json {env_json}: {exc}", file=sys.stderr)
+        raise SystemExit(2)
     events = read_session(session)
     deviations = {}
     for e in events:
         if e.get("kind") == "deviation":
             deviations.setdefault(e.get("lab", ""), []).append(e.get("text", ""))
     if track == "adhoc":
-        ucs = adhoc_use_cases(work)
+        ucs, plan_statuses = adhoc_use_cases(work)
     else:
-        ucs = track_use_cases(track, env.get("class", "unknown"), specs_dir, tracks_dir)
+        ucs, plan_statuses = track_use_cases(track, env.get("class", "unknown"), specs_dir, tracks_dir)
     use_cases, failures = [], []
     failed_seen = set()
-    explained = {}
+    explained, decisions = {}, {}
     for e in events:
         if e.get("kind") == "failure":
             explained.setdefault(e.get("lab", ""), []).append(e.get("text", ""))
+        elif e.get("kind") == "decision":
+            decisions[e.get("lab", "")] = e.get("text", "")
     for uc in ucs:
         labs = []
         for key in uc["keys"]:
-            row = lab_row(key, parse_outcome(os.path.join(work, key, "outcome")), deviations, specs_dir)
+            row = lab_row(key, parse_outcome(os.path.join(work, key, "outcome")), deviations, specs_dir,
+                           plan_statuses.get(key, ""))
             labs.append(row)
             if row["result"] == "FAIL" and key not in failed_seen:
                 failed_seen.add(key)
                 failures.append({"lab": key, "note": row["note"],
-                                 "explanation": " ".join(explained.get(key, [])) or "no explanation recorded"})
+                                 "explanation": " ".join(explained.get(key, [])) or "no explanation recorded",
+                                 "decision": decisions.get(key, "")})
         use_cases.append({"name": uc["name"], "labs": labs})
     dev_list = [{"lab": e.get("lab", ""), "text": e.get("text", "")}
                 for e in events if e.get("kind") == "deviation"]
@@ -195,6 +218,7 @@ def build_data(work, track, env_json, session, specs_dir, tracks_dir):
         "deviations": dev_list,
         "failures": failures,
         "leftovers": leftovers,
+        "base_kept": any(e.get("kind") == "keep-base" for e in events),
         "questions": questions,
     }
 
@@ -222,11 +246,20 @@ def render_markdown(data):
         out.append("None.")
     out += ["", "## Failures", ""]
     if data["failures"]:
-        out += [f"- {f['lab']}: {f['explanation']}" for f in data["failures"]]
+        for f in data["failures"]:
+            line = f"- {f['lab']}"
+            if f.get("note"):
+                line += f" ({f['note']})"
+            line += f": {f['explanation']}"
+            if f.get("decision"):
+                line += f" Decision: {f['decision']}"
+            out.append(line)
     else:
         out.append("None.")
     out += ["", "## Leftovers", ""]
     out += [f"- {ln}" for ln in data["leftovers"]] if data["leftovers"] else [NO_LEFTOVERS]
+    if data.get("base_kept"):
+        out += ["", "The base install was kept on request."]
     out += ["", "## Questions", ""]
     if data["questions"]:
         for qa in data["questions"]:
@@ -262,10 +295,14 @@ def _results(data):
 
 
 def cmd_compare(args):
-    with open(args.a, encoding="utf-8") as fh:
-        a = json.load(fh)
-    with open(args.b, encoding="utf-8") as fh:
-        b = json.load(fh)
+    try:
+        with open(args.a, encoding="utf-8") as fh:
+            a = json.load(fh)
+        with open(args.b, encoding="utf-8") as fh:
+            b = json.load(fh)
+    except (OSError, ValueError) as exc:
+        print(f"report.py: cannot compare: {exc}")
+        return 0
     ea, eb = a.get("environment", {}), b.get("environment", {})
     print(f"environments: {ea.get('class', 'unknown')} ({a.get('chart_version', 'unknown')}) "
           f"-> {eb.get('class', 'unknown')} ({b.get('chart_version', 'unknown')})")

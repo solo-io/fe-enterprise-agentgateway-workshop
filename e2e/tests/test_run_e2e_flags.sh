@@ -138,20 +138,37 @@ done
   && ok "requires is comma-joined" || fail "requires not comma-joined: $(outcome_of skipme)"
 
 # --report / --report-only: flag parsing and the no-run path.
+export E2E_CHART_VERSION=v-test
 RPT="${TMP}/reports"
 mkdir -p "${TMP}/work/routing/rpt"
 echo "status=pass rc=0 duration=5 requires=" > "${TMP}/work/routing/rpt/outcome"
-out="$("$RUNNER" --report-only "$RPT" --env vind 2>&1)"; rc=$?
-if [[ $rc == 0 && "$out" == *"-vind-adhoc.md"* && "$out" == *"-vind-adhoc.json"* ]]; then ok "--report-only prints both report paths"
+out="$("$RUNNER" --report-only="$RPT" --env vind 2>&1)"; rc=$?
+if [[ $rc == 0 && "$out" == *"-vind-adhoc.md"* && "$out" == *"-vind-adhoc.json"* ]]; then ok "--report-only=<dir> prints both report paths"
 else fail "--report-only (rc=$rc): $out"; fi
-if [[ -f "$(printf '%s\n' "$out" | grep '\.md$')" ]]; then ok "--report-only wrote the Markdown"; else fail "no markdown written"; fi
-grep -q "routing/rpt" "$(printf '%s\n' "$out" | grep '\.md$')" 2>/dev/null \
-  && ok "--report-only reads existing outcome files" || fail "outcome not in report"
-run "--report-only --track mcp builds the mcp report" 0 "-vind-mcp.md" --report-only "$RPT" --track mcp --env vind
+MD="$(printf '%s\n' "$out" | grep '\.md$')"
+[[ -f "$MD" ]] && ok "--report-only wrote the Markdown" || fail "no markdown written"
+grep -q "routing/rpt" "$MD" 2>/dev/null && ok "--report-only reads existing outcome files" || fail "outcome not in report"
+run "--report-only --track mcp builds the mcp report" 0 "-vind-mcp.md" --report-only="$RPT" --track mcp --env vind
+(cd "$TMP" && "$RUNNER" --report-only=out --env vind >/dev/null 2>&1)
+ls "${TMP}"/out/*-vind-adhoc.md >/dev/null 2>&1 && ok "--report-only=out creates a relative dir" || fail "relative dir not created"
+run "--report-only rejects a positional argument" 2 "--report-only takes no positional argument" --report-only routing/rpt
+run "--report-only rejects a bare directory word" 2 "--report-only takes no positional argument" --report-only "$RPT"
 [[ ! -d "${TMP}/work/.run.lock" ]] && ok "--report-only takes no lock" || fail "lock left behind"
 run "--report with a bare spec keeps the spec positional" 1 "No spec at" --report routing/nope --no-prompt
 run "--report --resolve-creds exits before the report" 0 "Resolving credentials" \
   --track llm --env gke --report --resolve-creds --no-prompt
+
+# Stale outcomes: a track run clears them, a single-lab run leaves other labs alone.
+mkdir -p "${TMP}/work/stale/lab"
+echo "status=pass rc=0 duration=1 requires=" > "${TMP}/work/stale/lab/outcome"
+echo "BASELINE DRIFT: old" > "${TMP}/work/leftovers.txt"
+"$RUNNER" --track mcp --env vind --resolve-creds --no-prompt >/dev/null 2>&1
+[[ ! -e "${TMP}/work/stale/lab/outcome" && ! -e "${TMP}/work/leftovers.txt" ]] \
+  && ok "--track run clears stale outcomes and leftovers" || fail "track run left stale outcome/leftovers"
+mkdir -p "${TMP}/work/stale/lab"
+echo "status=pass rc=0 duration=1 requires=" > "${TMP}/work/stale/lab/outcome"
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --no-prompt >/dev/null 2>&1
+[[ -e "${TMP}/work/stale/lab/outcome" ]] && ok "single-lab run leaves other outcomes" || fail "single-lab run cleared an outcome"
 
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 [[ "$T_FAIL" -eq 0 ]]

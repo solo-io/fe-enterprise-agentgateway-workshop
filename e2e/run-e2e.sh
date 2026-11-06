@@ -14,8 +14,9 @@
 #   ./e2e/run-e2e.sh --tier t0                # only credential-free labs
 #   ./e2e/run-e2e.sh --track llm --env gke    # every runnable entry of a use-case track
 #   ./e2e/run-e2e.sh --track llm --resolve-creds  # resolve credentials, run nothing
-#   ./e2e/run-e2e.sh --track mcp --no-prompt --report [dir]  # run, then write the report (default dir reports/)
-#   ./e2e/run-e2e.sh --track mcp --report-only [dir]  # rebuild the report from existing outcomes, run nothing
+#   ./e2e/run-e2e.sh --track mcp --no-prompt --report[=dir]  # run, then write the report (default dir reports/)
+#   ./e2e/run-e2e.sh --report-only[=dir] --track mcp  # build from whatever outcomes exist, run nothing;
+#                                             # --track and --resolve-creds reset them, single-lab runs do not
 #   ./e2e/run-e2e.sh --lint                   # validate specs against labs, run nothing
 #   ./e2e/run-e2e.sh --list                   # show coverage table
 #
@@ -91,14 +92,10 @@ while [[ $# -gt 0 ]]; do
     --track)        TRACK="$2"; shift 2 ;;
     --env)          ENV_CLASS="$2"; shift 2 ;;
     --resolve-creds) RESOLVE_CREDS=true; shift ;;
-    --report|--report-only)
-      [[ "$1" == "--report" ]] && REPORT=true || REPORT_ONLY=true
-      shift
-      # An optional directory follows. A bare word stays a positional spec
-      # unless it looks like a path or names a directory that exists.
-      if [[ $# -gt 0 && ( "$1" == /* || "$1" == .* || "$1" == "~"* || -d "$1" ) ]]; then
-        REPORT_DIR="$1"; shift
-      fi ;;
+    --report)         REPORT=true; shift ;;
+    --report=*)       REPORT=true; REPORT_DIR="${1#--report=}"; shift ;;
+    --report-only)    REPORT_ONLY=true; shift ;;
+    --report-only=*)  REPORT_ONLY=true; REPORT_DIR="${1#--report-only=}"; shift ;;
     --no-prompt)    export E2E_PROMPT=0; shift ;;
     --verbose|-v)   export E2E_VERBOSE=1; shift ;;
     --keep-work)    KEEP_WORK=true; shift ;;
@@ -106,6 +103,11 @@ while [[ $# -gt 0 ]]; do
     *)              SPECIFIC="$1"; shift ;;
   esac
 done
+
+if [[ "$REPORT_ONLY" == "true" && -n "$SPECIFIC" ]]; then
+  printf "${RED}--report-only takes no positional argument (got %s); use --report-only=<dir> for a directory${NC}\n" "$SPECIFIC" >&2
+  exit 2
+fi
 
 if [[ -n "$TRACK" ]]; then
   [[ -z "$TIER_FILTER" ]] || { printf "${RED}--track and --tier are mutually exclusive${NC}\n" >&2; exit 1; }
@@ -558,6 +560,12 @@ fi
 # Build the run list
 declare -a RUN_SPECS=()
 if [[ -n "$TRACK" ]]; then
+  # A track run is a fresh session: drop every earlier outcome and the old
+  # leftovers so the report cannot mix runs. Single-lab runs never clear,
+  # because the enablement flow runs labs one at a time and reports at the end.
+  # --report-only exits before this point.
+  find "$WORK_ROOT" -name outcome -type f -delete 2>/dev/null
+  rm -f "${WORK_ROOT}/leftovers.txt"
   track_rows="$("$PYTHON" "${E2E_DIR}/lib/tracks.py" list "$TRACK" --env "$ENV_CLASS" 2>&1)" || {
     if [[ "$track_rows" == *"no track '"* ]]; then
       printf "${RED}no track named %s${NC}\n" "$TRACK" >&2
@@ -650,9 +658,11 @@ printf "${BOLD}═════════════════════�
 if [[ "$REPORT" == "true" ]]; then
   # The guard's findings become the report's Leftovers section.
   : > "${WORK_ROOT}/leftovers.txt"
-  for t in "${BASELINE_DRIFT[@]}"; do
-    printf 'BASELINE DRIFT: %s\n' "$t" >> "${WORK_ROOT}/leftovers.txt"
-  done
+  if (( ${#BASELINE_DRIFT[@]} > 0 )); then
+    for t in "${BASELINE_DRIFT[@]}"; do
+      printf 'BASELINE DRIFT: %s\n' "$t" >> "${WORK_ROOT}/leftovers.txt"
+    done
+  fi
   build_report || printf "${RED}report build failed${NC}\n" >&2
 fi
 

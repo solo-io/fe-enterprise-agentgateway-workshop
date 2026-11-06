@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.join(HERE, "..", "lib")
@@ -20,6 +21,10 @@ class ReportCase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.session = os.path.join(FIX, "session.jsonl")
+        # Hermetic: never call helm against the current kube context.
+        patcher = mock.patch.dict(os.environ, {"E2E_CHART_VERSION": "v-test"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def build(self, work=None, session=None):
         work = work or os.path.join(FIX, "work")
@@ -108,6 +113,99 @@ class TestBuild(ReportCase):
         self.assertEqual(heads, ["Environment", "First", "Second", "Deviations", "Failures", "Leftovers", "Questions"])
         self.assertIn("| Lab | Result | Duration | Note |", text)
         self.assertNotIn("—", text)
+
+
+class TestFixRound1(ReportCase):
+    def session_with(self, *events):
+        path = os.path.join(self.tmp.name, "s.jsonl")
+        with open(path, "w") as fh:
+            for kind, lab, text in events:
+                fh.write(json.dumps({"ts": "t", "kind": kind, "lab": lab, "text": text}) + "\n")
+        return path
+
+    def test_failure_carries_note_and_decision(self):
+        s = self.session_with(("failure", "routing/c", "Port clash."),
+                              ("decision", "routing/c", "Skip it."),
+                              ("decision", "routing/c", "Retry later."))
+        _, _, text, data = self.build(session=s)
+        f = data["failures"][0]
+        self.assertEqual((f["lab"], f["note"], f["decision"]), ("routing/c", "interrupted", "Retry later."))
+        self.assertIn("- routing/c (interrupted): Port clash. Decision: Retry later.", text)
+
+    def test_keep_base_sentence_in_leftovers(self):
+        s = self.session_with(("keep-base", "", "keep"))
+        _, _, text, _ = self.build(session=s)
+        leftovers = text.split("## Leftovers")[1].split("## Questions")[0]
+        self.assertIn("The base install was kept on request.", leftovers)
+        self.assertNotIn("kept on request", self.build()[2])
+
+    def test_missing_outcome_follows_track_entry(self):
+        work = os.path.join(self.tmp.name, "w")
+        os.makedirs(work)
+        _, _, _, data = self.build(work=work)
+        self.assertEqual(self.row(data, "routing/f", 1)["result"], "NOT AUTOMATED")
+        self.assertEqual(self.row(data, "routing/e", 1)["result"], "NOT APPLICABLE (only on eks)")
+        self.assertEqual(self.row(data, "routing/a")["note"], "no outcome recorded")
+
+    def test_malformed_outcome_is_fail(self):
+        work = os.path.join(self.tmp.name, "w")
+        os.makedirs(os.path.join(work, "routing", "a"))
+        with open(os.path.join(work, "routing", "a", "outcome"), "w") as fh:
+            fh.write("garbage\n")
+        _, _, _, data = self.build(work=work)
+        r = self.row(data, "routing/a")
+        self.assertEqual((r["result"], r["note"]), ("FAIL", "malformed outcome"))
+
+    def test_missing_env_json_exits_2_without_traceback(self):
+        proc = subprocess.run(
+            [sys.executable, os.path.join(LIB, "report.py"), "build", "--work", self.tmp.name,
+             "--track", "adhoc", "--env-json", os.path.join(self.tmp.name, "nope.json"),
+             "--session", self.session, "--out", self.tmp.name], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 2)
+        self.assertNotIn("Traceback", proc.stderr)
+        self.assertIn("cannot read env json", proc.stderr)
+
+    def test_compare_bad_json_exits_0_one_line(self):
+        bad = os.path.join(self.tmp.name, "bad.json")
+        with open(bad, "w") as fh:
+            fh.write("{not json")
+        proc = subprocess.run([sys.executable, os.path.join(LIB, "report.py"), "compare", bad, bad],
+                              capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0)
+        self.assertEqual(len(proc.stdout.strip().splitlines()), 1)
+        self.assertNotIn("Traceback", proc.stderr)
+
+
+class TestChartVersion(unittest.TestCase):
+    def fake_helm(self, body):
+        d = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(d, ignore_errors=True))
+        path = os.path.join(d, "helm")
+        with open(path, "w") as fh:
+            fh.write("#!/usr/bin/env bash\n" + body + "\n")
+        os.chmod(path, 0o755)
+        return d
+
+    def version(self, helm_dir):
+        env = {k: v for k, v in os.environ.items() if k != "E2E_CHART_VERSION"}
+        env["PATH"] = helm_dir + os.pathsep + env["PATH"]
+        with mock.patch.dict(os.environ, env, clear=True):
+            return report.chart_version()
+
+    def test_skips_crds_chart_and_strips_prefix(self):
+        out = json.dumps([{"chart": "enterprise-agentgateway-crds-v1.2.3"},
+                          {"chart": "enterprise-agentgateway-v2026.10.1"}])
+        self.assertEqual(self.version(self.fake_helm(f"echo '{out}'")), "v2026.10.1")
+
+    def test_unknown_when_release_gone(self):
+        self.assertEqual(self.version(self.fake_helm("echo '[]'")), "unknown")
+
+    def test_unknown_on_failure(self):
+        self.assertEqual(self.version(self.fake_helm("echo boom; exit 1")), "unknown")
+
+    def test_env_override_skips_helm(self):
+        with mock.patch.dict(os.environ, {"E2E_CHART_VERSION": "v9"}):
+            self.assertEqual(report.chart_version(), "v9")
 
 
 class TestCompare(ReportCase):
