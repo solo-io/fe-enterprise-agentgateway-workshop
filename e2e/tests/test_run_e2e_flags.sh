@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for run-e2e.sh's --track / --env / --resolve-creds flags and the
-# per-lab outcome files. Offline: kubectl is a stub, helm is absent, and
+# per-lab outcome files. Offline: kubectl and helm are stubs, and
 # --resolve-creds exits before any lab runs.
 E2E="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNNER="${E2E}/run-e2e.sh"
@@ -18,9 +18,12 @@ cat > "${TMP}/bin/kubectl" <<STUB
 #!/usr/bin/env bash
 [[ "\$1 \$2" == "config current-context" ]] && echo stub-context
 [[ "\$1 \$2" == "get gateway" && -f "${TMP}/gw" ]] && cat "${TMP}/gw"
+[[ "\$1 \$2" == "get namespaces" && -f "${TMP}/ns" ]] && cat "${TMP}/ns"
 exit 0
 STUB
 chmod +x "${TMP}/bin/kubectl"
+printf '#!/usr/bin/env bash\necho "helm stub: no cluster in tests" >&2; exit 1\n' > "${TMP}/bin/helm"
+chmod +x "${TMP}/bin/helm"
 
 export PATH="${TMP}/bin:${PATH}"
 export E2E_WORK_ROOT="${TMP}/work"
@@ -167,6 +170,12 @@ tkey="$(python3 "${E2E}/lib/tracks.py" list mcp --env vind | awk -F'\t' '$2=="ru
 out="$("$RUNNER" --track mcp --env vind --skip "$tkey" --skip other/key --resolve-creds --no-prompt 2>&1)"; rc=$?
 [[ $rc == 0 ]] && ok "--skip is repeatable with --track" || fail "--skip repeat rc=$rc: $out"
 
+# E2E_SPEC_TIMEOUT in the environment overrides the spec's timeout.
+mkfix slowpass t0 "" 30 "sleep 5; echo hi" hi
+E2E_SPEC_TIMEOUT=1 E2E_SPEC_DIR="$FIX" "$RUNNER" fx/slowpass --no-prompt >/dev/null 2>&1
+[[ "$(outcome_of slowpass)" == "status=timeout rc=124"* ]] && ok "E2E_SPEC_TIMEOUT overrides the spec timeout" \
+  || fail "slowpass outcome: '$(outcome_of slowpass)'"
+
 # Cleanup blocks that fail are tolerated but land in leftovers.txt and the outcome.
 cat > "${FIX}/fx/cleanfail.yaml" <<YAML
 lab: ${LAB}
@@ -201,6 +210,38 @@ rm -f "${TMP}/gw"
 grep -qx "BASELINE DRIFT: fx/drifter" "${TMP}/work/leftovers.txt" 2>/dev/null \
   && ok "single-lab drift written to leftovers.txt" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
 [[ "$(outcome_of drifter)" == "status=fail "*"drift=1" ]] && ok "drift=1 in the outcome" || fail "drifter outcome: '$(outcome_of drifter)'"
+
+# --uninstall-base lists namespaces that were not in detect-env's snapshot.
+mkdir -p "${FIX}/_base"
+for n in 901-uninstall-monitoring 902-uninstall-agentgateway; do
+  cat > "${FIX}/_base/${n}.yaml" <<YAML
+lab: ${LAB}
+description: fixture ${n}
+tier: t0
+requires: []
+timeout: 30
+steps:
+  - probe: "noop"
+    script: |
+      echo ok
+YAML
+done
+echo '{"class":"vind","namespaces":["default","kube-system"]}' > "${TMP}/work/env.json"
+printf 'default Active\nkube-system Active\nagw-evaluator Active\nmcp Active\n' > "${TMP}/ns"
+rm -f "${TMP}/work/leftovers.txt"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" --uninstall-base 2>&1)"; rc=$?
+[[ $rc == 1 && "$out" == *"LEFTOVER NAMESPACE: mcp (Active)"* ]] && ok "uninstall names a leftover namespace and exits 1" \
+  || fail "uninstall (rc=$rc): $(printf '%s' "$out" | tail -5)"
+[[ "$out" != *"LEFTOVER NAMESPACE: agw-evaluator"* ]] && ok "agw-evaluator is not a leftover" || fail "agw-evaluator flagged"
+grep -qx "LEFTOVER NAMESPACE: mcp (Active)" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "leftover namespace written to leftovers.txt" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
+echo '{"class":"vind"}' > "${TMP}/work/env.json"
+rm -f "${TMP}/work/leftovers.txt"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" --uninstall-base 2>&1)"
+grep -q "NAMESPACE CHECK NOT RUN" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "missing snapshot is reported, not passed silently" || fail "no snapshot: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
+rm -f "${TMP}/work/env.json" "${TMP}/ns" "${TMP}/work/leftovers.txt"
+rm -rf "${FIX}/_base" "${TMP}/work/_base"
 
 # --report / --report-only: flag parsing and the no-run path.
 export E2E_CHART_VERSION=v-test

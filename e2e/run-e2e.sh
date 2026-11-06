@@ -21,6 +21,9 @@
 #   ./e2e/run-e2e.sh --lint                   # validate specs against labs, run nothing
 #   ./e2e/run-e2e.sh --list                   # show coverage table
 #
+# E2E_SPEC_TIMEOUT=<secs> in the environment overrides every spec's timeout
+# (used to force a timeout failure on a real lab).
+#
 # Only one run at a time: labs share a cluster, so a second invocation is
 # refused while another holds e2e/.work/.run.lock.
 #
@@ -36,6 +39,8 @@ WORK_ROOT="${E2E_WORK_ROOT:-${E2E_DIR}/.work}"
 LABDOC="${E2E_DIR}/lib/labdoc.py"
 
 export E2E_DIR E2E_REPO_ROOT="${REPO_ROOT}"
+# Captured before any spec's metadata is eval'd, since that sets the same name.
+E2E_TIMEOUT_OVERRIDE="${E2E_SPEC_TIMEOUT:-}"
 
 # Bash 4+ is required (associative arrays). macOS /bin/bash is 3.2; the
 # shebang picks up homebrew bash from PATH.
@@ -77,7 +82,7 @@ declare -a SKIP_KEYS=()
 export E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
 usage() {
-  sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 ORIGINAL_ARGS=("$@")
@@ -342,6 +347,7 @@ run_lab() {
   local meta
   meta="$("$PYTHON" "$LABDOC" meta "$spec")" || { printf "${RED}✗ %s — bad spec${NC}\n" "$key"; TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); write_outcome fail 1; return; }
   eval "$meta"
+  [[ -n "$E2E_TIMEOUT_OVERRIDE" ]] && E2E_SPEC_TIMEOUT="$E2E_TIMEOUT_OVERRIDE"
   req="${E2E_SPEC_REQUIRES// /,}"
 
   local lab="${REPO_ROOT}/${E2E_SPEC_LAB}"
