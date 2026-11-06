@@ -29,6 +29,8 @@ E2E_RC=0
 E2E_OUT=""          # path to the last block's captured output
 E2E_LAST=""         # last block's output, in memory
 E2E_CLEANUP_DONE=0
+E2E_CLEANUP_FAIL=0  # cleanup blocks that exited non-zero (tolerated, but reported)
+E2E_PHASE=""
 E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
 e2e_begin() {
@@ -37,6 +39,7 @@ e2e_begin() {
 }
 
 e2e_phase() {
+  E2E_PHASE="$1"
   printf "  ${DIM}── %s ──${NC}\n" "$1"
 }
 
@@ -105,6 +108,9 @@ e2e_run_block() {
     printf "  ${CYAN}▸${NC} %-58s ${DIM}ran${NC}%b\n" "$label" "$suffix"
   elif [[ "$allow" == "1" ]]; then
     printf "  ${CYAN}▸${NC} %-58s ${DIM}ran (rc=%s, tolerated)${NC}\n" "$label" "$E2E_RC"
+    # A failed cleanup block may leave something on the cluster; the runner
+    # reports it as a leftover even when the lab passed.
+    [[ "$E2E_PHASE" == "cleanup" ]] && E2E_CLEANUP_FAIL=$((E2E_CLEANUP_FAIL + 1))
   else
     printf "  ${RED}✗${NC} %-58s ${RED}FAIL${NC} — block exited %s\n" "$label" "$E2E_RC"
     e2e_dump_output
@@ -360,8 +366,8 @@ e2e_run_cleanup() {
 }
 
 e2e_write_result() {
-  printf 'pass=%s fail=%s skip=%s blocks=%s\n' \
-    "$E2E_PASS" "$E2E_FAIL" "$E2E_SKIP" "$E2E_BLOCKS" >"${E2E_WORKDIR}/result"
+  printf 'pass=%s fail=%s skip=%s blocks=%s cleanup_fail=%s\n' \
+    "$E2E_PASS" "$E2E_FAIL" "$E2E_SKIP" "$E2E_BLOCKS" "$E2E_CLEANUP_FAIL" >"${E2E_WORKDIR}/result"
 }
 
 e2e_end() {

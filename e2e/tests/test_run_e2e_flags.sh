@@ -7,10 +7,17 @@ RUNNER="${E2E}/run-e2e.sh"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+# Hermetic: never read the developer's e2e/.env.local or shell rc files.
+# PYTHONUSERBASE keeps a user-site PyYAML importable after HOME moves.
+export PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/null)}"
+export E2E_ENV_LOCAL=/dev/null HOME="$TMP"
 mkdir -p "${TMP}/bin" "${TMP}/work"
-cat > "${TMP}/bin/kubectl" <<'STUB'
+# The Gateway fingerprint answers from ${TMP}/gw when it exists, so a fixture
+# probe can simulate baseline drift by rewriting that file.
+cat > "${TMP}/bin/kubectl" <<STUB
 #!/usr/bin/env bash
-[[ "$1 $2" == "config current-context" ]] && echo stub-context
+[[ "\$1 \$2" == "config current-context" ]] && echo stub-context
+[[ "\$1 \$2" == "get gateway" && -f "${TMP}/gw" ]] && cat "${TMP}/gw"
 exit 0
 STUB
 chmod +x "${TMP}/bin/kubectl"
@@ -45,6 +52,17 @@ run "--uninstall-base rejects --resolve-creds" 1 \
   "--uninstall-base and --resolve-creds are mutually exclusive" --uninstall-base --resolve-creds --no-prompt
 run "--uninstall-base rejects a positional spec" 1 \
   "--uninstall-base and a positional spec are mutually exclusive" --uninstall-base routing/direct-response --no-prompt
+run "--uninstall-base rejects --report-only" 1 \
+  "--uninstall-base and --report-only are mutually exclusive" --uninstall-base --report-only
+run "--uninstall-base rejects --report" 1 \
+  "--uninstall-base and --report are mutually exclusive" --uninstall-base --report --no-prompt
+run "--uninstall-base rejects --only-base" 1 \
+  "--uninstall-base and --only-base are mutually exclusive" --uninstall-base --only-base --no-prompt
+run "--report-only rejects --install-base" 1 \
+  "--report-only and --install-base are mutually exclusive" --report-only --install-base
+run "--skip needs a key" 1 "--skip needs a lab key" --skip
+run "--no-prompt banner names .env.local and rc files, no prompt" 0 "(env → e2e/.env.local → shell rc)" \
+  --track llm --env gke --resolve-creds --no-prompt
 run "--resolve-creds on a track exits 0" 0 "Resolving credentials" \
   --track llm --env gke --resolve-creds --no-prompt
 
@@ -136,6 +154,53 @@ for pair in excluded:excluded skipme:skip passme:pass failme:fail timeoutme:time
 done
 [[ "$(outcome_of skipme)" == *"requires=NOPE_KEY,NOPE_TWO" ]] \
   && ok "requires is comma-joined" || fail "requires not comma-joined: $(outcome_of skipme)"
+
+# --skip: a declined lab is recorded, not run, for positional and --track runs.
+rm -rf "${TMP}/work/fx/passme"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --skip fx/passme --no-prompt 2>&1)"
+[[ "$(outcome_of passme)" == "status=skip rc=0 duration=0 requires= reason=declined" ]] \
+  && ok "--skip writes a declined skip outcome" || fail "--skip outcome: '$(outcome_of passme)'"
+[[ ! -e "${TMP}/work/fx/passme/driver.sh" ]] && ok "--skip runs nothing" || fail "--skip ran the lab"
+[[ "$out" == *"(declined)"* ]] && ok "--skip prints declined" || fail "--skip output: $out"
+tkey="$(python3 "${E2E}/lib/tracks.py" list mcp --env vind | awk -F'\t' '$2=="run"{print $1; exit}')"
+"$RUNNER" --track mcp --env vind --skip "$tkey" --resolve-creds --no-prompt >/dev/null 2>&1
+out="$("$RUNNER" --track mcp --env vind --skip "$tkey" --skip other/key --resolve-creds --no-prompt 2>&1)"; rc=$?
+[[ $rc == 0 ]] && ok "--skip is repeatable with --track" || fail "--skip repeat rc=$rc: $out"
+
+# Cleanup blocks that fail are tolerated but land in leftovers.txt and the outcome.
+cat > "${FIX}/fx/cleanfail.yaml" <<YAML
+lab: ${LAB}
+description: fixture cleanfail
+tier: t0
+requires: []
+timeout: 30
+steps:
+  - probe: "fixture probe"
+    script: |
+      echo hi
+    assert:
+      - contains: "hi"
+cleanup:
+  - probe: "failing cleanup"
+    script: |
+      false
+YAML
+rm -f "${TMP}/work/leftovers.txt"
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/cleanfail --no-prompt >/dev/null 2>&1
+[[ "$(outcome_of cleanfail)" == "status=pass "*"cleanup_fail=1" ]] \
+  && ok "failed cleanup block recorded in the outcome" || fail "cleanfail outcome: '$(outcome_of cleanfail)'"
+grep -qx "CLEANUP BLOCK FAILED: fx/cleanfail" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "failed cleanup block listed in leftovers.txt" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
+
+# Baseline drift in a single-lab run is persisted for the report.
+mkfix drifter t0 "" 30 "echo '80|changed' > ${TMP}/gw; echo hi" hi
+echo "80|agentgateway-config" > "${TMP}/gw"
+rm -f "${TMP}/work/leftovers.txt"
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/drifter --no-prompt >/dev/null 2>&1
+rm -f "${TMP}/gw"
+grep -qx "BASELINE DRIFT: fx/drifter" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "single-lab drift written to leftovers.txt" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
+[[ "$(outcome_of drifter)" == "status=fail "*"drift=1" ]] && ok "drift=1 in the outcome" || fail "drifter outcome: '$(outcome_of drifter)'"
 
 # --report / --report-only: flag parsing and the no-run path.
 export E2E_CHART_VERSION=v-test

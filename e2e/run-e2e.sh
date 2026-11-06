@@ -14,6 +14,7 @@
 #   ./e2e/run-e2e.sh --tier t0                # only credential-free labs
 #   ./e2e/run-e2e.sh --track llm --env gke    # every runnable entry of a use-case track
 #   ./e2e/run-e2e.sh --track llm --resolve-creds  # resolve credentials, run nothing
+#   ./e2e/run-e2e.sh --track llm --skip llm/x # record llm/x as SKIP (declined); repeatable
 #   ./e2e/run-e2e.sh --track mcp --no-prompt --report[=dir]  # run, then write the report (default dir reports/)
 #   ./e2e/run-e2e.sh --report-only[=dir] --track mcp  # build from whatever outcomes exist, run nothing;
 #                                             # --track and --resolve-creds reset them, single-lab runs do not
@@ -72,10 +73,11 @@ UNINSTALL_BASE=false
 REPORT=false
 REPORT_ONLY=false
 REPORT_DIR=""
+declare -a SKIP_KEYS=()
 export E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
 usage() {
-  sed -n '2,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,25p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 ORIGINAL_ARGS=("$@")
@@ -92,6 +94,8 @@ while [[ $# -gt 0 ]]; do
     --track)        TRACK="$2"; shift 2 ;;
     --env)          ENV_CLASS="$2"; shift 2 ;;
     --resolve-creds) RESOLVE_CREDS=true; shift ;;
+    --skip)         [[ -n "${2:-}" ]] || { printf "${RED}--skip needs a lab key${NC}\n" >&2; exit 1; }
+                    SKIP_KEYS+=("${2%.yaml}"); shift 2 ;;
     --report)         REPORT=true; shift ;;
     --report=*)       REPORT=true; REPORT_DIR="${1#--report=}"; shift ;;
     --report-only)    REPORT_ONLY=true; shift ;;
@@ -121,7 +125,14 @@ if [[ "$UNINSTALL_BASE" == "true" ]]; then
   [[ -z "$TIER_FILTER" ]]            || _ub_conflict="--tier"
   [[ "$RESOLVE_CREDS" != "true" ]]   || _ub_conflict="--resolve-creds"
   [[ -z "$SPECIFIC" ]]               || _ub_conflict="a positional spec"
+  [[ "$REPORT_ONLY" != "true" ]]     || _ub_conflict="--report-only"
+  [[ "$REPORT" != "true" ]]          || _ub_conflict="--report"
+  [[ "$ONLY_BASE" != "true" ]]       || _ub_conflict="--only-base"
   [[ -z "$_ub_conflict" ]] || { printf "${RED}--uninstall-base and %s are mutually exclusive${NC}\n" "$_ub_conflict" >&2; exit 1; }
+fi
+
+if [[ "$REPORT_ONLY" == "true" && "$INSTALL_BASE" == "true" ]]; then
+  printf "${RED}--report-only and --install-base are mutually exclusive${NC}\n" >&2; exit 1
 fi
 
 # --env: the environment class the tracks filter on. Default to what the
@@ -164,19 +175,32 @@ E2E_CHILD_PGID=""
 E2E_CURRENT_KEY=""
 E2E_CURRENT_START=0
 
-# write_outcome_file <key> <status> <rc> <duration> <requires> [only_on]
+# write_outcome_file <key> <status> <rc> <duration> <requires> [only_on] [k=v...]
 #   One line per lab at ${WORK_ROOT}/<key>/outcome. The report builder reads it,
-#   so the field names and status values are a contract.
+#   so the field names and status values are a contract. Optional trailing
+#   fields: drift=1, cleanup_fail=N, reason=declined.
 write_outcome_file() {
-  local key="$1" status="$2" rc="$3" dur="$4" req="$5" only_on="${6:-}"
+  local key="$1" status="$2" rc="$3" dur="$4" req="$5" only_on="${6:-}" line
+  shift 5; (( $# )) && shift
+  line="status=${status} rc=${rc} duration=${dur} requires=${req}"
+  [[ -n "$only_on" ]] && line+=" only_on=${only_on}"
+  (( $# )) && line+=" $*"
   mkdir -p "${WORK_ROOT}/${key}"
-  if [[ -n "$only_on" ]]; then
-    printf 'status=%s rc=%s duration=%s requires=%s only_on=%s\n' \
-      "$status" "$rc" "$dur" "$req" "$only_on" > "${WORK_ROOT}/${key}/outcome"
-  else
-    printf 'status=%s rc=%s duration=%s requires=%s\n' \
-      "$status" "$rc" "$dur" "$req" > "${WORK_ROOT}/${key}/outcome"
-  fi
+  printf '%s\n' "$line" > "${WORK_ROOT}/${key}/outcome"
+}
+
+# note_leftover <line>
+#   Appends one line to the report's Leftovers section. Every run mode writes
+#   here; only a --track run starts the file afresh.
+note_leftover() {
+  printf '%s\n' "$1" >> "${WORK_ROOT}/leftovers.txt"
+}
+
+# is_declined <key>: true when --skip named the key.
+is_declined() {
+  local k
+  for k in ${SKIP_KEYS[@]+"${SKIP_KEYS[@]}"}; do [[ "$k" == "$1" ]] && return 0; done
+  return 1
 }
 
 run_with_timeout() {
@@ -190,8 +214,13 @@ run_with_timeout() {
 
   while kill -0 "$pid" 2>/dev/null; do
     if (( waited >= secs )); then
+      # SIGTERM runs the driver's EXIT trap, which runs the lab's Cleanup. Give
+      # it time to finish (deleting a namespace takes a while) before SIGKILL.
       kill -TERM "-${pid}" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
-      sleep 2
+      local grace=0
+      while kill -0 "$pid" 2>/dev/null && (( grace < ${E2E_CLEANUP_GRACE:-180} )); do
+        sleep 1; grace=$((grace + 1))
+      done
       kill -KILL "-${pid}" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
       wait "$pid" 2>/dev/null
       E2E_CHILD_PGID=""
@@ -298,10 +327,17 @@ run_lab() {
   local start="$SECONDS" req=""
   E2E_CURRENT_KEY="$key"; E2E_CURRENT_START="$start"
   # <status> <rc>: record the outcome, then clear the in-flight marker.
+  local extra=()
   write_outcome() {
-    write_outcome_file "$key" "$1" "$2" "$((SECONDS - start))" "$req"
+    write_outcome_file "$key" "$1" "$2" "$((SECONDS - start))" "$req" "" ${extra[@]+"${extra[@]}"}
     E2E_CURRENT_KEY=""
   }
+
+  if is_declined "$key"; then
+    printf "  ${YELLOW}⊘${NC} %-58s ${YELLOW}SKIP${NC} (declined)\n" "$key"
+    TOTAL_SKIP=$((TOTAL_SKIP+1)); SKIPPED+=("${key} (declined)")
+    write_outcome_file "$key" skip 0 0 "" "" reason=declined; E2E_CURRENT_KEY=""; return
+  fi
 
   local meta
   meta="$("$PYTHON" "$LABDOC" meta "$spec")" || { printf "${RED}✗ %s — bad spec${NC}\n" "$key"; TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); write_outcome fail 1; return; }
@@ -366,9 +402,29 @@ run_lab() {
       printf "      ${YELLOW}restored the 001 Gateway so the run can continue${NC}\n"
     fi
     drifted=true
+    extra+=("drift=1")
+    note_leftover "BASELINE DRIFT: ${key}"
     BASELINE_DRIFT+=("$key")
     TOTAL_FAIL=$((TOTAL_FAIL + 1))
     FAILED+=("${key} (baseline drift)")
+  fi
+
+  # The driver writes `result` after its Cleanup section finishes, so an empty
+  # file means Cleanup never completed.
+  local p=0 f=0 s=0 cf=0
+  E2E_R_pass=0; E2E_R_fail=0; E2E_R_skip=0; E2E_R_cleanup_fail=0
+  if [[ -s "${workdir}/result" ]]; then
+    # shellcheck disable=SC2046
+    eval $(sed 's/\([a-z_]*\)=/E2E_R_\1=/g' "${workdir}/result")
+    p="${E2E_R_pass:-0}"; f="${E2E_R_fail:-0}"; s="${E2E_R_skip:-0}"; cf="${E2E_R_cleanup_fail:-0}"
+  elif [[ "$rc" -ne 0 ]]; then
+    note_leftover "CLEANUP INCOMPLETE: ${key}"
+    extra+=("cleanup_fail=incomplete")
+  fi
+  if [[ "$cf" -gt 0 ]]; then
+    printf "  ${YELLOW}!${NC} %-58s ${YELLOW}%s cleanup block(s) failed${NC}\n" "$key" "$cf"
+    note_leftover "CLEANUP BLOCK FAILED: ${key}"
+    extra+=("cleanup_fail=${cf}")
   fi
 
   if [[ "$rc" -eq 124 ]]; then
@@ -376,13 +432,6 @@ run_lab() {
     TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("${key} (timeout)")
     write_outcome timeout 124
     printf "\n"; return
-  fi
-
-  local p=0 f=0 s=0
-  if [[ -f "${workdir}/result" ]]; then
-    # shellcheck disable=SC2046
-    eval $(sed 's/\([a-z]*\)=/E2E_R_\1=/g' "${workdir}/result")
-    p="${E2E_R_pass:-0}"; f="${E2E_R_fail:-0}"; s="${E2E_R_skip:-0}"
   fi
 
   TOTAL_PASS=$((TOTAL_PASS + p))
@@ -479,12 +528,48 @@ uninstall_base() {
     [[ -f "$spec" ]] || { printf "${RED}missing base spec: %s${NC}\n" "$spec"; exit 1; }
     run_lab "$spec"
   done
-  local line existing rc=0
-  line="$("${E2E_DIR}/lib/detect-env.sh" --skip-rbac-check 2>/dev/null | grep '^existing_install' || true)"
+  local rc=0
+  if [[ "$TOTAL_FAIL" -ne 0 ]]; then
+    printf "${RED}uninstall step failed, see above${NC}\n"; rc=1
+  fi
+
+  # Leftover namespaces: anything present now that was not in the namespace
+  # snapshot detect-env.sh took before the session. agw-evaluator holds the
+  # evaluator identity the prospect applied, so it stays.
+  local snapshot="${WORK_ROOT}/env.json" before now ns phase waited=0 leftover=()
+  if before="$("$PYTHON" -c 'import json,sys; d=json.load(open(sys.argv[1])); print("\n".join(d["namespaces"]))' \
+      "$snapshot" 2>/dev/null)"; then
+    while :; do
+      leftover=()
+      now="$(kubectl get namespaces -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{"\n"}{end}' 2>/dev/null)" \
+        || { printf "${RED}cannot list namespaces${NC}\n"; rc=1; break; }
+      local terminating=0
+      while read -r ns phase; do
+        [[ -n "$ns" && "$ns" != "agw-evaluator" ]] || continue
+        grep -qxF "$ns" <<<"$before" && continue
+        leftover+=("${ns}${phase:+ (${phase})}")
+        [[ "$phase" == "Terminating" ]] && terminating=$((terminating + 1))
+      done <<<"$now"
+      # Namespaces the uninstall just deleted are still Terminating for a while.
+      (( ${#leftover[@]} > 0 && terminating == ${#leftover[@]} && waited < 180 )) || break
+      sleep 5; waited=$((waited + 5))
+    done
+    for ns in ${leftover[@]+"${leftover[@]}"}; do
+      printf "${RED}LEFTOVER NAMESPACE: %s${NC}\n" "$ns"
+      note_leftover "LEFTOVER NAMESPACE: ${ns}"
+    done
+    (( ${#leftover[@]} == 0 )) || rc=1
+  else
+    printf "${YELLOW}No namespace snapshot in %s; run e2e/lib/detect-env.sh before the base install to enable this check.${NC}\n" "$snapshot"
+    note_leftover "NAMESPACE CHECK NOT RUN: no namespace snapshot from before the session"
+  fi
+
+  local line existing
+  line="$("${E2E_DIR}/lib/detect-env.sh" --skip-rbac-check --skip-lb-probe \
+    --out "${WORK_ROOT}/env-teardown.json" 2>/dev/null | grep '^existing_install' || true)"
   printf '%s\n' "${line:-existing_install: (probe failed)}"
   existing="${line#existing_install:}"; existing="${existing# }"
-  [[ "$TOTAL_FAIL" -eq 0 ]] || rc=1
-  if [[ -n "$existing" || -z "$line" ]]; then
+  if [[ -n "$existing" || -z "$line" || "$rc" -ne 0 ]]; then
     printf "${RED}Something from the baseline remains on the cluster.${NC}\n"; rc=1
   fi
   [[ "$rc" -eq 0 ]] && printf "${GREEN}Baseline removed.${NC}\n"
@@ -576,8 +661,6 @@ if [[ -n "$TRACK" ]]; then
   printf "${BOLD}Track: %s | Env: %s${NC}\n" "$TRACK" "$ENV_CLASS"
   while IFS=$'\t' read -r tkey tstatus _; do
     [[ -n "$tkey" ]] || continue
-    # A fresh session must not inherit outcomes from an earlier run.
-    [[ "$RESOLVE_CREDS" == "true" ]] && rm -f "${WORK_ROOT}/${tkey}/outcome"
     case "$tstatus" in
       run)
         [[ -f "${SPEC_DIR}/${tkey}.yaml" ]] || { printf "${RED}track entry %s has no spec file${NC}\n" "$tkey" >&2; exit 1; }
@@ -608,12 +691,17 @@ fi
 # Resolve every credential the run needs, up front, in one prompt batch.
 declare -A NEEDED=()
 for spec in "${RUN_SPECS[@]}"; do
+  is_declined "$(spec_key "$spec")" && continue
   eval "$("$PYTHON" "$LABDOC" meta "$spec")"
   [[ "$E2E_SPEC_TIER" == "excluded" || "$E2E_SPEC_TIER" == "t5-manual" ]] && continue
   for v in $E2E_SPEC_REQUIRES; do NEEDED["$v"]=1; done
 done
 if (( ${#NEEDED[@]} > 0 )); then
-  printf "${BOLD}Resolving credentials${NC} ${DIM}(env → shell rc → prompt)${NC}\n"
+  if [[ "$E2E_PROMPT" == "0" ]]; then
+    printf "${BOLD}Resolving credentials${NC} ${DIM}(env → e2e/.env.local → shell rc)${NC}\n"
+  else
+    printf "${BOLD}Resolving credentials${NC} ${DIM}(env → e2e/.env.local → shell rc → prompt)${NC}\n"
+  fi
   for v in $(printf '%s\n' "${!NEEDED[@]}" | sort); do
     if e2e_resolve_key "$v"; then
       printf "  ${GREEN}✓${NC} %s\n" "$v"
@@ -627,7 +715,7 @@ fi
 
 printf "${BOLD}═══════════════════════════════════════════════════════════════${NC}\n"
 printf "${BOLD}  Enterprise Agentgateway Workshop — Lab E2E${NC}\n"
-printf "${BOLD}  Cluster: %s | Specs: %d${NC}\n" \
+printf "${BOLD}  Context: %s | Specs: %d${NC}\n" \
   "$(kubectl config current-context 2>/dev/null || echo unknown)" "${#RUN_SPECS[@]}"
 printf "${BOLD}═══════════════════════════════════════════════════════════════${NC}\n\n"
 
@@ -656,13 +744,6 @@ printf "${BOLD}═════════════════════�
 [[ "$KEEP_WORK" == "true" ]] || printf "${DIM}  block output kept in %s${NC}\n" "$WORK_ROOT"
 
 if [[ "$REPORT" == "true" ]]; then
-  # The guard's findings become the report's Leftovers section.
-  : > "${WORK_ROOT}/leftovers.txt"
-  if (( ${#BASELINE_DRIFT[@]} > 0 )); then
-    for t in "${BASELINE_DRIFT[@]}"; do
-      printf 'BASELINE DRIFT: %s\n' "$t" >> "${WORK_ROOT}/leftovers.txt"
-    done
-  fi
   build_report || printf "${RED}report build failed${NC}\n" >&2
 fi
 
