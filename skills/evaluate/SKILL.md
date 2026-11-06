@@ -24,22 +24,23 @@ Run:
 ./e2e/lib/detect-env.sh
 ```
 
-Exit 0: continue. Exit 2: stop and show the message; it names the missing CLI, unsupported server version, missing LoadBalancer, or the permissions to grant with `kubectl apply -f rbac/evaluator.yaml`. Exit 1: the cluster is unreachable, so ask the prospect to fix their kubeconfig. See `skills/detect-environment/SKILL.md`.
+Exit 0: continue. Exit 2: stop and show the message; it names the missing CLI, missing PyYAML, a bash older than 4, an unsupported server version, a missing LoadBalancer, or the permissions to grant with `kubectl apply -f rbac/evaluator.yaml`. Exit 1: the cluster is unreachable, so ask the prospect to fix their kubeconfig. See `skills/detect-environment/SKILL.md`.
 
 If `existing_install` in `e2e/.work/env.json` is non-empty, say what it names and ask before continuing.
 
 ## 2. Choose track and mode
 
-Ask which track to run if the prospect has not said. Offer this heuristic: the MCP track if their interest is tools and agents talking to internal services, the LLM track if it is model access, cost, and guardrails. Both is allowed; run them one after the other. The second track's `--track` run clears the first track's outcomes, so build the first track's report (step 6) before you start the second.
+Ask which track to run if the prospect has not said. Offer this heuristic: the MCP track if their interest is tools and agents talking to internal services, the LLM track if it is model access, cost, and guardrails. Both is allowed; run them one after the other. The second track's `--track` run clears the first track's outcomes, so build the first track's report with the step 8 command before you start the second, and ask keep-or-remove (step 7) only after the last track.
 
 Ask for the mode:
 
 - `enablement` (default): you explain each lab, run it, and pause between use cases.
 - `rig`: all labs run unattended and you report at the end.
 
-Record the answer, with `<t>` as `llm` or `mcp` and `<m>` as the mode:
+Start a fresh session log, then record the answer, with `<t>` as `llm` or `mcp` and `<m>` as the mode. Do this again at the start of each track:
 
 ```bash
+e2e/lib/session-log.sh start
 e2e/lib/session-log.sh add decision - "track=<t> mode=<m>"
 ```
 
@@ -57,7 +58,11 @@ python3 e2e/lib/tracks.py list <t> --env <class>
 
 The `tracks.py list` output has one line per lab: `<key>`, `<status>`, `<use-case>`. Show it grouped by use case. Name:
 
-- the labs that need a paid provider key (tier `t1-key` in `--list`), and ask before running them
+- the labs that need a paid provider key (tier `t1-key` in `--list`), and ask before running them. For each paid lab the prospect declines, log it and pass `--skip <key>` on every later `run-e2e.sh` call; the report shows it as `SKIP (declined)`:
+
+  ```bash
+  e2e/lib/session-log.sh add decision <key> declined
+  ```
 - the labs that will skip because a credential is missing: join the `⊘ VAR` lines from the `--resolve-creds` output against the REQUIRES column of `--list`, filtered to this track's keys
 - the labs with status `duplicate`: listed under two use cases, run once, and shown in both report tables
 - the labs marked `no-spec`, reported as `NOT AUTOMATED`; the prospect can run these by hand from the lab markdown
@@ -75,29 +80,30 @@ Otherwise narrate Use Case 1 from `tracks/<t>-track.md`.
 
 ## 5. Run the labs
 
-`rig` mode:
+`rig` mode, with one `--skip <key>` per declined lab (leave `--skip` out when there are none):
 
 ```bash
-./e2e/run-e2e.sh --track <t> --env <class> --no-prompt --report
+./e2e/run-e2e.sh --track <t> --env <class> --no-prompt --skip <key>
 ```
-
-Then go to step 7.
 
 `enablement` mode: for each `run` entry from the list, in order:
 
-1. Invoke `skills/explain-lab/SKILL.md` for the lab.
-2. Run `./e2e/run-e2e.sh <key>` and show the result line.
-3. On any non-zero exit, invoke `skills/diagnose-failure/SKILL.md` and do nothing else until the prospect chooses.
+1. If the prospect declined the lab, run `./e2e/run-e2e.sh <key> --skip <key>` to record it and move on.
+2. Invoke `skills/explain-lab/SKILL.md` for the lab.
+3. Run `./e2e/run-e2e.sh <key>` and show the result line.
+4. On any non-zero exit, invoke `skills/diagnose-failure/SKILL.md` and do nothing else until the prospect chooses.
 
 After the last lab of a use case, pause and invite questions. Answer product questions with `skills/ask-the-docs/SKILL.md`.
 
-## 6. Build the report
+## 6. Diagnose rig failures
+
+In `rig` mode, take every lab listed under `Failed:` in the run summary. For each one, follow steps 1 and 2 of `skills/diagnose-failure/SKILL.md`: read `e2e/.work/<key>/`, record the failure, and explain it.
 
 ```bash
-./e2e/run-e2e.sh --report-only --track <t> --env <class>
+e2e/lib/session-log.sh add failure <key> "<one-line explanation>"
 ```
 
-This builds the report from the work directory and runs nothing. Skip it in `rig` mode, where step 5 already wrote the report.
+Then offer the four options from that skill once, for the whole set, and do nothing to the cluster until the prospect picks. Record each choice as that skill says. Skip this step in `enablement` mode, where each failure was handled as it happened.
 
 ## 7. Keep or remove the base
 
@@ -111,11 +117,14 @@ Otherwise:
 
 ```bash
 ./e2e/run-e2e.sh --uninstall-base
-./e2e/lib/detect-env.sh
 ```
 
-Show `existing_install` from `e2e/.work/env.json` and confirm it is empty.
+It removes the base, lists any `LEFTOVER NAMESPACE:` that was not on the cluster when detection ran, and writes `e2e/.work/env-teardown.json`. Show `existing_install` from that file and confirm it is empty. If the command exits non-zero, show what it names; the report lists the same lines under Leftovers.
 
-## 8. Show the report
+## 8. Build and show the report
 
-Show the paths: `reports/<YYYYMMDD-HHMM>-<class>-<track>.md` and `.json`. Say the report is a local file and nothing was sent anywhere. If the prospect wants Solo to see it, they send it themselves.
+```bash
+./e2e/run-e2e.sh --report-only --track <t> --env <class>
+```
+
+This builds the report from the work directory and runs nothing. Show the two paths it prints: `reports/<YYYYMMDD-HHMMSS>-<class>-<track>.md` and `.json`. Say the report is a local file and nothing was sent anywhere. If the prospect wants Solo to see it, they send it themselves.

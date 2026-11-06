@@ -51,6 +51,8 @@ class AgentLayer(unittest.TestCase):
             self.assertIn(opt, text)
         self.assertIn('session-log.sh add deviation <key> "<what was applied and why>"', text)
         self.assertIn("session-log.sh add decision <key> stop", text)
+        self.assertIn("session-log.sh add decision <key> skip", text)
+        self.assertIn("session-log.sh add decision <key> retry", text)
         for p in ["e2e/.work/<key>/driver.sh", "blocks/NNNN.sh", "blocks/NNNN.out", "result", "outcome"]:
             self.assertIn(p, text)
 
@@ -91,6 +93,42 @@ class AgentLayer(unittest.TestCase):
     def test_evaluate_covers_license_key_duplicates_and_two_tracks(self):
         text = read("skills/evaluate/SKILL.md")
         for needle in ["SOLO_TRIAL_LICENSE_KEY", "duplicate", "last 30 lines", "clears the first track's outcomes"]:
+            self.assertIn(needle, text)
+
+    def test_leak_rule_covers_web_and_object_names(self):
+        self.assertIn("web search", read("AGENTS.md"))
+        self.assertIn("web fetch", read("AGENTS.md"))
+        docs = read("skills/ask-the-docs/SKILL.md")
+        for needle in ["metadata.name", "web search", "`agentgateway-system`", "`mcp`", "`procurement`",
+                       "`stripe-mcp`", "`team-research`", "hostnames and URLs"]:
+            self.assertIn(needle, docs)
+
+    def test_evaluate_rig_diagnoses_then_tears_down_then_reports(self):
+        text = read("skills/evaluate/SKILL.md")
+        rig = text[text.index("## 5. Run the labs"):]
+        self.assertIn("./e2e/run-e2e.sh --track <t> --env <class> --no-prompt", rig)
+        self.assertNotIn("--no-prompt --report", rig)
+        self.assertIn('e2e/lib/session-log.sh add failure <key> "<one-line explanation>"', rig)
+        self.assertLess(rig.index("add failure"), rig.index("--uninstall-base"))
+        self.assertLess(rig.index("--uninstall-base"), rig.index("--report-only"))
+        self.assertIn("env-teardown.json", rig)
+        self.assertIn("<YYYYMMDD-HHMMSS>", rig)
+
+    def test_evaluate_starts_session_and_handles_declined_labs(self):
+        text = read("skills/evaluate/SKILL.md")
+        self.assertLess(text.index("session-log.sh start"), text.index('add decision - "track=<t> mode=<m>"'))
+        self.assertIn("session-log.sh add decision <key> declined", text)
+        self.assertIn("--skip <key>", text)
+        self.assertIn("SKIP (declined)", read("AGENTS.md"))
+
+    def test_explain_lab_has_fallbacks(self):
+        text = read("skills/explain-lab/SKILL.md")
+        for needle in ["first H2", "`Source:` lines", "`Overview`", "`description:`"]:
+            self.assertIn(needle, text)
+
+    def test_agents_md_prereqs_and_env_local_quoting(self):
+        text = read("AGENTS.md")
+        for needle in ["PyYAML", "bash 4", "quote any value", "<YYYYMMDD-HHMMSS>"]:
             self.assertIn(needle, text)
 
     def test_command_file(self):

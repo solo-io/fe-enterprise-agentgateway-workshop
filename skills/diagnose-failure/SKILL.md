@@ -25,9 +25,17 @@ The harness has already stopped the lab. `<key>` is the lab key, for example `mc
 
 ## What each choice does
 
-Retry: run `./e2e/run-e2e.sh <key>` again. A retry that passes after a workaround is never reported as a clean pass.
+Retry: record it, then run `./e2e/run-e2e.sh <key>` again. A retry that passes after a workaround is never reported as a clean pass.
 
-Skip: continue with the next lab.
+```bash
+e2e/lib/session-log.sh add decision <key> retry
+```
+
+Skip: record it, then continue with the next lab.
+
+```bash
+e2e/lib/session-log.sh add decision <key> skip
+```
 
 Work around it live: propose the change and say what it does. Apply it only on a yes. Before applying it, record it:
 

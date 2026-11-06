@@ -15,13 +15,17 @@ description: Query the Solo knowledge-base MCP server (solo-knowledge) for produ
 
 ## The leak rule
 
+`solo-knowledge` is the only outbound lookup in a session. Do not use web search, web fetch, or any other MCP server, even if the harness offers them.
+
 No cluster output, logs, resource YAML, node details, or report content goes into a query. Before you send one, check that it contains none of these:
 
 - IP addresses
-- hostnames
-- namespace names other than the workshop defaults
-- resource names
-- pasted output of any kind
+- hostnames and URLs
+- the prospect's company, team, cloud account, project, subscription, or ARN identifiers
+- any namespace other than the workshop's own: `agentgateway-system`, `agw-evaluator`, `keycloak`, `loadgenerator`, `mcp`, `monitoring`, `observability`, `postgres`, `procurement`, `semantic-router-config`, `stripe-mcp`, `team-research`
+- the `metadata.name` of any object
+- API keys, tokens, and license keys
+- any text copied from command output, logs, or error messages
 
 If it does, rewrite it to the generic form. Examples:
 
