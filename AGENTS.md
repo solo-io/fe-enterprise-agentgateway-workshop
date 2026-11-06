@@ -27,6 +27,13 @@ will cost money before the run starts.
 `kubectl`, `helm`, `jq`, and `python3` on the PATH, and a kubeconfig that points
 at the cluster. `./e2e/lib/detect-env.sh` checks all of them.
 
+The base install needs `SOLO_TRIAL_LICENSE_KEY`. Labs that call a provider need
+that provider's key, for example `OPENAI_API_KEY`. The agent's shell has no
+terminal, so it cannot prompt for keys. Provide each one in one of three ways:
+export it in the shell before starting the agent, put it in a shell rc file
+such as `~/.zshrc`, or put `KEY=value` lines in `e2e/.env.local` (gitignored).
+Labs whose key is missing in all three places skip.
+
 ## Identity
 
 The recommended identity is the `agw-evaluator` ServiceAccount. The prospect
@@ -37,7 +44,9 @@ kubectl apply -f rbac/evaluator.yaml
 ./rbac/mint-kubeconfig.sh
 ```
 
-See `rbac/README.md`. The role is privilege-equivalent to cluster-admin, so use
+The script prints an `export KUBECONFIG=<path>` line. Run it in the shell, then
+start the agent (or restart it) so the agent inherits `KUBECONFIG`. See
+`rbac/README.md`. The role is privilege-equivalent to cluster-admin, so use
 it on disposable or test clusters only. It covers the llm and mcp tracks. The
 prospect's own admin identity also works.
 

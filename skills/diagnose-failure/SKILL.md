@@ -7,7 +7,11 @@ description: Handle a lab that exited non-zero. Read the failing block, explain 
 
 The harness has already stopped the lab. `<key>` is the lab key, for example `mcp/in-cluster-mcp`. Do exactly these five steps.
 
-1. Read the failing block, its captured output, and the lab's expected output from `e2e/.work/<key>/`: `e2e/.work/<key>/driver.sh` is the generated script, `blocks/NNNN.sh` is each block, `blocks/NNNN.out` is its output, `result` is the pass/fail line, and `outcome` is the recorded outcome.
+1. Read the failing block, its captured output, and the lab's expected output from `e2e/.work/<key>/`: `e2e/.work/<key>/driver.sh` is the generated script, `blocks/NNNN.sh` is each block, `blocks/NNNN.out` is its output, `result` is the pass/fail line, and `outcome` is the recorded outcome. Then record the failure:
+
+   ```bash
+   e2e/lib/session-log.sh add failure <key> "<one-line explanation>"
+   ```
 2. Explain in plain language: what the lab expected, what the cluster returned, and the most likely cause. If the cause is a product question, you may consult `solo-knowledge` with a generic query, following `skills/ask-the-docs/SKILL.md`. Never paste cluster output into that query.
 3. Offer exactly these options:
 
@@ -16,13 +20,8 @@ The harness has already stopped the lab. `<key>` is the lab key, for example `mc
    - Work around it live
    - Stop the session
 
-4. Do nothing to the cluster until the prospect picks. Record the failure first:
-
-   ```bash
-   e2e/lib/session-log.sh add failure <key> "<one line: block number and what failed>"
-   ```
-
-5. Run the lab's Cleanup regardless of the choice, including on stop.
+4. Do nothing to the cluster until the prospect picks.
+5. The harness already ran the lab's Cleanup when it exited, whatever the choice. Confirm it from the cleanup phase in `e2e/.work/<key>/blocks/*.out`, show any leftovers, and never run cleanup blocks by hand.
 
 ## What each choice does
 
@@ -36,9 +35,9 @@ Work around it live: propose the change and say what it does. Apply it only on a
 e2e/lib/session-log.sh add deviation <key> "<what was applied and why>"
 ```
 
-Then apply it and re-run with `./e2e/run-e2e.sh <key>`. The report marks the lab `PASS (deviation)` with the change recorded.
+Then apply it and re-run with `./e2e/run-e2e.sh <key>`. Revert the workaround after the re-run, or say so if the baseline guard will report it as a leftover. The report marks the lab `PASS (deviation)` with the change recorded.
 
-Stop: run nothing further except Cleanup, then record it:
+Stop: run nothing further, then record it:
 
 ```bash
 e2e/lib/session-log.sh add decision <key> stop

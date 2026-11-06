@@ -30,7 +30,7 @@ If `existing_install` in `e2e/.work/env.json` is non-empty, say what it names an
 
 ## 2. Choose track and mode
 
-Ask which track to run if the prospect has not said. Offer this heuristic: the MCP track if their interest is tools and agents talking to internal services, the LLM track if it is model access, cost, and guardrails. Both is allowed; run them one after the other.
+Ask which track to run if the prospect has not said. Offer this heuristic: the MCP track if their interest is tools and agents talking to internal services, the LLM track if it is model access, cost, and guardrails. Both is allowed; run them one after the other. The second track's `--track` run clears the first track's outcomes, so build the first track's report (step 6) before you start the second.
 
 Ask for the mode:
 
@@ -53,10 +53,13 @@ python3 e2e/lib/tracks.py list <t> --env <class>
 ./e2e/run-e2e.sh --list
 ```
 
-`--resolve-creds` runs nothing and clears outcomes from earlier runs. The `tracks.py list` output has one line per lab: `<key>`, `<status>`, `<use-case>`. Show it grouped by use case. Name:
+`--resolve-creds` runs nothing and clears outcomes from earlier runs. It does not resolve `SOLO_TRIAL_LICENSE_KEY`; only the base install does. The agent's shell has no terminal, so it cannot prompt for keys. Keys come from the shell environment, a shell rc file, or `KEY=value` lines in `e2e/.env.local`. A paid-lab key that is absent from all three makes those labs skip, which is fine.
+
+The `tracks.py list` output has one line per lab: `<key>`, `<status>`, `<use-case>`. Show it grouped by use case. Name:
 
 - the labs that need a paid provider key (tier `t1-key` in `--list`), and ask before running them
-- the labs that will skip because a credential is missing
+- the labs that will skip because a credential is missing: join the `⊘ VAR` lines from the `--resolve-creds` output against the REQUIRES column of `--list`, filtered to this track's keys
+- the labs with status `duplicate`: listed under two use cases, run once, and shown in both report tables
 - the labs marked `no-spec`, reported as `NOT AUTOMATED`; the prospect can run these by hand from the lab markdown
 - the labs marked `not-applicable:<class>`, reported as `NOT APPLICABLE` on this cluster
 
@@ -66,7 +69,9 @@ python3 e2e/lib/tracks.py list <t> --env <class>
 ./e2e/run-e2e.sh --install-base --only-base
 ```
 
-Then narrate Use Case 1 from `tracks/<t>-track.md`.
+If it exits non-zero, stop, show the last 30 lines of its output, and ask the prospect how to proceed. The usual cause is a missing `SOLO_TRIAL_LICENSE_KEY`.
+
+Otherwise narrate Use Case 1 from `tracks/<t>-track.md`.
 
 ## 5. Run the labs
 

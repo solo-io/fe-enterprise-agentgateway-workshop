@@ -6,7 +6,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SKILLS = ["evaluate", "detect-environment", "explain-lab", "diagnose-failure", "ask-the-docs"]
-INTERNAL = "support-agent-tools"
+INTERNAL = "support-agent" + "-tools"
 
 
 def read(rel):
@@ -75,6 +75,23 @@ class AgentLayer(unittest.TestCase):
 
     def test_claude_md_is_one_line(self):
         self.assertEqual(read("CLAUDE.md").strip(), "Read AGENTS.md and follow it.")
+
+    def test_agents_md_names_license_key_and_credential_sources(self):
+        text = read("AGENTS.md")
+        for needle in ["SOLO_TRIAL_LICENSE_KEY", "e2e/.env.local", "shell rc file", "export it in the shell",
+                       "export KUBECONFIG=<path>"]:
+            self.assertIn(needle, text)
+
+    def test_diagnose_says_harness_already_cleaned_up(self):
+        text = read("skills/diagnose-failure/SKILL.md")
+        self.assertIn("already ran the lab's Cleanup", text)
+        self.assertIn("never run cleanup blocks by hand", text)
+        self.assertLess(text.index("add failure"), text.index("Offer exactly these options"))
+
+    def test_evaluate_covers_license_key_duplicates_and_two_tracks(self):
+        text = read("skills/evaluate/SKILL.md")
+        for needle in ["SOLO_TRIAL_LICENSE_KEY", "duplicate", "last 30 lines", "clears the first track's outcomes"]:
+            self.assertIn(needle, text)
 
     def test_command_file(self):
         text = read(".claude/commands/evaluate.md")
