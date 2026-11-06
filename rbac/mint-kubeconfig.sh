@@ -32,6 +32,10 @@ if [[ -z "$ca_data" && -n "$ca_file" ]]; then ca_data="$(base64 < "$ca_file" | t
 token="$(kubectl create token agw-evaluator -n agw-evaluator --duration "$DURATION")" \
   || { echo "cannot create a token; apply rbac/evaluator.yaml as admin first" >&2; exit 1; }
 
+if [[ -z "$ca_data" ]]; then
+  echo "warning: no cluster CA found in the current context; the kubeconfig omits it and kubectl will use the system trust roots" >&2
+fi
+
 mkdir -p "$(dirname "$OUT")"
 umask 077
 {
@@ -43,8 +47,6 @@ umask 077
   echo "      server: ${server}"
   if [[ -n "$ca_data" ]]; then
     echo "      certificate-authority-data: ${ca_data}"
-  else
-    echo "      insecure-skip-tls-verify: true"
   fi
   echo "users:"
   echo "  - name: agw-evaluator"

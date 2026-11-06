@@ -93,7 +93,14 @@ Y
   check "subresource and resourceNames denials exit 2" "$RC" 2
   [[ "$OUT" == *"create pods/portforward"* ]] && ok "subresource checked with --subresource" || fail "output: $OUT"
   [[ "$OUT" == *"escalate clusterroles.rbac.authorization.k8s.io"* ]] && ok "resourceNames rule checked by name" || fail "output: $OUT"
-  [[ "$OUT" != *"widgets"* ]] && ok "absent CRD type is not reported" || fail "absent type reported: $OUT"
+  [[ "$(field '.permissions|tostring')" != *widgets* ]] && ok "absent CRD type is not reported missing" || fail "absent type reported: $OUT"
+  [[ "$(field '.signals|index("can-i-unchecked:get widgets.example.io")')" != null ]] && ok "absent CRD type raises can-i-unchecked signal" || fail "signals: $(field .signals)"
+  # a denial on the second resourceName alone is still a missing permission
+  echo "escalate clusterroles.rbac.authorization.k8s.io/bar" > "${fx}/can-i-no"
+  : > "$DETECT_LOG"; RC=0
+  OUT="$(DETECT_FIXTURE="$fx" "$DETECT" --out "$JSON" --rbac-file "$rbac" 2>&1)" || RC=$?
+  check "denial on second resourceName exits 2" "$RC" 2
+  [[ "$(field '.permissions|tostring')" == *"escalate clusterroles.rbac.authorization.k8s.io"* ]] && ok "second resourceName checked" || fail "output: $OUT"
 }
 
 test_helm_failure_is_unknown_not_clean() {

@@ -7,8 +7,23 @@ chart that needs it.
 
 The role is broad on CRDs and ClusterRoles because a gateway install is
 cluster-scoped, and Kubernetes refuses to let an identity grant more
-permissions than it holds. The `escalate` and `bind` verbs are limited to the
-exact ClusterRole and Role names the charts create.
+permissions than it holds.
+
+## Security model
+
+The role guards against accidents, not against a hostile evaluator. It can
+create and update ClusterRoles and ClusterRoleBindings, holds `escalate` and
+`bind` on the chart roles, and can read Secrets cluster-wide, so it is
+privilege-equivalent to cluster-admin. Use it on disposable or test clusters.
+The `escalate` and `bind` rules name the chart release names and namespaces that
+`--install-base` uses; if you change those, edit the role.
+
+## Coverage
+
+The role was derived by running `--install-base`, `--track llm`,
+`--track mcp`, and `--uninstall-base`. Labs outside those tracks (Kyverno,
+inference, HPA, networking) return forbidden errors as the evaluator; run them
+as an admin or add rules.
 
 ## Setup
 

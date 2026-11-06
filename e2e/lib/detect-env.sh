@@ -149,7 +149,11 @@ preflight_permissions() {  # sets PERMISSIONS (json: "ok", "skipped" or a list)
       yes) ;;
       no)  # A resource type whose CRD is not installed yet cannot be checked; the
            # CRD install is covered by the customresourcedefinitions rule.
-           grep -q "doesn't have a resource type" "$errf" || missing+=("$label") ;;
+           if grep -q "doesn't have a resource type" "$errf"; then
+             SIGNALS+=("can-i-unchecked:${label}")
+           else
+             [[ " ${missing[*]} " == *" ${label} "* ]] || missing+=("$label")
+           fi ;;
       *)   SIGNALS+=("can-i-error:${label}"); missing+=("$label") ;;   # fail closed
     esac
   done < <(python3 -c '
@@ -165,12 +169,13 @@ for doc in yaml.safe_load_all(open(sys.argv[1])):
                 full = f"{base}.{g}" if g else base
                 for v in r.get("verbs") or []:
                     label = f"{v} {res}.{g}" if g else f"{v} {res}"
-                    # resourceNames-scoped rules only match a request that names the object.
-                    names = r.get("resourceNames") or []
-                    target = full + "/" + names[0] if names else full
-                    args = f"{v} {target}" + (f" --subresource={sub}" if sub else "")
-                    if label not in seen:
-                        seen.add(label); print(label + "\t" + args)' "$RBAC_FILE") || { rm -f "$errf"; die "cannot parse ${RBAC_FILE}"; }
+                    # resourceNames-scoped rules only match a request that names the object; check every name.
+                    names = r.get("resourceNames") or [None]
+                    for n in names:
+                        target = full + "/" + n if n else full
+                        args = f"{v} {target}" + (f" --subresource={sub}" if sub else "")
+                        if (label, args) not in seen:
+                            seen.add((label, args)); print(label + "\t" + args)' "$RBAC_FILE") || { rm -f "$errf"; die "cannot parse ${RBAC_FILE}"; }
   rm -f "$errf"
   if (( ${#missing[@]} )); then
     PERMISSIONS="$(printf '%s\n' "${missing[@]}" | jq -R . | jq -sc .)"

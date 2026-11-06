@@ -13,17 +13,26 @@ def docs():
         return [d for d in yaml.safe_load_all(f) if d]
 
 
+def roles():
+    return [d for d in docs() if d["kind"] in ("ClusterRole", "Role")]
+
+
 def role():
-    return next(d for d in docs() if d["kind"] == "ClusterRole")
+    return next(d for d in docs() if d["kind"] == "ClusterRole" and d["metadata"]["name"] == "agw-evaluator")
+
+
+def all_rules():
+    return [r for d in roles() for r in d.get("rules") or []]
 
 
 class TestEvaluatorRbac(unittest.TestCase):
     def test_no_wildcard_verbs_resources_or_groups(self):
-        rules = role()["rules"]
+        rules = all_rules()
         self.assertTrue(rules)
         for r in rules:
-            for key in ("apiGroups", "resources", "verbs"):
+            for key in ("apiGroups", "resources", "verbs", "nonResourceURLs", "resourceNames"):
                 self.assertNotIn("*", r.get(key, []), f"wildcard in {key}: {r}")
+            self.assertNotIn("impersonate", r.get("verbs", []), f"impersonate granted: {r}")
             self.assertTrue(r.get("verbs"), f"rule without verbs: {r}")
             self.assertTrue(r.get("resources"), f"rule without resources: {r}")
 
@@ -31,7 +40,7 @@ class TestEvaluatorRbac(unittest.TestCase):
         with open(RBAC) as f:
             lines = f.read().splitlines()
         idx = [i for i, l in enumerate(lines) if l.strip() == "- apiGroups:"]
-        self.assertEqual(len(idx), len(role()["rules"]))
+        self.assertEqual(len(idx), len(all_rules()))
         for i in idx:
             j = i - 1
             while j >= 0 and not lines[j].strip():
@@ -41,7 +50,7 @@ class TestEvaluatorRbac(unittest.TestCase):
 
     def test_escalate_and_bind_are_resource_scoped(self):
         found = False
-        for r in role()["rules"]:
+        for r in all_rules():
             if {"escalate", "bind"} & set(r["verbs"]):
                 found = True
                 self.assertTrue(r.get("resourceNames"), f"unscoped escalate/bind: {r}")
