@@ -1,5 +1,18 @@
 # Changelog
 
+0.15.3 - (11-6-26)
+---
+- Add an evaluation agent: an AI agent (Claude Code or Codex) runs the LLM or MCP track against a user-provided cluster, explains each lab, stops on failure, cleans up, and writes a local report
+  - Agent layer: `AGENTS.md` (the four hard rules, prerequisites, identity, how to start), `skills/` (evaluate, detect-environment, explain-lab, diagnose-failure, ask-the-docs), `.mcp.json` for the Solo docs server, the `/evaluate` command, and a README section that points at `AGENTS.md`
+  - Tracks: `tracks/llm-track.yaml` and `tracks/mcp-track.yaml`, and `./e2e/run-e2e.sh --track <llm|mcp> --env <class>` to run a track's labs in use-case order; `--skip <key>` records a lab the user declined as `SKIP (declined)`
+  - Environment detection: `./e2e/lib/detect-env.sh` classifies the cluster, checks CLIs, sizing, LoadBalancer and permissions, and writes `e2e/.work/env.json`
+  - Least-privilege identity: `rbac/evaluator.yaml` and `rbac/mint-kubeconfig.sh` for an `agw-evaluator` identity whose role lists every verb and resource with no wildcards; the script embeds the cluster CA (from the context, `kube-root-ca.crt`, or `--ca-file`)
+  - Reports: `--report` and `--report-only` write a Markdown and JSON report to `reports/`, `python3 e2e/lib/report.py compare` diffs two reports, and `e2e/lib/session-log.sh` records decisions, deviations, questions, answers and failures for the report
+  - Teardown: `./e2e/run-e2e.sh --uninstall-base` removes the monitoring stack and the controller install, lists any namespace that was not on the cluster when detection ran as `LEFTOVER NAMESPACE`, and records a cleanup that fails or is cut short under Leftovers in the report
+  - `E2E_SPEC_TIMEOUT` and `E2E_CLEANUP_GRACE` overrides for `./e2e/run-e2e.sh`
+- `001-install-enterprise-agentgateway.md` Uninstall: the optional Gateway API CRD removal is its own block, so the eval agent harness never runs it
+- Cleanup in `in-cluster-mcp`, `mcp-tool-federation`, `mcp-tool-mode-search`, `mcp-tool-mode-code`, `mcp-byo-grpc-ext-authz` and `mcp-tool-rate-limiting` now deletes the `mcp` namespace and waits for it to go
+
 0.15.2 - (11-4-26)
 ---
 - "View Metrics Endpoint" in 18 routing, agent-harness, agent-framework and guardrail labs: scrape every proxy replica instead of port-forwarding to one pod of the deployment
