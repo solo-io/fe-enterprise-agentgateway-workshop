@@ -3,6 +3,7 @@ BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "$*" in
   "version --short") echo "v3.15.0+gstub" ;;
   "list -A -o json")
+    [[ -e "${DETECT_FIXTURE}/helm-fail" ]] && { echo "helm: boom" >&2; exit 1; }
     f="${DETECT_FIXTURE}/helm.json"; [[ -e "$f" ]] || f="${BIN}/../_default/helm.json"; cat "$f" ;;
 esac
 exit 0

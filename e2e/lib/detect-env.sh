@@ -58,14 +58,17 @@ classify() {  # sets CLASS, appends SIGNALS
   pid="$(jq -r '.items[0].spec.providerID // ""' <<<"$NODES_JSON")"
   host="$(jq -r '.items[0].metadata.labels["kubernetes.io/hostname"] // ""' <<<"$NODES_JSON")"
   ctx="$(kubectl config current-context 2>/dev/null)"
+  local rc=0 apis
+  apis="$(kubectl api-resources --api-group=config.openshift.io -o name 2>/dev/null)" || rc=$?
+  (( rc )) && SIGNALS+=("api-resources-failed")
+  if [[ -n "$apis" ]]; then   # OpenShift on a cloud keeps that cloud's providerID
+    CLASS=openshift; SIGNALS+=("api-group=config.openshift.io"); return
+  fi
   case "$pid" in
     aws:///*)   CLASS=eks; SIGNALS+=("providerID=aws"); return ;;
     gce://*)    CLASS=gke; SIGNALS+=("providerID=gce"); return ;;
     azure:///*) CLASS=aks; SIGNALS+=("providerID=azure"); return ;;
   esac
-  if [[ -n "$(kubectl api-resources --api-group=config.openshift.io -o name 2>/dev/null)" ]]; then
-    CLASS=openshift; SIGNALS+=("api-group=config.openshift.io"); return
-  fi
   if [[ "$pid" == vcluster://* ]]; then   # vind nodes carry vcluster:// providerIDs
     CLASS=vind; SIGNALS+=("providerID=vcluster"); return
   fi
@@ -105,7 +108,9 @@ for n in items:
     a = n["status"]["allocatable"]
     c = a["cpu"]; cpu += int(c[:-1]) / 1000 if c.endswith("m") else float(c)
     m = re.match(r"(\d+)(Ki|Mi|Gi)?", a["memory"]); mem += int(m[1]) * u[m[2] or ""]
-print(len(items), round(cpu, 2), round(mem / 2**30, 1))' <<<"$NODES_JSON")
+print(len(items), round(cpu, 2), round(mem / 2**30, 1))' <<<"$NODES_JSON") \
+    || die "cannot parse node allocatable"
+  [[ "${NODE_COUNT:-0}" -gt 0 && -n "${CPU:-}" && -n "${MEM_GIB:-}" ]] || die "cluster reports no nodes"
 }
 
 check_sizing() {  # floor = min nodes x min node size from the POC sizing table
@@ -121,9 +126,11 @@ check_sizing() {  # floor = min nodes x min node size from the POC sizing table
 }
 
 probe_install() {  # sets EXISTING_INSTALL
-  EXISTING_INSTALL="$(helm list -A -o json 2>/dev/null \
-    | jq -r '[.[] | select(.chart | startswith("enterprise-agentgateway"))
-              | select(.chart | startswith("enterprise-agentgateway-crds") | not)][0].namespace // ""')"
+  local listing rc=0
+  listing="$(helm list -A -o json 2>/dev/null)" || rc=$?
+  if (( rc )); then EXISTING_INSTALL=unknown; SIGNALS+=("helm-list-failed"); return; fi
+  EXISTING_INSTALL="$(jq -r '[.[] | select(.chart | startswith("enterprise-agentgateway"))
+              | select(.chart | startswith("enterprise-agentgateway-crds") | not)][0].namespace // ""' <<<"$listing")" || { EXISTING_INSTALL=unknown; SIGNALS+=("helm-list-failed"); return; }
   if [[ -z "$EXISTING_INSTALL" ]] && kubectl get crd \
       enterpriseagentgatewayparameters.enterpriseagentgateway.solo.io -o name >/dev/null 2>&1; then
     SIGNALS+=("crds-only")
@@ -132,10 +139,15 @@ probe_install() {  # sets EXISTING_INSTALL
 
 preflight_permissions() {  # sets PERMISSIONS (json: "ok", "skipped" or a list)
   if (( SKIP_RBAC )); then PERMISSIONS='"skipped"'; return; fi
-  local missing=() line verb res
+  local missing=() line verb res ans
   while IFS= read -r line; do
     verb="${line%% *}"; res="${line#* }"
-    kubectl auth can-i "$verb" "$res" >/dev/null 2>&1 || missing+=("$line")
+    ans="$(kubectl auth can-i "$verb" "$res" 2>/dev/null)"
+    case "$ans" in
+      yes) ;;
+      no)  missing+=("$line") ;;
+      *)   SIGNALS+=("can-i-error:${line}") ;;
+    esac
   done < <(python3 -c '
 import sys, yaml
 seen = set()
@@ -203,17 +215,18 @@ NODES_JSON="$(kubectl get nodes -o json 2>/dev/null)" || die "cannot list nodes 
 classify
 check_version
 read_nodes
-check_sizing
+check_sizing || die "sizing check failed"
 probe_install
 IDENTITY="$(kubectl auth whoami -o json 2>/dev/null | jq -r '.status.userInfo.username // empty')"
 [[ -n "$IDENTITY" ]] || { IDENTITY=unknown; SIGNALS+=("whoami-unsupported"); }
 preflight_permissions
 if (( ${#STOP[@]} )); then
-  LOADBALANCER=unchecked; SIGNALS+=("lb-probe-skipped")
+  LOADBALANCER=none; SIGNALS+=("lb-probe-skipped")
 else
   probe_lb
 fi
-write_json
+write_json || die "cannot write ${OUT}"
+jq -e . "$OUT" >/dev/null || die "${OUT} is not valid JSON"
 jq -r 'to_entries[] | "\(.key): \(.value|if type=="string" then . else tojson end)"' "$OUT"
 if (( ${#STOP[@]} )); then printf 'detect-env: %s\n' "${STOP[@]}" >&2; exit 2; fi
 exit 0

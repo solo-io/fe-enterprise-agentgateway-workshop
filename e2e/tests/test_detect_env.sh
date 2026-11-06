@@ -21,6 +21,11 @@ detect() {  # detect <fixture> <args...>; sets OUT, RC
   RC=0
   OUT="$(DETECT_FIXTURE="${FX}/${fixture}" "$DETECT" --out "$JSON" "$@" 2>&1)" || RC=$?
 }
+detect_dir() {  # detect_dir <fixture path> <args...>; like detect with an explicit dir
+  local fx="$1"; shift
+  : > "$DETECT_LOG"; rm -f "$JSON"; RC=0
+  OUT="$(DETECT_FIXTURE="$fx" "$DETECT" --out "$JSON" "$@" 2>&1)" || RC=$?
+}
 field() { jq -r "$1" "$JSON" 2>/dev/null; }
 check() {  # check <desc> <actual> <expected>
   if [[ "$2" == "$3" ]]; then ok "$1"; else fail "$1 (got '$2', wanted '$3')"; fi
@@ -42,6 +47,33 @@ test_lb_timeout_exits_2_and_deletes_probe() {
   [[ "$OUT" == *cloud-provider-kind* ]] && ok "no LB names cloud-provider-kind" || fail "no LB message: $OUT"
   grep -q 'delete.*e2e-lb-probe' "$DETECT_LOG" && ok "probe Service deleted" || fail "probe not deleted: $(cat "$DETECT_LOG")"
   check "loadbalancer none" "$(field .loadbalancer)" none
+  # Probe skipped because a stop reason already exists: still "none".
+  local fx="${TMP}/skip"; cp -R "${FX}/eks" "$fx"; echo "delete namespaces" > "${fx}/can-i-no"
+  detect_dir "$fx"
+  check "skipped probe exits 2" "$RC" 2
+  check "skipped probe loadbalancer is none" "$(field .loadbalancer)" none
+  [[ "$(field '.signals|index("lb-probe-skipped")')" != null ]] && ok "lb-probe-skipped signal" || fail "lb-probe-skipped missing"
+  grep -q 'create' "$DETECT_LOG" && fail "probe created despite stop" || ok "no probe created when skipped"
+}
+
+test_helm_failure_is_unknown_not_clean() {
+  local fx="${TMP}/helmfail"; cp -R "${FX}/eks" "$fx"; touch "${fx}/helm-fail"
+  detect_dir "$fx" --skip-rbac-check
+  check "helm failure exits 0" "$RC" 0
+  check "existing_install unknown" "$(field .existing_install)" unknown
+  [[ "$(field '.signals|index("helm-list-failed")')" != null ]] && ok "helm-list-failed signal" || fail "signal missing"
+}
+
+test_openshift_wins_over_cloud_providerid() {
+  local fx="${TMP}/ocp"; cp -R "${FX}/eks" "$fx"; touch "${fx}/openshift"
+  detect_dir "$fx" --skip-rbac-check
+  check "openshift on aws" "$(field .class)" openshift
+}
+
+test_empty_node_list_is_own_error() {
+  local fx="${TMP}/nonodes"; cp -R "${FX}/eks" "$fx"; echo '{"items": []}' > "${fx}/nodes.json"
+  detect_dir "$fx" --skip-rbac-check
+  check "empty nodes exits 1" "$RC" 1
 }
 
 test_reports_existing_install_namespace() {
@@ -49,7 +81,8 @@ test_reports_existing_install_namespace() {
   check "existing_install namespace" "$(field .existing_install)" agw-other
   detect eks --skip-rbac-check
   check "no install is empty string" "$(field .existing_install)" ""
-  touch "${FX}/eks/crd"; detect eks --skip-rbac-check; rm -f "${FX}/eks/crd"
+  local fx="${TMP}/crd"; cp -R "${FX}/eks" "$fx"; touch "${fx}/crd"
+  detect_dir "$fx" --skip-rbac-check
   check "crds-only install namespace" "$(field .existing_install)" ""
   [[ "$(field '.signals|index("crds-only")')" != null ]] && ok "crds-only signal" || fail "crds-only signal missing"
 }
@@ -128,6 +161,9 @@ test_signals_lists_the_heuristic
 test_json_fields_and_summary
 test_version_out_of_range_exits_2
 test_permission_preflight_names_missing_verb_resource
+test_helm_failure_is_unknown_not_clean
+test_openshift_wins_over_cloud_providerid
+test_empty_node_list_is_own_error
 
 printf '\n%d passed, %d failed\n' "$T_PASS" "$T_FAIL"
 (( T_FAIL == 0 ))
