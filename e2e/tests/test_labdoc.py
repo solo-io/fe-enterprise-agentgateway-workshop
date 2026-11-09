@@ -1,6 +1,7 @@
 """Tests for labdoc.py — pure parse/plan logic, no cluster needed."""
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -146,6 +147,52 @@ class TestResourceVerb(unittest.TestCase):
             _y.safe_dump(bad, f); path = f.name
         with self.assertRaises(SystemExit):
             labdoc.build_driver(LAB, path, tempfile.mkdtemp(), repo_root="/REPO")
+
+
+class TestRequirements(unittest.TestCase):
+    def spec(self, **kw):
+        base = {"lab": "x.md", "steps": [{"section": "A", "assert": [{"status": 200}]}]}
+        base.update(kw)
+        return base
+
+    def test_no_requirements_key_is_clean(self):
+        self.assertEqual(labdoc.check_requirements(self.spec()), [])
+
+    def test_requirement_without_step_reported(self):
+        s = self.spec(requirements=[{"id": "R1", "text": "no token is rejected"}])
+        errs = labdoc.check_requirements(s)
+        self.assertEqual(errs, ["requirement R1 has no step that proves it"])
+
+    def test_proves_unknown_id_reported(self):
+        s = self.spec(requirements=[{"id": "R1", "text": "t"}],
+                      steps=[{"section": "A", "proves": ["R9"], "assert": [{"status": 401}]}])
+        errs = labdoc.check_requirements(s)
+        self.assertIn("step 1 proves undeclared requirement R9", errs)
+        self.assertIn("requirement R1 has no step that proves it", errs)
+
+    def test_proving_step_without_assert_reported(self):
+        s = self.spec(requirements=[{"id": "R1", "text": "t"}],
+                      steps=[{"section": "A", "proves": ["R1"]}])
+        self.assertEqual(labdoc.check_requirements(s),
+                         ["step 1 proves R1 but has no assert"])
+
+    def test_requirement_missing_id_or_text_reported(self):
+        s = self.spec(requirements=[{"id": "R1"}, {"text": "no id"}])
+        errs = labdoc.check_requirements(s)
+        self.assertIn("requirement 1 has no text", errs)
+        self.assertIn("requirement 2 has no id", errs)
+
+    def test_covered_requirement_is_clean(self):
+        s = self.spec(requirements=[{"id": "R1", "text": "t"}],
+                      steps=[{"section": "A", "proves": ["R1"], "assert": [{"status": 401}]}])
+        self.assertEqual(labdoc.check_requirements(s), [])
+
+    def test_lint_cli_fails_on_uncovered_requirement(self):
+        spec = os.path.join(FIX, "req-spec.yaml")
+        proc = subprocess.run([sys.executable, os.path.join(HERE, "..", "lib", "labdoc.py"),
+                               "lint", LAB, spec], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("requirement R2 has no step that proves it", proc.stdout + proc.stderr)
 
 
 if __name__ == "__main__":

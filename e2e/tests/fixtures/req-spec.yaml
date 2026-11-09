@@ -1,0 +1,23 @@
+lab: e2e/tests/fixtures/mini-lab.md
+tier: t0
+timeout: 60
+requirements:
+  - id: R1
+    text: covered
+  - id: R2
+    text: not covered
+steps:
+  - section: Deploy the echo server
+    run: [2]
+    wait: "--for=condition=Ready pod -l app=echo -n mini --timeout=60s"
+  - section: Send a request
+    proves: [R1]
+    retry:
+      attempts: 3
+      delay: 1
+      until: "HTTP/"
+    assert:
+      - status: 200
+      - contains: "echo"
+cleanup:
+  - section: Cleanup
