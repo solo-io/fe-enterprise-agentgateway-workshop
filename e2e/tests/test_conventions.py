@@ -1,5 +1,6 @@
 """Tests for the conventions linter, using throwaway fixture trees."""
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -142,6 +143,34 @@ class TestAiBackendRule(unittest.TestCase):
             "# provider settings\n    ai:\n      provider: {}\nEOF\n```\n\n## Cleanup\n"))
         errs = conventions.check_ai_backend(root, ["labs/x.md"], allow=set())
         self.assertEqual(len(errs), 1)
+
+
+class TestCustomLabs(unittest.TestCase):
+    def _run(self, root, rel):
+        return subprocess.run([sys.executable, conventions.__file__, root,
+                               "--file", rel], capture_output=True, text=True)
+
+    def test_cleanup_required_under_custom_labs(self):
+        root = tempfile.mkdtemp()
+        write(root, "custom-labs/x/x.md", "# X\n\n## Step\n")
+        errs = conventions.check_cleanup(root, ["custom-labs/x/x.md"])
+        self.assertEqual(len(errs), 1)
+        self.assertIn("custom-labs/x/x.md", errs[0])
+
+    def test_file_mode_checks_only_named_files(self):
+        root = tempfile.mkdtemp()
+        write(root, "README.md", "[broken](nope.md)")
+        write(root, "custom-labs/x/x.md", "# X\n\n## Cleanup\n")
+        proc = self._run(root, "custom-labs/x/x.md")
+        self.assertEqual(proc.returncode, 0, proc.stdout)
+        self.assertIn("conventions: 1 file(s), 0 violation(s)", proc.stdout)
+
+    def test_file_mode_reports_violation(self):
+        root = tempfile.mkdtemp()
+        write(root, "custom-labs/x/x.md", "# X\n\nsee [gone](missing.md)\n\n## Cleanup\n")
+        proc = self._run(root, "custom-labs/x/x.md")
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("broken link -> missing.md", proc.stdout)
 
 
 if __name__ == "__main__":
