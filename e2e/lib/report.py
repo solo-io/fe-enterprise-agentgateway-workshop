@@ -155,7 +155,8 @@ def adhoc_use_cases(work):
     for root, _dirs, files in os.walk(work):
         if "outcome" in files:
             key = os.path.relpath(root, work)
-            if not key.startswith("_base" + os.sep):  # --uninstall-base's own steps
+            # Skip --uninstall-base's own steps and custom labs (author runs).
+            if not key.startswith(("_base" + os.sep, "custom" + os.sep)):
                 keys.append(key)
     return [{"name": "Ad hoc run", "keys": sorted(keys)}], {}
 

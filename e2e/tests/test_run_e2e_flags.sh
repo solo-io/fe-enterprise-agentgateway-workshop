@@ -19,6 +19,7 @@ cat > "${TMP}/bin/kubectl" <<STUB
 [[ "\$1 \$2" == "config current-context" ]] && echo stub-context
 [[ "\$1 \$2" == "get gateway" && -f "${TMP}/gw" ]] && cat "${TMP}/gw"
 [[ "\$1 \$2" == "get namespaces" && -f "${TMP}/ns" ]] && cat "${TMP}/ns"
+[[ "\$1" == "get" && "\$2" == namespaces,* && -f "${TMP}/snap" ]] && sort "${TMP}/snap"
 exit 0
 STUB
 chmod +x "${TMP}/bin/kubectl"
@@ -27,6 +28,7 @@ chmod +x "${TMP}/bin/helm"
 
 export PATH="${TMP}/bin:${PATH}"
 export E2E_WORK_ROOT="${TMP}/work"
+export E2E_TEST_SNAP="${TMP}/snap"
 
 T_PASS=0; T_FAIL=0
 ok()   { T_PASS=$((T_PASS+1)); printf 'ok   %s\n' "$1"; }
@@ -289,6 +291,27 @@ run "--custom --lint fails without Cleanup" 1 "no \`## Cleanup\` section" --cust
 run "--custom runs the fixture and keys it custom/demo" 0 "1 PASS" --custom demo --no-prompt
 [[ -f "${E2E_WORK_ROOT}/custom/demo/outcome" ]] && grep -q "status=pass" "${E2E_WORK_ROOT}/custom/demo/outcome" \
   && ok "custom outcome at custom/demo" || fail "custom outcome at custom/demo"
+run "--custom rejects a path as the name" 1 "--custom needs a name" --custom ../x --no-prompt
+run "--custom rejects a flag as the name" 1 "--custom needs a name" --custom --lint
+run "--custom rejects --list" 1 "--custom and --list are mutually exclusive" --custom demo --list
+mkdir -p "${TMP}/badspec/broken"
+printf 'not: [valid\n' > "${TMP}/badspec/broken/spec.yaml"
+out="$(E2E_CUSTOM_ROOT="${TMP}/badspec" "$RUNNER" --custom broken --lint 2>&1)"; rc=$?
+[[ "$rc" -eq 1 && "$out" != *"unbound variable"* ]] && ok "--custom --lint fails cleanly on a bad spec" \
+  || fail "--custom --lint fails cleanly on a bad spec (rc=$rc; output: $(printf '%s' "$out" | tail -3))"
+
+run "--keep requires --custom" 1 "--keep requires --custom" --keep routing/x --no-prompt
+printf 'namespace/default\n' > "${TMP}/snap"
+run "leftover check reports a new namespace" 0 "LEFTOVER: namespace/left-behind" --custom leftover --no-prompt
+grep -q "leftover=1" "${E2E_WORK_ROOT}/custom/leftover/outcome" && ok "outcome records leftover=1" || fail "outcome records leftover=1"
+grep -q "LEFTOVER: namespace/left-behind" "${E2E_WORK_ROOT}/leftovers.txt" && ok "leftover noted for the report" || fail "leftover noted for the report"
+printf 'namespace/default\n' > "${TMP}/snap"
+run "--keep skips cleanup" 0 "cleanup skipped (--keep)" --custom demo --keep --no-prompt
+grep -q "keep=1" "${E2E_WORK_ROOT}/custom/demo/outcome" && ok "outcome records keep=1" || fail "outcome records keep=1"
+grep -q "LEFTOVER CHECK SKIPPED" "${E2E_WORK_ROOT}/leftovers.txt" && ok "keep notes the skipped check" || fail "keep notes the skipped check"
+[[ -f "${E2E_WORK_ROOT}/custom/demo/result" ]] && ok "--keep still writes result" || fail "--keep still writes result"
+run "--track leaves custom outcomes alone" 0 "Resolving credentials" --track llm --env gke --resolve-creds --no-prompt
+[[ -f "${E2E_WORK_ROOT}/custom/demo/outcome" ]] && ok "custom outcome survives --track" || fail "custom outcome survives --track"
 unset E2E_CUSTOM_ROOT
 
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"

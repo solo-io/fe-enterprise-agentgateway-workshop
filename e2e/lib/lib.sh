@@ -358,7 +358,9 @@ e2e_run_cleanup() {
   # Kill anything the lab backgrounded (port-forwards, tail -f).
   jobs -p 2>/dev/null | while read -r pid; do kill "$pid" 2>/dev/null; done
 
-  if declare -F e2e_define_cleanup >/dev/null; then
+  if [[ "${E2E_KEEP:-0}" == "1" ]]; then
+    printf "  cleanup skipped (--keep)\n"
+  elif declare -F e2e_define_cleanup >/dev/null; then
     e2e_define_cleanup
   fi
   e2e_write_result

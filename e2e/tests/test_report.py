@@ -249,6 +249,16 @@ class TestFinalWave(ReportCase):
         keys, _ = report.adhoc_use_cases(work)
         self.assertEqual(keys[0]["keys"], ["routing/a"])
 
+    def test_adhoc_report_ignores_custom_outcomes(self):
+        work = os.path.join(self.tmp.name, "work")
+        os.makedirs(os.path.join(work, "custom", "x"))
+        os.makedirs(os.path.join(work, "routing", "a"))
+        for k in ("custom/x", "routing/a"):
+            with open(os.path.join(work, k, "outcome"), "w") as fh:
+                fh.write("status=pass rc=0 duration=1 requires=\n")
+        ucs, _ = report.adhoc_use_cases(work)
+        self.assertEqual(ucs[0]["keys"], ["routing/a"])
+
     def test_filename_and_generated_at_share_utc_basis(self):
         md, _, _, data = self.build()
         stamp = data["generated_at"].replace("-", "").replace(":", "").replace("T", "-").rstrip("Z")

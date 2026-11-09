@@ -1,0 +1,14 @@
+lab: e2e/tests/fixtures/custom-labs/leftover/leftover.md
+description: fixture custom lab that leaves a namespace behind
+tier: t0
+timeout: 60
+requirements:
+  - id: R1
+    text: the lab makes a namespace
+steps:
+  - section: "Make a namespace"
+    proves: [R1]
+    assert:
+      - contains: "made a namespace"
+cleanup:
+  section: "Cleanup"

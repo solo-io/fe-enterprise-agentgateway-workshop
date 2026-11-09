@@ -22,6 +22,7 @@
 #   ./e2e/run-e2e.sh --list                   # show coverage table
 #   ./e2e/run-e2e.sh --custom <name>          # run custom-labs/<name>/spec.yaml
 #   ./e2e/run-e2e.sh --custom <name> --lint   # lint that one custom lab, run nothing
+#   ./e2e/run-e2e.sh --custom <name> --keep   # skip its Cleanup blocks, leave the resources up
 #
 # E2E_SPEC_TIMEOUT=<secs> in the environment overrides every spec's timeout
 # (used to force a timeout failure on a real lab).
@@ -76,6 +77,7 @@ LIST_ONLY=false
 TIER_FILTER=""
 SPECIFIC=""
 KEEP_WORK=false
+KEEP=false
 TRACK=""
 ENV_CLASS=""
 RESOLVE_CREDS=false
@@ -102,7 +104,7 @@ while [[ $# -gt 0 ]]; do
     --list)         LIST_ONLY=true; shift ;;
     --tier)         TIER_FILTER="$2"; shift 2 ;;
     --track)        TRACK="$2"; shift 2 ;;
-    --custom)       [[ -n "${2:-}" ]] || { printf "${RED}--custom needs a name${NC}\n" >&2; exit 1; }
+    --custom)       [[ "${2:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { printf "${RED}--custom needs a name${NC}\n" >&2; exit 1; }
                     CUSTOM_NAME="$2"; shift 2 ;;
     --env)          ENV_CLASS="$2"; shift 2 ;;
     --resolve-creds) RESOLVE_CREDS=true; shift ;;
@@ -115,6 +117,7 @@ while [[ $# -gt 0 ]]; do
     --no-prompt)    export E2E_PROMPT=0; shift ;;
     --verbose|-v)   export E2E_VERBOSE=1; shift ;;
     --keep-work)    KEEP_WORK=true; shift ;;
+    --keep)         KEEP=true; shift ;;
     --*)            printf "${RED}Unknown option: %s${NC}\n" "$1" >&2; usage >&2; exit 1 ;;
     *)              SPECIFIC="$1"; shift ;;
   esac
@@ -138,7 +141,14 @@ if [[ -n "$CUSTOM_NAME" ]]; then
   [[ -z "$_cu_conflict" && "$INSTALL_BASE" == "true" ]]       && _cu_conflict="--install-base"
   [[ -z "$_cu_conflict" && "$RESOLVE_CREDS" == "true" ]]      && _cu_conflict="--resolve-creds"
   [[ -z "$_cu_conflict" && -n "$SPECIFIC" ]]                  && _cu_conflict="a positional spec"
+  [[ -z "$_cu_conflict" && "$LIST_ONLY" == "true" ]]          && _cu_conflict="--list"
   [[ -z "$_cu_conflict" ]] || { printf "${RED}--custom and %s are mutually exclusive${NC}\n" "$_cu_conflict" >&2; exit 1; }
+fi
+
+# --keep leaves a custom lab's resources up for inspection, so it only makes
+# sense for a lab you wrote yourself.
+if [[ "$KEEP" == "true" && -z "$CUSTOM_NAME" ]]; then
+  printf "${RED}--keep requires --custom${NC}\n" >&2; exit 1
 fi
 
 if [[ "$UNINSTALL_BASE" == "true" ]]; then
@@ -211,6 +221,12 @@ write_outcome_file() {
   (( $# )) && line+=" $*"
   mkdir -p "${WORK_ROOT}/${key}"
   printf '%s\n' "$line" > "${WORK_ROOT}/${key}/outcome"
+}
+
+# custom_snapshot: the cluster-scoped objects a custom lab could leave behind,
+#   one sorted `kind/name` line each. run_lab diffs it before and after.
+custom_snapshot() {
+  kubectl get namespaces,clusterroles,clusterrolebindings,gatewayclasses,crds,validatingwebhookconfigurations,mutatingwebhookconfigurations,priorityclasses -o name 2>/dev/null | sort
 }
 
 # note_leftover <line>
@@ -422,8 +438,31 @@ run_lab() {
   local drifted=false base_before="" base_after=""
   [[ "$is_base" == "false" ]] && base_before="$(baseline_fingerprint)"
 
+  # Custom labs get a cluster-scoped snapshot before and after, and --keep.
+  local is_custom=false snap_before=""
+  [[ "$key" == custom/* ]] && is_custom=true
+  [[ "$is_custom" == "true" ]] && snap_before="$(custom_snapshot)"
+
   local rc=0
-  run_with_timeout "$E2E_SPEC_TIMEOUT" bash "$driver" || rc=$?
+  if [[ "$is_custom" == "true" && "$KEEP" == "true" ]]; then
+    E2E_KEEP=1 run_with_timeout "$E2E_SPEC_TIMEOUT" bash "$driver" || rc=$?
+  else
+    run_with_timeout "$E2E_SPEC_TIMEOUT" bash "$driver" || rc=$?
+  fi
+
+  if [[ "$is_custom" == "true" && "$KEEP" == "true" ]]; then
+    extra+=("keep=1")
+    note_leftover "LEFTOVER CHECK SKIPPED: ${key} kept on the cluster"
+  elif [[ "$is_custom" == "true" ]]; then
+    local left n_left=0
+    while IFS= read -r left; do
+      [[ -n "$left" ]] || continue
+      printf "  ${YELLOW}LEFTOVER: %s${NC}\n" "$left"
+      note_leftover "LEFTOVER: ${left}"
+      n_left=$((n_left + 1))
+    done < <(comm -13 <(printf '%s\n' "$snap_before") <(custom_snapshot))
+    (( n_left > 0 )) && extra+=("leftover=${n_left}")
+  fi
 
   # Attribute baseline damage to the lab that caused it, while we still know
   # which lab that was.
@@ -504,7 +543,8 @@ if [[ "$LINT_ONLY" == "true" && -n "$CUSTOM_NAME" ]]; then
   spec="${CUSTOM_ROOT}/${CUSTOM_NAME}/spec.yaml"
   [[ -f "$spec" ]] || { printf "${RED}No custom lab at %s${NC}\n" "$spec" >&2; exit 1; }
   lint_fail=0
-  eval "$("$PYTHON" "$LABDOC" meta "$spec")" || exit 1
+  meta="$("$PYTHON" "$LABDOC" meta "$spec")" || exit 1
+  eval "$meta"
   lab="${REPO_ROOT}/${E2E_SPEC_LAB}"
   [[ -f "$lab" ]] || { printf "${RED}✗ %s — lab not found: %s${NC}\n" "$(spec_key "$spec")" "$E2E_SPEC_LAB"; exit 1; }
   if out="$("$PYTHON" "$LABDOC" lint "$lab" "$spec" 2>&1)"; then
@@ -720,7 +760,8 @@ if [[ -n "$TRACK" ]]; then
   # leftovers so the report cannot mix runs. Single-lab runs never clear,
   # because the enablement flow runs labs one at a time and reports at the end.
   # --report-only exits before this point.
-  find "$WORK_ROOT" -name outcome -type f -delete 2>/dev/null
+  # Custom-lab outcomes belong to the author's own runs and survive the reset.
+  find "$WORK_ROOT" -name outcome -type f -not -path "*/custom/*" -delete 2>/dev/null
   rm -f "${WORK_ROOT}/leftovers.txt"
   track_rows="$("$PYTHON" "${E2E_DIR}/lib/tracks.py" list "$TRACK" --env "$ENV_CLASS" 2>&1)" || {
     if [[ "$track_rows" == *"no track '"* ]]; then
