@@ -18,6 +18,8 @@ An AI agent can run the LLM or MCP track against your own cluster, explain each 
 
 The same agent can also build a custom lab for your own scenario. Run `/adapt-lab` in Claude Code, or tell Codex to read `AGENTS.md` and run the adapt-lab skill, then name the labs to start from or describe what you need. The agent writes a proposal, waits for your approval, then writes a lab and an e2e spec under `custom-labs/<name>/` and runs the spec on your cluster until every requirement passes. The folder is gitignored and stays on your machine.
 
+To contribute a custom lab back to the workshop, run `/contribute-lab <name>` in Claude Code, or tell Codex to read `AGENTS.md` and run the contribute-lab skill. The agent scrubs a copy of the lab with you, moves it into `labs/`, updates the README and CHANGELOG, runs the spec again, commits on a new version branch, and shows you the diff; it pushes and opens the PR only when you say yes.
+
 # Table of Contents
 
 - [Installation](#installation)

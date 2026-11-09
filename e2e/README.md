@@ -72,6 +72,11 @@ and names them in each step's `proves:` list. `--custom <name> --lint` fails whe
 - a step has `run: none` and no `reason:`
 - the spec's `lab:` is not `custom-labs/<name>/<name>.md`
 
+Shipped specs under `e2e/specs/` may declare `requirements:` and `proves:` too.
+The keys are optional there, and recommended for new specs. When a shipped spec
+has them, `--lint` fails when a requirement has no proving step, a proving step
+has no `assert`, or a `proves` id is undeclared.
+
 A `--custom` run snapshots namespaces, the cluster-scoped kinds the labs
 create, and the common namespaced kinds in `agentgateway-system` and `default`,
 before the run and after Cleanup. It prints `LEFTOVER: <kind>/<name>` (or
@@ -87,6 +92,26 @@ alone.
 
 Tracks, `--list`, `--lint`, and a plain `./e2e/run-e2e.sh` read `e2e/specs/`
 only and never see `custom-labs/`.
+
+### Contributing a custom lab
+
+The contribute-lab skill (`/contribute-lab <name>`) turns a custom lab that
+passed into a shipped lab on a new version branch. Two tools do the mechanical
+work, and both run on a staging copy at `e2e/.work/contribute/<name>/stage/`,
+so `custom-labs/<name>/` stays as the user left it:
+
+```bash
+python3 e2e/lib/scrub.py --summary --from-changes <stage>/CHANGES.md <stage>   # candidate leaks for the user to rule on
+python3 e2e/lib/promote.py <name> --category <cat> [--lib <asset>=<concern>] [--subdir] [--dry-run]
+python3 e2e/lib/promote.py <name> --record README.md                           # save a repo file before editing it
+python3 e2e/lib/promote.py <name> --undo                                       # remove what promote created, restore recorded files
+```
+
+`scrub.py` prints one line per candidate (`<file>:<line>`, rule, match) for
+addresses, hostnames, emails, tokens, cloud ids, and the values listed in
+`CHANGES.md`. `promote.py` copies the lab, spec, and assets into `labs/`,
+`e2e/specs/`, and `lib/`, rewrites asset paths and relative links, and writes
+`e2e/.work/contribute/<name>/manifest.json` for `--undo`.
 
 ## Adding a lab
 

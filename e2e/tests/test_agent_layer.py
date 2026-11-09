@@ -5,7 +5,8 @@ import re
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SKILLS = ["evaluate", "detect-environment", "explain-lab", "diagnose-failure", "ask-the-docs", "adapt-lab"]
+SKILLS = ["evaluate", "detect-environment", "explain-lab", "diagnose-failure", "ask-the-docs", "adapt-lab",
+          "contribute-lab"]
 INTERNAL = "support-agent" + "-tools"
 
 
@@ -15,7 +16,7 @@ def read(rel):
 
 def user_files():
     files = [ROOT / "AGENTS.md", ROOT / "CLAUDE.md", ROOT / ".claude/commands/evaluate.md",
-             ROOT / ".claude/commands/adapt-lab.md"]
+             ROOT / ".claude/commands/adapt-lab.md", ROOT / ".claude/commands/contribute-lab.md"]
     files += [ROOT / "skills" / s / "SKILL.md" for s in SKILLS]
     return files
 
@@ -160,6 +161,28 @@ class AgentLayer(unittest.TestCase):
     def test_agents_md_mentions_both_modes_and_custom_labs(self):
         text = read("AGENTS.md")
         for needle in ["skills/adapt-lab/SKILL.md", "/adapt-lab", "custom-labs/", "get_crd_schema"]:
+            self.assertIn(needle, text)
+
+    def test_contribute_skill_names_every_cli_and_rule(self):
+        text = read("skills/contribute-lab/SKILL.md")
+        for needle in ["gh auth status", "git status --porcelain", "e2e/lib/scrub.py", "--from-changes",
+                       "e2e/lib/promote.py", "--record", "--undo", "--dry-run", "--lint",
+                       "see CHANGELOG (X.Y.Z)", "gh pr create --base main", "git push -u origin",
+                       "style-guide.md", "Nothing is pushed until the user says yes to the diff.",
+                       "custom-labs/<name>/", "never edited"]:
+            self.assertIn(needle, text)
+        for heading in ["## 1. Preflight", "## 2. Scrub", "## 3. Promote", "## 4. Conform",
+                        "## 5. Verify as a shipped lab", "## 6. Branch and commit",
+                        "## 7. Show the diff and stop", "## 8. Stopping partway"]:
+            self.assertIn(heading, text)
+
+    def test_contribute_command_points_at_skill(self):
+        self.assertIn("Read skills/contribute-lab/SKILL.md and follow it. Arguments: $ARGUMENTS",
+                      read(".claude/commands/contribute-lab.md"))
+
+    def test_agents_md_names_three_modes(self):
+        text = read("AGENTS.md")
+        for needle in ["Three modes", "skills/contribute-lab/SKILL.md", "/contribute-lab"]:
             self.assertIn(needle, text)
 
     def test_no_prospect_and_no_em_dash_in_agent_files(self):

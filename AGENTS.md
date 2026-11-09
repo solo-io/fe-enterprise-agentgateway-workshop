@@ -67,12 +67,16 @@ this. The other skills are called from there:
 - `skills/diagnose-failure/SKILL.md`: what to do when a lab fails.
 - `skills/ask-the-docs/SKILL.md`: how to query the Solo docs server without leaking cluster data.
 
-Two modes. Evaluate (`skills/evaluate/SKILL.md`, `/evaluate`) runs the shipped
+Three modes. Evaluate (`skills/evaluate/SKILL.md`, `/evaluate`) runs the shipped
 labs and proves they work on the cluster. Adapt (`skills/adapt-lab/SKILL.md`,
 `/adapt-lab`) turns one or more shipped labs into a custom lab for the user's
 own requirements, proves it with a spec, and writes both to
 `custom-labs/<name>/`, which is gitignored. Adapt never edits a shipped lab, and
-it reads each CRD schema with `get_crd_schema` before writing YAML.
+it reads each CRD schema with `get_crd_schema` before writing YAML. Contribute
+(`skills/contribute-lab/SKILL.md`, `/contribute-lab`) promotes a custom lab that
+passed adapt mode to a shipped lab, proves it as a shipped spec, and commits it
+on a new version branch. It runs only when the user asks, and it never pushes
+or opens a PR until the user says yes to the diff.
 
 ## Solo docs server
 
