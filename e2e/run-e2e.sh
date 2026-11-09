@@ -45,6 +45,9 @@ WORK_ROOT="${E2E_WORK_ROOT:-${E2E_DIR}/.work}"
 LABDOC="${E2E_DIR}/lib/labdoc.py"
 
 export E2E_DIR E2E_REPO_ROOT="${REPO_ROOT}"
+# Only --keep sets E2E_KEEP, for the one custom lab it runs. A value from the
+# caller's environment would make shipped labs skip Cleanup.
+unset E2E_KEEP
 # Captured before any spec's metadata is eval'd, since that sets the same name.
 E2E_TIMEOUT_OVERRIDE="${E2E_SPEC_TIMEOUT:-}"
 
@@ -182,15 +185,23 @@ export E2E_ENV="$ENV_CLASS"
 # ---------------------------------------------------------------------------
 # build_report
 #   Calls report.py build with this run's track (adhoc when none), the env
-#   probe output, and the session log. Prints the two file paths.
+#   probe output, and the session log. Prints the two file paths. With
+#   --custom it builds the single-row custom report, written by default to
+#   custom-labs/<name>/reports.
 # ---------------------------------------------------------------------------
 build_report() {
-  local env_json="${WORK_ROOT}/env.json" out="${REPORT_DIR:-${REPO_ROOT}/reports}"
+  local env_json="${WORK_ROOT}/env.json" out="${REPORT_DIR:-${REPO_ROOT}/reports}" which
+  if [[ -n "$CUSTOM_NAME" ]]; then
+    out="${REPORT_DIR:-${CUSTOM_ROOT}/${CUSTOM_NAME}/reports}"
+    which=(--custom "$CUSTOM_NAME")
+  else
+    which=(--track "${TRACK:-adhoc}")
+  fi
   if [[ ! -f "$env_json" ]]; then
     env_json="${WORK_ROOT}/env-report.json"
     printf '{"class": "%s"}\n' "$ENV_CLASS" > "$env_json"
   fi
-  "$PYTHON" "${E2E_DIR}/lib/report.py" build --work "$WORK_ROOT" --track "${TRACK:-adhoc}" \
+  "$PYTHON" "${E2E_DIR}/lib/report.py" build --work "$WORK_ROOT" "${which[@]}" \
     --env-json "$env_json" --session "${WORK_ROOT}/session.jsonl" --out "$out"
 }
 
@@ -454,14 +465,22 @@ run_lab() {
     extra+=("keep=1")
     note_leftover "LEFTOVER CHECK SKIPPED: ${key} kept on the cluster"
   elif [[ "$is_custom" == "true" ]]; then
-    local left n_left=0
-    while IFS= read -r left; do
-      [[ -n "$left" ]] || continue
-      printf "  ${YELLOW}LEFTOVER: %s${NC}\n" "$left"
-      note_leftover "LEFTOVER: ${left}"
-      n_left=$((n_left + 1))
-    done < <(comm -13 <(printf '%s\n' "$snap_before") <(custom_snapshot))
-    (( n_left > 0 )) && extra+=("leftover=${n_left}")
+    # A real cluster always has namespaces, so an empty snapshot means kubectl
+    # failed. Diffing it would report nothing, or every object, as leftover.
+    local snap_after left n_left=0
+    snap_after="$(custom_snapshot)"
+    if [[ -z "$snap_before" || -z "$snap_after" ]]; then
+      printf "  ${RED}LEFTOVER CHECK NOT RUN: %s (cluster snapshot failed)${NC}\n" "$key"
+      note_leftover "LEFTOVER CHECK NOT RUN: ${key} (cluster snapshot failed)"
+    else
+      while IFS= read -r left; do
+        [[ -n "$left" ]] || continue
+        printf "  ${YELLOW}LEFTOVER: %s${NC}\n" "$left"
+        note_leftover "LEFTOVER: ${left}"
+        n_left=$((n_left + 1))
+      done < <(comm -13 <(printf '%s\n' "$snap_before") <(printf '%s\n' "$snap_after"))
+      (( n_left > 0 )) && extra+=("leftover=${n_left}")
+    fi
   fi
 
   # Attribute baseline damage to the lab that caused it, while we still know

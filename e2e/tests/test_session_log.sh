@@ -46,5 +46,10 @@ rotated=("${E2E_WORK_ROOT}"/session-*.jsonl)
 rc=0; "$LOG" start extra >/dev/null 2>&1 || rc=$?
 [[ $rc == 2 ]] && ok "start takes no arguments" || fail "start extra rc=$rc"
 
+"$LOG" add run custom/demo "status=pass" && ok "run kind accepted" || fail "run kind rejected"
+"$LOG" add keep-custom custom/demo kept && ok "keep-custom kind accepted" || fail "keep-custom kind rejected"
+usage="$("$LOG" add bogus - x 2>&1 || true)"
+[[ "$usage" == *" run "* && "$usage" == *"keep-custom"* ]] && ok "usage lists run and keep-custom" || fail "usage: $usage"
+
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 [[ "$T_FAIL" -eq 0 ]]

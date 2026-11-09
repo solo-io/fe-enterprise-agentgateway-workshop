@@ -6,6 +6,9 @@ Usage:
                   --session PATH --out DIR [--specs-dir D] [--tracks-dir T]
       writes <out>/<YYYYMMDD-HHMMSS>-<class>-<track>.md and .json (UTC; -1, -2
       appended when that name exists), prints both paths
+  report.py build --work DIR --custom <name> --env-json PATH --session PATH --out DIR
+      the single-row report for custom-labs/<name> (key custom/<name>), written as
+      <stamp>-<class>-custom-<name>.md and .json; adds a Runs section
   report.py compare A.json B.json
       one line per lab whose result differs, after a line naming both environments;
       exits 2 when either file cannot be read
@@ -130,6 +133,11 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status="", stopped=False):
     if cleanup and cleanup != "0":
         extra = "cleanup did not finish" if cleanup == "incomplete" else "cleanup block failed"
         note = f"{note}; {extra}" if note else extra
+    if outcome.get("keep") == "1":
+        note = f"{note}; kept on the cluster" if note else "kept on the cluster"
+    leftover = outcome.get("leftover", "")
+    if leftover and leftover != "0":
+        note = f"{note}; {leftover} leftover(s)" if note else f"{leftover} leftover(s)"
     return {"key": key, "result": result, "duration": dur, "note": note}
 
 
@@ -172,7 +180,7 @@ def track_use_cases(track, env_class, specs_dir, tracks_dir):
             for uc in data.get("use_cases") or []], statuses
 
 
-def build_data(work, track, env_json, session, specs_dir, tracks_dir):
+def build_data(work, track, env_json, session, specs_dir, tracks_dir, custom=None):
     try:
         with open(env_json, encoding="utf-8") as fh:
             env = json.load(fh)
@@ -184,7 +192,10 @@ def build_data(work, track, env_json, session, specs_dir, tracks_dir):
     for e in events:
         if e.get("kind") == "deviation":
             deviations.setdefault(e.get("lab", ""), []).append(e.get("text", ""))
-    if track == "adhoc":
+    if custom:
+        track = f"custom/{custom}"
+        ucs, plan_statuses = [{"name": "Custom lab", "keys": [track]}], {}
+    elif track == "adhoc":
         ucs, plan_statuses = adhoc_use_cases(work)
     else:
         ucs, plan_statuses = track_use_cases(track, env.get("class", "unknown"), specs_dir, tracks_dir)
@@ -241,12 +252,15 @@ def build_data(work, track, env_json, session, specs_dir, tracks_dir):
         "environment": env,
         "chart_version": chart_version(),
         "track": track,
+        "custom": custom,
         "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "use_cases": use_cases,
         "deviations": dev_list,
         "failures": failures,
         "leftovers": leftovers,
         "base_kept": any(e.get("kind") == "keep-base" for e in events),
+        "custom_kept": any(e.get("kind") == "keep-custom" for e in events),
+        "runs": [{"lab": e.get("lab", ""), "text": e.get("text", "")} for e in events if e.get("kind") == "run"],
         "questions": questions,
     }
 
@@ -257,7 +271,12 @@ def cell(text):
 
 def render_markdown(data):
     env = data["environment"]
-    out = [f"# Agentgateway evaluation report: {data['track']} track on {env.get('class', 'unknown')}", "",
+    env_class = env.get("class", "unknown")
+    if data.get("custom"):
+        title = f"# Agentgateway custom lab report: {data['custom']} on {env_class}"
+    else:
+        title = f"# Agentgateway evaluation report: {data['track']} track on {env_class}"
+    out = [title, "",
            f"Generated {data['generated_at']}.", "", "## Environment", "", "```"]
     for k, v in env.items():
         out.append(f"{k}: {json.dumps(v) if isinstance(v, (dict, list)) else v}")
@@ -266,6 +285,10 @@ def render_markdown(data):
         out += [f"## {uc['name']}", "", "| Lab | Result | Duration | Note |", "| --- | --- | --- | --- |"]
         for lab in uc["labs"]:
             out.append(f"| {cell(lab['key'])} | {cell(lab['result'])} | {lab['duration']} | {cell(lab['note'])} |")
+        out.append("")
+    if data.get("custom"):
+        out += ["## Runs", ""]
+        out += [f"- {r['lab'] or 'general'}: {r['text']}" for r in data.get("runs", [])] or ["None."]
         out.append("")
     out += ["## Deviations", ""]
     if data["deviations"]:
@@ -288,6 +311,8 @@ def render_markdown(data):
     out += [f"- {ln}" for ln in data["leftovers"]] if data["leftovers"] else [NO_LEFTOVERS]
     if data.get("base_kept"):
         out += ["", "The base install was kept on request."]
+    if data.get("custom_kept"):
+        out += ["", "The custom lab was kept on the cluster."]
     out += ["", "## Questions", ""]
     if data["questions"]:
         for qa in data["questions"]:
@@ -299,9 +324,11 @@ def render_markdown(data):
 
 
 def cmd_build(args):
-    data = build_data(args.work, args.track, args.env_json, args.session, args.specs_dir, args.tracks_dir)
+    data = build_data(args.work, args.track, args.env_json, args.session, args.specs_dir, args.tracks_dir,
+                      custom=args.custom)
     stamp = datetime.datetime.strptime(data["generated_at"], "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d-%H%M%S")
-    base = f"{stamp}-{data['environment'].get('class') or 'unknown'}-{args.track}"
+    suffix = f"custom-{args.custom}" if args.custom else args.track
+    base = f"{stamp}-{data['environment'].get('class') or 'unknown'}-{suffix}"
     os.makedirs(args.out, exist_ok=True)
     name, n = base, 0
     while os.path.exists(os.path.join(args.out, name + ".md")) or os.path.exists(os.path.join(args.out, name + ".json")):
@@ -351,7 +378,9 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build")
     b.add_argument("--work", required=True)
-    b.add_argument("--track", required=True)
+    which = b.add_mutually_exclusive_group(required=True)
+    which.add_argument("--track")
+    which.add_argument("--custom", help="build the single-row report for custom-labs/<name>")
     b.add_argument("--env-json", required=True)
     b.add_argument("--session", required=True)
     b.add_argument("--out", required=True)

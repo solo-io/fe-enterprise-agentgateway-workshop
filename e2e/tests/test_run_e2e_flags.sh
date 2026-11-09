@@ -314,5 +314,27 @@ run "--track leaves custom outcomes alone" 0 "Resolving credentials" --track llm
 [[ -f "${E2E_WORK_ROOT}/custom/demo/outcome" ]] && ok "custom outcome survives --track" || fail "custom outcome survives --track"
 unset E2E_CUSTOM_ROOT
 
+# Hardening: an empty snapshot means kubectl failed, so the check does not run.
+export E2E_CUSTOM_ROOT="${E2E}/tests/fixtures/custom-labs"
+rm -f "${TMP}/snap" "${E2E_WORK_ROOT}/leftovers.txt"
+out="$("$RUNNER" --custom demo --no-prompt 2>&1)"
+grep -q "LEFTOVER CHECK NOT RUN: custom/demo (cluster snapshot failed)" "${E2E_WORK_ROOT}/leftovers.txt" 2>/dev/null \
+  && ok "empty snapshot notes LEFTOVER CHECK NOT RUN" || fail "empty snapshot: $(cat "${E2E_WORK_ROOT}/leftovers.txt" 2>/dev/null)"
+[[ "$out" != *"LEFTOVER: "* ]] && ok "empty snapshot reports no LEFTOVER line" || fail "empty snapshot printed LEFTOVER"
+printf 'namespace/default\n' > "${TMP}/snap"
+# A caller's E2E_KEEP must not make a run skip Cleanup. Block output lands in
+# the work dir, not on stdout, so look for the cleanup block's echo there.
+rm -rf "${E2E_WORK_ROOT}/custom/demo"
+out="$(E2E_KEEP=1 "$RUNNER" --custom demo --no-prompt 2>&1)"
+grep -qs "cleanup ran" "${E2E_WORK_ROOT}"/custom/demo/blocks/*.out && [[ "$out" != *"cleanup skipped"* ]] \
+  && ok "caller E2E_KEEP is ignored" \
+  || fail "caller E2E_KEEP: $(printf '%s' "$out" | tail -3)"
+unset E2E_CUSTOM_ROOT
+
+mkdir -p "${TMP}/custom-labs" && cp -R "${E2E}/tests/fixtures/custom-labs/demo" "${TMP}/custom-labs/demo"
+export E2E_CUSTOM_ROOT="${TMP}/custom-labs"
+run "--custom --report-only writes under custom-labs/<name>/reports" 0 "/custom-labs/demo/reports/" --custom demo --report-only
+unset E2E_CUSTOM_ROOT
+
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 [[ "$T_FAIL" -eq 0 ]]

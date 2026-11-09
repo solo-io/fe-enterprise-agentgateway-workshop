@@ -5,7 +5,9 @@
 #          moves an existing session.jsonl aside to session-<UTC stamp>.jsonl, so a
 #          new session's report holds only its own events
 #        session-log.sh add <kind> <lab-key> <text...>
-#   kind: decision | deviation | question | answer | failure | keep-base
+#   kind: decision | deviation | question | answer | failure | keep-base | run | keep-custom
+#     run: one attempt at a custom lab (the report lists these under Runs)
+#     keep-custom: the custom lab was left on the cluster
 #   lab-key: the spec key the event belongs to, or - for none
 #
 # Writes one JSON line {"ts","kind","lab","text"} to ${E2E_WORK_ROOT:-e2e/.work}/session.jsonl.
@@ -14,7 +16,7 @@ set -euo pipefail
 
 E2E_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK_ROOT="${E2E_WORK_ROOT:-${E2E_DIR}/.work}"
-KINDS="decision deviation question answer failure keep-base"
+KINDS="decision deviation question answer failure keep-base run keep-custom"
 
 die() { printf 'session-log.sh: %s\n' "$*" >&2; exit 2; }
 

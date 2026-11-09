@@ -315,5 +315,62 @@ class TestCompare(ReportCase):
         self.assertEqual(lines[1:], ["routing/c: FAIL -> PASS"])
 
 
+class TestCustom(ReportCase):
+    def build_custom(self, outcome_line=None, session=None):
+        work = os.path.join(self.tmp.name, "work")
+        if outcome_line is not None:
+            os.makedirs(os.path.join(work, "custom", "demo"), exist_ok=True)
+            with open(os.path.join(work, "custom", "demo", "outcome"), "w") as fh:
+                fh.write(outcome_line + "\n")
+        else:
+            os.makedirs(work, exist_ok=True)
+        proc = subprocess.run(
+            [sys.executable, os.path.join(LIB, "report.py"), "build", "--work", work,
+             "--custom", "demo", "--env-json", os.path.join(FIX, "env.json"),
+             "--session", session or self.session, "--out", self.tmp.name,
+             "--specs-dir", os.path.join(FIX, "specs"), "--tracks-dir", os.path.join(FIX, "tracks")],
+            capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        md, js = proc.stdout.split()
+        with open(md, encoding="utf-8") as fh:
+            text = fh.read()
+        with open(js, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return md, text, data
+
+    def test_filename_and_title(self):
+        md, text, data = self.build_custom("status=pass rc=0 duration=5 requires=")
+        self.assertRegex(os.path.basename(md), r"^\d{8}-\d{6}-[a-z0-9-]+-custom-demo\.md$")
+        self.assertTrue(text.startswith("# Agentgateway custom lab report: demo on "))
+        self.assertEqual(data["use_cases"][0]["name"], "Custom lab")
+        self.assertEqual(self.row(data, "custom/demo")["result"], "PASS")
+
+    def test_keep_and_leftover_notes(self):
+        _, _, data = self.build_custom("status=pass rc=0 duration=5 requires= keep=1")
+        self.assertEqual(self.row(data, "custom/demo")["note"], "kept on the cluster")
+        _, _, data = self.build_custom("status=pass rc=0 duration=5 requires= leftover=2")
+        self.assertEqual(self.row(data, "custom/demo")["note"], "2 leftover(s)")
+
+    def test_missing_outcome_is_fail_row(self):
+        _, _, data = self.build_custom(None)
+        row = self.row(data, "custom/demo")
+        self.assertEqual((row["result"], row["note"]), ("FAIL", "no outcome recorded"))
+
+    def test_run_events_and_keep_custom(self):
+        session = os.path.join(self.tmp.name, "s.jsonl")
+        with open(session, "w") as fh:
+            fh.write(json.dumps({"ts": "t", "kind": "run", "lab": "custom/demo", "text": "status=fail rc=1"}) + "\n")
+            fh.write(json.dumps({"ts": "t", "kind": "keep-custom", "lab": "custom/demo", "text": "kept"}) + "\n")
+        _, text, _ = self.build_custom("status=pass rc=0 duration=5 requires=", session=session)
+        self.assertIn("## Runs\n\n- custom/demo: status=fail rc=1", text)
+        self.assertIn("The custom lab was kept on the cluster.", text)
+
+    def test_track_and_custom_exclusive(self):
+        proc = subprocess.run([sys.executable, os.path.join(LIB, "report.py"), "build", "--work", self.tmp.name,
+                               "--track", "llm", "--custom", "x", "--env-json", os.path.join(FIX, "env.json"),
+                               "--session", self.session, "--out", self.tmp.name], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 2)
+
+
 if __name__ == "__main__":
     unittest.main()
