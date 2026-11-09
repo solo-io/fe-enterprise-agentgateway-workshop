@@ -6,8 +6,9 @@ Usage:
              [--stage DIR] [--root REPO] [--work DIR] [--dry-run]
       copies <stage>/NAME.md to labs/CAT/NAME.md (or labs/CAT/NAME/README.md
       with --subdir), <stage>/spec.yaml to e2e/specs/CAT/NAME.yaml with its
-      lab: line rewritten, each --lib asset to lib/CONCERN/ASSET, and every
-      other asset to labs/CAT/NAME/ASSET (--subdir only). In the lab text,
+      lab: line rewritten, each --lib asset to lib/CONCERN/ASSET (CONCERN
+      may nest, as keycloak/sub), and every other asset to
+      labs/CAT/NAME/ASSET (--subdir only). In the lab text,
       custom-labs/NAME/assets/ASSET references become the asset's new path
       and relative Markdown link targets are recomputed for the new location.
       Refuses to run when any target exists, or when the lab exists in the
@@ -37,7 +38,10 @@ import re
 import shutil
 import sys
 
-LINK_RE = re.compile(r"\]\(([^)\s#][^)\s]*)\)")
+LINK_RE = re.compile(r'\]\(([^)\s#][^)\s]*)(\s+"[^"]*")?\)')
+# A path character, or a dot followed by one, ends a match too early to be a whole reference.
+PATH_CONT = r"(?![\w/-]|\.[\w/-])"
+TEXT = {"encoding": "utf-8", "newline": ""}
 LAB_LINE_RE = re.compile(r"^lab:.*$", re.M)
 
 
@@ -122,13 +126,21 @@ def asset_map_of(moves, name):
     return {"custom-labs/%s/assets/%s" % (name, m.asset): m.dst for m in moves if m.kind == "asset"}
 
 
+def add_rewrite(rewrites, fname, old, new):
+    if rewrites is None:
+        return
+    row = {"file": fname, "from": old, "to": new}
+    if row not in rewrites:
+        rewrites.append(row)
+
+
 def replace_assets(text, asset_map, rewrites=None, fname=None):
-    # Longest first, so a.yaml cannot clip a.yaml.bak.
+    # A match must end the path, so kc.yaml.bak is left for the leftover check.
     for old in sorted(asset_map, key=len, reverse=True):
-        if old in text:
-            text = text.replace(old, asset_map[old])
-            if rewrites is not None:
-                rewrites.append({"file": fname, "from": old, "to": asset_map[old]})
+        new = asset_map[old]
+        text, n = re.subn(re.escape(old) + PATH_CONT, lambda _m: new, text)
+        if n:
+            add_rewrite(rewrites, fname, old, new)
     return text
 
 
@@ -137,7 +149,7 @@ def rewrite_lab(text, name, asset_map, old_dir, new_dir, rewrites=None, fname=No
     old_dir and new_dir are repo-relative directories."""
 
     def fix(match):
-        target = match.group(1)
+        target, title = match.group(1), match.group(2) or ""
         if "://" in target or target.startswith(("mailto:", "/")):
             return match.group(0)
         path, frag = target, ""
@@ -147,9 +159,9 @@ def rewrite_lab(text, name, asset_map, old_dir, new_dir, rewrites=None, fname=No
         resolved = rel(os.path.normpath(os.path.join(old_dir, path)))
         resolved = asset_map.get(resolved, resolved)
         new = rel(os.path.relpath(resolved, new_dir)) + frag
-        if new != target and rewrites is not None:
-            rewrites.append({"file": fname, "from": target, "to": new})
-        return "](%s)" % new
+        if new != target:
+            add_rewrite(rewrites, fname, target, new)
+        return "](%s%s)" % (new, title)
 
     text = LINK_RE.sub(fix, text)
     return replace_assets(text, asset_map, rewrites, fname)
@@ -161,8 +173,8 @@ def rewrite_spec(text, new_lab_rel, asset_map=None, rewrites=None, fname=None):
     if not match:
         raise PromoteError("spec has no lab: line")
     new_line = "lab: " + new_lab_rel
-    if rewrites is not None and match.group(0) != new_line:
-        rewrites.append({"file": fname, "from": match.group(0), "to": new_line})
+    if match.group(0) != new_line:
+        add_rewrite(rewrites, fname, match.group(0), new_line)
     text = text[:match.start()] + new_line + text[match.end():]
     return replace_assets(text, asset_map or {}, rewrites, fname)
 
@@ -175,12 +187,12 @@ def render(moves, name, root):
     lab_dst = next(m.dst for m in moves if m.kind == "lab")
     for m in moves:
         if m.kind == "lab":
-            with open(m.src) as f:
+            with open(m.src, **TEXT) as f:
                 text = f.read()
             text = rewrite_lab(text, name, amap, "custom-labs/%s" % name,
                                os.path.dirname(m.dst), rewrites, m.dst)
         elif m.kind == "spec":
-            with open(m.src) as f:
+            with open(m.src, **TEXT) as f:
                 text = f.read()
             text = rewrite_spec(text, lab_dst, amap, rewrites, m.dst)
         else:
@@ -200,16 +212,18 @@ def manifest_path(work):
 def load_manifest(work, name):
     path = manifest_path(work)
     if os.path.exists(path):
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     return {"name": name, "created": [], "recorded": [], "rewrites": []}
 
 
 def save_manifest(work, m):
     os.makedirs(work, exist_ok=True)
-    with open(manifest_path(work), "w") as f:
+    tmp = manifest_path(work) + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(m, f, indent=2)
         f.write("\n")
+    os.replace(tmp, manifest_path(work))
 
 
 def show(src, root):
@@ -232,13 +246,15 @@ def table(rows):
 
 
 def apply(moves, work, root, name, dry_run=False):
-    """Write every target and the manifest (nothing with dry_run). Returns the table text."""
+    """Write every target and the manifest (nothing with dry_run). Returns the table text.
+    The manifest is saved after each write, so a run that fails partway can be undone."""
     contents, rewrites = render(moves, name, root)
     rows = [("copy " + m.kind, show(m.src, root), m.dst) for m in moves]
     rows += [("rewrite " + r["file"], r["from"], r["to"]) for r in rewrites]
     if dry_run:
         return table(rows)
     m = load_manifest(work, name)
+    m["rewrites"].extend(r for r in rewrites if r not in m["rewrites"])
     for mv in moves:
         parent = os.path.dirname(mv.dst)
         missing = []
@@ -248,15 +264,15 @@ def apply(moves, work, root, name, dry_run=False):
         for d in reversed(missing):
             os.makedirs(os.path.join(root, d))
             m["created"].append(d + "/")
+            save_manifest(work, m)
         dst = os.path.join(root, mv.dst)
         if contents[mv.dst] is None:
             shutil.copy2(mv.src, dst)
         else:
-            with open(dst, "w") as f:
+            with open(dst, "w", **TEXT) as f:
                 f.write(contents[mv.dst])
         m["created"].append(mv.dst)
-    m["rewrites"].extend(rewrites)
-    save_manifest(work, m)
+        save_manifest(work, m)
     return table(rows)
 
 
@@ -284,12 +300,11 @@ def undo(name, root, work):
     path = manifest_path(work)
     if not os.path.exists(path):
         raise PromoteError("no manifest at %s" % path)
-    with open(path) as f:
+    with open(path, encoding="utf-8") as f:
         m = json.load(f)
     for r in m["recorded"]:
         shutil.copy2(os.path.join(work, r["before"]), os.path.join(root, r["path"]))
         print("restored %s" % r["path"])
-        os.remove(os.path.join(work, r["before"]))
     files = [c for c in m["created"] if not c.endswith("/")]
     dirs = [c.rstrip("/") for c in m["created"] if c.endswith("/")]
     for c in files:
@@ -306,6 +321,9 @@ def undo(name, root, work):
             print("removed directory %s/" % d)
         elif os.path.isdir(p):
             print("kept non-empty directory %s/" % d)
+    # Saved copies go only after every restore and delete, so an interrupted undo can rerun.
+    for r in m["recorded"]:
+        os.remove(os.path.join(work, r["before"]))
     before_dir = os.path.join(work, "before")
     if os.path.isdir(before_dir) and not os.listdir(before_dir):
         os.rmdir(before_dir)
@@ -319,8 +337,10 @@ def parse_libs(values):
         if "=" not in v:
             raise PromoteError("--lib expects ASSET=CONCERN, got %s" % v)
         a, c = v.split("=", 1)
-        if not a or not c or "/" in c:
-            raise PromoteError("--lib expects ASSET=CONCERN, got %s" % v)
+        if not a or a in (".", "..") or "/" in a:
+            raise PromoteError("--lib asset must be a plain file name, got %s" % v)
+        if c.startswith("/") or any(seg in ("", ".", "..") for seg in c.split("/")):
+            raise PromoteError("--lib concern must be a relative path without empty, . or .. segments, got %s" % v)
         libs[a] = c
     return libs
 
@@ -356,6 +376,9 @@ def main(argv=None):
                 print("dry run: nothing written")
     except PromoteError as e:
         print("promote: %s" % e, file=sys.stderr)
+        return 1
+    except OSError as e:
+        print("promote: %s (run --undo to remove what was written)" % e, file=sys.stderr)
         return 1
     return 0
 

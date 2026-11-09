@@ -154,6 +154,79 @@ class TestPromote(unittest.TestCase):
         self.assertIn("[c](#top)", out)
         self.assertIn("[d](x.md#sec)", out)
 
+    def test_nested_lib_concern_and_undo_keeps_existing_dir(self):
+        run, read, exists = self.run_cli, self.read, self.exists
+        run(["demo", "--category", "security", "--lib", "kc.yaml=keycloak/sub", "--lib", "realm.json=keycloak/sub"])
+        self.assertTrue(exists("lib/keycloak/sub/kc.yaml"))
+        self.assertIn("kubectl apply -f lib/keycloak/sub/kc.yaml", read("labs/security/demo.md"))
+        run(["demo", "--undo"])
+        self.assertFalse(exists("lib/keycloak/sub"))
+        self.assertTrue(os.path.isdir(os.path.join(self.root, "lib/keycloak")))
+
+    def test_lib_rejects_traversal(self):
+        before = self.snapshot(".")
+        for lib in ("x.yaml=..", "../x=keycloak", "kc.yaml=..", "kc.yaml=keycloak/../..", "kc.yaml=/abs", "kc.yaml=a//b", ".=keycloak"):
+            proc = self.run_cli(["demo", "--category", "security", "--subdir", "--lib", lib], check=False)
+            self.assertEqual(proc.returncode, 1, lib)
+        self.assertEqual(self.snapshot("."), before)
+        self.assertFalse(self.exists(self.work("manifest.json")))
+
+    def test_partial_failure_is_recorded_and_undoable(self):
+        # lib/blocker is a file, so creating lib/blocker/ for the last asset fails.
+        self._write("lib/blocker", "not a directory\n")
+        proc = self.run_cli(["demo", "--category", "security", "--lib", "kc.yaml=keycloak",
+                             "--lib", "realm.json=blocker"], check=False)
+        self.assertEqual(proc.returncode, 1)
+        self.assertTrue(self.exists("labs/security/demo.md"))
+        with open(self.work("manifest.json")) as f:
+            m = json.load(f)
+        self.assertIn("labs/security/demo.md", m["created"])
+        self.assertIn("lib/keycloak/kc.yaml", m["created"])
+        self.run_cli(["demo", "--undo"])
+        self.assertFalse(self.exists("labs/security/demo.md"))
+        self.assertFalse(self.exists("lib/keycloak/kc.yaml"))
+        self.assertFalse(self.exists("e2e/specs/security/demo.yaml"))
+
+    def test_non_ascii_and_crlf_survive(self):
+        text = "# Caf\u00e9 \u2192 demo\r\nkubectl apply -f custom-labs/demo/assets/kc.yaml\r\n"
+        with open(self.work("stage/demo.md"), "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+        self.run_cli(["demo", "--category", "security", "--subdir"])
+        with open(os.path.join(self.root, "labs/security/demo/README.md"), "rb") as f:
+            got = f.read()
+        want = text.replace("custom-labs/demo/assets/kc.yaml", "labs/security/demo/kc.yaml").encode("utf-8")
+        self.assertEqual(got, want)
+
+    def test_asset_reference_must_end_the_path(self):
+        import promote
+        amap = {"custom-labs/demo/assets/kc.yaml": "lib/keycloak/kc.yaml"}
+        out = promote.rewrite_lab("a custom-labs/demo/assets/kc.yaml.bak b custom-labs/demo/assets/kc.yaml.",
+                                  "demo", amap, "custom-labs/demo", "labs/security")
+        self.assertIn("custom-labs/demo/assets/kc.yaml.bak", out)
+        self.assertIn("b lib/keycloak/kc.yaml.", out)
+        with open(self.work("stage/demo.md"), "a") as f:
+            f.write("cp custom-labs/demo/assets/kc.yaml.bak /tmp\n")
+        proc = self.run_cli(["demo", "--category", "security", "--subdir"], check=False)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("still references custom-labs/", proc.stderr)
+        self.assertFalse(self.exists("labs/security/demo"))
+
+    def test_titled_link_keeps_title(self):
+        import promote
+        out = promote.rewrite_lab('[JWT](../../labs/security/x.md "JWT lab")', "demo", {},
+                                  "custom-labs/demo", "labs/security")
+        self.assertEqual(out, '[JWT](x.md "JWT lab")')
+
+    def test_rewrite_rows_deduplicated(self):
+        with open(self.work("stage/demo.md"), "a") as f:
+            f.write("[again](../../labs/security/jwt-auth-with-rbac.md)\nkubectl apply -f custom-labs/demo/assets/kc.yaml\n")
+        proc = self.run_cli(["demo", "--category", "security", "--subdir"])
+        self.assertEqual(proc.stdout.count("../../labs/security/jwt-auth-with-rbac.md"), 1)
+        with open(self.work("manifest.json")) as f:
+            m = json.load(f)
+        froms = [(r["file"], r["from"]) for r in m["rewrites"]]
+        self.assertEqual(len(froms), len(set(froms)))
+
     def read(self, rel):
         with open(os.path.join(self.root, rel)) as f:
             return f.read()
