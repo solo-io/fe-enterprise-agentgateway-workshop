@@ -47,7 +47,10 @@ EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 HOSTNAME = re.compile(r"(?<![\w.@-])[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
 VERSION = re.compile(r"v?\d+\.\d+(\.\d+)*")
 BEARER = re.compile(r"\bBearer\s+([A-Za-z0-9._~+/=-]{3,})", re.IGNORECASE)
-SECRET_PREFIX = re.compile(r"\bsk-[A-Za-z0-9][A-Za-z0-9_-]*|\beyJ[A-Za-z0-9_.-]{3,}|\bAKIA[A-Z0-9]{8,}")
+SECRET_PREFIX = re.compile(
+    r"\bsk-[A-Za-z0-9][A-Za-z0-9_-]*|\beyJ[A-Za-z0-9_.-]{3,}|\bAKIA[A-Z0-9]{8,}"
+    r"|\bgh[pousr]_[A-Za-z0-9_]+|\bgithub_pat_[A-Za-z0-9_]+|\bxox[abposr]-[A-Za-z0-9-]+|\bAIza[A-Za-z0-9_-]+"
+)
 BASE64 = re.compile(r"[A-Za-z0-9+/=]{40,}")
 KIND_IMAGE_LINE = re.compile(r"^\s*(?:-\s*)?(?:kind|image):")
 ARN = re.compile(r"\barn:aws[\w-]*:[\w-]*:[\w-]*:\d*:[^\s'\"`)\]]+")

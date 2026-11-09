@@ -41,6 +41,15 @@ class TestRules(unittest.TestCase):
         self.assertIn(("bearer", "Bearer abc.def.ghi"), self.hits("-H 'Authorization: Bearer abc.def.ghi'"))
         self.assertEqual([r for r, _ in self.hits("key sk-live-12345 and eyJhbGciOi")], ["secret-prefix", "secret-prefix"])
 
+    def test_github_and_slack_tokens(self):
+        # Built by concatenation so the test file itself holds no token-shaped literal.
+        gh = "gh" + "p_" + "A1b2C3d4E5f6G7h8I9j0"
+        slack = "xo" + "xb-" + "1234567890-abcdefABCDEF"
+        pat = "github" + "_pat_" + "11ABCDEFG0123456789"
+        gkey = "AI" + "za" + "SyA1b2C3d4E5f6G7h8"
+        for token in (gh, slack, pat, gkey):
+            self.assertIn(("secret-prefix", token), self.hits("token: %s" % token), token)
+
     def test_base64_blob(self):
         blob = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVphYmNkZWZnaGlqa2xtbm9w"
         self.assertIn(("base64-blob", blob), self.hits(f"n: {blob}"))
@@ -113,6 +122,13 @@ class TestCli(unittest.TestCase):
             fh.write(b"\0 10.1.2.3")
         proc = subprocess.run([sys.executable, SCRUB, "b.bin"], capture_output=True, text=True, cwd=tmp)
         self.assertEqual((proc.returncode, proc.stdout), (0, ""))
+
+    def test_patch_file_is_scanned(self):
+        tmp = tempfile.mkdtemp()
+        with open(os.path.join(tmp, "staged.patch"), "w") as fh:
+            fh.write("diff --git a/x.md b/x.md\n+issuer: http://10.1.2.3/realms/x\n")
+        proc = subprocess.run([sys.executable, SCRUB, "--summary", "staged.patch"], capture_output=True, text=True, cwd=tmp)
+        self.assertEqual(proc.stdout.splitlines(), ["1\tipv4\t10.1.2.3\tstaged.patch:2"])
 
     def test_missing_path_exits_2(self):
         proc = subprocess.run([sys.executable, SCRUB, "/nonexistent/x.md"], capture_output=True, text=True)
