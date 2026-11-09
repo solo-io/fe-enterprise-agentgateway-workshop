@@ -11,14 +11,22 @@ Usage:
       labs/CAT/NAME/ASSET (--subdir only). In the lab text,
       custom-labs/NAME/assets/ASSET references become the asset's new path
       and relative Markdown link targets are recomputed for the new location.
-      Refuses to run when any target exists, or when the lab exists in the
-      other layout (NAME.md versus NAME/README.md). Writes <work>/manifest.json.
+      NAME and CAT are single segments matching ^[a-z0-9][a-z0-9-]*$, and
+      labs/CAT/ must exist. Refuses to run when any target exists, when the
+      lab exists in the other layout (NAME.md versus NAME/README.md), or when
+      the lab, the spec, or a text asset still holds custom-labs/ after the
+      rewrite. Prints a warning for each target git ignores. Writes
+      <work>/manifest.json.
   promote.py NAME --record FILE [--root REPO] [--work DIR]
       saves a copy of the repo-relative FILE under <work>/before/ so that
-      --undo can restore it after a later hand edit.
+      --undo can restore it after a later hand edit. Refuses absolute paths
+      and paths outside the repo.
   promote.py NAME --undo [--root REPO] [--work DIR]
-      deletes the files a run created, removes the directories it created
-      once they are empty, restores recorded files, removes the manifest.
+      restores recorded files, deletes the files a run created, and removes
+      the directories it created once they are empty. An entry that fails is
+      reported and the rest still run. The saved copies and the manifest are
+      removed only when every entry succeeded; otherwise undo exits 1 and
+      keeps them.
 
 Defaults: --root is two levels above this file, --work is
 <root>/e2e/.work/contribute/NAME/, --stage is <work>/stage/. The tool reads
@@ -36,6 +44,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import sys
 
 LINK_RE = re.compile(r'\]\(([^)\s#][^)\s]*)(\s+"[^"]*")?\)')
@@ -43,6 +52,7 @@ LINK_RE = re.compile(r'\]\(([^)\s#][^)\s]*)(\s+"[^"]*")?\)')
 PATH_CONT = r"(?![\w/-]|\.[\w/-])"
 TEXT = {"encoding": "utf-8", "newline": ""}
 LAB_LINE_RE = re.compile(r"^lab:.*$", re.M)
+SEGMENT_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 
 
 class PromoteError(Exception):
@@ -197,12 +207,29 @@ def render(moves, name, root):
             text = rewrite_spec(text, lab_dst, amap, rewrites, m.dst)
         else:
             contents[m.dst] = None
+            check_leftover(m.dst, asset_text(m.src))
             continue
-        if "custom-labs/" in text:
-            line = next(l for l in text.splitlines() if "custom-labs/" in l)
-            raise PromoteError("%s still references custom-labs/ after rewriting: %s" % (m.dst, line.strip()))
+        check_leftover(m.dst, text)
         contents[m.dst] = text
     return contents, rewrites
+
+
+def asset_text(path):
+    """The asset's text, or None for a binary file (a NUL byte or invalid UTF-8)."""
+    with open(path, "rb") as f:
+        data = f.read()
+    if b"\0" in data:
+        return None
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def check_leftover(dst, text):
+    if text and "custom-labs/" in text:
+        line = next(l for l in text.splitlines() if "custom-labs/" in l)
+        raise PromoteError("%s still references custom-labs/ after rewriting: %s" % (dst, line.strip()))
 
 
 def manifest_path(work):
@@ -245,14 +272,37 @@ def table(rows):
     return "\n".join(lines)
 
 
+def ignored_targets(dsts, root):
+    """Targets git would ignore; empty when git is missing or root is not a work tree."""
+    try:
+        inside = subprocess.run(["git", "-C", root, "rev-parse", "--is-inside-work-tree"],
+                                capture_output=True, text=True)
+    except OSError:
+        return []
+    if inside.returncode != 0 or inside.stdout.strip() != "true":
+        return []
+    out = []
+    for dst in dsts:
+        try:
+            proc = subprocess.run(["git", "-C", root, "check-ignore", "-q", "--", dst], capture_output=True)
+        except OSError:
+            return []
+        if proc.returncode == 0:
+            out.append(dst)
+    return out
+
+
 def apply(moves, work, root, name, dry_run=False):
     """Write every target and the manifest (nothing with dry_run). Returns the table text.
     The manifest is saved after each write, so a run that fails partway can be undone."""
     contents, rewrites = render(moves, name, root)
     rows = [("copy " + m.kind, show(m.src, root), m.dst) for m in moves]
     rows += [("rewrite " + r["file"], r["from"], r["to"]) for r in rewrites]
+    warnings = ["warning: %s is gitignored and will not be committed" % d
+                for d in ignored_targets([m.dst for m in moves], root)]
+    out = "\n".join([table(rows)] + warnings)
     if dry_run:
-        return table(rows)
+        return out
     m = load_manifest(work, name)
     m["rewrites"].extend(r for r in rewrites if r not in m["rewrites"])
     for mv in moves:
@@ -273,11 +323,14 @@ def apply(moves, work, root, name, dry_run=False):
                 f.write(contents[mv.dst])
         m["created"].append(mv.dst)
         save_manifest(work, m)
-    return table(rows)
+    return out
 
 
 def record(name, path, root, work):
-    path = rel(os.path.normpath(path))
+    norm = rel(os.path.normpath(path))
+    if os.path.isabs(path) or norm == ".." or norm.startswith("../"):
+        raise PromoteError("record: %s is outside the repo" % path)
+    path = norm
     src = os.path.join(root, path)
     if not os.path.isfile(src):
         raise PromoteError("cannot record %s: not a file" % path)
@@ -297,31 +350,53 @@ def record(name, path, root, work):
 
 
 def undo(name, root, work):
+    """Restore, delete and remove each entry on its own; an entry that fails is
+    reported and the rest still run. The saved copies and the manifest go only
+    when every entry succeeded, so an incomplete undo can be rerun."""
     path = manifest_path(work)
     if not os.path.exists(path):
         raise PromoteError("no manifest at %s" % path)
     with open(path, encoding="utf-8") as f:
         m = json.load(f)
+    ok = True
     for r in m["recorded"]:
-        shutil.copy2(os.path.join(work, r["before"]), os.path.join(root, r["path"]))
-        print("restored %s" % r["path"])
+        saved = os.path.join(work, r["before"])
+        if not os.path.isfile(saved):
+            print("skip %s: no saved copy" % r["path"])
+            ok = False
+            continue
+        try:
+            shutil.copy2(saved, os.path.join(root, r["path"]))
+            print("restored %s" % r["path"])
+        except OSError as e:
+            print("cannot restore %s: %s" % (r["path"], e))
+            ok = False
     files = [c for c in m["created"] if not c.endswith("/")]
     dirs = [c.rstrip("/") for c in m["created"] if c.endswith("/")]
     for c in files:
         p = os.path.join(root, c)
-        if os.path.lexists(p):
-            os.remove(p)
-            print("deleted %s" % c)
-        else:
-            print("already gone %s" % c)
+        try:
+            if os.path.lexists(p):
+                os.remove(p)
+                print("deleted %s" % c)
+            else:
+                print("already gone %s" % c)
+        except OSError as e:
+            print("cannot delete %s: %s" % (c, e))
+            ok = False
     for d in sorted(dirs, key=lambda d: d.count("/"), reverse=True):
         p = os.path.join(root, d)
-        if os.path.isdir(p) and not os.listdir(p):
-            os.rmdir(p)
-            print("removed directory %s/" % d)
-        elif os.path.isdir(p):
-            print("kept non-empty directory %s/" % d)
-    # Saved copies go only after every restore and delete, so an interrupted undo can rerun.
+        try:
+            if os.path.isdir(p) and not os.listdir(p):
+                os.rmdir(p)
+                print("removed directory %s/" % d)
+            elif os.path.isdir(p):
+                print("kept non-empty directory %s/" % d)
+        except OSError as e:
+            print("cannot remove directory %s/: %s" % (d, e))
+            ok = False
+    if not ok:
+        raise PromoteError("undo incomplete; manifest kept")
     for r in m["recorded"]:
         os.remove(os.path.join(work, r["before"]))
     before_dir = os.path.join(work, "before")
@@ -345,6 +420,18 @@ def parse_libs(values):
     return libs
 
 
+def check_name(name):
+    if not SEGMENT_RE.match(name):
+        raise PromoteError("invalid name: %s" % name)
+
+
+def check_category(category, root):
+    if not SEGMENT_RE.match(category):
+        raise PromoteError("invalid category: %s" % category)
+    if not os.path.isdir(os.path.join(root, "labs", category)):
+        raise PromoteError("no such category labs/%s/" % category)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="Copy a staged custom lab into the repo.")
     ap.add_argument("name")
@@ -360,9 +447,10 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     root = os.path.abspath(args.root or default_root())
-    work = os.path.abspath(args.work or os.path.join(root, "e2e", ".work", "contribute", args.name))
-    stage = os.path.abspath(args.stage or os.path.join(work, "stage"))
     try:
+        check_name(args.name)
+        work = os.path.abspath(args.work or os.path.join(root, "e2e", ".work", "contribute", args.name))
+        stage = os.path.abspath(args.stage or os.path.join(work, "stage"))
         if args.undo:
             undo(args.name, root, work)
         elif args.record:
@@ -370,6 +458,7 @@ def main(argv=None):
         else:
             if not args.category:
                 raise PromoteError("--category is required")
+            check_category(args.category, root)
             moves = plan(args.name, args.category, parse_libs(args.lib), args.subdir, stage, root)
             print(apply(moves, work, root, args.name, dry_run=args.dry_run))
             if args.dry_run:

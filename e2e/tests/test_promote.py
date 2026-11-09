@@ -227,6 +227,83 @@ class TestPromote(unittest.TestCase):
         froms = [(r["file"], r["from"]) for r in m["rewrites"]]
         self.assertEqual(len(froms), len(set(froms)))
 
+    def test_record_rejects_paths_outside_repo(self):
+        for path in (os.path.join(self.root, "README.md"), "../outside.md", "labs/../../x.md"):
+            proc = self.run_cli(["demo", "--record", path], check=False)
+            self.assertEqual(proc.returncode, 1, path)
+            self.assertIn("record: %s is outside the repo" % path, proc.stderr)
+        self.assertFalse(self.exists(self.work("manifest.json")))
+        self.assertFalse(self.exists(self.work("before")))
+
+    def test_undo_skips_missing_saved_copy_and_restores_rest(self):
+        self.run_cli(["demo", "--category", "security", "--subdir"])
+        self._write("CHANGELOG.md", "0.1.0\n")
+        self.run_cli(["demo", "--record", "README.md"])
+        self.run_cli(["demo", "--record", "CHANGELOG.md"])
+        self._write("README.md", "edited\n")
+        self._write("CHANGELOG.md", "edited\n")
+        with open(self.work("manifest.json")) as f:
+            m = json.load(f)
+        os.remove(self.work(m["recorded"][0]["before"]))
+        proc = self.run_cli(["demo", "--undo"], check=False)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("skip README.md: no saved copy", proc.stdout)
+        self.assertIn("undo incomplete; manifest kept", proc.stderr)
+        self.assertEqual(self.read("CHANGELOG.md"), "0.1.0\n")
+        self.assertFalse(self.exists("labs/security/demo"))
+        self.assertTrue(self.exists(self.work("manifest.json")))
+
+    def test_undo_failing_entry_keeps_manifest(self):
+        self.run_cli(["demo", "--category", "security", "--subdir"])
+        self._write("docs/notes.md", "notes\n")
+        self.run_cli(["demo", "--record", "docs/notes.md"])
+        # A file where the recorded file's directory was makes the restore fail with an OSError.
+        shutil.rmtree(os.path.join(self.root, "docs"))
+        self._write("docs", "not a directory\n")
+        proc = self.run_cli(["demo", "--undo"], check=False)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("undo incomplete; manifest kept", proc.stderr)
+        self.assertFalse(self.exists("labs/security/demo/README.md"))
+        self.assertTrue(self.exists(self.work("manifest.json")))
+        self.assertTrue(os.listdir(self.work("before")))
+
+    def test_invalid_name_and_category(self):
+        cases = [
+            (["../demo", "--category", "security", "--subdir"], "invalid name"),
+            (["Demo", "--category", "security", "--subdir"], "invalid name"),
+            (["demo", "--category", "../security", "--subdir"], "invalid category"),
+            (["demo", "--category", "sec/urity", "--subdir"], "invalid category"),
+            (["demo", "--category", "nosuch", "--subdir"], "no such category labs/nosuch/"),
+        ]
+        for args, msg in cases:
+            proc = self.run_cli(args, check=False)
+            self.assertEqual(proc.returncode, 1, args)
+            self.assertIn(msg, proc.stderr, args)
+        self.assertFalse(self.exists("labs/nosuch"))
+        self.assertFalse(self.exists("labs/security/demo"))
+
+    def test_leftover_in_text_asset_errors(self):
+        with open(self.work("stage/assets/kc.yaml"), "a") as f:
+            f.write("# copied from custom-labs/x/assets/y\n")
+        proc = self.run_cli(["demo", "--category", "security", "--subdir"], check=False)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("labs/security/demo/kc.yaml still references custom-labs/", proc.stderr)
+        self.assertFalse(self.exists("labs/security/demo"))
+
+    def test_gitignored_target_warns(self):
+        if shutil.which("git") is None:
+            self.skipTest("git not available")
+        subprocess.run(["git", "init", "-q", self.root], check=True)
+        self._write(".gitignore", "*secret*\n")
+        self._write("e2e/.work/contribute/demo/stage/assets/my-secret.yaml", "kind: Secret\n")
+        proc = self.run_cli(["demo", "--category", "security", "--subdir", "--dry-run"])
+        self.assertIn("warning: labs/security/demo/my-secret.yaml is gitignored and will not be committed", proc.stdout)
+        self.assertNotIn("warning: labs/security/demo/kc.yaml", proc.stdout)
+
+    def test_no_warning_outside_a_repo(self):
+        proc = self.run_cli(["demo", "--category", "security", "--subdir", "--dry-run"])
+        self.assertNotIn("warning:", proc.stdout + proc.stderr)
+
     def read(self, rel):
         with open(os.path.join(self.root, rel)) as f:
             return f.read()
