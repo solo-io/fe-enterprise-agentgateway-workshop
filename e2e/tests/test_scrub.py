@@ -56,6 +56,21 @@ class TestRules(unittest.TestCase):
     def test_extra_allow(self):
         self.assertEqual(self.hits("host corp.acme-internal.net", allow=["*.acme-internal.net"]), [])
 
+    def test_dotted_identifiers_are_not_hostnames(self):
+        self.assertEqual(self.hits("jwt.plan chat.completion access.token.claim org.keycloak.userprofile.UserProfileProvider"), [])
+
+    def test_tld_rule(self):
+        self.assertIn(("hostname", "corp.acme.nl"), self.hits("host corp.acme.nl"))
+        self.assertIn(("hostname", "bank.acme.systems"), self.hits("host bank.acme.systems"))
+        self.assertIn(("hostname", "corp.acme.NET"), self.hits("host corp.acme.NET"))
+
+    def test_user_value_word_boundary(self):
+        self.assertEqual(self.hits("an explanation", user_values=["plan"]), [])
+        self.assertIn(("user-value", "plan"), self.hits("the plan claim", user_values=["plan"]))
+
+    def test_ipv6(self):
+        self.assertIn(("ipv6", "fe80::1"), self.hits("addr fe80::1 here"))
+
 
 class TestCli(unittest.TestCase):
     def test_from_changes_and_output_format(self):
@@ -70,6 +85,34 @@ class TestCli(unittest.TestCase):
         self.assertEqual(proc.returncode, 0)
         self.assertIn("lab.md:2\tuser-value\tacme-key", proc.stdout)
         self.assertIn("lab.md:2\tuser-value\tAcme Payments", proc.stdout)
+
+    def run_changes(self, rows):
+        tmp = tempfile.mkdtemp()
+        changes = os.path.join(tmp, "CHANGES.md")
+        with open(changes, "w") as fh:
+            fh.write("## Configuration\n\n| Kind | Name |\n|--|--|\n" + rows)
+        return scrub.user_values_from_changes(changes)
+
+    def test_extraction_skips(self):
+        vals = self.run_changes(
+            "| Secret | `12345` |\n| Secret | `/openai` |\n| Secret | `/acme-payments` |\n"
+            "| Secret | `OPENAI_API_KEY` |\n| Secret | `KUBECONFIG` |\n| Secret | `gold-user` |\n")
+        self.assertEqual(vals, ["/acme-payments", "gold-user"])
+
+    def test_summary(self):
+        tmp = tempfile.mkdtemp()
+        lab = os.path.join(tmp, "lab.md")
+        with open(lab, "w") as fh:
+            fh.write("ip 10.1.2.3\nagain 10.1.2.3 and 10.9.9.9\n")
+        proc = subprocess.run([sys.executable, SCRUB, "--summary", "lab.md"], capture_output=True, text=True, cwd=tmp)
+        self.assertEqual(proc.stdout.splitlines(), ["2\tipv4\t10.1.2.3\tlab.md:1", "1\tipv4\t10.9.9.9\tlab.md:2"])
+
+    def test_binary_skipped(self):
+        tmp = tempfile.mkdtemp()
+        with open(os.path.join(tmp, "b.bin"), "wb") as fh:
+            fh.write(b"\0 10.1.2.3")
+        proc = subprocess.run([sys.executable, SCRUB, "b.bin"], capture_output=True, text=True, cwd=tmp)
+        self.assertEqual((proc.returncode, proc.stdout), (0, ""))
 
     def test_missing_path_exits_2(self):
         proc = subprocess.run([sys.executable, SCRUB, "/nonexistent/x.md"], capture_output=True, text=True)

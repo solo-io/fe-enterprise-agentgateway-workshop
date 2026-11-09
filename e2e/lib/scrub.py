@@ -5,7 +5,9 @@ Usage:
   scrub.py [--allow GLOB]... [--from-changes CHANGES.md] PATH...
       walks files (directories recursively, text files only) and prints one line
       per hit: <relpath>:<line>\t<rule>\t<match>. Exits 0 whatever it finds,
-      2 when a path (or the CHANGES.md) does not exist.
+      2 when a path (or the CHANGES.md) does not exist. --summary prints one
+      line per distinct rule and match instead: count, rule, match, first
+      location, sorted by rule then count descending.
 
 Rules: ipv4, ipv6, hostname, email, bearer, secret-prefix, base64-blob,
 cloud-id, user-value. The scan favours false positives over misses, so a human
@@ -29,6 +31,12 @@ DEFAULT_ALLOW = [
 ]
 FILE_EXTS = {"md", "yaml", "yml", "json", "sh", "py"}
 IGNORED_NAMESPACES = {"agentgateway-system", "default", "keycloak"}
+GENERIC_VALUES = {"OPENAI_API_KEY", "ANTHROPIC_API_KEY", "SOLO_TRIAL_LICENSE_KEY", "GATEWAY_IP", "KUBECONFIG"}
+# Last labels that count as a real TLD besides any 2-letter alphabetic one.
+KNOWN_TLDS = set(
+    "com net org edu gov mil int biz info dev app cloud tech xyz ai io internal local "
+    "corp lan home company group systems network online site store bank finance".split()
+)
 
 IPV4 = re.compile(r"(?<![\w.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\w])")
 _G = r"[0-9A-Fa-f]{1,4}"
@@ -77,9 +85,9 @@ def _line_hits(line, allow, user_values):
         token = m.group(0)
         labels = token.split(".")
         tld = labels[-1]
-        if VERSION.fullmatch(token) or not (tld.isalpha() and len(tld) >= 2):
+        if tld.lower() in FILE_EXTS or VERSION.fullmatch(token):
             continue
-        if tld.lower() in FILE_EXTS:
+        if not (tld.isalpha() and (len(tld) == 2 or tld.lower() in KNOWN_TLDS)):
             continue
         if line[m.end():m.end() + 1] == "(":
             continue
@@ -108,9 +116,10 @@ def _line_hits(line, allow, user_values):
         for m in rx.finditer(line):
             yield "cloud-id", m.group(0)
 
-    lowered = line.lower()
     for value in user_values:
-        if value.lower() in lowered:
+        lead = r"(?<![A-Za-z0-9_])" if value[:1].isalnum() else ""
+        trail = r"(?![A-Za-z0-9_])" if value[-1:].isalnum() else ""
+        if re.search(lead + re.escape(value) + trail, line, re.IGNORECASE):
             yield "user-value", value
 
 
@@ -166,6 +175,10 @@ def user_values_from_changes(path):
             continue
         if re.fullmatch(r"[A-Z][A-Za-z0-9]*", v):
             continue  # kind-like name such as HTTPRoute
+        if v in GENERIC_VALUES or re.fullmatch(r"\d+", v):
+            continue
+        if re.fullmatch(r"/[a-z]{1,12}", v):
+            continue  # a short single path segment such as /openai
         if v not in out:
             out.append(v)
     return out
@@ -191,6 +204,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Report candidate leaks in a custom lab.")
     ap.add_argument("--allow", action="append", default=[], metavar="GLOB")
     ap.add_argument("--from-changes", metavar="CHANGES.md")
+    ap.add_argument("--summary", action="store_true",
+                    help="one line per distinct rule and match: count, rule, match, first location")
     ap.add_argument("paths", nargs="+")
     args = ap.parse_args(argv)
 
@@ -203,17 +218,25 @@ def main(argv=None):
         return 2
 
     user_values = user_values_from_changes(args.from_changes) if args.from_changes else []
+    summary = {}
     for path in _walk(args.paths):
         try:
             if _is_binary(path):
                 continue
             with open(path, encoding="utf-8", errors="replace") as fh:
                 text = fh.read()
-        except OSError:
+        except OSError as exc:
+            print("scrub: cannot read %s: %s" % (path, exc), file=sys.stderr)
             continue
         rel = os.path.relpath(path)
         for no, rule, match in scan_text(text, args.allow, user_values):
-            print("%s:%d\t%s\t%s" % (rel, no, rule, match))
+            if args.summary:
+                entry = summary.setdefault((rule, match), [0, "%s:%d" % (rel, no)])
+                entry[0] += 1
+            else:
+                print("%s:%d\t%s\t%s" % (rel, no, rule, match))
+    for (rule, match), (count, first) in sorted(summary.items(), key=lambda kv: (kv[0][0], -kv[1][0], kv[0][1])):
+        print("%d\t%s\t%s\t%s" % (count, rule, match, first))
     return 0
 
 
