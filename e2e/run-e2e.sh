@@ -251,14 +251,21 @@ write_outcome_file() {
 #   instead of a diff against a partial list.
 #   Every namespaced kind listed comes with the 001 base install. kubectl fails
 #   the whole call on a kind the cluster does not know, so on a cluster without
-#   the base the check reports NOT RUN rather than a silent pass.
+#   the base the check reports NOT RUN rather than a silent pass. kubectl's
+#   stderr goes to <work>/custom/<name>/snapshot.err so NOT RUN names a cause.
 CUSTOM_SNAPSHOT_NAMESPACES=(agentgateway-system default)
 custom_snapshot() {
-  local all ns_out ns
-  all="$(kubectl get namespaces,clusterroles,clusterrolebindings,gatewayclasses,crds,validatingwebhookconfigurations,mutatingwebhookconfigurations,priorityclasses -o name 2>/dev/null)" || return 1
+  local all ns_out ns err="${SNAPSHOT_ERR:-/dev/null}"
+  all="$(kubectl get namespaces,clusterroles,clusterrolebindings,gatewayclasses,crds,validatingwebhookconfigurations,mutatingwebhookconfigurations,priorityclasses -o name 2>>"$err")" || return 1
   [[ -n "$all" ]] || return 1
   for ns in "${CUSTOM_SNAPSHOT_NAMESPACES[@]}"; do
-    ns_out="$(kubectl get -n "$ns" enterpriseagentgatewaybackends,ratelimitconfigs,secrets,configmaps,referencegrants,deployments,services,serviceaccounts -o name --ignore-not-found 2>/dev/null)" || return 1
+    # One line per object: `Kind/name` plus the owner kinds, if any. Owned
+    # objects (a Gateway's Deployment, a Deployment's ReplicaSet) go away with
+    # their owner, so they are dropped rather than diffed; so are Helm release
+    # secrets and the controller's JWKS cache, which the controller owns.
+    ns_out="$(kubectl get -n "$ns" enterpriseagentgatewaybackends,ratelimitconfigs,secrets,configmaps,referencegrants,deployments,services,serviceaccounts \
+      -o jsonpath='{range .items[*]}{.kind}{"/"}{.metadata.name}{" "}{.metadata.ownerReferences[*].kind}{"\n"}{end}' --ignore-not-found 2>>"$err")" || return 1
+    ns_out="$(awk 'NF == 1 && $1 !~ /^[Ss]ecret\/sh\.helm\.release\.v1\./ && $1 !~ /^[Cc]onfig[Mm]ap\/enterprise-jwks-store-/ { print tolower(substr($1, 1, index($1, "/") - 1)) substr($1, index($1, "/")) }' <<<"$ns_out")"
     [[ -n "$ns_out" ]] && all+=$'\n'"$(sed "s|^|${ns} |" <<<"$ns_out")"
   done
   printf '%s\n' "$all" | sort
@@ -481,6 +488,7 @@ run_lab() {
   local is_custom=false snap_before="" snap_ok=true leftover_fail=false
   [[ "$key" == custom/* ]] && is_custom=true
   if [[ "$is_custom" == "true" && "$KEEP" != "true" ]]; then
+    SNAPSHOT_ERR="${workdir}/snapshot.err"; : > "$SNAPSHOT_ERR"
     snap_before="$(custom_snapshot)" || snap_ok=false
   fi
 
@@ -500,7 +508,7 @@ run_lab() {
     local snap_after left n_left=0
     snap_after="$(custom_snapshot)" || snap_ok=false
     if [[ "$snap_ok" != "true" ]]; then
-      printf "  ${RED}LEFTOVER CHECK NOT RUN: %s (cluster snapshot failed)${NC}\n" "$key"
+      printf "  ${RED}LEFTOVER CHECK NOT RUN: %s (cluster snapshot failed; see %s)${NC}\n" "$key" "${SNAPSHOT_ERR}"
       note_leftover "LEFTOVER CHECK NOT RUN: ${key} (cluster snapshot failed)"
       extra+=("leftover_check=not-run")
       leftover_fail=true
@@ -606,7 +614,7 @@ if [[ "$LINT_ONLY" == "true" && -n "$CUSTOM_NAME" ]]; then
   meta="$("$PYTHON" "$LABDOC" meta "$spec")" || exit 1
   eval "$meta"
   lab="${REPO_ROOT}/${E2E_SPEC_LAB}"
-  [[ -f "$lab" ]] || { printf "${RED}✗ %s — lab not found: %s${NC}\n" "$(spec_key "$spec")" "$E2E_SPEC_LAB"; exit 1; }
+  [[ -f "$lab" ]] || { printf "${RED}✗ %s: lab not found: %s${NC}\n" "$(spec_key "$spec")" "$E2E_SPEC_LAB"; exit 1; }
   # The spec's lab: must be the lab file in its own directory, so the lab, its
   # spec and its reports stay together and the harness keys it by name.
   want_lab="${CUSTOM_ROOT}/${CUSTOM_NAME}/${CUSTOM_NAME}.md"

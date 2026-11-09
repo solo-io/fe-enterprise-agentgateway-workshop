@@ -329,9 +329,17 @@ E2E_TEST_SNAP="${TMP}/snap-agentgateway-system" run "a namespaced leftover is na
   "LEFTOVER: agentgateway-system namespace/left-behind" --custom leftover --no-prompt
 rm -f "${TMP}/snap-agentgateway-system"
 printf 'namespace/default\n' > "${TMP}/snap"
+printf 'Secret/base\n' > "${TMP}/snap-agentgateway-system"
+E2E_TEST_SNAP="${TMP}/snap-agentgateway-system" run "owned, Helm release, and JWKS cache objects are not leftovers" 0 \
+  "1 PASS" --custom owned --no-prompt
+E2E_TEST_SNAP="${TMP}/snap-agentgateway-system" out="$("$RUNNER" --custom owned --no-prompt 2>&1)"
+[[ "$out" != *"LEFTOVER: "* ]] && ok "owned objects print no LEFTOVER line" || fail "owned objects: $(grep LEFTOVER <<<"$out")"
+rm -f "${TMP}/snap-agentgateway-system"
+printf 'namespace/default\n' > "${TMP}/snap"
 out="$(E2E_STUB_GET_FAIL=1 "$RUNNER" --custom demo --no-prompt 2>&1)"; rc=$?
 [[ "$rc" -eq 1 && "$out" == *"LEFTOVER CHECK NOT RUN: custom/demo"* ]] \
   && ok "kubectl exit 1 with output fails the check" || fail "kubectl exit 1 (rc=$rc): $(printf '%s' "$out" | tail -3)"
+[[ -f "${E2E_WORK_ROOT}/custom/demo/snapshot.err" ]] && ok "NOT RUN keeps kubectl stderr in snapshot.err" || fail "snapshot.err missing"
 grep -q "^status=fail .*leftover_check=not-run" "${E2E_WORK_ROOT}/custom/demo/outcome" \
   && ok "outcome records leftover_check=not-run" || fail "outcome: $(cat "${E2E_WORK_ROOT}/custom/demo/outcome")"
 printf 'namespace/default\n' > "${TMP}/snap"

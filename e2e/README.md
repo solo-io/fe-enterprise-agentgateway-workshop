@@ -76,8 +76,11 @@ A `--custom` run snapshots namespaces, the cluster-scoped kinds the labs
 create, and the common namespaced kinds in `agentgateway-system` and `default`,
 before the run and after Cleanup. It prints `LEFTOVER: <kind>/<name>` (or
 `LEFTOVER: <namespace> <kind>/<name>`) for anything new, and any leftover fails
-the run. `LEFTOVER CHECK NOT RUN` means a snapshot failed, and that fails the
-run too. A `--keep` run skips the check. Work files, including the run's own
+the run. Objects with an owner (a Gateway's Deployment, a Deployment's
+ReplicaSet), Helm release secrets, and the controller's `enterprise-jwks-store-*`
+ConfigMaps are not counted, since the controller manages them. `LEFTOVER CHECK
+NOT RUN` means a snapshot failed, and that fails the run too; kubectl's stderr
+is in `e2e/.work/custom/<name>/snapshot.err`. A `--keep` run skips the check. Work files, including the run's own
 `leftovers.txt`, go to `e2e/.work/custom/<name>/`; a custom run never writes
 the shared `e2e/.work/leftovers.txt`, and a `--track` run leaves custom files
 alone.
