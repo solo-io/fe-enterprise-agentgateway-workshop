@@ -63,13 +63,24 @@ custom-labs/<name>/
 ```
 
 A custom spec declares top-level `requirements:` (a list of `id` and `text`)
-and names them in each step's `proves:` list. Lint fails when a requirement has
-no proving step, a proving step has no `assert`, or a `proves` id is undeclared.
+and names them in each step's `proves:` list. `--custom <name> --lint` fails when:
 
-A `--custom` run snapshots namespaces and the cluster-scoped kinds the labs
-create before the run and after Cleanup, and prints `LEFTOVER: <kind>/<name>`
-for anything new. `LEFTOVER CHECK NOT RUN` means a snapshot failed. Work files
-go to `e2e/.work/custom/<name>/`, and a `--track` run leaves them alone.
+- the spec declares no requirements
+- a requirement has no proving step
+- a proving step has no `assert`, or is a `resource:` check
+- a `proves` id is undeclared
+- a step has `run: none` and no `reason:`
+- the spec's `lab:` is not `custom-labs/<name>/<name>.md`
+
+A `--custom` run snapshots namespaces, the cluster-scoped kinds the labs
+create, and the common namespaced kinds in `agentgateway-system` and `default`,
+before the run and after Cleanup. It prints `LEFTOVER: <kind>/<name>` (or
+`LEFTOVER: <namespace> <kind>/<name>`) for anything new, and any leftover fails
+the run. `LEFTOVER CHECK NOT RUN` means a snapshot failed, and that fails the
+run too. A `--keep` run skips the check. Work files, including the run's own
+`leftovers.txt`, go to `e2e/.work/custom/<name>/`; a custom run never writes
+the shared `e2e/.work/leftovers.txt`, and a `--track` run leaves custom files
+alone.
 
 Tracks, `--list`, `--lint`, and a plain `./e2e/run-e2e.sh` read `e2e/specs/`
 only and never see `custom-labs/`.

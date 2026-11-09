@@ -65,7 +65,7 @@ Rules:
 - **Pre-requisites boilerplate** (use verbatim): *"This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana."* Reference labs `001`/`002` by bare backticked number in this sentence; reference all other labs with relative markdown links (`[Mock OpenAI Server lab](configure-mock-openai-server.md)`, `[001 — Install...](../../001-install-enterprise-agentgateway.md)` from two levels deep).
 - **Hard requirements** (architecture, sizing, version gates) go in bold-lead blockquotes right after Pre-requisites: `> **Node architecture (important):** ...`. Labs assume the version `001` installs, so skip version gates for features that version already ships. Add one only for a feature from the last release or two, which users on a slightly older install may lack. State it plainly (*"available in **v2026.9.3 and later**"*), and remove it once the gate is a few releases old.
 - **Lab Objectives**: always present, bulleted, verb-first, e.g. `- Create a route to OpenAI using an `AgentgatewayModel` and `HTTPRoute``. Multi-part labs may use bold sub-labels: `- **Part A — Impersonation:** ...`.
-- **Step headings** (normative): for multi-step runbooks use `## Step N — Title` (em-dash; this is the dominant style; do **not** use `## Step N: Title`). Short labs skip numbering and use plain descriptive `##`/`###` Title Case headings. Use `---` horizontal rules between major sections in long labs.
+- **Step headings** (normative): for multi-step runbooks use `## Step N: Title`. Short labs skip numbering and use plain descriptive `##`/`###` Title Case headings. Use `---` horizontal rules between major sections in long labs.
 - **Runbooks** should state what they were validated against: *"This runbook was validated against controller **v2026.6.1** on a local KinD cluster."*
 - There is no "Next Steps" section convention; cross-link related labs inline instead. `## Key Takeaways` as a closing bullet list is optional.
 
@@ -277,7 +277,7 @@ Most labs end feature work with a near-verbatim `## Observability` block; copy i
 - **Testing tiers** (pick per lab weight): (1) **MCP Inspector**: `npx @modelcontextprotocol/inspector@0.21.1` (pin the version), UI steps: Transport `Streamable HTTP`, URL `http://$GATEWAY_IP:8080/mcp`, Connect → Tools → List Tools → Run Tool; (2) **Claude Code**: `claude mcp add --transport http <name> http://$GATEWAY_IP:8080/mcp`, verify with `/mcp` and `claude mcp list`; (3) **raw curl JSON-RPC** for "under the hood" sections.
 - The canonical curl JSON-RPC sequence: `initialize` with `-i` to capture headers, extract `mcp-session-id` into `SID`, then pass `-H "Mcp-Session-Id: $SID"` on every call, always with the dual Accept header `application/json, text/event-stream`. Pipe responses to `python3 -m json.tool`. Note that with `sessionRouting: Stateless` no session id is emitted and the empty header is harmless.
 - **SSE requires single-replica session affinity**: if your lab uses `protocol: SSE`, include the replica patch and the note; StreamableHTTP/OpenAPI backends scale across replicas.
-- External APIs used by MCP labs get prereq bullets with signup links and a required/optional label (*"**FRED API key** (required — the pod won't start without it)"*); prefer key-free APIs (Open-Meteo) where possible.
+- External APIs used by MCP labs get prereq bullets with signup links and a required/optional label (*"**FRED API key** (required; the pod won't start without it)"*); prefer key-free APIs (Open-Meteo) where possible.
 - IdP console setup is documented as numbered steps under a dedicated `### <IdP> (Layer A)` heading with exact copy-paste callback URLs in fenced blocks, plus a variable reference table.
 
 ### Variant labs (multi-IdP)
@@ -324,7 +324,7 @@ These exist in the corpus; new labs should follow the **normative** column.
 
 | Drift observed | Normative choice for new labs |
 |---|---|
-| `## Step N — Title` vs `## Step N: Title` vs unnumbered | `## Step N — Title` (em-dash) for runbooks; unnumbered `##`/`###` for short labs |
+| `## Step N: Title` vs unnumbered | `## Step N: Title` for runbooks; unnumbered `##`/`###` for short labs |
 | `kubectl apply -f -` vs `-f-` | `-f -` (with space) |
 | `Expected output:` / `Expected Output:` / `Expected response:` | `Expected output:` |
 | `> **Note:**` blockquotes vs `> [!NOTE]` alerts | Bold-lead blockquotes; don't mix styles in one lab |

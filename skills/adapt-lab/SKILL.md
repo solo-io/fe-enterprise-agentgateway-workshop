@@ -57,7 +57,7 @@ The user names one or more source labs or describes the use case. When they desc
 - Compose: join two labs, for example JWT auth from an OIDC provider plus rate limits keyed on a token claim.
 - Reskin: keep a lab's mechanics and swap in the user's organization: team names, models, budgets.
 
-Ask only for what you cannot infer from the labs: tiers, claims, team names, models, thresholds. Ask one question at a time. Agree a name for the lab with the user. Use lowercase kebab-case, for example `oidc-tiered-rate-limits` (the harness accepts `^[A-Za-z0-9][A-Za-z0-9._-]*$`), and pick a name that does not exist yet under `custom-labs/`.
+Ask only for what you cannot infer from the labs: tiers, claims, team names, models, thresholds. Ask one question at a time. Agree a name for the lab with the user. Use lowercase letters, digits, and hyphens, starting with a letter or digit, for example `oidc-tiered-rate-limits`; the harness refuses any other name. Pick a name that does not exist yet under `custom-labs/`.
 
 Write every requirement as a numbered, testable statement in the user's terms, for example: "R1: Gold tier gets 1000 input tokens per minute, silver 200, and a token without a tier claim is rejected." Push an untestable statement back to the user and ask for a testable version.
 
@@ -126,7 +126,7 @@ Write `custom-labs/<name>/<name>.md` following "Writing the lab" and `custom-lab
    ./e2e/run-e2e.sh --custom <name>
    ```
 
-   Read the outcome line from `e2e/.work/custom/<name>/outcome` and log it:
+   Read the outcome line from `e2e/.work/custom/<name>/outcome` and log it. Only `status=pass` in the outcome counts. A skip is not a pass.
 
    ```bash
    e2e/lib/session-log.sh add run custom/<name> "<outcome line>"
@@ -139,13 +139,19 @@ Write `custom-labs/<name>/<name>.md` following "Writing the lab" and `custom-lab
    - Stop
 
    Do nothing to the cluster until the user picks.
-4. Any `LEFTOVER: <kind>/<name>` line is a Cleanup bug in your lab, and the resource is still on the cluster. The next run's snapshot would include it and report clean. Fix the Cleanup section, show the user the leftover resources, and on their approval delete each one:
+4. Any `LEFTOVER:` line fails the run. It is a Cleanup bug in your lab, and the resource is still on the cluster. The next run's snapshot would include it and report clean. Fix the Cleanup section, show the user the leftover resources, and on their approval delete each one. For a `LEFTOVER: <kind>/<name>` line:
 
    ```bash
    kubectl delete <kind>/<name> --ignore-not-found
    ```
 
-   Then run again. `LEFTOVER CHECK NOT RUN` means the snapshot failed; say so and do not count the run as clean.
+   For a `LEFTOVER: <namespace> <kind>/<name>` line:
+
+   ```bash
+   kubectl delete -n <namespace> <kind>/<name> --ignore-not-found
+   ```
+
+   Then run again. `LEFTOVER CHECK NOT RUN` means the snapshot failed, and it also fails the run; say so and do not count the run as clean.
 
 You may fix your own authoring: a wrong ordinal, a heading mismatch, a missing `retry`, a field the schema rejects. You may not change a requirement, loosen an assertion, or invent configuration to make a step pass. If a requirement cannot be met with what the labs and the docs server provide, report it to the user as a gap. If the user wants to keep the rest, the lab states the gap in a callout and `CHANGES.md` records it.
 
@@ -177,7 +183,13 @@ Validation ran with Cleanup, so the cluster now holds only the base. Ask whether
 e2e/lib/session-log.sh add keep-custom custom/<name> "custom configuration kept at the user's request"
 ```
 
-Log the outcome line of that run with `session-log.sh add run` as in step 4. Rebuild the report so it shows the kept run:
+Log the outcome line of that run with `session-log.sh add run` as in step 4. If the kept run fails, tell the user, then run the lab again without `--keep` so its Cleanup removes what the failed run left:
+
+```bash
+./e2e/run-e2e.sh --custom <name>
+```
+
+Rebuild the report so it shows the kept run:
 
 ```bash
 ./e2e/run-e2e.sh --custom <name> --report-only
@@ -191,7 +203,7 @@ Follow `style-guide.md`. Use no em dashes, no filler words, and no commentary ab
 
 - Clone the skeleton of the closest source lab: title, Pre-requisites boilerplate, Lab Objectives, steps, Observability, Cleanup. Each step is why-prose, a command block, then verification with `Expected output:`.
 - Depend on labs 001 and 002 only. Deploy anything else the lab needs, including an in-cluster IdP, and remove it in Cleanup.
-- Reference `lib/` assets and link to `labs/` with repo-root-relative paths. Put files the repo does not ship under `custom-labs/<name>/assets/` and reference them by that path.
+- Write markdown links relative to the lab file, for example `[Rate limiting](../../labs/rate-limiting/<lab>.md)`. Write paths inside bash blocks relative to the repo root, for example `lib/jwt/generate-jwt.sh`, because the harness and the user run the blocks from there. Put files the repo does not ship under `custom-labs/<name>/assets/` and reference them from bash blocks as `custom-labs/<name>/assets/<file>`.
 - Keep headings unique within the lab, case-insensitively.
 - Make every bash block executable. Never fence expected-output tables as bash.
 - Write YAML in block style, never inline flow style.
@@ -248,6 +260,6 @@ cleanup:
   section: "Cleanup"
 ```
 
-Lint fails when a requirement has no proving step, a proving step has no `assert`, a `proves` id is undeclared, or a step uses `run: none` without `reason:`. Give each requirement at least one positive and one negative step.
+Lint fails when the spec declares no requirements, a requirement has no proving step, a proving step has no `assert` or is a `resource:` check, a `proves` id is undeclared, a step uses `run: none` without `reason:`, or `lab:` is not `custom-labs/<name>/<name>.md`. Give each requirement at least one positive and one negative step.
 
 Put a `retry` on every step whose result depends on asynchronous work: route programming, policy attachment, backend discovery, rate-limit counters. Match `until` to what the last block prints, and keep it no stricter than the step's assertion.
