@@ -18,7 +18,8 @@ e2e/.work/contribute/<name>/
   stage/          the staging copy you scrub
   manifest.json   files the promoter created and repo files you recorded
   before/         copies of recorded repo files, for --undo
-  pr-body.md      the CHANGELOG block, used as the PR body
+  pr-body.md      the CHANGELOG bullets, used as the PR body
+  staged.patch    the staged diff, scanned again before the commit
 ```
 
 Contribute mode makes no call to the Solo docs server. The scrub list, the lab text, and the diff stay on the machine.
@@ -42,7 +43,16 @@ Run these checks in order. Stop on the first failure with the message shown, and
    ls e2e/.work/contribute/<name>/manifest.json
    ```
 
-   If the file exists, a previous session stopped partway. Show the manifest and offer the undo from step 8. On a yes, run the undo, then continue with check 3. On a no, stop the session and print the manifest path, `e2e/.work/contribute/<name>/manifest.json`, so the user can finish or revert by hand. Never start a new run on top of an old manifest.
+   If the file exists, a previous session stopped. Check whether its files are still uncommitted:
+
+   ```bash
+   jq -r '.created[], .recorded[].path' e2e/.work/contribute/<name>/manifest.json | xargs git status --porcelain --
+   ```
+
+   - The command prints nothing, or the manifest lists no paths: the previous session's work is already committed. Tell the user, and offer to retire the manifest. On a yes, run `mv e2e/.work/contribute/<name>/manifest.json e2e/.work/contribute/<name>/manifest.stale.json` and continue with check 3. On a no, stop the session and print the manifest path.
+   - The command prints lines: those files are uncommitted. Show the manifest and offer the undo from step 8. On a yes, run the undo, then continue with check 3. On a no, stop the session and print the manifest path, `e2e/.work/contribute/<name>/manifest.json`, so the user can finish or revert by hand.
+
+   Never start a new run on top of an old manifest.
 
 3. `gh` is logged in and points at the main repo with default branch `main`:
 
@@ -66,15 +76,38 @@ Run these checks in order. Stop on the first failure with the message shown, and
    - The branch is not `main` and does not match `^[0-9]+\.[0-9]+\.[0-9]+$`. Stop message: "The current branch is <branch>. Switch to main or a version branch, then start again."
    - The first line of `git status -sb` shows `ahead` or `behind`. Stop message: "<branch> differs from origin/<branch>. Pull or push it so the two match, then start again."
 
-   When the start branch is not `main`, update local `main` so the step 7 diff is current:
+   When the start branch is not `main`, update local `main` so check 5 and the step 7 diff read the current `main`:
 
    ```bash
    git fetch origin main:main
    ```
 
-   If that fetch fails, because `main` is checked out in another worktree or has diverged from `origin/main`, tell the user the step 7 diff may be stale and continue. Also tell the user the PR will carry the start branch's commits, so they can merge that version first if they want a PR with only this lab.
+   If that fetch fails, because `main` is checked out in another worktree or has diverged from `origin/main`, tell the user that check 5 and the step 7 diff read a stale `main`, and continue. Also tell the user the PR will carry the start branch's commits, so they can merge that version first if they want a PR with only this lab.
 
-5. The cluster is reachable and the base is installed, because step 5 runs the promoted spec:
+5. A free version and branch name exist. Print the highest version among the start branch's CHANGELOG head, `main`'s CHANGELOG head, and every local and remote version branch:
+
+   ```bash
+   { grep -m1 -E '^[0-9]+\.[0-9]+\.[0-9]+ - \(' CHANGELOG.md
+     git show main:CHANGELOG.md | grep -m1 -E '^[0-9]+\.[0-9]+\.[0-9]+ - \('
+     git branch --list '[0-9]*.[0-9]*.[0-9]*'
+     git ls-remote --heads origin '[0-9]*.[0-9]*.[0-9]*'
+   } | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | sort -t. -k1,1n -k2,2n -k3,3n | tail -1
+   ```
+
+   Add one to the patch number of the printed version. That is the proposed `X.Y.Z`. Both of these commands must print nothing for it:
+
+   ```bash
+   git branch --list X.Y.Z
+   git ls-remote --heads origin X.Y.Z
+   ```
+
+   If either prints a line, add one to the patch number again and repeat the two commands. Propose the result to the user, who confirms it or gives another name. Run the two commands on a name the user gives.
+
+   - The chosen name exists locally or on `origin`. Stop message: "Branch X.Y.Z already exists locally or on origin. Choose a version that is not taken, then start again."
+
+   Use the confirmed `X.Y.Z` for the CHANGELOG block in step 4, the branch in step 6, and the PR title in step 7.
+
+6. The cluster is reachable and the base is installed, because step 5 runs the promoted spec:
 
    ```bash
    ./e2e/lib/detect-env.sh
@@ -97,15 +130,16 @@ Make the staging copy:
 mkdir -p e2e/.work/contribute/<name> && rm -rf e2e/.work/contribute/<name>/stage && cp -R custom-labs/<name> e2e/.work/contribute/<name>/stage
 ```
 
-Run the scanner on the staging copy:
+Run the scanner on the lab, spec, CHANGES.md, and assets in the staging copy. Leave out the `assets` path when the lab has no assets:
 
 ```bash
-python3 e2e/lib/scrub.py --summary --from-changes e2e/.work/contribute/<name>/stage/CHANGES.md e2e/.work/contribute/<name>/stage
+S=e2e/.work/contribute/<name>/stage
+python3 e2e/lib/scrub.py --summary --from-changes $S/CHANGES.md $S/<name>.md $S/spec.yaml $S/CHANGES.md $S/assets
 ```
 
 Each line is `<count>\t<rule>\t<match>\t<first location>`. The rules are `ipv4`, `ipv6`, `hostname`, `email`, `bearer`, `secret-prefix`, `base64-blob`, `cloud-id`, and `user-value`. Drop `--summary` to see every location of a match.
 
-Show the list grouped by rule. Ask the user for a ruling on one group at a time:
+Each distinct match gets one ruling. Show the matches grouped by rule and go through one rule at a time. For every rule except `user-value`, the user may give one ruling for the whole group. For `user-value`, the user rules on each distinct value. The rulings are:
 
 - Keep: the value is fine to publish.
 - Replace: give the generic value to use, for example `example.com` for a tenant host or `team-a` for a team name.
@@ -115,7 +149,7 @@ Show the list grouped by rule. Ask the user for a ruling on one group at a time:
   e2e/lib/session-log.sh add decision custom/<name> "contribute stopped: scrub"
   ```
 
-The `user-value` group lists the lab's own vocabulary: tier names, user names, resource names, model aliases. Many are fine to keep. The user rules on each one.
+The `user-value` group lists the lab's own vocabulary: tier names, user names, resource names, model aliases. Many are fine to keep.
 
 Log every ruling:
 
@@ -128,7 +162,8 @@ After every ruling is in, apply the replacements to the files under `e2e/.work/c
 Run the scanner again. Add `--allow <glob>` for a host the user ruled as fine to keep, so it drops out of the list:
 
 ```bash
-python3 e2e/lib/scrub.py --summary --allow <glob> --from-changes e2e/.work/contribute/<name>/stage/CHANGES.md e2e/.work/contribute/<name>/stage
+S=e2e/.work/contribute/<name>/stage
+python3 e2e/lib/scrub.py --summary --allow <glob> --from-changes $S/CHANGES.md $S/<name>.md $S/spec.yaml $S/CHANGES.md $S/assets
 ```
 
 Every remaining line must be a match the user ruled as keep. A new hit gets a ruling like the others. Nothing is scrubbed without a ruling.
@@ -152,7 +187,9 @@ Preview first:
 python3 e2e/lib/promote.py <name> --category <category> --lib <asset>=<concern> --dry-run
 ```
 
-Show the table of files and rewrites. On the user's yes, run it for real with the same arguments:
+Show the table of files and rewrites. A `warning: <path> is gitignored and will not be committed` line means the commit in step 6 would leave that file out: agree a different file name or destination with the user and preview again. If the promoter reports that a file still references `custom-labs/`, edit that file under `stage/` and preview again.
+
+On the user's yes, run it for real with the same arguments:
 
 ```bash
 python3 e2e/lib/promote.py <name> --category <category> --lib <asset>=<concern>
@@ -173,24 +210,12 @@ python3 e2e/lib/promote.py <name> --record labs/installation/image-list.md   # o
 
 Work through `style-guide.md` §15 and its "Checklist when adding a lab". Change the lab only to conform it; never redesign its content.
 
-- README: add a bullet under the category's `## <Category>` section in the form `- [Lab Title](labs/<category>/<name>.md) _(Provider)_`. When the lab spans categories, list it under each one with a reciprocal `_(see also: <Other Categories>)_`. Add a capability bullet under `# Use Cases`.
+- README: add a bullet under the category's `## <Category>` section in the form `- [Lab Title](labs/<category>/<name>.md) _(Provider)_`, with `labs/<category>/<name>/README.md` as the link target in subdir mode. When the lab spans categories, list it under each one with a reciprocal `_(see also: <Other Categories>)_`. Add a capability bullet under `# Use Cases`.
 - tracks: add a `| Lab | What you'll learn |` row to a `### Use Case` table in `tracks/llm-track.md` or `tracks/mcp-track.md` only when the lab fits an existing use case. Otherwise skip it and tell the user you skipped it.
 - `labs/installation/image-list.md`: add a block for any new chart-managed image. For an image the lab deploys itself, such as Keycloak, do what the existing labs do for the same image.
 - The lab's Pre-requisites name `001` and `002` in the boilerplate sentence and name every environment variable the lab reads.
-- CHANGELOG: propose the version and confirm it with the user. Take the first `X.Y.Z - (` line of `CHANGELOG.md` on the start branch and add one to the patch number:
-
-  ```bash
-  grep -m1 -E '^[0-9]+\.[0-9]+\.[0-9]+ - \(' CHANGELOG.md
-  ```
-
-  The branch for that version must not exist locally or on the remote. Both commands must print nothing:
-
-  ```bash
-  git branch --list X.Y.Z
-  git ls-remote --heads origin X.Y.Z
-  ```
-
-  Add a block at the top of `CHANGELOG.md`, dated today in `M-D-YY` form. The first bullet names the source labs the lab was derived from. Bullets lead with `Add` and name files in backticks:
+- Assets: read each copied asset for comments that mention `assets/` or the custom lab, and change them to name the asset's new path.
+- CHANGELOG: add a block for the `X.Y.Z` confirmed in preflight check 5 at the top of `CHANGELOG.md`, dated today in `M-D-YY` form. The first bullet names the source labs the lab was derived from. Bullets lead with `Add` and name files in backticks:
 
   ```markdown
   X.Y.Z - (M-D-YY)
@@ -200,7 +225,9 @@ Work through `style-guide.md` §15 and its "Checklist when adding a lab". Change
   - Add `lib/<concern>/<asset>`: <what the asset is>
   ```
 
-  Write the same block, verbatim, to `e2e/.work/contribute/<name>/pr-body.md`.
+  In subdir mode the first bullet names `labs/<category>/<name>/README.md`.
+
+  Write the block's bullets to `e2e/.work/contribute/<name>/pr-body.md`, without the `X.Y.Z - (M-D-YY)` and `---` lines. The PR title carries the version.
 
 Then lint:
 
@@ -236,15 +263,22 @@ Each must return `NotFound`. A namespace that still exists is a Cleanup bug: sho
 
 ## 6. Branch and commit
 
-Only now does git change. Stage every file in the manifest's `created` and `recorded` lists, then commit with a plain message and no trailer:
+Only now does git change. Stage every path in the manifest's `created` and `recorded` lists, then scan the staged diff and the PR body once more. Pass the same `--allow` flags as the last step 2 scan, or none if it had none:
+
+```bash
+jq -r '.created[], .recorded[].path' e2e/.work/contribute/<name>/manifest.json | xargs git add --
+git diff --cached > e2e/.work/contribute/<name>/staged.patch
+python3 e2e/lib/scrub.py --summary --allow <glob> --from-changes e2e/.work/contribute/<name>/stage/CHANGES.md e2e/.work/contribute/<name>/staged.patch e2e/.work/contribute/<name>/pr-body.md
+```
+
+Every line must be a match the user ruled keep in step 2. A new hit gets a ruling before the commit. For a replace, replace the value in every promoted or recorded file it appears in, so the spec still matches the lab, run the three commands again, and repeat until every line is a keep. For a stop, unstage with `git reset -q`, which leaves the files in place, and go to step 8.
+
+Create the branch and commit with a plain message and no trailer. One commit:
 
 ```bash
 git checkout -b X.Y.Z
-git add <every file the promoter and conform steps touched>
 git commit -m "see CHANGELOG (X.Y.Z)"
 ```
-
-Check that `git status --porcelain` prints nothing afterward. One commit.
 
 Right after the commit succeeds, retire the manifest so a later session never offers to undo committed work:
 
@@ -252,14 +286,25 @@ Right after the commit succeeds, retire the manifest so a later session never of
 mv e2e/.work/contribute/<name>/manifest.json e2e/.work/contribute/<name>/manifest.committed.json
 ```
 
+Then run `git status --porcelain`. If it prints anything, stop and show the output: a file the session wrote is missing from the commit. The commit is unpushed, so you may add the file and run `git commit --amend --no-edit`, but only after the user says yes.
+
 ## 7. Show the diff and stop
 
+Show this lab's commit in full:
+
 ```bash
-git --no-pager diff --stat main..X.Y.Z
-git --no-pager diff main..X.Y.Z
+git --no-pager show --stat HEAD
+git --no-pager show HEAD
 ```
 
-Show both in full. State the PR title `see CHANGELOG (X.Y.Z)` and show the body from `e2e/.work/contribute/<name>/pr-body.md`. Ask one question: push this branch and open the PR, yes or no.
+Then show the PR scope, every file the PR changes against `main`, and the number of commits it carries:
+
+```bash
+git --no-pager diff --stat main...X.Y.Z
+git rev-list --count main..X.Y.Z
+```
+
+A count above 1 means the PR also carries the start branch's commits; say so. State the PR title `see CHANGELOG (X.Y.Z)` and show the body from `e2e/.work/contribute/<name>/pr-body.md`. Ask one question: push this branch and open the PR, yes or no.
 
 Nothing is pushed until the user says yes to the diff. Any answer other than yes ends the session. The branch stays local. Print the branch name and the `git push` and `gh pr create` commands below so the user can push later by hand.
 
@@ -275,7 +320,7 @@ Print the PR URL. Tell the user that `custom-labs/<name>/` is still theirs, and 
 
 ## 8. Stopping partway
 
-After step 3 and before step 6, a step 5 failure you may not fix or the user quitting leaves uncommitted files on the start branch. Never discard them on your own. Show the manifest:
+The session can stop after step 3 and before the commit in step 6: a step 5 failure you may not fix, a stop ruling at the step 6 scan, or the user quitting. Each leaves uncommitted files on the start branch. Never discard them on your own. Show the manifest:
 
 ```bash
 cat e2e/.work/contribute/<name>/manifest.json
@@ -287,7 +332,7 @@ Offer one undo, and run it only on a yes:
 python3 e2e/lib/promote.py <name> --undo
 ```
 
-Undo deletes every file the promoter created and restores every recorded file from `before/`, then prints what it did. `custom-labs/<name>/` is unchanged either way. On a no, the files stay; print the manifest path so the user can finish or revert by hand.
+Undo deletes every file the promoter created and restores every recorded file from `before/`, then prints what it did. If it ends with `undo incomplete; manifest kept`, show the user the lines it printed for the entries that failed. The manifest stays, so the user can fix those entries and run the undo again. `custom-labs/<name>/` is unchanged either way. On a no, the files stay; print the manifest path so the user can finish or revert by hand.
 
 ```bash
 e2e/lib/session-log.sh add decision custom/<name> "contribute stopped: <undo|kept>"

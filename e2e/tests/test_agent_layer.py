@@ -169,7 +169,7 @@ class AgentLayer(unittest.TestCase):
                        "e2e/lib/promote.py", "--record", "--undo", "--dry-run", "--lint",
                        "see CHANGELOG (X.Y.Z)", "gh pr create --base main", "git push -u origin",
                        "style-guide.md", "Nothing is pushed until the user says yes to the diff.",
-                       "custom-labs/<name>/", "never edited"]:
+                       "custom-labs/<name>/", "never edited", "main...X.Y.Z", "staged.patch"]:
             self.assertIn(needle, text)
         for heading in ["## 1. Preflight", "## 2. Scrub", "## 3. Promote", "## 4. Conform",
                         "## 5. Verify as a shipped lab", "## 6. Branch and commit",
@@ -177,12 +177,13 @@ class AgentLayer(unittest.TestCase):
             self.assertIn(heading, text)
 
     def test_contribute_command_points_at_skill(self):
-        self.assertIn("Read skills/contribute-lab/SKILL.md and follow it. Arguments: $ARGUMENTS",
-                      read(".claude/commands/contribute-lab.md"))
+        text = read(".claude/commands/contribute-lab.md")
+        self.assertIn("Read skills/contribute-lab/SKILL.md and follow it. Arguments: $ARGUMENTS", text)
+        self.assertIn("custom-labs/", text)
 
     def test_agents_md_names_three_modes(self):
         text = read("AGENTS.md")
-        for needle in ["Three modes", "skills/contribute-lab/SKILL.md", "/contribute-lab"]:
+        for needle in ["Three modes", "skills/contribute-lab/SKILL.md", "/contribute-lab", "manifest"]:
             self.assertIn(needle, text)
 
     def test_no_prospect_and_no_em_dash_in_agent_files(self):
