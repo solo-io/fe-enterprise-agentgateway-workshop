@@ -43,7 +43,7 @@ Exit 0: continue. Any other exit: handle it as step 1 of `skills/evaluate/SKILL.
 ./e2e/run-e2e.sh --install-base --only-base
 ```
 
-Recommend once that the user run the relevant baseline lab or track first, so the custom work starts from a known-good cluster. They may decline.
+Recommend once that the user run the source labs, or the track that contains them, with `/evaluate` first, so the custom work starts from a known-good cluster. They may decline.
 
 Start a fresh session log:
 
@@ -55,17 +55,11 @@ The user names one or more source labs or describes the use case. When they desc
 
 - Extend: keep one lab's pattern and scale it, for example tiered rate limits instead of one counter.
 - Compose: join two labs, for example JWT auth from an OIDC provider plus rate limits keyed on a token claim.
-- Reskin: keep a lab's mechanics and swap in the user's organisation: team names, models, budgets.
+- Reskin: keep a lab's mechanics and swap in the user's organization: team names, models, budgets.
 
-Ask only for what you cannot infer from the labs: tiers, claims, team names, models, thresholds. Ask one question at a time. Agree a name for the lab with the user. It must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`, be kebab-case, and not exist yet under `custom-labs/`.
+Ask only for what you cannot infer from the labs: tiers, claims, team names, models, thresholds. Ask one question at a time. Agree a name for the lab with the user. Use lowercase kebab-case, for example `oidc-tiered-rate-limits` (the harness accepts `^[A-Za-z0-9][A-Za-z0-9._-]*$`), and pick a name that does not exist yet under `custom-labs/`.
 
-Write every requirement as a numbered, testable statement in the user's terms, for example: "R1: Gold tier gets 1000 input tokens per minute, silver 200, and a token without a tier claim is rejected." If a statement cannot be tested, push it back to the user. Do not accept it.
-
-Record the outcome of intake:
-
-```bash
-e2e/lib/session-log.sh add decision custom/<name> "sources=<labs> requirements=<count>"
-```
+Write every requirement as a numbered, testable statement in the user's terms, for example: "R1: Gold tier gets 1000 input tokens per minute, silver 200, and a token without a tier claim is rejected." Push an untestable statement back to the user and ask for a testable version.
 
 ## 3. Proposal
 
@@ -113,7 +107,7 @@ Write `custom-labs/<name>/CHANGES.md` from this template and show it:
 The user approves, edits, or stops. No cluster command runs before the user approves the proposal.
 
 ```bash
-e2e/lib/session-log.sh add decision custom/<name> "proposal approved"
+e2e/lib/session-log.sh add decision custom/<name> "proposal approved: sources=<labs> requirements=<count>"
 ```
 
 ## 4. Build and validate
@@ -138,8 +132,20 @@ Write `custom-labs/<name>/<name>.md` following "Writing the lab" and `custom-lab
    e2e/lib/session-log.sh add run custom/<name> "<outcome line>"
    ```
 
-3. On a failing step, apply `skills/diagnose-failure/SKILL.md` with the key `custom/<name>`. Read the work dir, explain what the cluster did against what the lab expected, and stop until the user picks.
-4. Any `LEFTOVER: <kind>/<name>` line is a Cleanup bug in your lab. Fix the Cleanup section and run again. `LEFTOVER CHECK NOT RUN` means the snapshot failed; say so and do not count the run as clean.
+3. On a failing step, apply `skills/diagnose-failure/SKILL.md` with the key `custom/<name>`. Read the work dir, explain what the cluster did against what the lab expected, and offer these choices:
+
+   - Fix the authoring, within the rule below
+   - Record a gap
+   - Stop
+
+   Do nothing to the cluster until the user picks.
+4. Any `LEFTOVER: <kind>/<name>` line is a Cleanup bug in your lab, and the resource is still on the cluster. The next run's snapshot would include it and report clean. Fix the Cleanup section, show the user the leftover resources, and on their approval delete each one:
+
+   ```bash
+   kubectl delete <kind>/<name> --ignore-not-found
+   ```
+
+   Then run again. `LEFTOVER CHECK NOT RUN` means the snapshot failed; say so and do not count the run as clean.
 
 You may fix your own authoring: a wrong ordinal, a heading mismatch, a missing `retry`, a field the schema rejects. You may not change a requirement, loosen an assertion, or invent configuration to make a step pass. If a requirement cannot be met with what the labs and the docs server provide, report it to the user as a gap. If the user wants to keep the rest, the lab states the gap in a callout and `CHANGES.md` records it.
 
@@ -147,7 +153,7 @@ Repeat until the spec passes from a clean state: Cleanup ran, then a fresh run p
 
 - `--custom <name> --lint` is clean.
 - Every row of the requirements table in `CHANGES.md` names a positive and a negative step, and both ran.
-- Each negative assertion exercises the deny path: the 401, the 429, the blocked request, the unattributed spend. A resource `Accepted` condition is never the assertion for a requirement; a policy can report `Accepted` while the behaviour is wrong.
+- Each negative assertion exercises the deny path: the 401, the 429, the blocked request, the unattributed spend. A resource `Accepted` condition is never the assertion for a requirement; a policy can report `Accepted` while the behavior is wrong.
 - For a compose, the interaction check steps are present and pass.
 - Every asynchronous step has a `retry` whose `until` is no stricter than its assertion.
 - The baseline-integrity guard reports no drift, and the run prints no `LEFTOVER:` line.
@@ -171,11 +177,17 @@ Validation ran with Cleanup, so the cluster now holds only the base. Ask whether
 e2e/lib/session-log.sh add keep-custom custom/<name> "custom configuration kept at the user's request"
 ```
 
-Log the outcome line of that run with `session-log.sh add run` as in step 4. Remind them that the lab's Cleanup section removes it later. The kept configuration depends on the base install, so do not offer base removal, and say why. If they did not keep it, ask the keep-or-remove question from step 7 of `skills/evaluate/SKILL.md`.
+Log the outcome line of that run with `session-log.sh add run` as in step 4. Rebuild the report so it shows the kept run:
+
+```bash
+./e2e/run-e2e.sh --custom <name> --report-only
+```
+
+Remind them that the lab's Cleanup section removes it later. The kept configuration depends on the base install, so do not offer base removal, and say why. If they did not keep it, ask the keep-or-remove question from step 7 of `skills/evaluate/SKILL.md`.
 
 ## Writing the lab
 
-Follow `style-guide.md` and the stop-slop rules: zero em dashes, no filler, no meta-commentary.
+Follow `style-guide.md`. Use no em dashes, no filler words, and no commentary about the lab itself.
 
 - Clone the skeleton of the closest source lab: title, Pre-requisites boilerplate, Lab Objectives, steps, Observability, Cleanup. Each step is why-prose, a command block, then verification with `Expected output:`.
 - Depend on labs 001 and 002 only. Deploy anything else the lab needs, including an in-cluster IdP, and remove it in Cleanup.
@@ -221,6 +233,16 @@ steps:
       until: "HTTP/[0-9.]+ 401"
     assert:
       - status: 401
+
+  - section: "Exhaust the gold budget"
+    proves:
+      - R3
+    retry:
+      attempts: 5
+      delay: 15
+      until: "HTTP/[0-9.]+ 429"
+    assert:
+      - status: 429
 
 cleanup:
   section: "Cleanup"
