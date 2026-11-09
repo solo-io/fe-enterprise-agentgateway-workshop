@@ -276,5 +276,20 @@ echo "status=pass rc=0 duration=1 requires=" > "${TMP}/work/stale/lab/outcome"
 E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --no-prompt >/dev/null 2>&1
 [[ -e "${TMP}/work/stale/lab/outcome" ]] && ok "single-lab run leaves other outcomes" || fail "single-lab run cleared an outcome"
 
+# --custom <name>: run and lint one lab under custom-labs/ (fixtures here).
+export E2E_CUSTOM_ROOT="${E2E}/tests/fixtures/custom-labs"
+run "--custom needs a name" 1 "--custom needs a name" --custom
+run "--custom with missing spec" 1 "No custom lab at" --custom nope --no-prompt
+run "--custom rejects --track" 1 "--custom and --track are mutually exclusive" --custom demo --track llm --no-prompt
+run "--custom rejects --tier" 1 "--custom and --tier are mutually exclusive" --custom demo --tier t0 --no-prompt
+run "--custom rejects a positional spec" 1 "--custom and a positional spec are mutually exclusive" --custom demo routing/x --no-prompt
+run "--custom rejects --uninstall-base" 1 "--custom and --uninstall-base are mutually exclusive" --custom demo --uninstall-base --no-prompt
+run "--custom --lint passes the demo fixture" 0 "conventions: 1 file(s), 0 violation(s)" --custom demo --lint
+run "--custom --lint fails without Cleanup" 1 "no \`## Cleanup\` section" --custom nocleanup --lint
+run "--custom runs the fixture and keys it custom/demo" 0 "1 PASS" --custom demo --no-prompt
+[[ -f "${E2E_WORK_ROOT}/custom/demo/outcome" ]] && grep -q "status=pass" "${E2E_WORK_ROOT}/custom/demo/outcome" \
+  && ok "custom outcome at custom/demo" || fail "custom outcome at custom/demo"
+unset E2E_CUSTOM_ROOT
+
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 [[ "$T_FAIL" -eq 0 ]]

@@ -20,6 +20,8 @@
 #                                             # --track and --resolve-creds reset them, single-lab runs do not
 #   ./e2e/run-e2e.sh --lint                   # validate specs against labs, run nothing
 #   ./e2e/run-e2e.sh --list                   # show coverage table
+#   ./e2e/run-e2e.sh --custom <name>          # run custom-labs/<name>/spec.yaml
+#   ./e2e/run-e2e.sh --custom <name> --lint   # lint that one custom lab, run nothing
 #
 # E2E_SPEC_TIMEOUT=<secs> in the environment overrides every spec's timeout
 # (used to force a timeout failure on a real lab).
@@ -35,6 +37,9 @@ CYAN='\033[0;36m'; DIM='\033[2m'; BOLD='\033[1m'; NC='\033[0m'
 E2E_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${E2E_DIR}/.." && pwd)"
 SPEC_DIR="${E2E_SPEC_DIR:-${E2E_DIR}/specs}"
+# User-owned labs (gitignored), one directory per lab: <name>/<lab>.md + spec.yaml.
+CUSTOM_ROOT="${E2E_CUSTOM_ROOT:-${REPO_ROOT}/custom-labs}"
+CUSTOM_NAME=""
 WORK_ROOT="${E2E_WORK_ROOT:-${E2E_DIR}/.work}"
 LABDOC="${E2E_DIR}/lib/labdoc.py"
 
@@ -82,7 +87,7 @@ declare -a SKIP_KEYS=()
 export E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
 usage() {
-  sed -n '2,28p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 ORIGINAL_ARGS=("$@")
@@ -97,6 +102,8 @@ while [[ $# -gt 0 ]]; do
     --list)         LIST_ONLY=true; shift ;;
     --tier)         TIER_FILTER="$2"; shift 2 ;;
     --track)        TRACK="$2"; shift 2 ;;
+    --custom)       [[ -n "${2:-}" ]] || { printf "${RED}--custom needs a name${NC}\n" >&2; exit 1; }
+                    CUSTOM_NAME="$2"; shift 2 ;;
     --env)          ENV_CLASS="$2"; shift 2 ;;
     --resolve-creds) RESOLVE_CREDS=true; shift ;;
     --skip)         [[ -n "${2:-}" ]] || { printf "${RED}--skip needs a lab key${NC}\n" >&2; exit 1; }
@@ -121,6 +128,17 @@ fi
 if [[ -n "$TRACK" ]]; then
   [[ -z "$TIER_FILTER" ]] || { printf "${RED}--track and --tier are mutually exclusive${NC}\n" >&2; exit 1; }
   [[ -z "$SPECIFIC" ]]    || { printf "${RED}--track and a positional spec are mutually exclusive${NC}\n" >&2; exit 1; }
+fi
+
+if [[ -n "$CUSTOM_NAME" ]]; then
+  _cu_conflict=""
+  [[ -n "$TRACK" ]]                                           && _cu_conflict="--track"
+  [[ -z "$_cu_conflict" && -n "$TIER_FILTER" ]]               && _cu_conflict="--tier"
+  [[ -z "$_cu_conflict" && "$UNINSTALL_BASE" == "true" ]]     && _cu_conflict="--uninstall-base"
+  [[ -z "$_cu_conflict" && "$INSTALL_BASE" == "true" ]]       && _cu_conflict="--install-base"
+  [[ -z "$_cu_conflict" && "$RESOLVE_CREDS" == "true" ]]      && _cu_conflict="--resolve-creds"
+  [[ -z "$_cu_conflict" && -n "$SPECIFIC" ]]                  && _cu_conflict="a positional spec"
+  [[ -z "$_cu_conflict" ]] || { printf "${RED}--custom and %s are mutually exclusive${NC}\n" "$_cu_conflict" >&2; exit 1; }
 fi
 
 if [[ "$UNINSTALL_BASE" == "true" ]]; then
@@ -279,6 +297,10 @@ discover_specs() {
 }
 
 spec_key() {  # e2e/specs/routing/direct-response.yaml -> routing/direct-response
+  if [[ "$1" == "${CUSTOM_ROOT}/"* ]]; then  # custom-labs/<name>/spec.yaml -> custom/<name>
+    local crel="${1#${CUSTOM_ROOT}/}"
+    printf 'custom/%s' "${crel%%/*}"; return
+  fi
   local rel="${1#${SPEC_DIR}/}"
   printf '%s' "${rel%.yaml}"
 }
@@ -476,6 +498,32 @@ if [[ "$LIST_ONLY" == "true" ]]; then
     printf "%-46s %-10s %s\n" "$(spec_key "$spec")" "$E2E_SPEC_TIER" "${E2E_SPEC_REQUIRES:--}"
   done < <(discover_specs)
   exit 0
+fi
+
+if [[ "$LINT_ONLY" == "true" && -n "$CUSTOM_NAME" ]]; then
+  spec="${CUSTOM_ROOT}/${CUSTOM_NAME}/spec.yaml"
+  [[ -f "$spec" ]] || { printf "${RED}No custom lab at %s${NC}\n" "$spec" >&2; exit 1; }
+  lint_fail=0
+  eval "$("$PYTHON" "$LABDOC" meta "$spec")" || exit 1
+  lab="${REPO_ROOT}/${E2E_SPEC_LAB}"
+  [[ -f "$lab" ]] || { printf "${RED}✗ %s — lab not found: %s${NC}\n" "$(spec_key "$spec")" "$E2E_SPEC_LAB"; exit 1; }
+  if out="$("$PYTHON" "$LABDOC" lint "$lab" "$spec" 2>&1)"; then
+    printf "${GREEN}✓${NC} %s\n" "$out"
+  else
+    printf "${RED}✗ %s${NC}\n" "$(spec_key "$spec")"
+    printf '%s\n' "$out" | sed 's/^/    /'
+    lint_fail=1
+  fi
+  # conventions.py scopes its Cleanup rule to custom-labs/ paths, so lint from
+  # the directory that holds CUSTOM_ROOT. With the default CUSTOM_ROOT this is
+  # REPO_ROOT and the path is the lab's repo-relative path.
+  conv_root="$REPO_ROOT"; conv_rel="${lab#${REPO_ROOT}/}"
+  if [[ "$lab" == "${CUSTOM_ROOT}/"* ]]; then
+    conv_root="$(dirname "$CUSTOM_ROOT")"; conv_rel="$(basename "$CUSTOM_ROOT")/${lab#${CUSTOM_ROOT}/}"
+  fi
+  printf "\n${BOLD}Conventions:${NC}\n"
+  "$PYTHON" "${E2E_DIR}/lib/conventions.py" "$conv_root" --file "$conv_rel" || lint_fail=1
+  exit "$lint_fail"
 fi
 
 if [[ "$LINT_ONLY" == "true" ]]; then
@@ -696,6 +744,10 @@ if [[ -n "$TRACK" ]]; then
         write_outcome_file "$tkey" not-applicable 0 0 "" "${tstatus#not-applicable:}" ;;
     esac
   done <<<"$track_rows"
+elif [[ -n "$CUSTOM_NAME" ]]; then
+  cand="${CUSTOM_ROOT}/${CUSTOM_NAME}/spec.yaml"
+  [[ -f "$cand" ]] || { printf "${RED}No custom lab at %s${NC}\n" "$cand" >&2; exit 1; }
+  RUN_SPECS=("$cand")
 elif [[ -n "$SPECIFIC" ]]; then
   cand="${SPEC_DIR}/${SPECIFIC%.yaml}.yaml"
   [[ -f "$cand" ]] || { printf "${RED}No spec at %s${NC}\n" "$cand" >&2; exit 1; }

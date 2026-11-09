@@ -1,0 +1,14 @@
+lab: e2e/tests/fixtures/custom-labs/demo/demo.md
+description: fixture custom lab
+tier: t0
+timeout: 60
+requirements:
+  - id: R1
+    text: the route answers
+steps:
+  - section: "Say hello"
+    proves: [R1]
+    assert:
+      - contains: "hello from custom"
+cleanup:
+  section: "Cleanup"
