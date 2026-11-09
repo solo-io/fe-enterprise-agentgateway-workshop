@@ -8,7 +8,9 @@ Usage:
       appended when that name exists), prints both paths
   report.py build --work DIR --custom <name> --env-json PATH --session PATH --out DIR
       the single-row report for custom-labs/<name> (key custom/<name>), written as
-      <stamp>-<class>-custom-<name>.md and .json; adds a Runs section
+      <stamp>-<class>-custom-<name>.md and .json; adds a Runs section. Reads
+      <work>/custom/<name>/leftovers.txt and only session events for that lab
+      or for no lab
   report.py compare A.json B.json
       one line per lab whose result differs, after a line naming both environments;
       exits 2 when either file cannot be read
@@ -135,6 +137,8 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status="", stopped=False):
         note = f"{note}; {extra}" if note else extra
     if outcome.get("keep") == "1":
         note = f"{note}; kept on the cluster" if note else "kept on the cluster"
+    if outcome.get("leftover_check") == "not-run":
+        note = f"{note}; leftover check not run" if note else "leftover check not run"
     leftover = outcome.get("leftover", "")
     if leftover and leftover != "0":
         note = f"{note}; {leftover} leftover(s)" if note else f"{leftover} leftover(s)"
@@ -188,6 +192,10 @@ def build_data(work, track, env_json, session, specs_dir, tracks_dir, custom=Non
         print(f"report.py: cannot read env json {env_json}: {exc}", file=sys.stderr)
         raise SystemExit(2)
     events = read_session(session)
+    if custom:
+        # A custom report covers only its own lab: session-wide events (no lab)
+        # stay, events logged for any other lab are dropped.
+        events = [e for e in events if e.get("lab", "") in (f"custom/{custom}", "")]
     deviations = {}
     for e in events:
         if e.get("kind") == "deviation":
@@ -243,8 +251,11 @@ def build_data(work, track, env_json, session, specs_dir, tracks_dir, custom=Non
     if pending is not None:
         questions.append(pending)
     leftovers = []
+    # A custom run writes its own leftovers file under its work directory.
+    leftovers_path = (os.path.join(work, "custom", custom, "leftovers.txt") if custom
+                      else os.path.join(work, "leftovers.txt"))
     try:
-        with open(os.path.join(work, "leftovers.txt"), encoding="utf-8") as fh:
+        with open(leftovers_path, encoding="utf-8") as fh:
             leftovers = [ln.rstrip("\n") for ln in fh if ln.strip()]
     except OSError:
         pass

@@ -365,6 +365,39 @@ class TestCustom(ReportCase):
         self.assertIn("## Runs\n\n- custom/demo: status=fail rc=1", text)
         self.assertIn("The custom lab was kept on the cluster.", text)
 
+    def test_custom_report_is_scoped_to_its_lab(self):
+        work = os.path.join(self.tmp.name, "work")
+        os.makedirs(os.path.join(work, "custom", "demo"))
+        with open(os.path.join(work, "leftovers.txt"), "w") as fh:
+            fh.write("BASELINE DRIFT: routing/other\n")
+        with open(os.path.join(work, "custom", "demo", "leftovers.txt"), "w") as fh:
+            fh.write("LEFTOVER: agentgateway-system secret/x\n")
+        session = os.path.join(self.tmp.name, "s.jsonl")
+        events = [
+            {"kind": "failure", "lab": "routing/other", "text": "unrelated failure"},
+            {"kind": "deviation", "lab": "routing/other", "text": "unrelated deviation"},
+            {"kind": "decision", "lab": "routing/other", "text": "unrelated decision"},
+            {"kind": "run", "lab": "custom/other", "text": "other custom run"},
+            {"kind": "question", "lab": "custom/other", "text": "other question"},
+            {"kind": "failure", "lab": "custom/demo", "text": "demo failure"},
+            {"kind": "question", "lab": "", "text": "general question"},
+        ]
+        with open(session, "w") as fh:
+            for e in events:
+                fh.write(json.dumps(dict(ts="t", **e)) + "\n")
+        _, text, data = self.build_custom("status=fail rc=0 duration=5 requires= leftover=1", session=session)
+        self.assertEqual(data["leftovers"], ["LEFTOVER: agentgateway-system secret/x"])
+        self.assertNotIn("routing/other", text)
+        self.assertNotIn("custom/other", text)
+        self.assertNotIn("other question", text)
+        self.assertIn("demo failure", text)
+        self.assertIn("general question", text)
+        self.assertEqual([f["lab"] for f in data["failures"]], ["custom/demo"])
+
+    def test_leftover_check_not_run_note(self):
+        _, _, data = self.build_custom("status=fail rc=0 duration=5 requires= leftover_check=not-run")
+        self.assertEqual(self.row(data, "custom/demo")["note"], "leftover check not run")
+
     def test_track_and_custom_exclusive(self):
         proc = subprocess.run([sys.executable, os.path.join(LIB, "report.py"), "build", "--work", self.tmp.name,
                                "--track", "llm", "--custom", "x", "--env-json", os.path.join(FIX, "env.json"),
