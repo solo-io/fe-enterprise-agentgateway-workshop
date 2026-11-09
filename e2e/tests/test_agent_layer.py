@@ -5,7 +5,7 @@ import re
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-SKILLS = ["evaluate", "detect-environment", "explain-lab", "diagnose-failure", "ask-the-docs"]
+SKILLS = ["evaluate", "detect-environment", "explain-lab", "diagnose-failure", "ask-the-docs", "adapt-lab"]
 INTERNAL = "support-agent" + "-tools"
 
 
@@ -14,7 +14,8 @@ def read(rel):
 
 
 def user_files():
-    files = [ROOT / "AGENTS.md", ROOT / "CLAUDE.md", ROOT / ".claude/commands/evaluate.md"]
+    files = [ROOT / "AGENTS.md", ROOT / "CLAUDE.md", ROOT / ".claude/commands/evaluate.md",
+             ROOT / ".claude/commands/adapt-lab.md"]
     files += [ROOT / "skills" / s / "SKILL.md" for s in SKILLS]
     return files
 
@@ -142,6 +143,30 @@ class AgentLayer(unittest.TestCase):
         text = read(".claude/commands/evaluate.md")
         self.assertIn("description: Evaluate Enterprise Agentgateway on the current cluster", text)
         self.assertIn("Read skills/evaluate/SKILL.md and follow it. Arguments: $ARGUMENTS", text)
+
+    def test_adapt_skill_names_every_cli_and_rule(self):
+        text = read("skills/adapt-lab/SKILL.md")
+        for needle in ["custom-labs/<name>/", "CHANGES.md", "--custom <name> --lint", "--custom <name> --keep",
+                       "--custom <name> --report-only", "get_crd_schema", "requirements:", "proves:",
+                       "labdoc.py sections", "style-guide.md", "diagnose-failure", "ask-the-docs",
+                       "session-log.sh add run", "session-log.sh add keep-custom", "Accepted",
+                       "No cluster command runs before the user approves the proposal."]:
+            self.assertIn(needle, text)
+
+    def test_adapt_command_points_at_skill(self):
+        self.assertIn("Read skills/adapt-lab/SKILL.md and follow it. Arguments: $ARGUMENTS",
+                      read(".claude/commands/adapt-lab.md"))
+
+    def test_agents_md_mentions_both_modes_and_custom_labs(self):
+        text = read("AGENTS.md")
+        for needle in ["skills/adapt-lab/SKILL.md", "/adapt-lab", "custom-labs/", "get_crd_schema"]:
+            self.assertIn(needle, text)
+
+    def test_no_prospect_and_no_em_dash_in_agent_files(self):
+        for f in user_files():
+            t = f.read_text()
+            self.assertNotIn("prospect", t.lower(), str(f))
+            self.assertNotIn("\u2014", t, str(f))
 
 
 if __name__ == "__main__":

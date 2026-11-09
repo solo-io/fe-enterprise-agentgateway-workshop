@@ -19,7 +19,7 @@ whether it has a spec; `--lint` prints the ones that do not.
 ```
 
 Flags: `--install-base`, `--only-base`, `--tier <t0|t1-key|…>`, `--lint`,
-`--list`, `--no-prompt`, `--verbose`, `--keep-work`.
+`--list`, `--no-prompt`, `--verbose`, `--keep-work`, `--custom <name>`, `--keep`.
 
 `--list` is the authority on tiers and per-lab coverage, and `--lint` on which
 labs have no spec yet. Both are derived from `e2e/specs/`, so re-run them after
@@ -40,6 +40,39 @@ allowlisted in `AI_BACKEND_ALLOW`).
 
 Requires bash ≥ 4, `python3` + PyYAML, `kubectl`, `helm`, `jq` (`k6` for the
 load-testing labs).
+
+## Custom labs
+
+`custom-labs/` at the repo root is gitignored and holds labs the adapt-lab skill
+builds for one user. Each lives in its own folder:
+
+```
+custom-labs/<name>/
+  <name>.md      the lab
+  spec.yaml      its spec; lab: custom-labs/<name>/<name>.md
+  CHANGES.md     source labs and the requirement-to-assertion table
+  reports/       --report-only output
+  assets/        optional files the lab applies
+```
+
+```bash
+./e2e/run-e2e.sh --custom <name> --lint         # spec against lab, coverage, conventions
+./e2e/run-e2e.sh --custom <name>                # run it, key custom/<name>
+./e2e/run-e2e.sh --custom <name> --keep         # run it and skip Cleanup
+./e2e/run-e2e.sh --custom <name> --report-only  # report into custom-labs/<name>/reports/
+```
+
+A custom spec declares top-level `requirements:` (a list of `id` and `text`)
+and names them in each step's `proves:` list. Lint fails when a requirement has
+no proving step, a proving step has no `assert`, or a `proves` id is undeclared.
+
+A `--custom` run snapshots namespaces and the cluster-scoped kinds the labs
+create before the run and after Cleanup, and prints `LEFTOVER: <kind>/<name>`
+for anything new. `LEFTOVER CHECK NOT RUN` means a snapshot failed. Work files
+go to `e2e/.work/custom/<name>/`, and a `--track` run leaves them alone.
+
+Tracks, `--list`, `--lint`, and a plain `./e2e/run-e2e.sh` read `e2e/specs/`
+only and never see `custom-labs/`.
 
 ## Adding a lab
 
@@ -265,7 +298,7 @@ Every block and its captured output is kept under `e2e/.work/<lab>/`:
 
 ```
 e2e/.work/mcp/in-cluster-mcp/
-  driver.sh          the generated bash driver — read this first
+  driver.sh          the generated bash driver; read this first
   blocks/0007.sh     the exact block that ran
   blocks/0007.out    its combined output
   result             pass/fail/skip counts
@@ -296,4 +329,4 @@ the matching `export VAR=` line is evaluated, never the whole file) → interact
 prompt → skip. Prompted values are cached to `e2e/.env.local` (`chmod 600`,
 gitignored). All resolution happens before the first lab runs, so prompts come in
 one batch. `--no-prompt` makes it CI-safe; unresolved keys mean the lab reports
-`SKIP — missing: VAR` rather than passing quietly.
+`SKIP` and names the missing `VAR` rather than passing quietly.
