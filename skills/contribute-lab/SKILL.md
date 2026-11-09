@@ -36,16 +36,25 @@ Run these checks in order. Stop on the first failure with the message shown, and
 
    Stop message: "custom-labs/<name>/ has no passing report. Run /adapt-lab to finish and validate it first."
 
-2. `gh` is logged in and points at the main repo with default branch `main`:
+2. No unfinished session exists. Check this before the working tree, because a half-promoted session leaves the tree dirty:
+
+   ```bash
+   ls e2e/.work/contribute/<name>/manifest.json
+   ```
+
+   If the file exists, a previous session stopped partway. Show the manifest and offer the undo from step 8. On a yes, run the undo, then continue with check 3. On a no, stop the session and print the manifest path, `e2e/.work/contribute/<name>/manifest.json`, so the user can finish or revert by hand. Never start a new run on top of an old manifest.
+
+3. `gh` is logged in and points at the main repo with default branch `main`:
 
    ```bash
    gh auth status
    gh repo view --json nameWithOwner,defaultBranchRef -q '.nameWithOwner + " " + .defaultBranchRef.name'
    ```
 
-   The second command must print `solo-io/fe-enterprise-agentgateway-workshop main`. Stop message: "gh is not logged in to github.com for solo-io/fe-enterprise-agentgateway-workshop. Run gh auth login, then start again."
+   - `gh auth status` fails. Stop message: "gh is not logged in to github.com. Run gh auth login, then start again."
+   - The second command prints anything other than `solo-io/fe-enterprise-agentgateway-workshop main`. Stop message: "gh resolves this checkout to <printed value>, not solo-io/fe-enterprise-agentgateway-workshop with default branch main. Contribute from a clone of the main repo."
 
-3. The working tree is clean, the branch is `main` or a version branch, and it is level with its remote:
+4. The working tree is clean, the branch is `main` or a version branch, and it is level with its remote:
 
    ```bash
    git status --porcelain
@@ -53,11 +62,17 @@ Run these checks in order. Stop on the first failure with the message shown, and
    git fetch origin && git status -sb
    ```
 
-   `git status --porcelain` must print nothing. The branch must be `main` or match `^[0-9]+\.[0-9]+\.[0-9]+$`. The first line of `git status -sb` must show no `ahead` or `behind`. Stop message: "The working tree has uncommitted changes, or the branch is not main or a version branch, or it differs from origin. Commit, stash, or sync it, then start again."
+   - `git status --porcelain` prints anything. Stop message: "The working tree has uncommitted changes. Commit or stash them, then start again."
+   - The branch is not `main` and does not match `^[0-9]+\.[0-9]+\.[0-9]+$`. Stop message: "The current branch is <branch>. Switch to main or a version branch, then start again."
+   - The first line of `git status -sb` shows `ahead` or `behind`. Stop message: "<branch> differs from origin/<branch>. Pull or push it so the two match, then start again."
 
-   When the start branch is a version branch, tell the user the PR will also carry that branch's commits, so they can merge that version first if they want a PR with only this lab.
+   When the start branch is not `main`, update local `main` so the step 7 diff is current:
 
-4. No unfinished session exists. If `e2e/.work/contribute/<name>/manifest.json` exists, a previous session stopped partway. Show the manifest and offer the undo from step 8 before you continue.
+   ```bash
+   git fetch origin main:main
+   ```
+
+   If that fetch fails, because `main` is checked out in another worktree or has diverged from `origin/main`, tell the user the step 7 diff may be stale and continue. Also tell the user the PR will carry the start branch's commits, so they can merge that version first if they want a PR with only this lab.
 
 5. The cluster is reachable and the base is installed, because step 5 runs the promoted spec:
 
@@ -94,7 +109,11 @@ Show the list grouped by rule. Ask the user for a ruling on one group at a time:
 
 - Keep: the value is fine to publish.
 - Replace: give the generic value to use, for example `example.com` for a tenant host or `team-a` for a team name.
-- Stop: end the session and go to step 8.
+- Stop: end the session. Nothing has been promoted yet, so the repo is unchanged. Leave `stage/` in place, log the stop, and end:
+
+  ```bash
+  e2e/lib/session-log.sh add decision custom/<name> "contribute stopped: scrub"
+  ```
 
 The `user-value` group lists the lab's own vocabulary: tier names, user names, resource names, model aliases. Many are fine to keep. The user rules on each one.
 
@@ -146,8 +165,8 @@ Before you edit any existing repo file in step 4, record it so `--undo` can rest
 ```bash
 python3 e2e/lib/promote.py <name> --record README.md
 python3 e2e/lib/promote.py <name> --record CHANGELOG.md
-python3 e2e/lib/promote.py <name> --record tracks/llm-track.md
-python3 e2e/lib/promote.py <name> --record labs/installation/image-list.md
+python3 e2e/lib/promote.py <name> --record tracks/llm-track.md               # only when you will edit it
+python3 e2e/lib/promote.py <name> --record labs/installation/image-list.md   # only when you will edit it
 ```
 
 ## 4. Conform
@@ -227,6 +246,12 @@ git commit -m "see CHANGELOG (X.Y.Z)"
 
 Check that `git status --porcelain` prints nothing afterward. One commit.
 
+Right after the commit succeeds, retire the manifest so a later session never offers to undo committed work:
+
+```bash
+mv e2e/.work/contribute/<name>/manifest.json e2e/.work/contribute/<name>/manifest.committed.json
+```
+
 ## 7. Show the diff and stop
 
 ```bash
@@ -236,9 +261,9 @@ git --no-pager diff main..X.Y.Z
 
 Show both in full. State the PR title `see CHANGELOG (X.Y.Z)` and show the body from `e2e/.work/contribute/<name>/pr-body.md`. Ask one question: push this branch and open the PR, yes or no.
 
-Nothing is pushed until the user says yes to the diff. Any answer other than yes ends the session. The branch stays local. Print the branch name and the two commands below so the user can push later by hand.
+Nothing is pushed until the user says yes to the diff. Any answer other than yes ends the session. The branch stays local. Print the branch name and the `git push` and `gh pr create` commands below so the user can push later by hand.
 
-On yes:
+On yes, push and open the PR, then log the URL:
 
 ```bash
 git push -u origin X.Y.Z
@@ -250,7 +275,7 @@ Print the PR URL. Tell the user that `custom-labs/<name>/` is still theirs, and 
 
 ## 8. Stopping partway
 
-A scrub stop, a step 5 failure you may not fix, or the user quitting leaves uncommitted files on the start branch. Never discard them on your own. Show the manifest:
+After step 3 and before step 6, a step 5 failure you may not fix or the user quitting leaves uncommitted files on the start branch. Never discard them on your own. Show the manifest:
 
 ```bash
 cat e2e/.work/contribute/<name>/manifest.json
