@@ -56,6 +56,17 @@ class TestEvaluatorRbac(unittest.TestCase):
                 self.assertTrue(r.get("resourceNames"), f"unscoped escalate/bind: {r}")
         self.assertTrue(found, "expected escalate/bind rules for chart ClusterRoles")
 
+    def test_custom_lab_snapshot_kinds_are_readable(self):
+        # run-e2e.sh's custom-lab leftover check lists these cluster-scoped kinds.
+        def can(group, resource, verb):
+            return any(group in r.get("apiGroups", []) and resource in r["resources"] and verb in r["verbs"]
+                       for r in all_rules())
+        for group, resource in (("scheduling.k8s.io", "priorityclasses"),
+                                ("admissionregistration.k8s.io", "validatingwebhookconfigurations"),
+                                ("admissionregistration.k8s.io", "mutatingwebhookconfigurations")):
+            for verb in ("get", "list"):
+                self.assertTrue(can(group, resource, verb), f"{verb} {group}/{resource} not granted")
+
     def test_service_account_and_binding_match(self):
         d = docs()
         sa = next(x for x in d if x["kind"] == "ServiceAccount")

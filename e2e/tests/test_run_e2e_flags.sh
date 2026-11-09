@@ -14,8 +14,15 @@ export E2E_ENV_LOCAL=/dev/null HOME="$TMP"
 mkdir -p "${TMP}/bin" "${TMP}/work"
 # The Gateway fingerprint answers from ${TMP}/gw when it exists, so a fixture
 # probe can simulate baseline drift by rewriting that file.
+# E2E_STUB_GET_FAIL=1 makes every `kubectl get` print what it has and exit 1.
+# `kubectl get -n <ns> ...` answers from ${TMP}/snap-<ns> when it exists.
 cat > "${TMP}/bin/kubectl" <<STUB
 #!/usr/bin/env bash
+if [[ -n "\${E2E_STUB_GET_FAIL:-}" && "\$1" == "get" ]]; then
+  [[ "\$2" == namespaces,* && -f "${TMP}/snap" ]] && sort "${TMP}/snap"
+  exit 1
+fi
+[[ "\$1 \$2" == "get -n" && -f "${TMP}/snap-\$3" ]] && sort "${TMP}/snap-\$3"
 [[ "\$1 \$2" == "config current-context" ]] && echo stub-context
 [[ "\$1 \$2" == "get gateway" && -f "${TMP}/gw" ]] && cat "${TMP}/gw"
 [[ "\$1 \$2" == "get namespaces" && -f "${TMP}/ns" ]] && cat "${TMP}/ns"
@@ -288,6 +295,7 @@ run "--custom rejects a positional spec" 1 "--custom and a positional spec are m
 run "--custom rejects --uninstall-base" 1 "--custom and --uninstall-base are mutually exclusive" --custom demo --uninstall-base --no-prompt
 run "--custom --lint passes the demo fixture" 0 "conventions: 1 file(s), 0 violation(s)" --custom demo --lint
 run "--custom --lint fails without Cleanup" 1 "no \`## Cleanup\` section" --custom nocleanup --lint
+printf 'namespace/default\n' > "${TMP}/snap"  # the leftover check needs a cluster snapshot
 run "--custom runs the fixture and keys it custom/demo" 0 "1 PASS" --custom demo --no-prompt
 [[ -f "${E2E_WORK_ROOT}/custom/demo/outcome" ]] && grep -q "status=pass" "${E2E_WORK_ROOT}/custom/demo/outcome" \
   && ok "custom outcome at custom/demo" || fail "custom outcome at custom/demo"
@@ -301,25 +309,60 @@ out="$(E2E_CUSTOM_ROOT="${TMP}/badspec" "$RUNNER" --custom broken --lint 2>&1)";
   || fail "--custom --lint fails cleanly on a bad spec (rc=$rc; output: $(printf '%s' "$out" | tail -3))"
 
 run "--keep requires --custom" 1 "--keep requires --custom" --keep routing/x --no-prompt
+run "--keep and --lint are mutually exclusive" 1 "--keep and --lint are mutually exclusive" --custom demo --keep --lint
+run "--custom rejects uppercase and underscores" 1 "--custom needs a name" --custom Foo_bar --no-prompt
+run "--custom rejects a dot in the name" 1 "--custom needs a name" --custom a.b --no-prompt
 printf 'namespace/default\n' > "${TMP}/snap"
-run "leftover check reports a new namespace" 0 "LEFTOVER: namespace/left-behind" --custom leftover --no-prompt
-grep -q "leftover=1" "${E2E_WORK_ROOT}/custom/leftover/outcome" && ok "outcome records leftover=1" || fail "outcome records leftover=1"
-grep -q "LEFTOVER: namespace/left-behind" "${E2E_WORK_ROOT}/leftovers.txt" && ok "leftover noted for the report" || fail "leftover noted for the report"
+echo "SHARED SENTINEL" > "${E2E_WORK_ROOT}/leftovers.txt"
+run "a leftover fails the run" 1 "LEFTOVER: namespace/left-behind" --custom leftover --no-prompt
+grep -q "^status=fail .*leftover=1" "${E2E_WORK_ROOT}/custom/leftover/outcome" \
+  && ok "outcome records status=fail leftover=1" || fail "outcome: $(cat "${E2E_WORK_ROOT}/custom/leftover/outcome")"
+grep -q "LEFTOVER: namespace/left-behind" "${E2E_WORK_ROOT}/custom/leftover/leftovers.txt" 2>/dev/null \
+  && ok "leftover noted in the per-lab leftovers file" || fail "per-lab leftovers file"
+[[ "$(cat "${E2E_WORK_ROOT}/leftovers.txt")" == "SHARED SENTINEL" ]] \
+  && ok "custom run leaves the shared leftovers file alone" || fail "shared leftovers: $(cat "${E2E_WORK_ROOT}/leftovers.txt")"
+# A namespaced object left in agentgateway-system: the fixture appends to the
+# file named by E2E_TEST_SNAP, here the stub's agentgateway-system listing.
+printf 'namespace/default\n' > "${TMP}/snap"
+printf 'secret/base\n' > "${TMP}/snap-agentgateway-system"
+E2E_TEST_SNAP="${TMP}/snap-agentgateway-system" run "a namespaced leftover is named with its namespace" 1 \
+  "LEFTOVER: agentgateway-system namespace/left-behind" --custom leftover --no-prompt
+rm -f "${TMP}/snap-agentgateway-system"
+printf 'namespace/default\n' > "${TMP}/snap"
+out="$(E2E_STUB_GET_FAIL=1 "$RUNNER" --custom demo --no-prompt 2>&1)"; rc=$?
+[[ "$rc" -eq 1 && "$out" == *"LEFTOVER CHECK NOT RUN: custom/demo"* ]] \
+  && ok "kubectl exit 1 with output fails the check" || fail "kubectl exit 1 (rc=$rc): $(printf '%s' "$out" | tail -3)"
+grep -q "^status=fail .*leftover_check=not-run" "${E2E_WORK_ROOT}/custom/demo/outcome" \
+  && ok "outcome records leftover_check=not-run" || fail "outcome: $(cat "${E2E_WORK_ROOT}/custom/demo/outcome")"
 printf 'namespace/default\n' > "${TMP}/snap"
 run "--keep skips cleanup" 0 "cleanup skipped (--keep)" --custom demo --keep --no-prompt
 grep -q "keep=1" "${E2E_WORK_ROOT}/custom/demo/outcome" && ok "outcome records keep=1" || fail "outcome records keep=1"
-grep -q "LEFTOVER CHECK SKIPPED" "${E2E_WORK_ROOT}/leftovers.txt" && ok "keep notes the skipped check" || fail "keep notes the skipped check"
+grep -q "LEFTOVER CHECK SKIPPED" "${E2E_WORK_ROOT}/custom/demo/leftovers.txt" && ok "keep notes the skipped check" || fail "keep notes the skipped check"
 [[ -f "${E2E_WORK_ROOT}/custom/demo/result" ]] && ok "--keep still writes result" || fail "--keep still writes result"
 run "--track leaves custom outcomes alone" 0 "Resolving credentials" --track llm --env gke --resolve-creds --no-prompt
 [[ -f "${E2E_WORK_ROOT}/custom/demo/outcome" ]] && ok "custom outcome survives --track" || fail "custom outcome survives --track"
+[[ -f "${E2E_WORK_ROOT}/custom/leftover/leftovers.txt" ]] && ok "custom leftovers survive --track" || fail "custom leftovers survive --track"
 unset E2E_CUSTOM_ROOT
+
+# The track reset is anchored to the work root: a work root whose own path
+# contains /custom/ still clears shipped outcomes.
+W2="${TMP}/custom/work2"
+mkdir -p "${W2}/routing/x" "${W2}/custom/demo"
+echo "status=pass rc=0 duration=1 requires=" > "${W2}/routing/x/outcome"
+echo "status=pass rc=0 duration=1 requires=" > "${W2}/custom/demo/outcome"
+E2E_WORK_ROOT="$W2" "$RUNNER" --track mcp --env vind --resolve-creds --no-prompt >/dev/null 2>&1
+[[ ! -e "${W2}/routing/x/outcome" ]] && ok "track reset clears shipped outcomes under a /custom/ work root" \
+  || fail "track reset kept a shipped outcome under a /custom/ work root"
+[[ -e "${W2}/custom/demo/outcome" ]] && ok "track reset keeps custom outcomes under a /custom/ work root" \
+  || fail "track reset removed a custom outcome"
 
 # Hardening: an empty snapshot means kubectl failed, so the check does not run.
 export E2E_CUSTOM_ROOT="${E2E}/tests/fixtures/custom-labs"
 rm -f "${TMP}/snap" "${E2E_WORK_ROOT}/leftovers.txt"
-out="$("$RUNNER" --custom demo --no-prompt 2>&1)"
-grep -q "LEFTOVER CHECK NOT RUN: custom/demo (cluster snapshot failed)" "${E2E_WORK_ROOT}/leftovers.txt" 2>/dev/null \
-  && ok "empty snapshot notes LEFTOVER CHECK NOT RUN" || fail "empty snapshot: $(cat "${E2E_WORK_ROOT}/leftovers.txt" 2>/dev/null)"
+out="$("$RUNNER" --custom demo --no-prompt 2>&1)"; rc=$?
+grep -q "LEFTOVER CHECK NOT RUN: custom/demo (cluster snapshot failed)" "${E2E_WORK_ROOT}/custom/demo/leftovers.txt" 2>/dev/null \
+  && ok "empty snapshot notes LEFTOVER CHECK NOT RUN" || fail "empty snapshot: $(cat "${E2E_WORK_ROOT}/custom/demo/leftovers.txt" 2>/dev/null)"
+[[ "$rc" -eq 1 ]] && ok "empty snapshot fails the run" || fail "empty snapshot rc=$rc"
 [[ "$out" != *"LEFTOVER: "* ]] && ok "empty snapshot reports no LEFTOVER line" || fail "empty snapshot printed LEFTOVER"
 printf 'namespace/default\n' > "${TMP}/snap"
 # A caller's E2E_KEEP must not make a run skip Cleanup. Block output lands in
@@ -335,6 +378,43 @@ mkdir -p "${TMP}/custom-labs" && cp -R "${E2E}/tests/fixtures/custom-labs/demo" 
 export E2E_CUSTOM_ROOT="${TMP}/custom-labs"
 run "--custom --report-only writes under custom-labs/<name>/reports" 0 "/custom-labs/demo/reports/" --custom demo --report-only
 unset E2E_CUSTOM_ROOT
+
+# A missing custom lab directory is refused before anything is written.
+W3="${TMP}/work3"
+out="$(E2E_WORK_ROOT="$W3" E2E_CUSTOM_ROOT="${TMP}/custom-labs" "$RUNNER" --custom nope --report-only 2>&1)"; rc=$?
+[[ "$rc" -eq 1 && "$out" == *"No custom lab at ${TMP}/custom-labs/nope"* ]] \
+  && ok "--report-only with a missing custom lab is refused" || fail "--report-only missing lab (rc=$rc): $out"
+[[ ! -e "$W3" && ! -e "${TMP}/custom-labs/nope" ]] && ok "missing custom lab creates nothing" || fail "missing custom lab created files"
+out="$(E2E_WORK_ROOT="$W3" E2E_CUSTOM_ROOT="${TMP}/custom-labs" "$RUNNER" --custom nope --report --no-prompt 2>&1)"; rc=$?
+[[ "$rc" -eq 1 && "$out" == *"No custom lab at"* && ! -e "$W3" ]] \
+  && ok "--report with a missing custom lab is refused" || fail "--report missing lab (rc=$rc): $out"
+
+# Custom lint: the spec's lab: must be <CUSTOM_ROOT>/<name>/<name>.md, and
+# requirements are mandatory.
+mkdir -p "${TMP}/lintlabs/wrong" "${TMP}/lintlabs/noreq"
+sed 's|^lab: .*|lab: e2e/tests/fixtures/custom-labs/demo/demo.md|' \
+  "${E2E}/tests/fixtures/custom-labs/demo/spec.yaml" > "${TMP}/lintlabs/wrong/spec.yaml"
+cp "${E2E}/tests/fixtures/custom-labs/demo/demo.md" "${TMP}/lintlabs/wrong/wrong.md"
+out="$(E2E_CUSTOM_ROOT="${TMP}/lintlabs" "$RUNNER" --custom wrong --lint 2>&1)"; rc=$?
+[[ "$rc" -eq 1 && "$out" == *"spec lab: must be ${TMP}/lintlabs/wrong/wrong.md"* ]] \
+  && ok "custom lint rejects a lab: outside <name>/<name>.md" || fail "lab path lint (rc=$rc): $(printf '%s' "$out" | tail -4)"
+cp "${E2E}/tests/fixtures/custom-labs/demo/demo.md" "${TMP}/lintlabs/noreq/noreq.md"
+# lab: is resolved from the repo root, so point at the temp lab relatively.
+NOREQ_REL="$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "${TMP}/lintlabs/noreq/noreq.md" "${E2E}/..")"
+cat > "${TMP}/lintlabs/noreq/spec.yaml" <<YAML
+lab: ${NOREQ_REL}
+description: no requirements
+tier: t0
+steps:
+  - section: "Say hello"
+    assert:
+      - contains: "hello from custom"
+cleanup:
+  section: "Cleanup"
+YAML
+out="$(E2E_CUSTOM_ROOT="${TMP}/lintlabs" "$RUNNER" --custom noreq --lint 2>&1)"; rc=$?
+[[ "$rc" -eq 1 && "$out" == *"custom spec declares no requirements"* ]] \
+  && ok "custom lint requires requirements" || fail "requirements lint (rc=$rc): $(printf '%s' "$out" | tail -4)"
 
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 [[ "$T_FAIL" -eq 0 ]]

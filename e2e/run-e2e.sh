@@ -107,7 +107,7 @@ while [[ $# -gt 0 ]]; do
     --list)         LIST_ONLY=true; shift ;;
     --tier)         TIER_FILTER="$2"; shift 2 ;;
     --track)        TRACK="$2"; shift 2 ;;
-    --custom)       [[ "${2:-}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { printf "${RED}--custom needs a name${NC}\n" >&2; exit 1; }
+    --custom)       [[ "${2:-}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { printf "${RED}--custom needs a name${NC}\n" >&2; exit 1; }
                     CUSTOM_NAME="$2"; shift 2 ;;
     --env)          ENV_CLASS="$2"; shift 2 ;;
     --resolve-creds) RESOLVE_CREDS=true; shift ;;
@@ -152,6 +152,15 @@ fi
 # sense for a lab you wrote yourself.
 if [[ "$KEEP" == "true" && -z "$CUSTOM_NAME" ]]; then
   printf "${RED}--keep requires --custom${NC}\n" >&2; exit 1
+fi
+if [[ "$KEEP" == "true" && "$LINT_ONLY" == "true" ]]; then
+  printf "${RED}--keep and --lint are mutually exclusive${NC}\n" >&2; exit 1
+fi
+
+# A custom name with no directory behind it is refused before anything is
+# written: no work dir, no lock, no reports directory.
+if [[ -n "$CUSTOM_NAME" && ! -d "${CUSTOM_ROOT}/${CUSTOM_NAME}" ]]; then
+  printf "${RED}No custom lab at %s${NC}\n" "${CUSTOM_ROOT}/${CUSTOM_NAME}" >&2; exit 1
 fi
 
 if [[ "$UNINSTALL_BASE" == "true" ]]; then
@@ -234,17 +243,34 @@ write_outcome_file() {
   printf '%s\n' "$line" > "${WORK_ROOT}/${key}/outcome"
 }
 
-# custom_snapshot: the cluster-scoped objects a custom lab could leave behind,
-#   one sorted `kind/name` line each. run_lab diffs it before and after.
+# custom_snapshot: the objects a custom lab could leave behind, one sorted line
+#   each: `kind/name` for cluster-scoped kinds, `<namespace> kind/name` for the
+#   shared namespaces. run_lab diffs it before and after. Returns 1 when any
+#   kubectl call exits non-zero or the cluster-scoped list is empty (a real
+#   cluster always has namespaces), so the caller reports LEFTOVER CHECK NOT RUN
+#   instead of a diff against a partial list.
+#   Every namespaced kind listed comes with the 001 base install. kubectl fails
+#   the whole call on a kind the cluster does not know, so on a cluster without
+#   the base the check reports NOT RUN rather than a silent pass.
+CUSTOM_SNAPSHOT_NAMESPACES=(agentgateway-system default)
 custom_snapshot() {
-  kubectl get namespaces,clusterroles,clusterrolebindings,gatewayclasses,crds,validatingwebhookconfigurations,mutatingwebhookconfigurations,priorityclasses -o name 2>/dev/null | sort
+  local all ns_out ns
+  all="$(kubectl get namespaces,clusterroles,clusterrolebindings,gatewayclasses,crds,validatingwebhookconfigurations,mutatingwebhookconfigurations,priorityclasses -o name 2>/dev/null)" || return 1
+  [[ -n "$all" ]] || return 1
+  for ns in "${CUSTOM_SNAPSHOT_NAMESPACES[@]}"; do
+    ns_out="$(kubectl get -n "$ns" enterpriseagentgatewaybackends,ratelimitconfigs,secrets,configmaps,referencegrants,deployments,services,serviceaccounts -o name --ignore-not-found 2>/dev/null)" || return 1
+    [[ -n "$ns_out" ]] && all+=$'\n'"$(sed "s|^|${ns} |" <<<"$ns_out")"
+  done
+  printf '%s\n' "$all" | sort
 }
 
 # note_leftover <line>
-#   Appends one line to the report's Leftovers section. Every run mode writes
-#   here; only a --track run starts the file afresh.
+#   Appends one line to the report's Leftovers section. Shipped labs write the
+#   shared file, which only a --track run starts afresh; run_lab points
+#   LEFTOVERS_FILE at <work>/custom/<name>/leftovers.txt for a custom lab.
+LEFTOVERS_FILE="${WORK_ROOT}/leftovers.txt"
 note_leftover() {
-  printf '%s\n' "$1" >> "${WORK_ROOT}/leftovers.txt"
+  printf '%s\n' "$1" >> "$LEFTOVERS_FILE"
 }
 
 # is_declined <key>: true when --skip named the key.
@@ -325,7 +351,7 @@ discover_specs() {
 
 spec_key() {  # e2e/specs/routing/direct-response.yaml -> routing/direct-response
   if [[ "$1" == "${CUSTOM_ROOT}/"* ]]; then  # custom-labs/<name>/spec.yaml -> custom/<name>
-    local crel="${1#${CUSTOM_ROOT}/}"
+    local crel="${1#"${CUSTOM_ROOT}"/}"
     printf 'custom/%s' "${crel%%/*}"; return
   fi
   local rel="${1#${SPEC_DIR}/}"
@@ -429,6 +455,8 @@ run_lab() {
 
   local workdir="${WORK_ROOT}/${key}"
   rm -rf "$workdir"; mkdir -p "$workdir/blocks"
+  LEFTOVERS_FILE="${WORK_ROOT}/leftovers.txt"
+  [[ "$key" == custom/* ]] && LEFTOVERS_FILE="${workdir}/leftovers.txt"
 
   local driver="${workdir}/driver.sh"
   if ! "$PYTHON" "$LABDOC" plan "$lab" "$spec" "$workdir" >"$driver" 2>"${workdir}/plan.err"; then
@@ -449,10 +477,12 @@ run_lab() {
   local drifted=false base_before="" base_after=""
   [[ "$is_base" == "false" ]] && base_before="$(baseline_fingerprint)"
 
-  # Custom labs get a cluster-scoped snapshot before and after, and --keep.
-  local is_custom=false snap_before=""
+  # Custom labs get a cluster snapshot before and after, and --keep.
+  local is_custom=false snap_before="" snap_ok=true leftover_fail=false
   [[ "$key" == custom/* ]] && is_custom=true
-  [[ "$is_custom" == "true" ]] && snap_before="$(custom_snapshot)"
+  if [[ "$is_custom" == "true" && "$KEEP" != "true" ]]; then
+    snap_before="$(custom_snapshot)" || snap_ok=false
+  fi
 
   local rc=0
   if [[ "$is_custom" == "true" && "$KEEP" == "true" ]]; then
@@ -465,13 +495,15 @@ run_lab() {
     extra+=("keep=1")
     note_leftover "LEFTOVER CHECK SKIPPED: ${key} kept on the cluster"
   elif [[ "$is_custom" == "true" ]]; then
-    # A real cluster always has namespaces, so an empty snapshot means kubectl
-    # failed. Diffing it would report nothing, or every object, as leftover.
+    # A failed snapshot would report nothing, or every object, as leftover, so
+    # the check does not run and the lab fails. So does any leftover.
     local snap_after left n_left=0
-    snap_after="$(custom_snapshot)"
-    if [[ -z "$snap_before" || -z "$snap_after" ]]; then
+    snap_after="$(custom_snapshot)" || snap_ok=false
+    if [[ "$snap_ok" != "true" ]]; then
       printf "  ${RED}LEFTOVER CHECK NOT RUN: %s (cluster snapshot failed)${NC}\n" "$key"
       note_leftover "LEFTOVER CHECK NOT RUN: ${key} (cluster snapshot failed)"
+      extra+=("leftover_check=not-run")
+      leftover_fail=true
     else
       while IFS= read -r left; do
         [[ -n "$left" ]] || continue
@@ -479,8 +511,12 @@ run_lab() {
         note_leftover "LEFTOVER: ${left}"
         n_left=$((n_left + 1))
       done < <(comm -13 <(printf '%s\n' "$snap_before") <(printf '%s\n' "$snap_after"))
-      (( n_left > 0 )) && extra+=("leftover=${n_left}")
+      if (( n_left > 0 )); then
+        extra+=("leftover=${n_left}")
+        leftover_fail=true
+      fi
     fi
+    [[ "$leftover_fail" == "true" ]] && printf "  ${RED}✗${NC} %-58s ${RED}LEFTOVERS${NC}\n" "$key"
   fi
 
   # Attribute baseline damage to the lab that caused it, while we still know
@@ -537,8 +573,13 @@ run_lab() {
   TOTAL_SKIP=$((TOTAL_SKIP + s))
   [[ "$f" -gt 0 || "$rc" -ne 0 ]] && FAILED+=("$key")
   [[ "$f" -eq 0 && "$rc" -ne 0 ]] && TOTAL_FAIL=$((TOTAL_FAIL + 1))
+  # Leftovers fail a lab that otherwise passed; a lab already counted as failed
+  # (steps, rc, baseline drift) is not counted twice.
+  if [[ "$leftover_fail" == "true" && "$f" -eq 0 && "$rc" -eq 0 && "$drifted" == "false" ]]; then
+    TOTAL_FAIL=$((TOTAL_FAIL + 1)); FAILED+=("${key} (leftovers)")
+  fi
 
-  if [[ "$f" -gt 0 || "$rc" -ne 0 || "$drifted" == "true" ]]; then
+  if [[ "$f" -gt 0 || "$rc" -ne 0 || "$drifted" == "true" || "$leftover_fail" == "true" ]]; then
     write_outcome fail "$rc"
   else
     write_outcome pass 0
@@ -566,7 +607,15 @@ if [[ "$LINT_ONLY" == "true" && -n "$CUSTOM_NAME" ]]; then
   eval "$meta"
   lab="${REPO_ROOT}/${E2E_SPEC_LAB}"
   [[ -f "$lab" ]] || { printf "${RED}✗ %s — lab not found: %s${NC}\n" "$(spec_key "$spec")" "$E2E_SPEC_LAB"; exit 1; }
-  if out="$("$PYTHON" "$LABDOC" lint "$lab" "$spec" 2>&1)"; then
+  # The spec's lab: must be the lab file in its own directory, so the lab, its
+  # spec and its reports stay together and the harness keys it by name.
+  want_lab="${CUSTOM_ROOT}/${CUSTOM_NAME}/${CUSTOM_NAME}.md"
+  if [[ "$(realpath "$lab")" != "$(realpath "$want_lab" 2>/dev/null)" ]]; then
+    printf "${RED}✗ %s${NC}\n" "$(spec_key "$spec")"
+    printf "    spec lab: must be %s\n" "${want_lab#"${REPO_ROOT}"/}"
+    lint_fail=1
+  fi
+  if out="$("$PYTHON" "$LABDOC" lint --custom "$lab" "$spec" 2>&1)"; then
     printf "${GREEN}✓${NC} %s\n" "$out"
   else
     printf "${RED}✗ %s${NC}\n" "$(spec_key "$spec")"
@@ -771,7 +820,8 @@ fi
 declare -a RUN_SPECS=()
 # A --report run without --track writes a report for this invocation only, so
 # it starts with no leftover lines from earlier runs.
-if [[ -z "$TRACK" && "$REPORT" == "true" ]]; then
+# A custom run writes its own leftovers file, so the shared one stays as is.
+if [[ -z "$TRACK" && -z "$CUSTOM_NAME" && "$REPORT" == "true" ]]; then
   rm -f "${WORK_ROOT}/leftovers.txt"
 fi
 if [[ -n "$TRACK" ]]; then
@@ -780,7 +830,7 @@ if [[ -n "$TRACK" ]]; then
   # because the enablement flow runs labs one at a time and reports at the end.
   # --report-only exits before this point.
   # Custom-lab outcomes belong to the author's own runs and survive the reset.
-  find "$WORK_ROOT" -name outcome -type f -not -path "*/custom/*" -delete 2>/dev/null
+  find "$WORK_ROOT" -name outcome -type f -not -path "${WORK_ROOT}/custom/*" -delete 2>/dev/null
   rm -f "${WORK_ROOT}/leftovers.txt"
   track_rows="$("$PYTHON" "${E2E_DIR}/lib/tracks.py" list "$TRACK" --env "$ENV_CLASS" 2>&1)" || {
     if [[ "$track_rows" == *"no track '"* ]]; then

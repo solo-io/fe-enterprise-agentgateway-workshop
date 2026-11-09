@@ -272,6 +272,15 @@ rules:
       - patch
       - delete
 
+  # Custom labs: the e2e leftover check lists PriorityClasses
+  - apiGroups:
+      - scheduling.k8s.io
+    resources:
+      - priorityclasses
+    verbs:
+      - get
+      - list
+
   # Monitoring chart (kube-prometheus-stack): pre-install admission hook Jobs
   - apiGroups:
       - batch
