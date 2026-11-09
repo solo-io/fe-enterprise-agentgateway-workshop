@@ -46,7 +46,7 @@ Run these checks in order. Stop on the first failure with the message shown, and
    If the file exists, a previous session stopped. Check whether its files are still uncommitted:
 
    ```bash
-   jq -r '.created[], .recorded[].path' e2e/.work/contribute/<name>/manifest.json | xargs git status --porcelain --
+   jq -r '.created[], .recorded[].path' e2e/.work/contribute/<name>/manifest.json | tr '\n' '\0' | xargs -0 -r git status --porcelain --
    ```
 
    - The command prints nothing, or the manifest lists no paths: the previous session's work is already committed. Tell the user, and offer to retire the manifest. On a yes, run `mv e2e/.work/contribute/<name>/manifest.json e2e/.work/contribute/<name>/manifest.stale.json` and continue with check 3. On a no, stop the session and print the manifest path.
@@ -266,7 +266,7 @@ Each must return `NotFound`. A namespace that still exists is a Cleanup bug: sho
 Only now does git change. Stage every path in the manifest's `created` and `recorded` lists, then scan the staged diff and the PR body once more. Pass the same `--allow` flags as the last step 2 scan, or none if it had none:
 
 ```bash
-jq -r '.created[], .recorded[].path' e2e/.work/contribute/<name>/manifest.json | xargs git add --
+jq -r '.created[], .recorded[].path' e2e/.work/contribute/<name>/manifest.json | tr '\n' '\0' | xargs -0 -r git add --
 git diff --cached > e2e/.work/contribute/<name>/staged.patch
 python3 e2e/lib/scrub.py --summary --allow <glob> --from-changes e2e/.work/contribute/<name>/stage/CHANGES.md e2e/.work/contribute/<name>/staged.patch e2e/.work/contribute/<name>/pr-body.md
 ```
@@ -332,7 +332,7 @@ Offer one undo, and run it only on a yes:
 python3 e2e/lib/promote.py <name> --undo
 ```
 
-Undo deletes every file the promoter created and restores every recorded file from `before/`, then prints what it did. If it ends with `undo incomplete; manifest kept`, show the user the lines it printed for the entries that failed. The manifest stays, so the user can fix those entries and run the undo again. `custom-labs/<name>/` is unchanged either way. On a no, the files stay; print the manifest path so the user can finish or revert by hand.
+Undo deletes every file the promoter created and restores every recorded file from `before/`, then prints what it did. If it ends with `undo incomplete; manifest kept`, show the user the lines it printed for the entries that failed. The manifest stays, so the user can fix those entries and run the undo again. A line starting `skip` means a recorded file had no saved copy, so undo left it as it is; tell the user to check that file by hand. `custom-labs/<name>/` is unchanged either way. On a no, the files stay; print the manifest path so the user can finish or revert by hand.
 
 ```bash
 e2e/lib/session-log.sh add decision custom/<name> "contribute stopped: <undo|kept>"

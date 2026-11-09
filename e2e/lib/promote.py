@@ -359,11 +359,15 @@ def undo(name, root, work):
     with open(path, encoding="utf-8") as f:
         m = json.load(f)
     ok = True
+    skipped = []
     for r in m["recorded"]:
         saved = os.path.join(work, r["before"])
         if not os.path.isfile(saved):
+            # An earlier undo already restored this file and removed its copy,
+            # or the user removed the copy. Nothing is written, so skipping is
+            # safe; the user checks the file by hand.
             print("skip %s: no saved copy" % r["path"])
-            ok = False
+            skipped.append(r["path"])
             continue
         try:
             shutil.copy2(saved, os.path.join(root, r["path"]))
@@ -398,7 +402,11 @@ def undo(name, root, work):
     if not ok:
         raise PromoteError("undo incomplete; manifest kept")
     for r in m["recorded"]:
-        os.remove(os.path.join(work, r["before"]))
+        saved = os.path.join(work, r["before"])
+        if os.path.exists(saved):
+            os.remove(saved)
+    if skipped:
+        print("check by hand, no saved copy was restored: %s" % ", ".join(skipped))
     before_dir = os.path.join(work, "before")
     if os.path.isdir(before_dir) and not os.listdir(before_dir):
         os.rmdir(before_dir)

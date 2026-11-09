@@ -245,13 +245,13 @@ class TestPromote(unittest.TestCase):
         with open(self.work("manifest.json")) as f:
             m = json.load(f)
         os.remove(self.work(m["recorded"][0]["before"]))
-        proc = self.run_cli(["demo", "--undo"], check=False)
-        self.assertEqual(proc.returncode, 1)
+        proc = self.run_cli(["demo", "--undo"])
         self.assertIn("skip README.md: no saved copy", proc.stdout)
-        self.assertIn("undo incomplete; manifest kept", proc.stderr)
+        self.assertIn("check by hand, no saved copy was restored: README.md", proc.stdout)
         self.assertEqual(self.read("CHANGELOG.md"), "0.1.0\n")
+        self.assertEqual(self.read("README.md"), "edited\n")
         self.assertFalse(self.exists("labs/security/demo"))
-        self.assertTrue(self.exists(self.work("manifest.json")))
+        self.assertFalse(self.exists(self.work("manifest.json")))
 
     def test_undo_failing_entry_keeps_manifest(self):
         self.run_cli(["demo", "--category", "security", "--subdir"])
