@@ -215,7 +215,8 @@ build_report() {
     printf '{"class": "%s"}\n' "$ENV_CLASS" > "$env_json"
   fi
   "$PYTHON" "${E2E_DIR}/lib/report.py" build --work "$WORK_ROOT" "${which[@]}" \
-    --env-json "$env_json" --env-class "$ENV_CLASS" --session "${WORK_ROOT}/session.jsonl" --out "$out"
+    --env-json "$env_json" --env-class "$ENV_CLASS" --session "${WORK_ROOT}/session.jsonl" --out "$out" \
+    --specs-dir "$SPEC_DIR" --custom-root "$CUSTOM_ROOT"
 }
 
 # ---------------------------------------------------------------------------
@@ -237,7 +238,8 @@ E2E_CLEANUP_KILLED=0   # run_with_timeout already wrote CLEANUP INCOMPLETE for t
 # write_outcome_file <key> <status> <rc> <duration> <requires> [only_on] [k=v...]
 #   One line per lab at ${WORK_ROOT}/<key>/outcome. The report builder reads it,
 #   so the field names and status values are a contract. Optional trailing
-#   fields: drift=1, cleanup_fail=N, reason=declined.
+#   fields: drift=1, cleanup_fail=N|incomplete, reason=declined, keep=1,
+#   leftover=N (custom), leftover_warn=N (shipped), leftover_check=not-run.
 write_outcome_file() {
   local key="$1" status="$2" rc="$3" dur="$4" req="$5" only_on="${6:-}" line
   shift 5; (( $# )) && shift
@@ -248,16 +250,18 @@ write_outcome_file() {
   printf '%s\n' "$line" > "${WORK_ROOT}/${key}/outcome"
 }
 
-# custom_snapshot: the objects a custom lab could leave behind, one sorted line
+# custom_snapshot: the objects a lab could leave behind, one sorted line
 #   each: `kind/name` for cluster-scoped kinds, `<namespace> kind/name` for the
-#   shared namespaces. run_lab diffs it before and after. Returns 1 when any
+#   shared namespaces. run_lab diffs it before and after every lab except the
+#   _base ones; the name predates shipped labs getting it. Three kubectl calls,
+#   names only, so a snapshot costs about a second on a typical cluster. Returns 1 when any
 #   kubectl call exits non-zero or the cluster-scoped list is empty (a real
 #   cluster always has namespaces), so the caller reports LEFTOVER CHECK NOT RUN
 #   instead of a diff against a partial list.
 #   Every namespaced kind listed comes with the 001 base install. kubectl fails
 #   the whole call on a kind the cluster does not know, so on a cluster without
 #   the base the check reports NOT RUN rather than a silent pass. kubectl's
-#   stderr goes to <work>/custom/<name>/snapshot.err so NOT RUN names a cause.
+#   stderr goes to <work>/<key>/snapshot.err so NOT RUN names a cause.
 CUSTOM_SNAPSHOT_NAMESPACES=(agentgateway-system default)
 custom_snapshot() {
   local all ns_out ns err="${SNAPSHOT_ERR:-/dev/null}"
@@ -432,6 +436,9 @@ run_lab() {
   local key; key="$(spec_key "$spec")"
   local start="$SECONDS" req=""
   E2E_CURRENT_KEY="$key"; E2E_CURRENT_START="$start"
+  # Step results from an earlier run must not outlive a lab that returns
+  # before its work dir is reset (declined, skipped, bad spec).
+  rm -f "${WORK_ROOT}/${key}/steps"
   # <status> <rc>: record the outcome, then clear the in-flight marker.
   local extra=()
   write_outcome() {
@@ -491,10 +498,14 @@ run_lab() {
   local drifted=false base_before="" base_after=""
   [[ "$is_base" == "false" ]] && base_before="$(baseline_fingerprint)"
 
-  # Custom labs get a cluster snapshot before and after, and --keep.
-  local is_custom=false snap_before="" snap_ok=true leftover_fail=false
+  # Every lab but the _base ones gets a cluster snapshot before and after. A
+  # custom lab fails on anything it leaves; a shipped lab only warns. The _base
+  # labs install and remove the baseline, so a diff would list the base itself;
+  # --uninstall-base does its own leftover check. --keep skips the snapshot.
+  local is_custom=false snap=false snap_before="" snap_ok=true leftover_fail=false
   [[ "$key" == custom/* ]] && is_custom=true
-  if [[ "$is_custom" == "true" && "$KEEP" != "true" ]]; then
+  [[ "$is_base" == "false" && ! ( "$is_custom" == "true" && "$KEEP" == "true" ) ]] && snap=true
+  if [[ "$snap" == "true" ]]; then
     SNAPSHOT_ERR="${workdir}/snapshot.err"; : > "$SNAPSHOT_ERR"
     snap_before="$(custom_snapshot)" || snap_ok=false
   fi
@@ -509,6 +520,25 @@ run_lab() {
   if [[ "$is_custom" == "true" && "$KEEP" == "true" ]]; then
     extra+=("keep=1")
     note_leftover "LEFTOVER CHECK SKIPPED: ${key} kept on the cluster"
+  elif [[ "$snap" == "true" && "$is_custom" == "false" ]]; then
+    # A shipped lab: report what it left, never fail it. A failed snapshot
+    # records leftover_check=not-run and no leftover_warn, so a reader never
+    # takes an unchecked lab for a clean one.
+    local snap_after left n_left=0
+    snap_after="$(custom_snapshot)" || snap_ok=false
+    if [[ "$snap_ok" != "true" ]]; then
+      printf "  ${YELLOW}LEFTOVER CHECK NOT RUN (warning): %s (cluster snapshot failed; see %s)${NC}\n" "$key" "${SNAPSHOT_ERR}"
+      note_leftover "LEFTOVER (warning): check not run after ${key} (cluster snapshot failed)"
+      extra+=("leftover_check=not-run")
+    else
+      while IFS= read -r left; do
+        [[ -n "$left" ]] || continue
+        printf "  ${YELLOW}LEFTOVER (warning): %s${NC}\n" "$left"
+        note_leftover "LEFTOVER (warning): ${left} (left by ${key})"
+        n_left=$((n_left + 1))
+      done < <(comm -13 <(printf '%s\n' "$snap_before") <(printf '%s\n' "$snap_after"))
+      extra+=("leftover_warn=${n_left}")
+    fi
   elif [[ "$is_custom" == "true" ]]; then
     # A failed snapshot would report nothing, or every object, as leftover, so
     # the check does not run and the lab fails. So does any leftover.

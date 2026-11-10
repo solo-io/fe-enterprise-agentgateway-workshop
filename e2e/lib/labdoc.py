@@ -338,7 +338,14 @@ def build_driver(lab_path, spec_path, workdir, repo_root):
     counter = BlockCounter()
     out = []
     for idx, step in enumerate(spec.get("steps") or [], start=1):
+        # A step that proves requirements records its own result, so the report
+        # can judge each requirement on the steps that prove it.
+        proves = [str(p) for p in (step.get("proves") or [])]
+        if proves:
+            out.append("e2e_step_begin")
         emit_step(out, step, sections, lab_path, workdir, idx, counter)
+        if proves:
+            out.append(f"e2e_step_end {idx} " + " ".join(q(p) for p in proves))
 
     cleanup_lines = []
     cleanup = spec.get("cleanup")

@@ -45,6 +45,24 @@ snap; assert_not_matches '^fox' t >/dev/null; check 1 0 "assert_not_matches anch
 snap; E2E_RC=7; assert_rc 7 t >/dev/null; check 1 0 "assert_rc equality"
 snap; assert_rc 0 t >/dev/null; check 0 1 "assert_rc mismatch fails"
 
+# e2e_step_begin/e2e_step_end: one line per requirement id in ${E2E_WORKDIR}/steps.
+steps_line() { sed -n "${1}p" "${E2E_WORKDIR}/steps"; }
+expect_line() {  # expect_line <n> <want> <desc>
+  if [[ "$(steps_line "$1")" == "$2" ]]; then T_PASS=$((T_PASS+1)); printf 'ok   %s\n' "$3"
+  else T_FAIL=$((T_FAIL+1)); printf 'FAIL %s (got "%s")\n' "$3" "$(steps_line "$1")"; fi
+}
+E2E_LAST='hello'
+e2e_step_begin; assert_contains hello t >/dev/null; e2e_step_end 3 R1 'R 2'
+expect_line 1 "step=3 status=pass req=R1" "a passing step records pass"
+expect_line 2 "step=3 status=pass req=R 2" "one line per id, the id runs to the end of the line"
+e2e_step_begin; assert_contains hello t >/dev/null; assert_contains nope t >/dev/null; e2e_step_end 4 R1
+expect_line 3 "step=4 status=fail req=R1" "one failed check fails the step"
+e2e_step_begin; e2e_note "skipped: x" "parked" >/dev/null; e2e_step_end 5 R3
+expect_line 4 "step=5 status=skip req=R3" "a step that ran nothing records skip"
+e2e_begin
+[[ ! -e "${E2E_WORKDIR}/steps" ]] && { T_PASS=$((T_PASS+1)); printf 'ok   e2e_begin clears the step records\n'; } \
+  || { T_FAIL=$((T_FAIL+1)); printf 'FAIL e2e_begin left %s/steps\n' "$E2E_WORKDIR"; }
+
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 rm -rf "$E2E_WORKDIR"
 exit $((T_FAIL > 0))

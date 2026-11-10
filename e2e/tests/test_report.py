@@ -280,6 +280,145 @@ class TestFinalWave(ReportCase):
         self.assertTrue(os.path.basename(md).startswith(stamp), (md, data["generated_at"]))
 
 
+def requirement_rows_in(text):
+    """The rows the contribute-lab preflight reads: `| R<n> ...` lines under ## Requirements."""
+    sect = text.split("\n## Requirements\n", 1)[1]
+    sect = re.split(r"(?m)^## ", sect, maxsplit=1)[0]
+    return [ln for ln in sect.splitlines() if re.match(r"^\| R[0-9]+ ", ln)]
+
+
+class TestRequirements(ReportCase):
+    REQ_SPEC = ("lab: labs/x.md\ntier: t0\nrequirements:\n"
+                "  - id: R1\n    text: the route answers\n"
+                "  - id: R2\n    text: a bad key | gets 401\n"
+                "steps:\n  - section: A\n    proves: [R1]\n    assert: [{status: 200}]\n"
+                "  - section: B\n    proves: [R2]\n    assert: [{status: 401}]\n")
+
+    def setUp(self):
+        super().setUp()
+        self.specs = os.path.join(self.tmp.name, "specs")
+        shutil.copytree(os.path.join(FIX, "specs"), self.specs)
+        self.work = os.path.join(self.tmp.name, "w")
+        shutil.copytree(os.path.join(FIX, "work"), self.work)
+        for key in ("routing/a", "routing/b"):
+            with open(os.path.join(self.specs, key + ".yaml"), "w") as fh:
+                fh.write(self.REQ_SPEC)
+
+    def steps(self, key, *lines):
+        with open(os.path.join(self.work, key, "steps"), "w") as fh:
+            fh.write("".join(ln + "\n" for ln in lines))
+
+    def build_reqs(self):
+        return self.build(work=self.work, extra=("--specs-dir", self.specs))
+
+    def rows(self, outcome, steps, expected=None):
+        reqs = [{"id": "R1", "text": "one"}, {"id": "R2", "text": "two"}]
+        row = report.lab_row("k", outcome, {}, self.specs) if outcome else \
+            {"key": "k", "result": "FAIL", "duration": "-", "note": "no outcome recorded"}
+        return [(r["result"], r["detail"]) for r in
+                report.requirement_rows("k", outcome, row, reqs, expected or {"R1": 1, "R2": 1}, steps)]
+
+    def test_rows_follow_the_proving_steps(self):
+        self.steps("routing/a", "step=1 status=pass req=R1", "step=2 status=fail req=R2")
+        _, _, text, data = self.build_reqs()
+        self.assertEqual(requirement_rows_in(text)[:2], ["| R1 | the route answers | PASS |",
+                                                     "| R2 | a bad key \\| gets 401 | FAIL |"])
+        self.assertIn("- R2: FAIL, failed in step 2", text)
+        a = [r for r in data["requirements"] if r["lab"] == "routing/a"]
+        self.assertEqual([(r["id"], r["result"]) for r in a], [("R1", "PASS"), ("R2", "FAIL")])
+
+    def test_lab_in_two_use_cases_is_listed_once_and_skipped_lab_is_skip(self):
+        self.steps("routing/a", "step=1 status=pass req=R1", "step=2 status=pass req=R2")
+        _, _, text, data = self.build_reqs()
+        self.assertEqual([r["lab"] for r in data["requirements"]], ["routing/a"] * 2 + ["routing/b"] * 2)
+        self.assertEqual({r["result"] for r in data["requirements"] if r["lab"] == "routing/b"}, {"SKIP"})
+        self.assertEqual(text.count("### routing/a"), 1)
+        self.assertEqual([ln.endswith("| PASS |") for ln in requirement_rows_in(text)], [True, True, False, False])
+
+    def test_section_sits_after_the_lab_tables(self):
+        _, _, text, _ = self.build_reqs()
+        heads = re.findall(r"^## (.+)$", text, re.M)
+        self.assertEqual(heads[:5], ["Environment", "First", "Second", "Requirements", "Deviations"])
+
+    def test_no_requirements_no_section(self):
+        _, _, text, data = self.build()
+        self.assertNotIn("## Requirements", text)
+        self.assertEqual(data["requirements"], [])
+
+    def test_unreached_step_fails(self):
+        self.assertEqual(self.rows({"status": "timeout"}, [("1", "pass", "R1")]),
+                         [("PASS", ""), ("FAIL", "1 of 1 proving step(s) did not run")])
+
+    def test_no_steps_file_fails(self):
+        self.assertEqual({r for r, _ in self.rows({"status": "pass"}, None)}, {"FAIL"})
+
+    def test_lab_that_did_not_run(self):
+        self.assertEqual(self.rows({"status": "skip", "requires": "K"}, None)[0], ("SKIP", "skip (missing k)"))
+        self.assertEqual(self.rows({"status": "excluded"}, None)[0][0], "SKIP")
+        self.assertEqual(self.rows(None, None)[0], ("FAIL", "no outcome recorded"))
+
+    def test_every_proving_step_skipped_is_skip(self):
+        got = self.rows({"status": "pass"}, [("1", "skip", "R1"), ("2", "pass", "R2")])
+        self.assertEqual(got, [("SKIP", "every proving step was skipped"), ("PASS", "")])
+
+    def test_any_failed_step_fails_a_requirement_with_two_steps(self):
+        got = self.rows({"status": "fail"}, [("1", "pass", "R1"), ("3", "fail", "R1")], {"R1": 2, "R2": 0})
+        self.assertEqual(got, [("FAIL", "failed in step 3"), ("FAIL", "no step proves it")])
+
+    def test_custom_report_reads_the_custom_root(self):
+        root = os.path.join(self.tmp.name, "custom-labs")
+        os.makedirs(os.path.join(root, "demo"))
+        with open(os.path.join(root, "demo", "spec.yaml"), "w") as fh:
+            fh.write(self.REQ_SPEC)
+        work = os.path.join(self.tmp.name, "cw")
+        os.makedirs(os.path.join(work, "custom", "demo"))
+        with open(os.path.join(work, "custom", "demo", "outcome"), "w") as fh:
+            fh.write("status=pass rc=0 duration=5 requires= leftover_warn=0\n")
+        with open(os.path.join(work, "custom", "demo", "steps"), "w") as fh:
+            fh.write("step=1 status=pass req=R1\nstep=2 status=pass req=R2\n")
+        proc = subprocess.run(
+            [sys.executable, os.path.join(LIB, "report.py"), "build", "--work", work, "--custom", "demo",
+             "--env-json", os.path.join(FIX, "env.json"), "--session", self.session, "--out", self.tmp.name,
+             "--custom-root", root], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        with open(proc.stdout.split()[0], encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("| custom/demo | PASS |", text)
+        rows = requirement_rows_in(text)
+        self.assertEqual(len(rows), 2)
+        self.assertTrue(all(r.endswith("| PASS |") for r in rows), rows)
+
+
+class TestLeftoverWarnings(ReportCase):
+    def test_warnings_get_their_own_section(self):
+        work = os.path.join(self.tmp.name, "w")
+        shutil.copytree(os.path.join(FIX, "work"), work)
+        with open(os.path.join(work, "routing", "a", "outcome"), "w") as fh:
+            fh.write("status=pass rc=0 duration=5 requires= leftover_warn=1\n")
+        with open(os.path.join(work, "leftovers.txt"), "w") as fh:
+            fh.write("LEFTOVER (warning): namespace/mcp (left by routing/a)\n")
+        _, _, text, data = self.build(work=work)
+        self.assertEqual(data["leftovers"], [])
+        self.assertEqual(data["leftover_warnings"], ["LEFTOVER (warning): namespace/mcp (left by routing/a)"])
+        self.assertEqual(self.row(data, "routing/a")["result"], "PASS (deviation)")
+        self.assertIn("1 leftover warning(s)", self.row(data, "routing/a")["note"])
+        heads = re.findall(r"^## (.+)$", text, re.M)
+        self.assertEqual(heads[-3:], ["Leftovers", "Leftover warnings", "Questions"])
+        self.assertIn("- LEFTOVER (warning): namespace/mcp (left by routing/a)", text)
+        self.assertIn(report.NO_LEFTOVERS_BUT_WARNINGS, text)
+
+    def test_zero_warnings_add_no_note(self):
+        work = os.path.join(self.tmp.name, "w")
+        os.makedirs(os.path.join(work, "routing", "a"))
+        with open(os.path.join(work, "routing", "a", "outcome"), "w") as fh:
+            fh.write("status=pass rc=0 duration=5 requires= leftover_warn=0\n")
+        empty = os.path.join(self.tmp.name, "empty.jsonl")
+        open(empty, "w").close()
+        _, _, text, data = self.build(work=work, session=empty)
+        self.assertEqual(self.row(data, "routing/a")["note"], "")
+        self.assertNotIn("## Leftover warnings", text)
+
+
 class TestChartVersion(unittest.TestCase):
     def fake_helm(self, body):
         d = tempfile.mkdtemp()
@@ -343,7 +482,8 @@ class TestCustom(ReportCase):
             [sys.executable, os.path.join(LIB, "report.py"), "build", "--work", work,
              "--custom", "demo", "--env-json", os.path.join(FIX, "env.json"),
              "--session", session or self.session, "--out", self.tmp.name,
-             "--specs-dir", os.path.join(FIX, "specs"), "--tracks-dir", os.path.join(FIX, "tracks")],
+             "--specs-dir", os.path.join(FIX, "specs"), "--tracks-dir", os.path.join(FIX, "tracks"),
+             "--custom-root", os.path.join(self.tmp.name, "no-custom-labs")],
             capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         md, js = proc.stdout.split()

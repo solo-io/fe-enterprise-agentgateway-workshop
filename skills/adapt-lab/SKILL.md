@@ -51,7 +51,7 @@ Start a fresh session log:
 e2e/lib/session-log.sh start
 ```
 
-The user names one or more source labs or describes the use case. When they describe it, find the closest labs from the tables in `README.md` and `tracks/`, read the candidate labs, and confirm the choice with the user. The request is usually one of these:
+The user names one or more source labs or describes the use case. When they describe it, find the closest labs from the tables in `README.md` and `tracks/`, read each candidate lab and its spec under `e2e/specs/`, and confirm the choice with the user. The request is usually one of these:
 
 - Extend: keep one lab's pattern and scale it, for example tiered rate limits instead of one counter.
 - Compose: join two labs, for example JWT auth from an OIDC provider plus rate limits keyed on a token claim.
@@ -104,7 +104,7 @@ Write `custom-labs/<name>/CHANGES.md` from this template and show it:
 <Filled in at hand-off.>
 ```
 
-The user approves, edits, or stops. No cluster command runs before the user approves the proposal.
+The user approves, edits, or stops. Nothing is written beyond `CHANGES.md`, and no cluster command runs, before the user approves the proposal.
 
 ```bash
 e2e/lib/session-log.sh add decision custom/<name> "proposal approved: sources=<labs> requirements=<count>"
@@ -174,7 +174,16 @@ Fill in "Changes during validation" in `CHANGES.md`: what changed and why. Build
 ./e2e/run-e2e.sh --custom <name> --report-only
 ```
 
-Show the three paths: `custom-labs/<name>/<name>.md`, `custom-labs/<name>/spec.yaml`, and the report under `custom-labs/<name>/reports/`. Tell the user they can run the lab by hand from the markdown, or re-run the proof with `./e2e/run-e2e.sh --custom <name>`. The folder is theirs and stays on their machine.
+Check the report's Requirements table. Every requirement row must end in `| PASS |`:
+
+```bash
+R=$(ls -t custom-labs/<name>/reports/*.md | head -1)
+awk '/^## Requirements/{on=1; next} /^## /{on=0} on && /^\| R[0-9]+ /' "$R"
+```
+
+A row that is not `PASS` leaves that requirement unproven. Go back to step 4.
+
+Show the three paths: `custom-labs/<name>/<name>.md`, `custom-labs/<name>/spec.yaml`, and the report under `custom-labs/<name>/reports/`. Tell the user they can run the lab by hand from the markdown, or re-run the proof with `./e2e/run-e2e.sh --custom <name>`. The folder is theirs and stays on their machine. To ship it in the workshop, they run `/contribute-lab <name>`.
 
 Validation ran with Cleanup, so the cluster now holds only the base. Ask whether to leave the custom configuration on the cluster. The default is no. On a yes:
 

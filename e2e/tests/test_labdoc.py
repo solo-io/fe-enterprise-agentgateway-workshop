@@ -110,6 +110,19 @@ class TestDriver(unittest.TestCase):
         body = driver.split("e2e_define_cleanup() {")[1].split("}")[0]
         self.assertIn("e2e_phase cleanup", body)
 
+    def test_only_proving_steps_record_their_result(self):
+        # req-spec.yaml: step 1 proves nothing, step 2 proves R1.
+        self.assertNotIn("e2e_step_", self.build())
+        driver = labdoc.build_driver(LAB, os.path.join(FIX, "req-spec.yaml"), tempfile.mkdtemp(), "/REPO")
+        lines = driver.splitlines()
+        begin, end = lines.index("e2e_step_begin"), lines.index("e2e_step_end 2 R1")
+        self.assertEqual(driver.count("e2e_step_begin"), 1)
+        # The wrapper encloses step 2's block and its assertions, nothing of step 1.
+        inside = lines[begin + 1:end]
+        self.assertEqual(sum(l.startswith("e2e_run_block") for l in inside), 1)
+        self.assertTrue(any(l.startswith("assert_status 200 ") for l in inside))
+        self.assertFalse(any(l.startswith("e2e_wait") for l in inside))
+
 
 class TestUncovered(unittest.TestCase):
     def test_uncovered_sections_lists_only_unnamed(self):

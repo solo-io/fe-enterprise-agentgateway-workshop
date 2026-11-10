@@ -13,7 +13,7 @@ Tell the user, in four sentences:
 
 - This is a dedicated test cluster, and the session installs and removes cluster-scoped resources.
 - Every lab cleans up after itself, and the base install is removed at the end unless they say to keep it.
-- Nothing about the cluster is sent anywhere; the only outbound call is a generic product question to the Solo docs server.
+- Nothing about the cluster leaves the machine except through their model provider, and the only service you query is the Solo docs server, with generic product questions.
 - If a lab fails, you stop, explain, and they decide what happens next.
 
 Say the recommended identity is the evaluator ServiceAccount from `rbac/README.md`, and that their own admin identity also works.
@@ -90,10 +90,20 @@ Otherwise narrate Use Case 1 from `tracks/<t>-track.md`.
 
 1. If the user declined the lab, run `./e2e/run-e2e.sh <key> --skip <key>` to record it and move on.
 2. Invoke `skills/explain-lab/SKILL.md` for the lab.
-3. Run `./e2e/run-e2e.sh <key>` and show the result line.
-4. On any non-zero exit, invoke `skills/diagnose-failure/SKILL.md` and do nothing else until the user chooses.
+3. Run `./e2e/run-e2e.sh <key>` and show the result line. Read the outcome line from `e2e/.work/<key>/outcome` and log it:
+
+   ```bash
+   e2e/lib/session-log.sh add run <key> "<outcome line>"
+   ```
+
+   `status=pass` with no `cleanup_fail=` and no `drift=` field is a pass. `status=skip` with `reason=declined` is a lab the user declined; any other skip names the missing key in `requires=`. Everything else is a failure: `fail`, `timeout`, and a pass that carries `cleanup_fail=` or `drift=`.
+4. On a failure, invoke `skills/diagnose-failure/SKILL.md` and do nothing else until the user chooses.
 
 After the last lab of a use case, pause and invite questions. Answer product questions with `skills/ask-the-docs/SKILL.md`.
+
+In both modes, name every `LEFTOVER (warning):`, `LEFTOVER CHECK NOT RUN`, `BASELINE DRIFT`, and `CLEANUP INCOMPLETE` line a run prints, as it happens, instead of waiting for step 7. A `LEFTOVER (warning):` line names an object a shipped lab left behind; it does not fail the lab in this release. Show it to the user and offer to delete it, and delete it only on a yes.
+
+Never edit a shipped lab under `labs/` or a shipped spec under `e2e/specs/`.
 
 ## 6. Diagnose rig failures
 
@@ -129,4 +139,10 @@ It removes the base and the `monitoring.coreos.com` CRDs the base added. It comp
 ./e2e/run-e2e.sh --report-only --track <t> --env <class>
 ```
 
-This builds the report from the work directory and runs nothing. Show the two paths it prints: `reports/<YYYYMMDD-HHMMSS>-<class>-<track>.md` and `.json`. Say the report is a local file and nothing was sent anywhere. If the user wants Solo to see it, they send it themselves.
+This builds the report from the work directory and runs nothing. Show the two paths it prints: `reports/<YYYYMMDD-HHMMSS>-<class>-<track>.md` and `.json`. To compare with an earlier report of the same track:
+
+```bash
+python3 e2e/lib/report.py compare <older.json> <newer.json>
+```
+
+Say the report is a local file and nothing was sent anywhere. If the user wants Solo to see it, they send it themselves.

@@ -77,9 +77,28 @@ The keys are optional there, and recommended for new specs. When a shipped spec
 has them, `--lint` fails when a requirement has no proving step, a proving step
 has no `assert`, or a `proves` id is undeclared.
 
-A `--custom` run snapshots namespaces, the cluster-scoped kinds the labs
-create, and the common namespaced kinds in `agentgateway-system` and `default`,
-before the run and after Cleanup. It prints `LEFTOVER: <kind>/<name>` (or
+Each step with `proves:` records its result in `e2e/.work/<key>/steps`, one line
+per id: `step=<n> status=<pass|fail|skip> req=<id>`. The report gives every lab
+whose spec declares requirements a table under `## Requirements`, one row per
+id that ends in its result: `| R1 | <text> | PASS |`. A requirement is `PASS`
+when every step that proves it ran and failed no check, `FAIL` when one failed
+or did not run (a timeout, an interrupt), and `SKIP` when the lab was skipped,
+declined or excluded. The reason for each `FAIL` and `SKIP` follows the table.
+A requirement row judges only its own steps, so it can pass while the lab row
+fails on drift or a leftover.
+
+Every lab run except the `_base` ones snapshots namespaces, the cluster-scoped
+kinds the labs create, and the common namespaced kinds in `agentgateway-system`
+and `default`, before the lab and after its Cleanup. That is three name-only
+`kubectl get` calls per snapshot. A shipped lab only warns: the run prints
+`LEFTOVER (warning): <kind>/<name>` for anything new, the outcome records
+`leftover_warn=<n>` (`0` when clean), and the report lists the lines under
+`## Leftover warnings`. A failed snapshot on a shipped lab prints `LEFTOVER
+CHECK NOT RUN (warning)` and records `leftover_check=not-run` instead. Neither
+changes the lab's result. `--uninstall-base` keeps its own namespace and CRD
+check.
+
+A `--custom` run prints `LEFTOVER: <kind>/<name>` (or
 `LEFTOVER: <namespace> <kind>/<name>`) for anything new, and any leftover fails
 the run. Objects with an owner (a Gateway's Deployment, a Deployment's
 ReplicaSet), Helm release secrets, and the controller's `enterprise-jwks-store-*`
@@ -340,7 +359,16 @@ e2e/.work/mcp/in-cluster-mcp/
   blocks/0007.sh     the exact block that ran
   blocks/0007.out    its combined output
   result             pass/fail/skip counts
+  outcome            the one-line outcome the report reads
+  steps              per-requirement step results (specs with proves: only)
 ```
+
+`outcome` is one line of space-separated `key=value` fields:
+`status=<pass|fail|timeout|interrupted|skip|excluded|no-spec|not-applicable>
+rc=<n> duration=<secs> requires=<VAR,VAR>`, then optional `only_on=<class>`,
+`drift=1`, `cleanup_fail=<n|incomplete>`, `reason=declined`, `keep=1`,
+`leftover=<n>` (custom), `leftover_warn=<n>` (shipped), and
+`leftover_check=not-run`.
 
 `-v` streams block output live. To see the driver without running it:
 
@@ -354,11 +382,15 @@ python3 e2e/lib/labdoc.py plan labs/mcp/in-cluster-mcp.md \
 The harness has its own tests, no cluster needed:
 
 ```bash
-python3 -m unittest discover -s e2e/tests   # labdoc.py parse/plan logic
+python3 -m unittest discover -s e2e/tests   # Python tests: labdoc.py, tracks, report, scrub, promote, RBAC, agent layer
 bash e2e/tests/test_assertions.sh           # lib.sh assertion semantics
+bash e2e/tests/test_detect_env.sh           # detect-env.sh with stub kubectl and helm
+bash e2e/tests/test_mint_kubeconfig.sh      # rbac/mint-kubeconfig.sh cluster CA handling
+bash e2e/tests/test_run_e2e_flags.sh        # run-e2e.sh --track, --env, --resolve-creds
+bash e2e/tests/test_session_log.sh          # session-log.sh
 ```
 
-Run both after changing `e2e/lib/`.
+Run all of them after changing `e2e/lib/`, `rbac/`, `skills/` or `AGENTS.md`.
 
 ## Credentials
 

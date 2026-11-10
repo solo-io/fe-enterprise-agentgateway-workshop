@@ -37,6 +37,7 @@ E2E_VERBOSE="${E2E_VERBOSE:-0}"
 e2e_begin() {
   mkdir -p "${E2E_WORKDIR}/blocks"
   : >"${E2E_WORKDIR}/result"
+  rm -f "${E2E_WORKDIR}/steps"
 }
 
 e2e_phase() {
@@ -47,6 +48,29 @@ e2e_phase() {
 e2e_note() {
   printf "  ${YELLOW}⊘${NC} %-58s ${YELLOW}SKIP${NC} — %s\n" "$1" "${2:-}"
   E2E_SKIP=$((E2E_SKIP + 1))
+}
+
+# ---------------------------------------------------------------------------
+# e2e_step_begin / e2e_step_end <step> <requirement-id...>
+#   Wrap a spec step that `proves:` requirements. e2e_step_end appends one line
+#   per id to ${E2E_WORKDIR}/steps: `step=<n> status=<pass|fail|skip> req=<id>`.
+#   fail: a block, wait or assertion in the step failed. skip: the step ran
+#   nothing (run: none). report.py builds the Requirements table from the file.
+#   A step the driver never finished (timeout, interrupt) writes no line.
+# ---------------------------------------------------------------------------
+E2E_STEP_PASS0=0; E2E_STEP_FAIL0=0; E2E_STEP_SKIP0=0
+e2e_step_begin() {
+  E2E_STEP_PASS0=$E2E_PASS; E2E_STEP_FAIL0=$E2E_FAIL; E2E_STEP_SKIP0=$E2E_SKIP
+}
+
+e2e_step_end() {
+  local n="$1" status=pass id; shift
+  if (( E2E_FAIL > E2E_STEP_FAIL0 )); then status=fail
+  elif (( E2E_PASS == E2E_STEP_PASS0 && E2E_SKIP > E2E_STEP_SKIP0 )); then status=skip
+  fi
+  for id in "$@"; do
+    printf 'step=%s status=%s req=%s\n' "$n" "$status" "$id" >>"${E2E_WORKDIR}/steps"
+  done
 }
 
 # ---------------------------------------------------------------------------

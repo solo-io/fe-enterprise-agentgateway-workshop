@@ -245,7 +245,7 @@ E2E_SPEC_DIR="$FIX" "$RUNNER" fx/midfail --no-prompt >/dev/null 2>&1
 E2E_SPEC_DIR="$FIX" "$RUNNER" fx/midnotfound --no-prompt >/dev/null 2>&1
 [[ "$(outcome_of midfail)" == *"cleanup_fail=1" ]] && grep -qx "CLEANUP BLOCK FAILED: fx/midfail" "${TMP}/work/leftovers.txt" 2>/dev/null \
   && ok "a failed command before the last cleanup line is reported" || fail "midfail outcome: '$(outcome_of midfail)'"
-[[ "$(outcome_of midnotfound)" != *cleanup_fail* ]] && ! grep -q midnotfound "${TMP}/work/leftovers.txt" 2>/dev/null \
+[[ "$(outcome_of midnotfound)" != *cleanup_fail* ]] && ! grep -q "CLEANUP.*midnotfound" "${TMP}/work/leftovers.txt" 2>/dev/null \
   && ok "a NotFound in cleanup is not a failure" || fail "midnotfound outcome: '$(outcome_of midnotfound)'"
 
 # A timed-out lab whose cleanup is killed is listed once under leftovers.
@@ -283,6 +283,82 @@ rm -f "${TMP}/gw"
 grep -qx "BASELINE DRIFT: fx/drifter" "${TMP}/work/leftovers.txt" 2>/dev/null \
   && ok "single-lab drift written to leftovers.txt" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
 [[ "$(outcome_of drifter)" == "status=fail "*"drift=1" ]] && ok "drift=1 in the outcome" || fail "drifter outcome: '$(outcome_of drifter)'"
+
+# Shipped labs get the leftover snapshot too, as a warning that never fails the lab.
+# mkfix's probe can append to the stub's cluster-scoped listing (${TMP}/snap).
+printf 'namespace/default\n' > "${TMP}/snap"
+mkfix leaver t0 "" 30 'echo "namespace/left-behind" >> "$E2E_TEST_SNAP"; echo hi' hi
+rm -f "${TMP}/work/leftovers.txt"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" fx/leaver --no-prompt 2>&1)"; rc=$?
+[[ $rc == 0 && "$out" == *"LEFTOVER (warning): namespace/left-behind"* && "$out" != *"LEFTOVER: "* ]] \
+  && ok "a shipped leftover prints a warning and the run passes" || fail "leaver (rc=$rc): $(printf '%s' "$out" | tail -4)"
+[[ "$(outcome_of leaver)" == "status=pass rc=0 "*" leftover_warn=1" ]] && ok "outcome records leftover_warn=1" \
+  || fail "leaver outcome: '$(outcome_of leaver)'"
+grep -qx "LEFTOVER (warning): namespace/left-behind (left by fx/leaver)" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "shipped leftover noted in leftovers.txt with its lab" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --no-prompt >/dev/null 2>&1
+[[ "$(outcome_of passme)" == "status=pass rc=0 "*" leftover_warn=0" ]] && ok "a clean shipped lab records leftover_warn=0" \
+  || fail "passme outcome: '$(outcome_of passme)'"
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/failme --no-prompt >/dev/null 2>&1
+[[ "$(outcome_of failme)" == "status=fail "*" leftover_warn=0" ]] && ok "a failed shipped lab is still checked for leftovers" \
+  || fail "failme outcome: '$(outcome_of failme)'"
+rm -f "${TMP}/snap" "${TMP}/work/leftovers.txt"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --no-prompt 2>&1)"; rc=$?
+[[ $rc == 0 && "$out" == *"LEFTOVER CHECK NOT RUN (warning): fx/passme"* \
+   && "$(outcome_of passme)" == "status=pass "*"leftover_check=not-run" && "$(outcome_of passme)" != *leftover_warn* ]] \
+  && ok "a failed shipped snapshot warns, records leftover_check=not-run, and passes" \
+  || fail "shipped NOT RUN (rc=$rc): '$(outcome_of passme)' $(printf '%s' "$out" | tail -2)"
+grep -q "^LEFTOVER (warning): check not run after fx/passme" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "shipped NOT RUN listed as a warning" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
+rm -f "${TMP}/work/leftovers.txt"
+
+# A shipped spec with requirements: each proving step records its result and the
+# report lists one row per requirement.
+cat > "${FIX}/fx/reqs.yaml" <<YAML
+lab: ${LAB}
+description: fixture reqs
+tier: t0
+requires: []
+timeout: 30
+requirements:
+  - id: R1
+    text: the first check holds
+  - id: R2
+    text: the second check holds
+  - id: R3
+    text: the parked check
+steps:
+  - probe: "first"
+    proves: [R1]
+    script: |
+      echo hi
+    assert:
+      - contains: "hi"
+  - probe: "second"
+    proves: [R2]
+    script: |
+      echo hi
+    assert:
+      - contains: "nope"
+  - probe: "no proof"
+    script: |
+      echo hi
+YAML
+printf 'namespace/default\n' > "${TMP}/snap"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" fx/reqs --no-prompt --report="${TMP}/reqrpt" 2>&1)"; rc=$?
+[[ "$(cat "${TMP}/work/fx/reqs/steps" 2>/dev/null)" == $'step=1 status=pass req=R1\nstep=2 status=fail req=R2' ]] \
+  && ok "proving steps record step=<n> status=<s> req=<id>" || fail "steps: $(cat "${TMP}/work/fx/reqs/steps" 2>/dev/null)"
+RMD="$(ls "${TMP}"/reqrpt/*.md 2>/dev/null | head -1)"
+grep -qxF "| R1 | the first check holds | PASS |" "$RMD" 2>/dev/null && grep -qxF "| R2 | the second check holds | FAIL |" "$RMD" \
+  && grep -qxF "| R3 | the parked check | FAIL |" "$RMD" \
+  && ok "the report has one PASS/FAIL row per requirement" || fail "requirements in report: $(grep '^| R' "$RMD" 2>/dev/null)"
+# Declined: the old step records go, and every requirement row is SKIP.
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/reqs --skip fx/reqs --no-prompt --report="${TMP}/reqrpt2" >/dev/null 2>&1
+RMD="$(ls "${TMP}"/reqrpt2/*.md 2>/dev/null | head -1)"
+[[ ! -e "${TMP}/work/fx/reqs/steps" ]] && grep -qxF "| R1 | the first check holds | SKIP |" "$RMD" 2>/dev/null \
+  && ok "a declined lab drops old step records and its requirements are SKIP" \
+  || fail "declined reqs: $(grep '^| R' "$RMD" 2>/dev/null)"
+rm -rf "${TMP}/reqrpt" "${TMP}/reqrpt2" "${TMP}/snap"
 
 # --uninstall-base compares against the record --install-base wrote.
 mkdir -p "${FIX}/_base"
@@ -337,6 +413,10 @@ rm -f "${TMP}/work/leftovers.txt"
 out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" --uninstall-base 2>&1)"; rc=$?
 [[ $rc == 0 && "$out" == *"Baseline removed."* && ! -e "$REC" ]] && ok "clean uninstall exits 0 and removes the record" \
   || fail "clean uninstall (rc=$rc): $(printf '%s' "$out" | tail -5)"
+# The _base labs take no leftover snapshot: the uninstall does its own check.
+[[ "$out" != *"LEFTOVER"* && ! -e "${TMP}/work/_base/901-uninstall-monitoring/snapshot.err" \
+   && "$(cat "${TMP}/work/_base/902-uninstall-agentgateway/outcome")" != *leftover* ]] \
+  && ok "the uninstall's _base labs take no leftover snapshot" || fail "uninstall snapshot: $(grep LEFTOVER <<<"$out")"
 
 # No record: nothing is removed.
 rm -rf "${TMP}/work/leftovers.txt" "${TMP}/work/_base"
@@ -410,6 +490,12 @@ printf 'namespace/default\n' > "${TMP}/snap"  # the leftover check needs a clust
 run "--custom runs the fixture and keys it custom/demo" 0 "1 PASS" --custom demo --no-prompt
 [[ -f "${E2E_WORK_ROOT}/custom/demo/outcome" ]] && grep -q "status=pass" "${E2E_WORK_ROOT}/custom/demo/outcome" \
   && ok "custom outcome at custom/demo" || fail "custom outcome at custom/demo"
+[[ "$(cat "${E2E_WORK_ROOT}/custom/demo/outcome")" != *leftover_warn* ]] \
+  && ok "a custom lab records no leftover_warn" || fail "custom outcome: $(cat "${E2E_WORK_ROOT}/custom/demo/outcome")"
+out="$("$RUNNER" --custom demo --report-only="${TMP}/custrpt" 2>&1)"
+grep -qxF "| R1 | the route answers | PASS |" "$(printf '%s\n' "$out" | grep '\.md$')" 2>/dev/null \
+  && ok "the custom report has a PASS row per requirement" || fail "custom requirements: $out"
+rm -rf "${TMP}/custrpt"
 run "--custom rejects a path as the name" 1 "--custom needs a name" --custom ../x --no-prompt
 run "--custom rejects a flag as the name" 1 "--custom needs a name" --custom --lint
 run "--custom rejects --list" 1 "--custom and --list are mutually exclusive" --custom demo --list

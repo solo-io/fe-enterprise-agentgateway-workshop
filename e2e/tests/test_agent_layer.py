@@ -21,6 +21,58 @@ def user_files():
     return files
 
 
+def harness_tools():
+    """The harness tools an agent runs: run-e2e.sh, e2e/lib/*.py and *.sh, mint-kubeconfig.sh."""
+    tools = [ROOT / "e2e/run-e2e.sh", ROOT / "rbac/mint-kubeconfig.sh"]
+    tools += sorted((ROOT / "e2e/lib").glob("*.py")) + sorted((ROOT / "e2e/lib").glob("*.sh"))
+    return tools
+
+
+# A flag a shell tool parses is a `case` pattern: `--out) ...`, `-h|--help)`, `--report=*)`.
+SH_CASE = re.compile(r"(?m)^\s*([-a-z|=*]+)\)")
+# A flag a Python tool parses is a quoted literal: add_argument("--work") or `a == "--custom"`.
+PY_FLAG = re.compile(r"""["'](--[a-z][a-z-]*)["']""")
+# A flag on a skill line: `--x` after start of line, a space, a backtick, `(` or `[`.
+LINE_FLAG = re.compile(r"(?:^|(?<=[ `(\[]))(--[a-z][a-z-]*)")
+
+
+def tool_flags(path):
+    text = path.read_text()
+    if path.suffix == ".py":
+        return set(PY_FLAG.findall(text))
+    flags = set()
+    for pattern in SH_CASE.findall(text):
+        for alt in pattern.split("|"):
+            alt = alt.split("=", 1)[0]
+            if re.fullmatch(r"--[a-z][a-z-]*", alt):
+                flags.add(alt)
+    return flags
+
+
+def agent_lines():
+    for f in sorted((ROOT / "skills").glob("*/SKILL.md")) + [ROOT / "AGENTS.md"]:
+        for n, line in enumerate(f.read_text().splitlines(), 1):
+            yield f"{f.relative_to(ROOT)}:{n}", line
+
+
+def command_units():
+    """(where, text) for each command an agent file shows: a line inside a ``` fence, or an
+    inline `code span` in prose. A flag belongs to the tool named in the same unit, so prose
+    like "`session-log.sh add run` ... without `--keep`" does not pin --keep on session-log.sh."""
+    for f in sorted((ROOT / "skills").glob("*/SKILL.md")) + [ROOT / "AGENTS.md"]:
+        fenced = False
+        for n, line in enumerate(f.read_text().splitlines(), 1):
+            where = f"{f.relative_to(ROOT)}:{n}"
+            if line.lstrip().startswith("```"):
+                fenced = not fenced
+                continue
+            if fenced:
+                yield where, line
+            else:
+                for span in re.findall(r"`([^`]+)`", line):
+                    yield where, span
+
+
 class AgentLayer(unittest.TestCase):
     def test_mcp_json_has_only_solo_knowledge(self):
         data = json.loads(read(".mcp.json"))
@@ -60,8 +112,8 @@ class AgentLayer(unittest.TestCase):
 
     def test_agents_md_has_four_hard_rules_and_codex_snippet(self):
         text = read("AGENTS.md")
-        for rule in ["Never leave anything behind.", "Nothing about the cluster leaves the cluster.",
-                     "Least privilege.", "Stop on failure, do not improvise."]:
+        for rule in ["Never leave anything behind.", "No cluster data leaves the machine except through the user's model provider.",
+                     "Scoped, reviewable identity.", "Stop on failure, do not improvise."]:
             self.assertIn(rule, text)
         self.assertIn("[mcp_servers.solo-knowledge]", text)
         self.assertIn('url = "https://knowledge-base.soloio-field.com/mcp"', text)
@@ -152,7 +204,7 @@ class AgentLayer(unittest.TestCase):
                        "--custom <name> --report-only", "get_crd_schema", "requirements:", "proves:",
                        "labdoc.py sections", "style-guide.md", "diagnose-failure", "ask-the-docs",
                        "session-log.sh add run", "session-log.sh add keep-custom", "Accepted",
-                       "No cluster command runs before the user approves the proposal."]:
+                       "Nothing is written beyond `CHANGES.md`, and no cluster command runs, before the user approves the proposal."]:
             self.assertIn(needle, text)
 
     def test_adapt_command_points_at_skill(self):
@@ -168,7 +220,7 @@ class AgentLayer(unittest.TestCase):
         text = read("skills/contribute-lab/SKILL.md")
         for needle in ["gh auth status", "git status --porcelain", "e2e/lib/scrub.py", "--from-changes",
                        "e2e/lib/promote.py", "--record", "--undo", "--dry-run", "--lint",
-                       "see CHANGELOG (X.Y.Z)", "gh pr create --base main", "git push -u origin",
+                       "see CHANGELOG (X.Y.Z)", "gh pr create --repo solo-io/fe-enterprise-agentgateway-workshop --base main", "git push -u origin",
                        "style-guide.md", "Nothing is pushed until the user says yes to the diff.",
                        "custom-labs/<name>/", "never edited", "main...X.Y.Z", "staged.patch"]:
             self.assertIn(needle, text)
@@ -184,8 +236,39 @@ class AgentLayer(unittest.TestCase):
 
     def test_agents_md_names_three_modes(self):
         text = read("AGENTS.md")
-        for needle in ["Evaluate (`skills/evaluate/SKILL.md`", "Adapt (`skills/adapt-lab/SKILL.md`", "Contribute\n(`skills/contribute-lab/SKILL.md`", "/contribute-lab", "manifest"]:
+        for needle in ["Evaluate (`skills/evaluate/SKILL.md`", "Adapt (`skills/adapt-lab/SKILL.md`", "Contribute (`skills/contribute-lab/SKILL.md`", "/contribute-lab", "manifest"]:
             self.assertIn(needle, text)
+
+    def test_tool_flag_parsers_find_known_flags(self):
+        # Guards the parsers below: if they stop finding flags, the generic check passes vacuously.
+        self.assertTrue({"--track", "--custom", "--report", "--report-only", "--uninstall-base", "--help"}
+                        <= tool_flags(ROOT / "e2e/run-e2e.sh"))
+        self.assertTrue({"--out", "--skip-rbac-check"} <= tool_flags(ROOT / "e2e/lib/detect-env.sh"))
+        self.assertTrue({"--from-changes", "--summary"} <= tool_flags(ROOT / "e2e/lib/scrub.py"))
+        self.assertIn("--custom", tool_flags(ROOT / "e2e/lib/labdoc.py"))
+        self.assertIn("--duration", tool_flags(ROOT / "rbac/mint-kubeconfig.sh"))
+
+    def test_every_flag_on_a_tool_line_exists_in_that_tool(self):
+        flags = {t: tool_flags(t) for t in harness_tools()}
+        bad, checked = [], 0
+        for where, unit in command_units():
+            named = [t for t in flags if t.name in unit]
+            if not named:
+                continue
+            for flag in sorted(set(LINE_FLAG.findall(unit))):
+                checked += 1
+                if not any(flag in flags[t] for t in named):
+                    bad.append(f"{where}: {flag} ({', '.join(t.name for t in named)})")
+        self.assertGreater(checked, 20, "the check found almost no flags; the unit parser is broken")
+        self.assertEqual(bad, [], "flags a skill passes to a harness tool that does not parse them")
+
+    def test_every_harness_path_the_skills_name_exists(self):
+        missing = set()
+        for where, line in agent_lines():
+            for p in re.findall(r"(?:e2e/lib|rbac)/[A-Za-z0-9_.-]+\.(?:sh|py|yaml|md)", line):
+                if not (ROOT / p).is_file():
+                    missing.add(f"{where}: {p}")
+        self.assertEqual(sorted(missing), [])
 
     def test_no_prospect_and_no_em_dash_in_agent_files(self):
         for f in user_files():
