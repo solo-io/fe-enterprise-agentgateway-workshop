@@ -12,14 +12,6 @@ Before starting this workshop, you will need:
 
 See [System Requirements](labs/installation/system-requirements.md) for detailed cluster sizing, version support, and resource recommendations.
 
-## Alpha: Evaluate with an agent
-
-An AI agent can run the LLM or MCP track against your own cluster, explain each lab, and write a local report. To start it from the repo root, run `/evaluate` in Claude Code, or tell Codex to read `AGENTS.md` and run the evaluate skill. See [AGENTS.md](AGENTS.md) for prerequisites, the identity to run as, and the hard rules the agent follows.
-
-The same agent can also build a custom lab for your own scenario. Run `/adapt-lab` in Claude Code, or tell Codex to read `AGENTS.md` and run the adapt-lab skill, then name the labs to start from or describe what you need. The agent writes a proposal, waits for your approval, then writes a lab and an e2e spec under `custom-labs/<name>/` and runs the spec on your cluster until every requirement passes. The folder is gitignored and stays on your machine.
-
-To contribute a custom lab back to the workshop, run `/contribute-lab <name>` in Claude Code, or tell Codex to read `AGENTS.md` and run the contribute-lab skill; the agent commits the lab on a new version branch, shows you the diff, and pushes only when you say yes.
-
 # Table of Contents
 
 - [Installation](#installation)
@@ -240,6 +232,16 @@ To contribute a custom lab back to the workshop, run `/contribute-lab <name>` in
 - [LLM Access, Centralized: The Platform as Provider](labs/platform-engineering/centralized-llm-ops-helm-chart.md): LLM backends are a vendor relationship, so the platform runs LLM consumption as an internal product: a model-alias catalog, per-team API keys and token budgets, one chart, no self-service
 - [Networking Architecture: Every Connection in a Single-Cluster Install](labs/platform-engineering/networking-architecture.md): how the controller, proxies, extension services, and observability stack communicate: every port, protocol, and initiator, with a connection reference table for firewall and NetworkPolicy planning
 - [Admission Control with Kyverno](labs/platform-engineering/kyverno-admission-control.md)
+
+---
+
+## Alpha: Evaluate with an agent
+
+An AI agent can run the LLM or MCP track against your own cluster, explain each lab, and write a local report. To start it from the repo root, run `/evaluate` in Claude Code, or tell Codex to read `AGENTS.md` and run the evaluate skill. See [AGENTS.md](AGENTS.md) for prerequisites, the identity to run as, and the hard rules the agent follows.
+
+The same agent can also build a custom lab for your own scenario. Run `/adapt-lab` in Claude Code, or tell Codex to read `AGENTS.md` and run the adapt-lab skill, then name the labs to start from or describe what you need. The agent writes a proposal, waits for your approval, then writes a lab and an e2e spec under `custom-labs/<name>/` and runs the spec on your cluster until every requirement passes. The folder is gitignored and stays on your machine.
+
+To contribute a custom lab back to the workshop, run `/contribute-lab <name>` in Claude Code, or tell Codex to read `AGENTS.md` and run the contribute-lab skill; the agent commits the lab on a new version branch, shows you the diff, and pushes only when you say yes.
 
 ---
 
