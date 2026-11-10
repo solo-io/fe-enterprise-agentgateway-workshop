@@ -138,7 +138,8 @@ class AgentLayer(unittest.TestCase):
         self.assertIn("## Alpha: Evaluate with an agent", text)
         self.assertIn("[AGENTS.md](AGENTS.md)", text)
         self.assertIn("`/evaluate`", text)
-        self.assertLess(text.index("## Alpha: Evaluate with an agent"), text.index("# Table of Contents"))
+        self.assertLess(text.index("# Table of Contents"), text.index("## Alpha: Evaluate with an agent"))
+        self.assertLess(text.index("## Alpha: Evaluate with an agent"), text.index("# Use Cases"))
 
     def test_command_file(self):
         text = read(".claude/commands/evaluate.md")
@@ -183,7 +184,7 @@ class AgentLayer(unittest.TestCase):
 
     def test_agents_md_names_three_modes(self):
         text = read("AGENTS.md")
-        for needle in ["Three modes", "skills/contribute-lab/SKILL.md", "/contribute-lab", "manifest"]:
+        for needle in ["Evaluate (`skills/evaluate/SKILL.md`", "Adapt (`skills/adapt-lab/SKILL.md`", "Contribute\n(`skills/contribute-lab/SKILL.md`", "/contribute-lab", "manifest"]:
             self.assertIn(needle, text)
 
     def test_no_prospect_and_no_em_dash_in_agent_files(self):

@@ -1,6 +1,6 @@
 # Changelog
 
-0.15.3 - (11-9-26)
+0.15.3 - (11-10-26)
 ---
 - Add an evaluation agent (Alpha): an AI agent (Claude Code or Codex) runs the workshop labs against a user-provided cluster. `AGENTS.md` holds the rules and how to start, the skills are in `skills/`, the commands in `.claude/commands/`, `.mcp.json` adds the Solo docs server, and the README section `## Alpha: Evaluate with an agent` points at `AGENTS.md`
   - `/evaluate`: runs the LLM or MCP track in use-case order, explains each lab before it runs, stops on the first failure, cleans up every lab and the base install, and writes a local report

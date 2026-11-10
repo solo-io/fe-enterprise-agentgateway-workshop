@@ -20,8 +20,8 @@ The `escalate` and `bind` rules name the chart release names and namespaces that
 
 ## Coverage
 
-The role was derived by running `--install-base`, `--track llm`,
-`--track mcp`, and `--uninstall-base`. Labs outside those tracks (Kyverno,
+The role grants what `--install-base`, `--track llm`,
+`--track mcp`, and `--uninstall-base` need. Labs outside those tracks (Kyverno,
 inference, HPA, networking) return forbidden errors as the evaluator; run them
 as an admin or add rules.
 

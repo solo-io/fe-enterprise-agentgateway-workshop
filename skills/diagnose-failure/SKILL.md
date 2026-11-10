@@ -5,7 +5,7 @@ description: Handle a lab that exited non-zero. Read the failing block, explain 
 
 # Diagnose a failed lab
 
-The harness has already stopped the lab. `<key>` is the lab key, for example `mcp/in-cluster-mcp`. Do exactly these five steps.
+The harness has already stopped the lab. `<key>` is the lab key, for example `mcp/in-cluster-mcp`. Do these steps, in order, and nothing else.
 
 1. Read the failing block, its captured output, and the lab's expected output from `e2e/.work/<key>/`: `e2e/.work/<key>/driver.sh` is the generated script, `blocks/NNNN.sh` is each block, `blocks/NNNN.out` is its output, `result` is the pass/fail line, and `outcome` is the recorded outcome. Then record the failure:
 

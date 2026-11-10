@@ -28,7 +28,7 @@ passing assertions than the last one, with nothing removed, means coverage
 stopped running.
 
 `--lint` also runs `e2e/lib/conventions.py` against every README/tracks/labs
-markdown file. It checks five things: relative `.md` links resolve, every
+markdown file. It checks that relative `.md` links resolve, every
 `export GATEWAY_IP=$(kubectl get svc ...)` block matches the canonical form in
 style-guide.md §6 byte-for-byte (labs with a legitimate different Gateway are
 allowlisted in `GATEWAY_IP_ALLOW`), every lab has a `Cleanup` section at heading level 2 or 3
@@ -96,8 +96,8 @@ only and never see `custom-labs/`.
 ### Contributing a custom lab
 
 The contribute-lab skill (`/contribute-lab <name>`) turns a custom lab that
-passed into a shipped lab on a new version branch. Two tools do the mechanical
-work, and both run on a staging copy at `e2e/.work/contribute/<name>/stage/`,
+passed into a shipped lab on a new version branch. `scrub.py` and `promote.py` do the mechanical
+work on a staging copy at `e2e/.work/contribute/<name>/stage/`,
 so `custom-labs/<name>/` stays as the user left it:
 
 ```bash
@@ -181,7 +181,7 @@ Field reads use `resource:` instead of a probe:
   name: proxy is scaled out        # optional label
 ```
 
-Reserve `probe:` for genuinely imperative verification (MCP protocol
+Reserve `probe:` for imperative verification (MCP protocol
 drives, browser-verified labs, multi-step curl flows).
 
 ## Things that will bite you
@@ -272,8 +272,7 @@ the lab's relative paths keep working unchanged. See `routing/openai-audio`.
 replayed by a real shell, so `kubectl apply -f - <<EOF` with `\\s` in a YAML
 double-quoted scalar collapses to `\s` and kubectl rejects it:
 `error converting YAML to JSON: found unknown escape character`. Quote it
-(`<<'EOF'`) as `builtin-guardrails` does. This is a lab bug, not a harness
-limitation: the reader hits it too. `security/WAF` Use Case D shipped this way.
+(`<<'EOF'`) as `builtin-guardrails` does. Readers hit this bug too, so fix it in the lab.
 
 **Never run two suite invocations against one cluster.** The labs share one
 Gateway, and several attach Gateway-scoped policies while they run: `virtual-keys`
@@ -298,8 +297,8 @@ single call, and allow ~10s of settle after the policy attaches.
 **The baseline-integrity guard fingerprints the shared Gateway** on
 `listeners[*].port` plus `infrastructure.parametersRef.name`, before and after
 every lab. It names the lab that changed either one and re-patches the
-`parametersRef`; leftover HTTPRoutes and policies are reported for manual
-cleanup. A full `kubectl apply` of the shared Gateway drops `parametersRef`,
+`parametersRef`; it reports leftover HTTPRoutes and policies for you to
+clean up. A full `kubectl apply` of the shared Gateway drops `parametersRef`,
 which detaches the params and freezes the proxy replica count. A lab that needs
 its own listener should patch one in and remove it on Cleanup, as
 `security/tls-termination` and `security/frontend-mtls` do.
@@ -319,7 +318,7 @@ its own listener should patch one in and remove it on Cleanup, as
 
 `lib.sh` exports `e2e_mcp_init`, `_rpc`, `_tool`, `_tools`, `_status`, and
 `_expect`; use them rather than hand-rolling JSON-RPC. `e2e_mcp_expect <needle>
-present|absent <cmd...>` polls, which took `in-cluster-mcp` from 77s to 51s.
+present|absent <cmd...>` polls until the needle appears or disappears.
 
 - The gateway answers MCP over `text/event-stream`, so bodies arrive as
   `data: {...}`. Strip the prefix with `sed -n 's/^data: //p'` before any JSON
