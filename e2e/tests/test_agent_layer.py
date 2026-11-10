@@ -135,10 +135,10 @@ class AgentLayer(unittest.TestCase):
 
     def test_readme_links_to_agents_md(self):
         text = read("README.md")
-        self.assertIn("## Evaluate with an agent", text)
+        self.assertIn("## Alpha: Evaluate with an agent", text)
         self.assertIn("[AGENTS.md](AGENTS.md)", text)
         self.assertIn("`/evaluate`", text)
-        self.assertLess(text.index("## Evaluate with an agent"), text.index("# Table of Contents"))
+        self.assertLess(text.index("## Alpha: Evaluate with an agent"), text.index("# Table of Contents"))
 
     def test_command_file(self):
         text = read(".claude/commands/evaluate.md")

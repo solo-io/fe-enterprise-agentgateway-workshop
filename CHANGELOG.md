@@ -1,6 +1,6 @@
 # Changelog
 
-0.15.3 - (11-6-26)
+0.15.3 - (11-9-26)
 ---
 - Add an evaluation agent: an AI agent (Claude Code or Codex) runs the LLM or MCP track against a user-provided cluster, explains each lab, stops on failure, cleans up, and writes a local report
   - Agent layer: `AGENTS.md` (the four hard rules, prerequisites, identity, how to start), `skills/` (evaluate, detect-environment, explain-lab, diagnose-failure, ask-the-docs), `.mcp.json` for the Solo docs server, the `/evaluate` command, and a README section that points at `AGENTS.md`
