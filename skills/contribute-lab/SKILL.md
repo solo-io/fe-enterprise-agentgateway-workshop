@@ -238,7 +238,7 @@ python3 e2e/lib/promote.py <name> --record labs/installation/image-list.md   # o
 
 ## 4. Conform
 
-Work through `style-guide.md` §15 and its "Checklist when adding a lab". Change the lab only to conform it; never redesign its content. Edit only the promoted files and the files you recorded.
+Work through `style-guide.md` §15 and its "Checklist when adding a lab". Change the lab only to conform it; never redesign its content. Edit only the promoted files and the files you recorded. Check the lab's prose, the CHANGELOG bullets, and `pr-body.md` against `skills/stop-slop/SKILL.md`.
 
 - README: add a bullet under the category's `## <Category>` section in the form `- [Lab Title](labs/<category>/<name>.md) _(Provider)_`, with `labs/<category>/<name>/README.md` as the link target in subdir mode. When the lab spans categories, list it under each one with a reciprocal `_(see also: <Other Categories>)_`. Add a capability bullet under `# Use Cases`.
 - tracks: add a `| Lab | What you'll learn |` row to a `### Use Case` table in `tracks/llm-track.md` or `tracks/mcp-track.md` only when the lab fits an existing use case. Otherwise skip it and tell the user you skipped it.

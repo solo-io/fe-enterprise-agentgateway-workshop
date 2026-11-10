@@ -24,6 +24,9 @@ generic query, as `skills/ask-the-docs/SKILL.md` describes. Before writing any
 CRD YAML, read the schema with `get_crd_map` then `get_crd_schema` through
 `solo-knowledge`, and never emit a field the schema does not define.
 
+Write all prose by `skills/stop-slop/SKILL.md`: what you tell the user, lab
+text, `CHANGES.md`, commit messages, and PR bodies.
+
 Paid labs are allowed when the user supplies a provider key. List which labs
 will cost money before the run starts.
 
@@ -96,6 +99,7 @@ called from those three:
 - `skills/detect-environment/SKILL.md`: classify the cluster and read `e2e/.work/env.json`.
 - `skills/explain-lab/SKILL.md`: say what a lab proves before it runs.
 - `skills/diagnose-failure/SKILL.md`: what to do when a lab fails.
+- `skills/stop-slop/SKILL.md`: the rules for every piece of prose you write.
 - `skills/ask-the-docs/SKILL.md`: how to query the Solo docs server without leaking cluster data.
 
 ## Claude Code settings

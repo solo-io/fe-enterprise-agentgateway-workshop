@@ -90,6 +90,7 @@ labs/mcp/<lab-name>/
 
 ## 5. Tone and voice
 
+- Follow `skills/stop-slop/SKILL.md`: plain words, no filler, no em dashes, name the actor.
 - Second person, imperative, present tense: "Create one Secret per user...", "Send a request as alice:". Occasional "we"/"let's" in verification prose is fine ("We should see...").
 - **Why-first**: every config a reader would not guess gets a rationale *before* the command. Use a `### Why ...?` sub-header, a `> **Why ...?**` blockquote at the point of a surprising choice, or a comparison table. The strongest labs explain what the client *cannot* forge/override, what fails without the setting, and what error you'd see.
 - Be honest about limitations and report real observed numbers with versions: *"Observed result (v2026.6.1, `shutdown.max: 110`): `streams_completed`: 157, `streams_cut`: 3"*, including when the result is imperfect, with the explanation.

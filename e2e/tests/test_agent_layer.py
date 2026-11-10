@@ -6,7 +6,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SKILLS = ["evaluate", "detect-environment", "explain-lab", "diagnose-failure", "ask-the-docs", "adapt-lab",
-          "contribute-lab"]
+          "contribute-lab", "stop-slop"]
 INTERNAL = "support-agent" + "-tools"
 
 

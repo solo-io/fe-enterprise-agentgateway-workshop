@@ -6,6 +6,7 @@
   - `/evaluate`: runs the LLM or MCP track, explains each lab before it runs, stops on the first failure, cleans up every lab and the base install, and writes a local report
   - `/adapt-lab`: builds a custom lab from one or more shipped labs for your own requirements, proves each requirement on your cluster, and keeps the result in `custom-labs/<name>/` on your machine
   - `/contribute-lab`: turns a custom lab that passed into a shipped lab and a pull request, from a clone of this repo or of your fork, and pushes only after you approve the diff
+  - The agent writes its prose, labs, and pull requests by `skills/stop-slop/SKILL.md`: plain words, no filler, no em dashes
   - Nothing about your cluster goes to Solo: the agent sends only generic product questions to the Solo docs server, and the report stays on your machine
   - `rbac/evaluator.yaml` and `rbac/mint-kubeconfig.sh` set up an `agw-evaluator` identity for the agent with no wildcards. It is privilege-equivalent to cluster-admin, so use it on disposable clusters only
 - `001-install-enterprise-agentgateway.md` Uninstall: the optional Gateway API CRD removal is its own block

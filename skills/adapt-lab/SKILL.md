@@ -208,7 +208,7 @@ Remind them that the lab's Cleanup section removes it later. The kept configurat
 
 ## Writing the lab
 
-Follow `style-guide.md`. Use no em dashes, no filler words, and no commentary about the lab itself.
+Follow `style-guide.md` and `skills/stop-slop/SKILL.md`. Use no em dashes, no filler words, and no commentary about the lab itself.
 
 - Clone the skeleton of the closest source lab: title, Pre-requisites boilerplate, Lab Objectives, steps, Observability, Cleanup. Each step is why-prose, a command block, then verification with `Expected output:`.
 - Depend on labs 001 and 002 only. Deploy anything else the lab needs, including an in-cluster IdP, and remove it in Cleanup.

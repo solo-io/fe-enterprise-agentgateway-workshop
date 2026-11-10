@@ -12,4 +12,4 @@ Given a lab key such as `routing/configure-routing-openai`:
 3. Say in three to five sentences what capability the lab proves and why a platform team cares. Base it on those sources and use the user's own words for their goals if they gave any.
 4. Cite the lab path once, for example `labs/routing/configure-routing-openai.md`, so they can read it themselves.
 
-Do not paste YAML, commands, or lab steps unless the user asks. If the lab needs a paid provider key, say so in the last sentence.
+Write the explanation by `skills/stop-slop/SKILL.md`. Do not paste YAML, commands, or lab steps unless the user asks. If the lab needs a paid provider key, say so in the last sentence.
