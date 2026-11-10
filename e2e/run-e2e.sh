@@ -24,6 +24,10 @@
 #   ./e2e/run-e2e.sh --custom <name> --lint   # lint that one custom lab, run nothing
 #   ./e2e/run-e2e.sh --custom <name> --keep   # skip its Cleanup blocks, leave the resources up
 #
+# A custom lab's run files (outcome, steps, blocks/, driver.sh, leftovers.txt)
+# go to custom-labs/<name>/.work/run/, inside the lab's own folder, so deleting
+# custom-labs/<name>/ removes them too. A shipped lab's go to e2e/.work/<key>/.
+#
 # E2E_SPEC_TIMEOUT=<secs> in the environment overrides every spec's timeout
 # (used to force a timeout failure on a real lab).
 #
@@ -40,6 +44,8 @@ REPO_ROOT="$(cd "${E2E_DIR}/.." && pwd)"
 SPEC_DIR="${E2E_SPEC_DIR:-${E2E_DIR}/specs}"
 # User-owned labs (gitignored), one directory per lab: <name>/<lab>.md + spec.yaml.
 CUSTOM_ROOT="${E2E_CUSTOM_ROOT:-${REPO_ROOT}/custom-labs}"
+# Absolute, so a custom lab's work dir (custom-labs/<name>/.work/run) holds when a block changes directory.
+[[ "$CUSTOM_ROOT" == /* ]] || CUSTOM_ROOT="${PWD}/${CUSTOM_ROOT}"
 CUSTOM_NAME=""
 WORK_ROOT="${E2E_WORK_ROOT:-${E2E_DIR}/.work}"
 LABDOC="${E2E_DIR}/lib/labdoc.py"
@@ -235,8 +241,16 @@ E2E_IN_GRACE=0
 E2E_CURRENT_START=0
 E2E_CLEANUP_KILLED=0   # run_with_timeout already wrote CLEANUP INCOMPLETE for this lab
 
+# key_dir <key>: a lab's work directory. custom/<name> lives in the custom lab's
+#   own folder, custom-labs/<name>/.work/run; any other key in ${WORK_ROOT}/<key>.
+#   Keep in step with key_dir() in e2e/lib/report.py.
+key_dir() {
+  if [[ "$1" == custom/* ]]; then printf '%s' "${CUSTOM_ROOT}/${1#custom/}/.work/run"
+  else printf '%s' "${WORK_ROOT}/$1"; fi
+}
+
 # write_outcome_file <key> <status> <rc> <duration> <requires> [only_on] [k=v...]
-#   One line per lab at ${WORK_ROOT}/<key>/outcome. The report builder reads it,
+#   One line per lab at $(key_dir <key>)/outcome. The report builder reads it,
 #   so the field names and status values are a contract. Optional trailing
 #   fields: drift=1, cleanup_fail=N|incomplete, reason=declined, keep=1,
 #   leftover=N (custom), leftover_warn=N (shipped), leftover_check=not-run.
@@ -246,8 +260,8 @@ write_outcome_file() {
   line="status=${status} rc=${rc} duration=${dur} requires=${req}"
   [[ -n "$only_on" ]] && line+=" only_on=${only_on}"
   (( $# )) && line+=" $*"
-  mkdir -p "${WORK_ROOT}/${key}"
-  printf '%s\n' "$line" > "${WORK_ROOT}/${key}/outcome"
+  mkdir -p "$(key_dir "$key")"
+  printf '%s\n' "$line" > "$(key_dir "$key")/outcome"
 }
 
 # custom_snapshot: the objects a lab could leave behind, one sorted line
@@ -438,7 +452,7 @@ run_lab() {
   E2E_CURRENT_KEY="$key"; E2E_CURRENT_START="$start"
   # Step results from an earlier run must not outlive a lab that returns
   # before its work dir is reset (declined, skipped, bad spec).
-  rm -f "${WORK_ROOT}/${key}/steps"
+  rm -f "$(key_dir "$key")/steps"
   # <status> <rc>: record the outcome, then clear the in-flight marker.
   local extra=()
   write_outcome() {
@@ -474,7 +488,7 @@ run_lab() {
     TOTAL_SKIP=$((TOTAL_SKIP+1)); SKIPPED+=("${key} (${E2E_SPEC_REQUIRES})"); write_outcome skip 0; return
   fi
 
-  local workdir="${WORK_ROOT}/${key}"
+  local workdir; workdir="$(key_dir "$key")"
   rm -rf "$workdir"; mkdir -p "$workdir/blocks"
   LEFTOVERS_FILE="${WORK_ROOT}/leftovers.txt"
   [[ "$key" == custom/* ]] && LEFTOVERS_FILE="${workdir}/leftovers.txt"

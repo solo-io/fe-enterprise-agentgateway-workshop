@@ -388,6 +388,33 @@ class TestRequirements(ReportCase):
         self.assertEqual(len(rows), 2)
         self.assertTrue(all(r.endswith("| PASS |") for r in rows), rows)
 
+    def test_custom_report_reads_the_run_in_the_lab_folder(self):
+        # run-e2e.sh writes a custom lab's outcome, steps and leftovers to
+        # custom-labs/<name>/.work/run, and the work root has no custom/ dir.
+        root = os.path.join(self.tmp.name, "custom-labs")
+        run = os.path.join(root, "demo", ".work", "run")
+        os.makedirs(run)
+        with open(os.path.join(root, "demo", "spec.yaml"), "w") as fh:
+            fh.write(self.REQ_SPEC)
+        with open(os.path.join(run, "outcome"), "w") as fh:
+            fh.write("status=pass rc=0 duration=5 requires= leftover=0\n")
+        with open(os.path.join(run, "steps"), "w") as fh:
+            fh.write("step=1 status=pass req=R1\nstep=2 status=pass req=R2\n")
+        with open(os.path.join(run, "leftovers.txt"), "w") as fh:
+            fh.write("LEFTOVER: agentgateway-system secret/x\n")
+        work = os.path.join(self.tmp.name, "empty-work")
+        os.makedirs(work)
+        proc = subprocess.run(
+            [sys.executable, os.path.join(LIB, "report.py"), "build", "--work", work, "--custom", "demo",
+             "--env-json", os.path.join(FIX, "env.json"), "--session", self.session, "--out", self.tmp.name,
+             "--custom-root", root], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        with open(proc.stdout.split()[0], encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("| custom/demo | PASS |", text)
+        self.assertEqual(len(requirement_rows_in(text)), 2)
+        self.assertIn("secret/x", text)
+
 
 class TestLeftoverWarnings(ReportCase):
     def test_warnings_get_their_own_section(self):

@@ -77,7 +77,8 @@ The keys are optional there, and recommended for new specs. When a shipped spec
 has them, `--lint` fails when a requirement has no proving step, a proving step
 has no `assert`, or a `proves` id is undeclared.
 
-Each step with `proves:` records its result in `e2e/.work/<key>/steps`, one line
+Each step with `proves:` records its result in `e2e/.work/<key>/steps` (for a custom lab,
+`custom-labs/<name>/.work/run/steps`), one line
 per id: `step=<n> status=<pass|fail|skip> req=<id>`. The report gives every lab
 whose spec declares requirements a table under `## Requirements`, one row per
 id that ends in its result: `| R1 | <text> | PASS |`. A requirement is `PASS`
@@ -104,8 +105,8 @@ the run. Objects with an owner (a Gateway's Deployment, a Deployment's
 ReplicaSet), Helm release secrets, and the controller's `enterprise-jwks-store-*`
 ConfigMaps are not counted, since the controller manages them. `LEFTOVER CHECK
 NOT RUN` means a snapshot failed, and that fails the run too; kubectl's stderr
-is in `e2e/.work/custom/<name>/snapshot.err`. A `--keep` run skips the check. Work files, including the run's own
-`leftovers.txt`, go to `e2e/.work/custom/<name>/`; a custom run never writes
+is in `custom-labs/<name>/.work/run/snapshot.err`. A `--keep` run skips the check. Work files, including the run's own
+`leftovers.txt`, go to `custom-labs/<name>/.work/run/`, inside the lab's folder; a custom run never writes
 the shared `e2e/.work/leftovers.txt`, and a `--track` run leaves custom files
 alone.
 
@@ -351,7 +352,8 @@ present|absent <cmd...>` polls until the needle appears or disappears.
 
 ## Debugging
 
-Every block and its captured output is kept under `e2e/.work/<lab>/`:
+Every block and its captured output is kept under `e2e/.work/<lab>/`, or
+`custom-labs/<name>/.work/run/` for a custom lab:
 
 ```
 e2e/.work/mcp/in-cluster-mcp/

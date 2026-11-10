@@ -11,7 +11,7 @@ Usage:
                   [--custom-root R]
       the single-row report for custom-labs/<name> (key custom/<name>), written as
       <stamp>-<class>-custom-<name>.md and .json; adds a Runs section. Reads
-      <work>/custom/<name>/leftovers.txt and only session events for that lab
+      custom-labs/<name>/.work/run/leftovers.txt and only session events for that lab
       or for no lab. The spec is <custom-root>/<name>/spec.yaml (default
       $E2E_CUSTOM_ROOT, else custom-labs/ at the repo root)
 
@@ -281,6 +281,17 @@ def track_use_cases(track, env_class, specs_dir, tracks_dir):
             for uc in data.get("use_cases") or []], statuses
 
 
+def key_dir(work, key, custom_root=None):
+    """A lab's work directory, as run-e2e.sh key_dir writes it. custom/<name> lives in
+    the custom lab's own folder, <custom root>/<name>/.work/run; a custom lab whose
+    files are still at <work>/custom/<name> (written before the move) is read there."""
+    if key.startswith("custom/"):
+        own = os.path.join(custom_root or DEFAULT_CUSTOM_ROOT, key[len("custom/"):], ".work", "run")
+        if os.path.isdir(own) or not os.path.isdir(os.path.join(work, key)):
+            return own
+    return os.path.join(work, key)
+
+
 def build_data(work, track, env_json, session, specs_dir, tracks_dir, custom=None, env_class=None,
                custom_root=None):
     try:
@@ -325,14 +336,14 @@ def build_data(work, track, env_json, session, specs_dir, tracks_dir, custom=Non
     for uc in ucs:
         labs = []
         for key in uc["keys"]:
-            outcome = parse_outcome(os.path.join(work, key, "outcome"))
+            outcome = parse_outcome(os.path.join(key_dir(work, key, custom_root), "outcome"))
             row = lab_row(key, outcome, deviations, specs_dir, plan_statuses.get(key, ""), stopped)
             labs.append(row)
             if key not in row_keys:
                 reqs, expected = spec_requirements(spec_path(key, specs_dir, custom_root))
                 if reqs:
                     requirements += requirement_rows(key, outcome, row, reqs, expected,
-                                                     read_steps(os.path.join(work, key, "steps")))
+                                                     read_steps(os.path.join(key_dir(work, key, custom_root), "steps")))
             row_keys.add(key)
             if row["result"] == "FAIL" and key not in failed_seen:
                 failed_seen.add(key)
@@ -363,7 +374,7 @@ def build_data(work, track, env_json, session, specs_dir, tracks_dir, custom=Non
         questions.append(pending)
     leftovers = []
     # A custom run writes its own leftovers file under its work directory.
-    leftovers_path = (os.path.join(work, "custom", custom, "leftovers.txt") if custom
+    leftovers_path = (os.path.join(key_dir(work, f"custom/{custom}", custom_root), "leftovers.txt") if custom
                       else os.path.join(work, "leftovers.txt"))
     try:
         with open(leftovers_path, encoding="utf-8") as fh:

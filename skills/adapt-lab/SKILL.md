@@ -7,7 +7,7 @@ description: Turn one or more shipped labs into a custom lab and spec for the us
 
 Work from the repo root. Follow the steps in order. The four hard rules in `AGENTS.md` apply throughout. One session builds one custom lab.
 
-A custom lab lives in `custom-labs/<name>/`, which is gitignored:
+A custom lab lives in `custom-labs/<name>/`, which is gitignored. Everything the harness writes for the lab stays in that folder, so deleting it removes the lab and all its run files:
 
 ```
 custom-labs/<name>/
@@ -16,6 +16,7 @@ custom-labs/<name>/
   CHANGES.md     source labs, deltas, requirement-to-assertion table
   reports/       written by --report-only
   assets/        optional files the lab applies
+  .work/run/     the last run: outcome, steps, driver.sh, blocks/, leftovers.txt
 ```
 
 Never edit a shipped lab under `labs/` or a shipped spec under `e2e/specs/`.
@@ -126,7 +127,7 @@ Write `custom-labs/<name>/<name>.md` following "Writing the lab" and `custom-lab
    ./e2e/run-e2e.sh --custom <name>
    ```
 
-   Read the outcome line from `e2e/.work/custom/<name>/outcome` and log it. Only `status=pass` in the outcome counts. A skip is not a pass.
+   Read the outcome line from `custom-labs/<name>/.work/run/outcome` and log it. Only `status=pass` in the outcome counts. A skip is not a pass.
 
    ```bash
    e2e/lib/session-log.sh add run custom/<name> "<outcome line>"

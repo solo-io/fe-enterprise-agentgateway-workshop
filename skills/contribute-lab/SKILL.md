@@ -154,10 +154,11 @@ e2e/lib/session-log.sh add decision custom/<name> "contribute started: <direct|f
 
 ## 2. Scrub
 
-Make the staging copy:
+Make the staging copy. It leaves out `custom-labs/<name>/.work/`, the lab's run files, which hold block output and logs:
 
 ```bash
-rm -rf e2e/.work/contribute/<name>/stage && cp -R custom-labs/<name> e2e/.work/contribute/<name>/stage
+rm -rf e2e/.work/contribute/<name>/stage && mkdir -p e2e/.work/contribute/<name>/stage
+(cd custom-labs/<name> && tar cf - --exclude ./.work .) | (cd e2e/.work/contribute/<name>/stage && tar xf -)
 ```
 
 Run the scanner on the lab, spec, CHANGES.md, and assets in the staging copy. Leave out the `assets` path when the lab has no assets:

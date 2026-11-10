@@ -476,7 +476,10 @@ echo "status=pass rc=0 duration=1 requires=" > "${TMP}/work/stale/lab/outcome"
 E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --no-prompt >/dev/null 2>&1
 [[ -e "${TMP}/work/stale/lab/outcome" ]] && ok "single-lab run leaves other outcomes" || fail "single-lab run cleared an outcome"
 
-# --custom <name>: run and lint one lab under custom-labs/ (fixtures here).
+# --custom <name>: run and lint one lab under custom-labs/. Lint reads the fixtures in place
+# (their spec's lab: is the fixture path); runs use a copy, since a run writes its files
+# into the lab's own folder, custom-labs/<name>/.work/run.
+FXC="${TMP}/fx/custom-labs"; rm -rf "$FXC"; mkdir -p "${TMP}/fx"; cp -R "${E2E}/tests/fixtures/custom-labs" "$FXC"
 export E2E_CUSTOM_ROOT="${E2E}/tests/fixtures/custom-labs"
 run "--custom needs a name" 1 "--custom needs a name" --custom
 run "--custom with missing spec" 1 "No custom lab at" --custom nope --no-prompt
@@ -487,11 +490,14 @@ run "--custom rejects --uninstall-base" 1 "--custom and --uninstall-base are mut
 run "--custom --lint passes the demo fixture" 0 "conventions: 1 file(s), 0 violation(s)" --custom demo --lint
 run "--custom --lint fails without Cleanup" 1 "no \`## Cleanup\` section" --custom nocleanup --lint
 printf 'namespace/default\n' > "${TMP}/snap"  # the leftover check needs a cluster snapshot
+export E2E_CUSTOM_ROOT="$FXC"
 run "--custom runs the fixture and keys it custom/demo" 0 "1 PASS" --custom demo --no-prompt
-[[ -f "${E2E_WORK_ROOT}/custom/demo/outcome" ]] && grep -q "status=pass" "${E2E_WORK_ROOT}/custom/demo/outcome" \
-  && ok "custom outcome at custom/demo" || fail "custom outcome at custom/demo"
-[[ "$(cat "${E2E_WORK_ROOT}/custom/demo/outcome")" != *leftover_warn* ]] \
-  && ok "a custom lab records no leftover_warn" || fail "custom outcome: $(cat "${E2E_WORK_ROOT}/custom/demo/outcome")"
+[[ -f "${FXC}/demo/.work/run/outcome" ]] && grep -q "status=pass" "${FXC}/demo/.work/run/outcome" \
+  && ok "custom outcome in the lab folder, custom-labs/demo/.work/run" || fail "custom outcome in custom-labs/demo/.work/run"
+[[ "$(cat "${FXC}/demo/.work/run/outcome")" != *leftover_warn* ]] \
+  && ok "a custom lab records no leftover_warn" || fail "custom outcome: $(cat "${FXC}/demo/.work/run/outcome")"
+[[ ! -e "${E2E_WORK_ROOT}/custom/demo" ]] && ok "a custom run writes nothing under e2e/.work/custom" \
+  || fail "a custom run wrote ${E2E_WORK_ROOT}/custom/demo"
 out="$("$RUNNER" --custom demo --report-only="${TMP}/custrpt" 2>&1)"
 grep -qxF "| R1 | the route answers | PASS |" "$(printf '%s\n' "$out" | grep '\.md$')" 2>/dev/null \
   && ok "the custom report has a PASS row per requirement" || fail "custom requirements: $out"
@@ -512,9 +518,9 @@ run "--custom rejects a dot in the name" 1 "--custom needs a name" --custom a.b 
 printf 'namespace/default\n' > "${TMP}/snap"
 echo "SHARED SENTINEL" > "${E2E_WORK_ROOT}/leftovers.txt"
 run "a leftover fails the run" 1 "LEFTOVER: namespace/left-behind" --custom leftover --no-prompt
-grep -q "^status=fail .*leftover=1" "${E2E_WORK_ROOT}/custom/leftover/outcome" \
-  && ok "outcome records status=fail leftover=1" || fail "outcome: $(cat "${E2E_WORK_ROOT}/custom/leftover/outcome")"
-grep -q "LEFTOVER: namespace/left-behind" "${E2E_WORK_ROOT}/custom/leftover/leftovers.txt" 2>/dev/null \
+grep -q "^status=fail .*leftover=1" "${FXC}/leftover/.work/run/outcome" \
+  && ok "outcome records status=fail leftover=1" || fail "outcome: $(cat "${FXC}/leftover/.work/run/outcome")"
+grep -q "LEFTOVER: namespace/left-behind" "${FXC}/leftover/.work/run/leftovers.txt" 2>/dev/null \
   && ok "leftover noted in the per-lab leftovers file" || fail "per-lab leftovers file"
 [[ "$(cat "${E2E_WORK_ROOT}/leftovers.txt")" == "SHARED SENTINEL" ]] \
   && ok "custom run leaves the shared leftovers file alone" || fail "shared leftovers: $(cat "${E2E_WORK_ROOT}/leftovers.txt")"
@@ -536,17 +542,17 @@ printf 'namespace/default\n' > "${TMP}/snap"
 out="$(E2E_STUB_GET_FAIL=1 "$RUNNER" --custom demo --no-prompt 2>&1)"; rc=$?
 [[ "$rc" -eq 1 && "$out" == *"LEFTOVER CHECK NOT RUN: custom/demo"* ]] \
   && ok "kubectl exit 1 with output fails the check" || fail "kubectl exit 1 (rc=$rc): $(printf '%s' "$out" | tail -3)"
-[[ -f "${E2E_WORK_ROOT}/custom/demo/snapshot.err" ]] && ok "NOT RUN keeps kubectl stderr in snapshot.err" || fail "snapshot.err missing"
-grep -q "^status=fail .*leftover_check=not-run" "${E2E_WORK_ROOT}/custom/demo/outcome" \
-  && ok "outcome records leftover_check=not-run" || fail "outcome: $(cat "${E2E_WORK_ROOT}/custom/demo/outcome")"
+[[ -f "${FXC}/demo/.work/run/snapshot.err" ]] && ok "NOT RUN keeps kubectl stderr in snapshot.err" || fail "snapshot.err missing"
+grep -q "^status=fail .*leftover_check=not-run" "${FXC}/demo/.work/run/outcome" \
+  && ok "outcome records leftover_check=not-run" || fail "outcome: $(cat "${FXC}/demo/.work/run/outcome")"
 printf 'namespace/default\n' > "${TMP}/snap"
 run "--keep skips cleanup" 0 "cleanup skipped (--keep)" --custom demo --keep --no-prompt
-grep -q "keep=1" "${E2E_WORK_ROOT}/custom/demo/outcome" && ok "outcome records keep=1" || fail "outcome records keep=1"
-grep -q "LEFTOVER CHECK SKIPPED" "${E2E_WORK_ROOT}/custom/demo/leftovers.txt" && ok "keep notes the skipped check" || fail "keep notes the skipped check"
-[[ -f "${E2E_WORK_ROOT}/custom/demo/result" ]] && ok "--keep still writes result" || fail "--keep still writes result"
+grep -q "keep=1" "${FXC}/demo/.work/run/outcome" && ok "outcome records keep=1" || fail "outcome records keep=1"
+grep -q "LEFTOVER CHECK SKIPPED" "${FXC}/demo/.work/run/leftovers.txt" && ok "keep notes the skipped check" || fail "keep notes the skipped check"
+[[ -f "${FXC}/demo/.work/run/result" ]] && ok "--keep still writes result" || fail "--keep still writes result"
 run "--track leaves custom outcomes alone" 0 "Resolving credentials" --track llm --env gke --resolve-creds --no-prompt
-[[ -f "${E2E_WORK_ROOT}/custom/demo/outcome" ]] && ok "custom outcome survives --track" || fail "custom outcome survives --track"
-[[ -f "${E2E_WORK_ROOT}/custom/leftover/leftovers.txt" ]] && ok "custom leftovers survive --track" || fail "custom leftovers survive --track"
+[[ -f "${FXC}/demo/.work/run/outcome" ]] && ok "custom outcome survives --track" || fail "custom outcome survives --track"
+[[ -f "${FXC}/leftover/.work/run/leftovers.txt" ]] && ok "custom leftovers survive --track" || fail "custom leftovers survive --track"
 unset E2E_CUSTOM_ROOT
 
 # The track reset is anchored to the work root: a work root whose own path
@@ -562,19 +568,19 @@ E2E_WORK_ROOT="$W2" "$RUNNER" --track mcp --env vind --resolve-creds --no-prompt
   || fail "track reset removed a custom outcome"
 
 # Hardening: an empty snapshot means kubectl failed, so the check does not run.
-export E2E_CUSTOM_ROOT="${E2E}/tests/fixtures/custom-labs"
+export E2E_CUSTOM_ROOT="$FXC"
 rm -f "${TMP}/snap" "${E2E_WORK_ROOT}/leftovers.txt"
 out="$("$RUNNER" --custom demo --no-prompt 2>&1)"; rc=$?
-grep -q "LEFTOVER CHECK NOT RUN: custom/demo (cluster snapshot failed)" "${E2E_WORK_ROOT}/custom/demo/leftovers.txt" 2>/dev/null \
-  && ok "empty snapshot notes LEFTOVER CHECK NOT RUN" || fail "empty snapshot: $(cat "${E2E_WORK_ROOT}/custom/demo/leftovers.txt" 2>/dev/null)"
+grep -q "LEFTOVER CHECK NOT RUN: custom/demo (cluster snapshot failed)" "${FXC}/demo/.work/run/leftovers.txt" 2>/dev/null \
+  && ok "empty snapshot notes LEFTOVER CHECK NOT RUN" || fail "empty snapshot: $(cat "${FXC}/demo/.work/run/leftovers.txt" 2>/dev/null)"
 [[ "$rc" -eq 1 ]] && ok "empty snapshot fails the run" || fail "empty snapshot rc=$rc"
 [[ "$out" != *"LEFTOVER: "* ]] && ok "empty snapshot reports no LEFTOVER line" || fail "empty snapshot printed LEFTOVER"
 printf 'namespace/default\n' > "${TMP}/snap"
 # A caller's E2E_KEEP must not make a run skip Cleanup. Block output lands in
 # the work dir, not on stdout, so look for the cleanup block's echo there.
-rm -rf "${E2E_WORK_ROOT}/custom/demo"
+rm -rf "${FXC}/demo/.work/run"
 out="$(E2E_KEEP=1 "$RUNNER" --custom demo --no-prompt 2>&1)"
-grep -qs "cleanup ran" "${E2E_WORK_ROOT}"/custom/demo/blocks/*.out && [[ "$out" != *"cleanup skipped"* ]] \
+grep -qs "cleanup ran" "${FXC}"/demo/.work/run/blocks/*.out && [[ "$out" != *"cleanup skipped"* ]] \
   && ok "caller E2E_KEEP is ignored" \
   || fail "caller E2E_KEEP: $(printf '%s' "$out" | tail -3)"
 unset E2E_CUSTOM_ROOT

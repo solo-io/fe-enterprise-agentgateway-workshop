@@ -128,6 +128,6 @@ agent following it.
 ## Output
 
 - Track reports: `reports/<YYYYMMDD-HHMMSS>-<class>-<track>.md` and `.json`, time in UTC, with `-1`, `-2` appended when the name exists. `reports/` is gitignored. A paid lab the user declined shows as `SKIP (declined)`.
-- Custom labs: `custom-labs/<name>/` with `<name>.md`, `spec.yaml`, `CHANGES.md`, and reports in `custom-labs/<name>/reports/`. `custom-labs/` is gitignored.
-- Per-lab work files: `e2e/.work/<key>/`, and `e2e/.work/custom/<name>/` for a custom lab. Contribute: `e2e/.work/contribute/<name>/`.
+- Custom labs: `custom-labs/<name>/` with `<name>.md`, `spec.yaml`, `CHANGES.md`, and reports in `custom-labs/<name>/reports/`. `custom-labs/` is gitignored. A custom lab's run files stay in its folder, in `custom-labs/<name>/.work/run/`, so deleting `custom-labs/<name>/` removes all of it.
+- Per-lab work files for a shipped lab: `e2e/.work/<key>/`. Contribute: `e2e/.work/contribute/<name>/`, which stays after the lab folder is deleted, since its manifest tracks the repo changes.
 - Session log: `e2e/.work/session.jsonl`. Environment: `e2e/.work/env.json`.
