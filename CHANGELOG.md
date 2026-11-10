@@ -10,6 +10,10 @@
   - A custom lab keeps its run files in its own folder, `custom-labs/<name>/.work/run/`, so deleting `custom-labs/<name>/` removes all of it. `/contribute-lab` leaves `.work/` out of its staging copy
   - Nothing about your cluster goes to Solo: the agent sends only generic product questions to the Solo docs server, and the report stays on your machine
   - `rbac/evaluator.yaml` and `rbac/mint-kubeconfig.sh` set up an `agw-evaluator` identity for the agent with no wildcards. It is privilege-equivalent to cluster-admin, so use it on disposable clusters only
+- Tracks: the LLM and MCP tracks list every lab that has an e2e spec, except the `image-list` reference page, so `/evaluate` runs them
+  - LLM track: `migrate-agentgatewaybackend-to-agentgatewaymodel` and `codex` (Unified LLM Access Point), `direct-response` (Advanced Routing), `byo-opa-grpc-ext-authz` and `kyverno-admission-control` (Security), `solo-ui-fine-grained-rbac` (Rate Limiting & Cost Control)
+  - MCP track: `byo-opa-grpc-ext-authz` and `mcp-eager-auth-keycloak` (MCP Security & Authorization)
+- e2e: `tracks.py list` marks a track entry whose spec tier is `excluded` or `t5-manual` as `excluded`, so the plan `/evaluate` shows names it before the run. A `--track` run prints `EXCLUDED` with the spec's reason and records `status=excluded`, and the report shows `NOT AUTOMATED` with that reason. `mcp-eager-auth-keycloak` is the one such entry: it upgrades the shared controller and needs a browser consent flow
 - `001-install-enterprise-agentgateway.md` Uninstall: the optional Gateway API CRD removal is its own block
 - Cleanup in `in-cluster-mcp`, `mcp-tool-federation`, `mcp-tool-mode-search`, `mcp-tool-mode-code`, `mcp-byo-grpc-ext-authz` and `mcp-tool-rate-limiting` now deletes the `mcp` namespace and waits for it to go
 - e2e: `--custom <name> --keep` no longer fails on baseline drift for the routes, policies, and models the kept lab leaves up. The outcome records `inventory_check=skipped`, and a change to the shared Gateway still fails the run

@@ -49,6 +49,15 @@ class TestPlan(unittest.TestCase):
         self.assertEqual(e.status, "no-spec")
         self.assertEqual(e.lab, "labs/x/nospec.md")
 
+    def test_excluded_and_manual_tiers_are_excluded(self):
+        t = track(uc("U", {"spec": "routing/gated"}, {"spec": "routing/manual"}, {"spec": "routing/a"}))
+        self.assertEqual([e.status for e in tracks.plan(t, "vind", SPECS)],
+                         ["excluded", "excluded", "run"])
+
+    def test_only_on_beats_excluded(self):
+        t = track(uc("U", {"spec": "routing/gated", "only_on": ["eks"]}))
+        self.assertEqual(tracks.plan(t, "gke", SPECS)[0].status, "not-applicable:eks")
+
     def test_duplicate_spec_runs_once(self):
         t = track(uc("One", {"spec": "routing/a"}), uc("Two", {"spec": "routing/a"}))
         self.assertEqual([e.status for e in tracks.plan(t, "vind", SPECS)],

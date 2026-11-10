@@ -187,6 +187,8 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status="", stopped=False):
         # No outcome file. The track entry says whether that is expected.
         if plan_status == "no-spec":
             return {"key": key, "result": "NOT AUTOMATED", "duration": "-", "note": "no spec for this lab"}
+        if plan_status == "excluded":
+            return {"key": key, "result": "NOT AUTOMATED", "duration": "-", "note": spec_reason(specs_dir, key)}
         if plan_status.startswith("not-applicable:"):
             return {"key": key, "result": f"NOT APPLICABLE (only on {plan_status.split(':', 1)[1]})",
                     "duration": "-", "note": ""}

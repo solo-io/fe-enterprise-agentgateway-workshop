@@ -20,6 +20,8 @@ use_cases:
     labs:
       - spec: routing/configure-mock-openai-server
       - spec: routing/configure-routing-openai
+      - spec: routing/migrate-agentgatewaybackend-to-agentgatewaymodel
+      - spec: agent-harnesses/codex
       - spec: routing/configure-routing-aws-bedrock
         lab: labs/routing/configure-routing-aws-bedrock.md
         status: no-spec
@@ -49,6 +51,7 @@ use_cases:
     value: Route based on request content, headers, or path to optimize for cost, latency, or model capability, and keep traffic moving when providers go down.
     labs:
       - spec: routing/routing-match-types
+      - spec: routing/direct-response
       - spec: routing/configure-body-based-routing
       - spec: routing/configure-semantic-routing-vllm-sr
         lab: labs/routing/configure-semantic-routing-vllm-sr.md
@@ -74,6 +77,8 @@ use_cases:
       - spec: security/sni-matching
       - spec: security/opa-authorization
       - spec: security/llm-byo-grpc-ext-authz
+      - spec: security/byo-opa-grpc-ext-authz
+      - spec: platform-engineering/kyverno-admission-control
   - name: Rate Limiting & Cost Control
     value: Prevent runaway usage, enforce fair-use policies, and attribute spend back to the teams and users that generated it.
     labs:
@@ -81,6 +86,7 @@ use_cases:
       - spec: rate-limiting/global-rate-limiting
       - spec: security/virtual-keys
       - spec: observability/llm-cost-management
+      - spec: observability/solo-ui-fine-grained-rbac
   - name: Content Safety & Guardrails
     value: Stop prompt injection, jailbreaks, PII leakage, and harmful content before requests reach the model, or before responses reach the client.
     labs:

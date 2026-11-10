@@ -187,6 +187,17 @@ tkey="$(python3 "${E2E}/lib/tracks.py" list mcp --env vind | awk -F'\t' '$2=="ru
 out="$("$RUNNER" --track mcp --env vind --skip "$tkey" --skip other/key --resolve-creds --no-prompt 2>&1)"; rc=$?
 [[ $rc == 0 ]] && ok "--skip is repeatable with --track" || fail "--skip repeat rc=$rc: $out"
 
+# An excluded track entry gets an excluded outcome and prints its spec reason,
+# even under --resolve-creds.
+xkey="$(python3 "${E2E}/lib/tracks.py" list mcp --env vind | awk -F'\t' '$2=="excluded"{print $1; exit}')"
+if [[ -n "$xkey" ]]; then
+  [[ "$(cat "${TMP}/work/${xkey}/outcome" 2>/dev/null)" == "status=excluded rc=0 duration=0 requires=" ]] \
+    && ok "excluded track entry has an excluded outcome" || fail "excluded outcome for $xkey: '$(cat "${TMP}/work/${xkey}/outcome" 2>/dev/null)'"
+  [[ "$out" == *"${xkey}"*"EXCLUDED"* ]] && ok "excluded track entry prints EXCLUDED" || fail "no EXCLUDED line for $xkey"
+else
+  fail "mcp track has no excluded entry to test"
+fi
+
 # E2E_SPEC_TIMEOUT in the environment overrides the spec's timeout.
 mkfix slowpass t0 "" 30 "sleep 5; echo hi" hi
 E2E_SPEC_TIMEOUT=1 E2E_SPEC_DIR="$FIX" "$RUNNER" fx/slowpass --no-prompt >/dev/null 2>&1

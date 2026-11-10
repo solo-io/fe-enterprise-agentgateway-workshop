@@ -66,6 +66,7 @@ The `tracks.py list` output has one line per lab: `<key>`, `<status>`, `<use-cas
 - the labs that will skip because a credential is missing: join the `⊘ VAR` lines from the `--resolve-creds` output against the REQUIRES column of `--list`, filtered to this track's keys
 - the labs with status `duplicate`: listed under two use cases, run once, and shown in both report tables
 - the labs marked `no-spec`, reported as `NOT AUTOMATED`; the user can run these by hand from the lab markdown
+- the labs marked `excluded`, reported as `NOT AUTOMATED` with the `reason` from `e2e/specs/<key>.yaml`; say that reason, and that the user can run the lab by hand
 - the labs marked `not-applicable:<class>`, reported as `NOT APPLICABLE` on this cluster
 
 ## 4. Install the base

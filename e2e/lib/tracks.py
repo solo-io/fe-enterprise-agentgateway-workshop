@@ -8,7 +8,8 @@ checks the YAML and the prose agree with each other and with e2e/specs.
 Usage:
   tracks.py list <track> --env <env> [--specs-dir D] [--tracks-dir T]
       one line per lab: <spec-key>\\t<status>\\t<use-case-name>
-      status: run | no-spec | not-applicable:<only_on joined by ,> | duplicate
+      status: run | no-spec | excluded | not-applicable:<only_on joined by ,> | duplicate
+      excluded: the spec's tier is excluded or t5-manual, so the harness never runs it
   tracks.py lint [--specs-dir D] [--tracks-dir T] [--labs-root R]
       one line per problem, exit 1 if any
 """
@@ -31,6 +32,8 @@ DEFAULT_TRACKS = os.path.join(REPO_ROOT, "tracks")
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 # Base labs are installed by the harness, so they are never track entries.
 BASE_LAB = re.compile(r"^00[12]-.*\.md$")
+# Tiers run-e2e.sh records as EXCLUDED without running the lab.
+EXCLUDED_TIERS = ("excluded", "t5-manual")
 
 
 class Entry(NamedTuple):
@@ -64,6 +67,8 @@ def plan(track, env, specs_dir):
                 status = "not-applicable:" + ",".join(only_on)
             elif no_spec:
                 status = "no-spec"
+            elif labdoc.load_spec(_spec_path(specs_dir, key)).get("tier") in EXCLUDED_TIERS:
+                status = "excluded"
             else:
                 status = "run"
             seen.add(key)

@@ -21,6 +21,7 @@ use_cases:
     value: Enforce zero-trust access at the tool level. Agents must present valid credentials before the gateway forwards any tool call, and you can gate access down to individual tool names.
     labs:
       - spec: mcp/mcp-byo-grpc-ext-authz
+      - spec: security/byo-opa-grpc-ext-authz
       - spec: mcp/mcp-eager-auth-auth0
         lab: labs/mcp/mcp-eager-auth-auth0.md
         status: no-spec
@@ -30,6 +31,7 @@ use_cases:
       - spec: mcp/mcp-eager-auth-entra
         lab: labs/mcp/mcp-eager-auth-entra.md
         status: no-spec
+      - spec: mcp/mcp-eager-auth-keycloak
       - spec: mcp/mcp-eager-auth-auth0-pre-issuance-authz
         lab: labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md
         status: no-spec

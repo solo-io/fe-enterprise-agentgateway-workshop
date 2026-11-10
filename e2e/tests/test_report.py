@@ -161,6 +161,8 @@ class TestFixRound1(ReportCase):
         self.assertEqual(self.row(data, "routing/f", 1)["result"], "NOT AUTOMATED")
         self.assertEqual(self.row(data, "routing/e", 1)["result"], "NOT APPLICABLE (only on eks)")
         self.assertEqual(self.row(data, "routing/a")["note"], "no outcome recorded")
+        r = self.row(data, "routing/d", 1)
+        self.assertEqual((r["result"], r["note"]), ("NOT AUTOMATED", "Needs a live Keycloak server."))
 
     def test_malformed_outcome_is_fail(self):
         work = os.path.join(self.tmp.name, "w")

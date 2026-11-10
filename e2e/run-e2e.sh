@@ -1025,6 +1025,11 @@ if [[ -n "$TRACK" ]]; then
       no-spec)
         printf "  ${DIM}—${NC} %-58s ${DIM}NOT AUTOMATED${NC}\n" "$tkey"
         write_outcome_file "$tkey" no-spec 0 0 "" ;;
+      excluded)
+        eval "$("$PYTHON" "$LABDOC" meta "${SPEC_DIR}/${tkey}.yaml")"
+        printf "  ${DIM}—${NC} %-58s ${DIM}EXCLUDED${NC} — %s\n" "$tkey" "${E2E_SPEC_REASON:-not automatable}"
+        EXCLUDED+=("$tkey")
+        write_outcome_file "$tkey" excluded 0 0 "" ;;
       not-applicable:*)
         printf "  ${DIM}—${NC} %-58s ${DIM}NOT APPLICABLE (only on %s)${NC}\n" "$tkey" "${tstatus#not-applicable:}"
         write_outcome_file "$tkey" not-applicable 0 0 "" "${tstatus#not-applicable:}" ;;
