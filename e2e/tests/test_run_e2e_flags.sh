@@ -13,7 +13,8 @@ export PYTHONUSERBASE="${PYTHONUSERBASE:-$(python3 -m site --user-base 2>/dev/nu
 export E2E_ENV_LOCAL=/dev/null HOME="$TMP"
 mkdir -p "${TMP}/bin" "${TMP}/work"
 # The Gateway fingerprint answers from ${TMP}/gw when it exists, so a fixture
-# probe can simulate baseline drift by rewriting that file.
+# probe can simulate baseline drift by rewriting that file. The HTTPRoute
+# inventory answers from ${TMP}/routes the same way.
 # E2E_STUB_GET_FAIL=1 makes every `kubectl get` print what it has and exit 1.
 # `kubectl get -n <ns> ...` answers from ${TMP}/snap-<ns> when it exists.
 cat > "${TMP}/bin/kubectl" <<STUB
@@ -25,6 +26,7 @@ fi
 [[ "\$1 \$2" == "get -n" && -f "${TMP}/snap-\$3" ]] && sort "${TMP}/snap-\$3"
 [[ "\$1 \$2" == "config current-context" ]] && echo stub-context
 [[ "\$1 \$2" == "get gateway" && -f "${TMP}/gw" ]] && cat "${TMP}/gw"
+[[ "\$1 \$2" == "get httproutes" && -f "${TMP}/routes" ]] && sort "${TMP}/routes"
 [[ "\$1 \$2" == "get namespaces" && -f "${TMP}/ns" ]] && cat "${TMP}/ns"
 [[ "\$1" == "get" && "\$2" == namespaces,* && -f "${TMP}/snap" ]] && sort "${TMP}/snap"
 # \${TMP}/crds lists the cluster's CRDs; \`delete crd\` removes names from it and logs the call.
@@ -550,6 +552,22 @@ run "--keep skips cleanup" 0 "cleanup skipped (--keep)" --custom demo --keep --n
 grep -q "keep=1" "${FXC}/demo/.work/run/outcome" && ok "outcome records keep=1" || fail "outcome records keep=1"
 grep -q "LEFTOVER CHECK SKIPPED" "${FXC}/demo/.work/run/leftovers.txt" && ok "keep notes the skipped check" || fail "keep notes the skipped check"
 [[ -f "${FXC}/demo/.work/run/result" ]] && ok "--keep still writes result" || fail "--keep still writes result"
+# --keep leaves the lab's routes, policies and models up, so the inventory
+# drift check skips them; a change to the shared Gateway still drifts.
+echo "80|agentgateway-config" > "${TMP}/gw"; : > "${TMP}/routes"
+export E2E_TEST_ROUTES="${TMP}/routes" E2E_TEST_GW="${TMP}/gw"
+run "--keep: a kept route is not baseline drift" 0 "1 PASS" --custom keptroute --keep --no-prompt
+grep -q "inventory_check=skipped" "${FXC}/keptroute/.work/run/outcome" && [[ "$(cat "${FXC}/keptroute/.work/run/outcome")" != *drift=1* ]] \
+  && ok "kept-route outcome records inventory_check=skipped and no drift" || fail "keptroute outcome: $(cat "${FXC}/keptroute/.work/run/outcome")"
+grep -q "BASELINE INVENTORY CHECK SKIPPED" "${FXC}/keptroute/.work/run/leftovers.txt" \
+  && ok "keep notes the skipped inventory check" || fail "keptroute leftovers: $(cat "${FXC}/keptroute/.work/run/leftovers.txt" 2>/dev/null)"
+: > "${TMP}/routes"
+run "a route without --keep is still baseline drift" 1 "BASELINE DRIFT" --custom keptroute --no-prompt
+: > "${TMP}/routes"; echo "80|agentgateway-config" > "${TMP}/gw"
+run "--keep: a Gateway change is still baseline drift" 1 "BASELINE DRIFT" --custom keptgw --keep --no-prompt
+grep -q "drift=1" "${FXC}/keptgw/.work/run/outcome" && ok "kept Gateway change records drift=1" \
+  || fail "keptgw outcome: $(cat "${FXC}/keptgw/.work/run/outcome")"
+unset E2E_TEST_ROUTES E2E_TEST_GW; rm -f "${TMP}/gw" "${TMP}/routes"
 run "--track leaves custom outcomes alone" 0 "Resolving credentials" --track llm --env gke --resolve-creds --no-prompt
 [[ -f "${FXC}/demo/.work/run/outcome" ]] && ok "custom outcome survives --track" || fail "custom outcome survives --track"
 [[ -f "${FXC}/leftover/.work/run/leftovers.txt" ]] && ok "custom leftovers survive --track" || fail "custom leftovers survive --track"

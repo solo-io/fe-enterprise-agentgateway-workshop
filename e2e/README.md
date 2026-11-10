@@ -105,7 +105,7 @@ the run. Objects with an owner (a Gateway's Deployment, a Deployment's
 ReplicaSet), Helm release secrets, and the controller's `enterprise-jwks-store-*`
 ConfigMaps are not counted, since the controller manages them. `LEFTOVER CHECK
 NOT RUN` means a snapshot failed, and that fails the run too; kubectl's stderr
-is in `custom-labs/<name>/.work/run/snapshot.err`. A `--keep` run skips the check. Work files, including the run's own
+is in `custom-labs/<name>/.work/run/snapshot.err`. A `--keep` run skips the check. It also skips the HTTPRoute, policy, and model inventory in the baseline-integrity guard, since the lab leaves those up on purpose, and records `inventory_check=skipped`; a change to the shared Gateway still fails a kept run. Work files, including the run's own
 `leftovers.txt`, go to `custom-labs/<name>/.work/run/`, inside the lab's folder; a custom run never writes
 the shared `e2e/.work/leftovers.txt`, and a `--track` run leaves custom files
 alone.

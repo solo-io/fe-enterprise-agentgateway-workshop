@@ -253,7 +253,8 @@ key_dir() {
 #   One line per lab at $(key_dir <key>)/outcome. The report builder reads it,
 #   so the field names and status values are a contract. Optional trailing
 #   fields: drift=1, cleanup_fail=N|incomplete, reason=declined, keep=1,
-#   leftover=N (custom), leftover_warn=N (shipped), leftover_check=not-run.
+#   leftover=N (custom), leftover_warn=N (shipped), leftover_check=not-run,
+#   inventory_check=skipped (custom --keep).
 write_outcome_file() {
   local key="$1" status="$2" rc="$3" dur="$4" req="$5" only_on="${6:-}" line
   shift 5; (( $# )) && shift
@@ -581,16 +582,31 @@ run_lab() {
   # Attribute baseline damage to the lab that caused it, while we still know
   # which lab that was.
   [[ "$is_base" == "false" ]] && base_after="$(baseline_fingerprint)"
+  # --keep leaves a custom lab's routes, policies and models up on purpose, so a
+  # kept run compares only the Gateway field. A kept lab that rewrites the
+  # shared Gateway still drifts.
+  local cmp_before="$base_before" cmp_after="$base_after" kept=false
+  if [[ "$is_custom" == "true" && "$KEEP" == "true" ]]; then
+    kept=true
+    IFS=$'\x1f' read -r cmp_before _ _ _ <<<"$base_before"
+    IFS=$'\x1f' read -r cmp_after _ _ _ <<<"$base_after"
+    if [[ "$is_base" == "false" ]] && baseline_exists "$base_before"; then
+      extra+=("inventory_check=skipped")
+      note_leftover "BASELINE INVENTORY CHECK SKIPPED: ${key} kept on the cluster"
+    fi
+  fi
   if [[ "$is_base" == "false" ]] && baseline_exists "$base_before" &&
-     [[ "$base_after" != "$base_before" ]]; then
+     [[ "$cmp_after" != "$cmp_before" ]]; then
     printf "  ${RED}✗${NC} %-58s ${RED}BASELINE DRIFT${NC}\n" "$key"
     local gw_b routes_b pols_b models_b gw_a routes_a pols_a models_a
     IFS=$'\x1f' read -r gw_b routes_b pols_b models_b <<<"$base_before"
     IFS=$'\x1f' read -r gw_a routes_a pols_a models_a <<<"$base_after"
     [[ "$gw_b"     != "$gw_a"     ]] && printf "      gateway:  %s -> %s\n" "$gw_b" "$gw_a"
-    [[ "$routes_b" != "$routes_a" ]] && printf "      routes:   %s -> %s\n" "${routes_b:-none}" "${routes_a:-none}"
-    [[ "$pols_b"   != "$pols_a"   ]] && printf "      policies: %s -> %s\n" "${pols_b:-none}" "${pols_a:-none}"
-    [[ "$models_b" != "$models_a" ]] && printf "      models:   %s -> %s\n" "${models_b:-none}" "${models_a:-none}"
+    if [[ "$kept" == "false" ]]; then
+      [[ "$routes_b" != "$routes_a" ]] && printf "      routes:   %s -> %s\n" "${routes_b:-none}" "${routes_a:-none}"
+      [[ "$pols_b"   != "$pols_a"   ]] && printf "      policies: %s -> %s\n" "${pols_b:-none}" "${pols_a:-none}"
+      [[ "$models_b" != "$models_a" ]] && printf "      models:   %s -> %s\n" "${models_b:-none}" "${models_a:-none}"
+    fi
     if [[ "$gw_b" != "$gw_a" ]] && baseline_restore; then
       printf "      ${YELLOW}restored the 001 Gateway so the run can continue${NC}\n"
     fi

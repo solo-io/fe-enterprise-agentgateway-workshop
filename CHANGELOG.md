@@ -12,6 +12,7 @@
   - `rbac/evaluator.yaml` and `rbac/mint-kubeconfig.sh` set up an `agw-evaluator` identity for the agent with no wildcards. It is privilege-equivalent to cluster-admin, so use it on disposable clusters only
 - `001-install-enterprise-agentgateway.md` Uninstall: the optional Gateway API CRD removal is its own block
 - Cleanup in `in-cluster-mcp`, `mcp-tool-federation`, `mcp-tool-mode-search`, `mcp-tool-mode-code`, `mcp-byo-grpc-ext-authz` and `mcp-tool-rate-limiting` now deletes the `mcp` namespace and waits for it to go
+- e2e: `--custom <name> --keep` no longer fails on baseline drift for the routes, policies, and models the kept lab leaves up. The outcome records `inventory_check=skipped`, and a change to the shared Gateway still fails the run
 
 0.15.2 - (11-4-26)
 ---
