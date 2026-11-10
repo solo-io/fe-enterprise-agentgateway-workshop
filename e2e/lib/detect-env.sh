@@ -20,7 +20,8 @@ SKIP_LB=0
 PY=""            # first python3 that imports yaml (E2E_PYTHON first, as run-e2e.sh does)
 RBAC_FILE="${REPO}/rbac/evaluator.yaml"
 SYSREQ="${REPO}/labs/installation/system-requirements.md"
-PROBE=e2e-lb-probe
+PROBE="e2e-lb-probe-$$"   # unique per run; PROBE_LABEL finds probes a killed run left
+PROBE_LABEL=agw-e2e/lb-probe=true
 SIGNALS=()
 STOP=()          # reasons the session must stop
 CLASS=unknown
@@ -207,19 +208,26 @@ for doc in yaml.safe_load_all(open(sys.argv[1])):
 }
 
 probe_lb() {  # sets LOADBALANCER; the probe Service is removed by the EXIT trap
+  # SIGKILL skips the EXIT trap, so a killed run leaves its probe behind.
+  # Remove those first; each one holds a LoadBalancer address.
+  kubectl delete svc -n default -l "$PROBE_LABEL" --ignore-not-found >/dev/null 2>&1
   trap 'kubectl delete svc "$PROBE" -n default --ignore-not-found >/dev/null 2>&1' EXIT
-  kubectl create -f - >/dev/null <<Y || die "cannot create Service/${PROBE}"
+  local err
+  err="$(kubectl create -f - 2>&1 >/dev/null <<Y
 apiVersion: v1
 kind: Service
 metadata:
   name: ${PROBE}
   namespace: default
+  labels:
+    ${PROBE_LABEL%%=*}: "${PROBE_LABEL#*=}"
 spec:
   type: LoadBalancer
   ports:
     - port: 80
       targetPort: 80
 Y
+)" || die "cannot create Service/${PROBE}: ${err}"
   local deadline=$((SECONDS + LB_TIMEOUT)) ing
   LOADBALANCER=none
   while :; do

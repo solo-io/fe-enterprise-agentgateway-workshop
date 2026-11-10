@@ -43,6 +43,7 @@ CUSTOM_ROOT="${E2E_CUSTOM_ROOT:-${REPO_ROOT}/custom-labs}"
 CUSTOM_NAME=""
 WORK_ROOT="${E2E_WORK_ROOT:-${E2E_DIR}/.work}"
 LABDOC="${E2E_DIR}/lib/labdoc.py"
+DETECT_ENV="${E2E_DETECT_ENV:-${E2E_DIR}/lib/detect-env.sh}"   # tests substitute a stub
 
 export E2E_DIR E2E_REPO_ROOT="${REPO_ROOT}"
 # Only --keep sets E2E_KEEP, for the one custom lab it runs. A value from the
@@ -181,10 +182,13 @@ if [[ "$REPORT_ONLY" == "true" && "$INSTALL_BASE" == "true" ]]; then
 fi
 
 # --env: the environment class the tracks filter on. Default to what the
-# environment probe recorded, else unknown.
+# environment probe recorded, else unknown. --report-only --track <t> without
+# --env uses the class that track last ran with, so the report matches the run.
 if [[ -z "$ENV_CLASS" ]]; then
   ENV_CLASS="unknown"
-  if [[ -f "${WORK_ROOT}/env.json" ]]; then
+  if [[ "$REPORT_ONLY" == "true" && -n "$TRACK" && -s "${WORK_ROOT}/track-env-${TRACK}" ]]; then
+    ENV_CLASS="$(head -n1 "${WORK_ROOT}/track-env-${TRACK}")"
+  elif [[ -f "${WORK_ROOT}/env.json" ]]; then
     ENV_CLASS="$("$PYTHON" -c 'import json,sys; print(json.load(open(sys.argv[1])).get("class") or "unknown")' \
       "${WORK_ROOT}/env.json" 2>/dev/null || echo unknown)"
   fi
@@ -211,7 +215,7 @@ build_report() {
     printf '{"class": "%s"}\n' "$ENV_CLASS" > "$env_json"
   fi
   "$PYTHON" "${E2E_DIR}/lib/report.py" build --work "$WORK_ROOT" "${which[@]}" \
-    --env-json "$env_json" --session "${WORK_ROOT}/session.jsonl" --out "$out"
+    --env-json "$env_json" --env-class "$ENV_CLASS" --session "${WORK_ROOT}/session.jsonl" --out "$out"
 }
 
 # ---------------------------------------------------------------------------
@@ -228,6 +232,7 @@ E2E_CHILD_PGID=""
 E2E_CURRENT_KEY=""
 E2E_IN_GRACE=0
 E2E_CURRENT_START=0
+E2E_CLEANUP_KILLED=0   # run_with_timeout already wrote CLEANUP INCOMPLETE for this lab
 
 # write_outcome_file <key> <status> <rc> <duration> <requires> [only_on] [k=v...]
 #   One line per lab at ${WORK_ROOT}/<key>/outcome. The report builder reads it,
@@ -290,6 +295,7 @@ is_declined() {
 run_with_timeout() {
   local secs="$1"; shift
   local pid rc waited=0
+  E2E_CLEANUP_KILLED=0
 
   set -m
   "$@" & pid=$!
@@ -308,6 +314,7 @@ run_with_timeout() {
       done
       if kill -0 "$pid" 2>/dev/null; then
         note_leftover "CLEANUP INCOMPLETE: ${E2E_CURRENT_KEY} (cleanup still running after ${grace}s, killed)"
+        E2E_CLEANUP_KILLED=1
       fi
       kill -KILL "-${pid}" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
       wait "$pid" 2>/dev/null
@@ -560,7 +567,7 @@ run_lab() {
     eval $(sed 's/\([a-z_]*\)=/E2E_R_\1=/g' "${workdir}/result")
     p="${E2E_R_pass:-0}"; f="${E2E_R_fail:-0}"; s="${E2E_R_skip:-0}"; cf="${E2E_R_cleanup_fail:-0}"
   elif [[ "$rc" -ne 0 ]]; then
-    note_leftover "CLEANUP INCOMPLETE: ${key}"
+    [[ "$E2E_CLEANUP_KILLED" == "1" ]] || note_leftover "CLEANUP INCOMPLETE: ${key}"
     extra+=("cleanup_fail=incomplete")
   fi
   if [[ "$cf" -gt 0 ]]; then
@@ -681,9 +688,47 @@ fi
 
 # ---------------------------------------------------------------------------
 # --install-base
+#   Records the cluster first (record_base_install), then installs 001 + 002.
 # ---------------------------------------------------------------------------
+# base-install.json: what was on the cluster before the harness installed the
+# base. --uninstall-base compares against it, and refuses to remove an install
+# that was already there. Detection reruns (adapt-lab, contribute-lab) do not
+# touch it.
+BASE_RECORD="${WORK_ROOT}/base-install.json"
+# Cluster-wide and often shared, so the uninstall keeps them on purpose.
+KEPT_CRD_GROUPS_RE='\.gateway\.networking\.(k8s|x-k8s)\.io$'
+
+record_base_install() {
+  local pre="${WORK_ROOT}/env-preinstall.json" rc=0 crds inst
+  rm -f "$pre"
+  "$DETECT_ENV" --skip-rbac-check --skip-lb-probe --out "$pre" >/dev/null 2>&1 || rc=$?
+  if [[ "$rc" == "1" || ! -s "$pre" ]]; then
+    printf "${RED}Cannot record the cluster before the base install (detect-env.sh exited %s).${NC}\n" "$rc"
+    return 1
+  fi
+  inst="$(jq -r '.existing_install // ""' "$pre")"
+  # A record whose base is still installed is from an earlier --install-base
+  # in this session (the user kept the base). Keep it: it describes the
+  # cluster before that first install.
+  if [[ -s "$BASE_RECORD" && -n "$inst" && "$inst" != "unknown" ]]; then
+    return 0
+  fi
+  crds="$(kubectl get crd -o name 2>/dev/null)" || {
+    printf "${RED}Cannot list CRDs before the base install.${NC}\n"; return 1; }
+  jq --arg crds "$crds" --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    '{namespaces: .namespaces, existing_install: .existing_install,
+      crds_only: ((.signals // []) | index("crds-only") != null),
+      crds: ($crds | split("\n") | map(select(length > 0) | sub("^[^/]*/"; ""))),
+      recorded_at: $at}' "$pre" > "$BASE_RECORD" || {
+    printf "${RED}Cannot write %s.${NC}\n" "$BASE_RECORD"; return 1; }
+  if [[ -n "$inst" ]]; then
+    printf "${YELLOW}Enterprise Agentgateway is already installed (%s). --uninstall-base will not remove it.${NC}\n" "$inst"
+  fi
+}
+
 install_base() {
   printf "${BOLD}═══ Installing baseline (001 + 002) ═══${NC}\n\n"
+  record_base_install || { printf "${RED}Baseline install not started.${NC}\n"; exit 1; }
   local spec
   for spec in "${SPEC_DIR}/_base/001-install-enterprise-agentgateway.yaml" \
               "${SPEC_DIR}/_base/002-set-up-monitoring-tools.yaml"; do
@@ -698,12 +743,33 @@ install_base() {
 
 # ---------------------------------------------------------------------------
 # --uninstall-base
-#   Removes 002 (monitoring) then 001 (controller, Gateway, enterprise CRDs).
-#   The Gateway API CRDs are cluster-wide and may be shared, so the optional
-#   block in 001 that deletes them is never run. Needs no license key.
+#   Removes 002 (monitoring) then 001 (controller, Gateway, enterprise CRDs),
+#   then the monitoring.coreos.com CRDs the session added. The Gateway API CRDs
+#   are cluster-wide and may be shared, so the optional block in 001 that
+#   deletes them is never run. Needs no license key.
+#   Removes only a base that --install-base installed: with no record, or with
+#   a record that names an install from before the session, it removes nothing.
 # ---------------------------------------------------------------------------
 uninstall_base() {
   printf "${BOLD}═══ Uninstalling baseline (002 + 001, Gateway API CRDs kept) ═══${NC}\n\n"
+  if [[ ! -s "$BASE_RECORD" ]]; then
+    printf "${RED}No record that --install-base installed the base on this cluster (%s).${NC}\n" "$BASE_RECORD"
+    printf "The harness removes only a base it installed. To remove an install you made yourself, follow the Uninstall sections of 002 and 001.\n"
+    note_leftover "BASE NOT REMOVED: no record that this session installed it"
+    exit 1
+  fi
+  local pre_inst crds_only
+  pre_inst="$(jq -r '.existing_install // ""' "$BASE_RECORD")"
+  crds_only="$(jq -r '.crds_only // false' "$BASE_RECORD")"
+  if [[ -n "$pre_inst" || "$crds_only" == "true" ]]; then
+    local what="the CRDs only"
+    [[ "$pre_inst" == "unknown" ]] && what="unknown, helm list failed"
+    [[ -n "$pre_inst" && "$pre_inst" != "unknown" ]] && what="release in ${pre_inst}"
+    printf "${RED}Enterprise Agentgateway was on the cluster before this session (%s). Not removing it.${NC}\n" "$what"
+    note_leftover "BASE NOT REMOVED: Enterprise Agentgateway was installed before this session (${what})"
+    exit 1
+  fi
+
   local spec
   for spec in "${SPEC_DIR}/_base/901-uninstall-monitoring.yaml" \
               "${SPEC_DIR}/_base/902-uninstall-agentgateway.yaml"; do
@@ -715,12 +781,50 @@ uninstall_base() {
     printf "${RED}uninstall step failed, see above${NC}\n"; rc=1
   fi
 
-  # Leftover namespaces: anything present now that was not in the namespace
-  # snapshot detect-env.sh took before the session. agw-evaluator holds the
-  # evaluator identity the user applied, so it stays.
-  local snapshot="${WORK_ROOT}/env.json" before now ns phase waited=0 leftover=()
-  if before="$("$PYTHON" -c 'import json,sys; d=json.load(open(sys.argv[1])); print("\n".join(d["namespaces"]))' \
-      "$snapshot" 2>/dev/null)" && [[ -n "$before" ]]; then
+  local before_crds now_crds crd added_mon=() left_crds=() kept_crds=()
+  before_crds="$(jq -r '.crds // [] | .[]' "$BASE_RECORD")"
+  # helm uninstall leaves the CRDs kube-prometheus-stack installed. Delete the
+  # ones the session added; ones that were there before belong to someone else.
+  if now_crds="$(kubectl get crd -o name 2>/dev/null | sed 's#^[^/]*/##')"; then
+    while IFS= read -r crd; do
+      [[ "$crd" == *.monitoring.coreos.com ]] || continue
+      grep -qxF "$crd" <<<"$before_crds" || added_mon+=("$crd")
+    done <<<"$now_crds"
+    if (( ${#added_mon[@]} )); then
+      printf "Deleting %s monitoring.coreos.com CRD(s) the base install added\n" "${#added_mon[@]}"
+      kubectl delete crd "${added_mon[@]}" --ignore-not-found >/dev/null \
+        || printf "${RED}deleting the monitoring CRDs failed${NC}\n"
+    fi
+  fi
+
+  # Leftover CRDs: anything present now that was not in the record, except the
+  # Gateway API CRDs, which are kept on purpose and listed as kept.
+  if now_crds="$(kubectl get crd -o name 2>/dev/null | sed 's#^[^/]*/##')"; then
+    while IFS= read -r crd; do
+      [[ -n "$crd" ]] || continue
+      grep -qxF "$crd" <<<"$before_crds" && continue
+      if [[ "$crd" =~ $KEPT_CRD_GROUPS_RE ]]; then kept_crds+=("$crd"); else left_crds+=("$crd"); fi
+    done <<<"$now_crds"
+    for crd in ${left_crds[@]+"${left_crds[@]}"}; do
+      printf "${RED}LEFTOVER CRD: %s${NC}\n" "$crd"
+      note_leftover "LEFTOVER CRD: ${crd}"
+    done
+    (( ${#left_crds[@]} == 0 )) || rc=1
+    if (( ${#kept_crds[@]} )); then
+      printf "${YELLOW}Kept %s Gateway API CRD(s) the base install added; they are cluster-wide, so remove them by hand if nothing else uses them.${NC}\n" "${#kept_crds[@]}"
+      note_leftover "KEPT: ${#kept_crds[@]} Gateway API CRD(s) the base install added (cluster-wide, removed only by hand)"
+    fi
+  else
+    printf "${RED}cannot list CRDs${NC}\n"; rc=1
+    note_leftover "CRD CHECK NOT RUN: cannot list CRDs"
+  fi
+
+  # Leftover namespaces: anything present now that was not on the cluster
+  # before --install-base. agw-evaluator holds the evaluator identity the user
+  # applied, so it stays.
+  local before now ns phase waited=0 leftover=()
+  before="$(jq -r '.namespaces // [] | .[]' "$BASE_RECORD" 2>/dev/null)"
+  if [[ -n "$before" ]]; then
     while :; do
       leftover=()
       now="$(kubectl get namespaces -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{"\n"}{end}' 2>/dev/null)" \
@@ -742,19 +846,22 @@ uninstall_base() {
     done
     (( ${#leftover[@]} == 0 )) || rc=1
   else
-    printf "${YELLOW}No namespace snapshot in %s; run e2e/lib/detect-env.sh before the base install to enable this check.${NC}\n" "$snapshot"
-    note_leftover "NAMESPACE CHECK NOT RUN: no namespace snapshot from before the session"
+    printf "${YELLOW}No namespace list in %s; the namespace check did not run.${NC}\n" "$BASE_RECORD"
+    note_leftover "NAMESPACE CHECK NOT RUN: no namespace list from before the base install"
   fi
 
   local line existing
-  line="$("${E2E_DIR}/lib/detect-env.sh" --skip-rbac-check --skip-lb-probe \
+  line="$("$DETECT_ENV" --skip-rbac-check --skip-lb-probe \
     --out "${WORK_ROOT}/env-teardown.json" 2>/dev/null | grep '^existing_install' || true)"
   printf '%s\n' "${line:-existing_install: (probe failed)}"
   existing="${line#existing_install:}"; existing="${existing# }"
   if [[ -n "$existing" || -z "$line" || "$rc" -ne 0 ]]; then
     printf "${RED}Something from the baseline remains on the cluster.${NC}\n"; rc=1
   fi
-  [[ "$rc" -eq 0 ]] && printf "${GREEN}Baseline removed.${NC}\n"
+  if [[ "$rc" -eq 0 ]]; then
+    rm -f "$BASE_RECORD"   # the next --install-base records the cluster afresh
+    printf "${GREEN}Baseline removed.${NC}\n"
+  fi
   exit "$rc"
 }
 
@@ -848,6 +955,7 @@ if [[ -n "$TRACK" ]]; then
     fi
     exit 1; }
   printf "${BOLD}Track: %s | Env: %s${NC}\n" "$TRACK" "$ENV_CLASS"
+  printf '%s\n' "$ENV_CLASS" > "${WORK_ROOT}/track-env-${TRACK}"
   while IFS=$'\t' read -r tkey tstatus _; do
     [[ -n "$tkey" ]] || continue
     case "$tstatus" in
@@ -936,8 +1044,9 @@ printf "${BOLD}═════════════════════�
 
 [[ "$KEEP_WORK" == "true" ]] || printf "${DIM}  block output kept in %s${NC}\n" "$WORK_ROOT"
 
+REPORT_FAILED=0
 if [[ "$REPORT" == "true" ]]; then
-  build_report || printf "${RED}report build failed${NC}\n" >&2
+  build_report || { printf "${RED}report build failed; no report was written${NC}\n" >&2; REPORT_FAILED=1; }
 fi
 
-[[ "$TOTAL_FAIL" -eq 0 ]]
+[[ "$TOTAL_FAIL" -eq 0 && "$REPORT_FAILED" -eq 0 ]]

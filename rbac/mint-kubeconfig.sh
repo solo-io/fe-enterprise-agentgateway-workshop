@@ -2,19 +2,22 @@
 # Mint a kubeconfig for the agw-evaluator ServiceAccount.
 # Run as an admin identity after applying rbac/evaluator.yaml.
 #   ./rbac/mint-kubeconfig.sh [--duration 8h] [--out <path>] [--ca-file <path>]
+#                             [--tls-server-name <name>]
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DURATION=8h
 OUT="${ROOT}/e2e/.work/evaluator.kubeconfig"
 CA_FILE=""
+TLS_NAME=""
 
 while (( $# )); do
   case "$1" in
     --duration) DURATION="${2:?--duration needs a value}"; shift 2 ;;
     --out)      OUT="${2:?--out needs a path}"; shift 2 ;;
     --ca-file)  CA_FILE="${2:?--ca-file needs a path}"; shift 2 ;;
-    -h|--help)  sed -n '2,5p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --tls-server-name) TLS_NAME="${2:?--tls-server-name needs a name}"; shift 2 ;;
+    -h|--help)  sed -n '2,6p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -28,6 +31,8 @@ view="$(kubectl config view --raw --minify -o json)" \
 server="$(jq -r '.clusters[0].cluster.server // empty' <<<"$view")"
 ca_data="$(jq -r '.clusters[0].cluster["certificate-authority-data"] // empty' <<<"$view")"
 ca_file="$(jq -r '.clusters[0].cluster["certificate-authority"] // empty' <<<"$view")"
+proxy_url="$(jq -r '.clusters[0].cluster["proxy-url"] // empty' <<<"$view")"
+[[ -n "$TLS_NAME" ]] || TLS_NAME="$(jq -r '.clusters[0].cluster["tls-server-name"] // empty' <<<"$view")"
 [[ -n "$server" ]] || { echo "current context has no cluster server" >&2; exit 1; }
 if [[ -n "$CA_FILE" ]]; then
   [[ -r "$CA_FILE" ]] || { echo "cannot read --ca-file ${CA_FILE}" >&2; exit 1; }
@@ -42,6 +47,14 @@ if [[ -z "$ca_data" ]]; then
   if [[ -n "$pem" ]]; then
     ca_data="$(printf '%s\n' "$pem" | base64 | tr -d '\n')"
     echo "note: cluster CA taken from kube-root-ca.crt" >&2
+    # The server address such a context uses (a forwarded localhost port, a
+    # host IP) is often missing from the apiserver certificate. Pods verify the
+    # apiserver as kubernetes.default.svc with this same CA, so that name is in
+    # the certificate.
+    if [[ -z "$TLS_NAME" ]]; then
+      TLS_NAME=kubernetes.default.svc
+      echo "note: verifying the apiserver certificate as ${TLS_NAME}" >&2
+    fi
   else
     echo "no cluster CA available; pass one with --ca-file <path>" >&2
     exit 1
@@ -61,6 +74,8 @@ umask 077
   echo "    cluster:"
   echo "      server: ${server}"
   echo "      certificate-authority-data: ${ca_data}"
+  [[ -n "$TLS_NAME" ]] && echo "      tls-server-name: ${TLS_NAME}"
+  [[ -n "$proxy_url" ]] && echo "      proxy-url: ${proxy_url}"
   echo "users:"
   echo "  - name: agw-evaluator"
   echo "    user:"
@@ -73,6 +88,15 @@ umask 077
   echo "current-context: agw-evaluator"
 } > "$OUT"
 chmod 600 "$OUT"
+
+# Prove the kubeconfig works before telling the user to export it.
+if ! err="$(kubectl --kubeconfig "$OUT" get --raw /version 2>&1 >/dev/null)"; then
+  rm -f "$OUT"
+  echo "the minted kubeconfig cannot reach the cluster:" >&2
+  echo "  $(head -n1 <<<"$err")" >&2
+  echo "for a certificate error, pass --ca-file <path> or --tls-server-name <name in the certificate>" >&2
+  exit 1
+fi
 
 echo "Token valid for ${DURATION}. Use it with:"
 echo "export KUBECONFIG=${OUT}"

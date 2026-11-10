@@ -46,6 +46,8 @@ test_lb_timeout_exits_2_and_deletes_probe() {
   check "no LB exits 2" "$RC" 2
   [[ "$OUT" == *cloud-provider-kind* ]] && ok "no LB names cloud-provider-kind" || fail "no LB message: $OUT"
   grep -q 'delete.*e2e-lb-probe' "$DETECT_LOG" && ok "probe Service deleted" || fail "probe not deleted: $(cat "$DETECT_LOG")"
+  grep -q 'delete svc -n default -l agw-e2e/lb-probe=true' "$DETECT_LOG" \
+    && ok "probes from killed runs deleted first" || fail "no stale-probe delete: $(cat "$DETECT_LOG")"
   check "loadbalancer none" "$(field .loadbalancer)" none
   # Probe skipped because a stop reason already exists: still "none".
   local fx="${TMP}/skip"; cp -R "${FX}/eks" "$fx"; echo "delete namespaces" > "${fx}/can-i-no"

@@ -2,14 +2,12 @@
 
 0.15.3 - (11-9-26)
 ---
-- Add an evaluation agent: an AI agent (Claude Code or Codex) runs the LLM or MCP track against a user-provided cluster, explains each lab, stops on failure, cleans up, and writes a local report
-  - Agent layer: `AGENTS.md` (the four hard rules, prerequisites, identity, how to start), `skills/` (evaluate, detect-environment, explain-lab, diagnose-failure, ask-the-docs), `.mcp.json` for the Solo docs server, the `/evaluate` command, and a README section that points at `AGENTS.md`
-  - Tracks: `tracks/llm-track.yaml` and `tracks/mcp-track.yaml`, and `./e2e/run-e2e.sh --track <llm|mcp> --env <class>` to run a track's labs in use-case order; `--skip <key>` records a lab the user declined as `SKIP (declined)`
-  - Environment detection: `./e2e/lib/detect-env.sh` classifies the cluster, checks CLIs, sizing, LoadBalancer and permissions, and writes `e2e/.work/env.json`
-  - Least-privilege identity: `rbac/evaluator.yaml` and `rbac/mint-kubeconfig.sh` for an `agw-evaluator` identity whose role lists every verb and resource with no wildcards; the script embeds the cluster CA (from the context, `kube-root-ca.crt`, or `--ca-file`)
-  - Reports: `--report` and `--report-only` write a Markdown and JSON report to `reports/`, `python3 e2e/lib/report.py compare` diffs two reports, and `e2e/lib/session-log.sh` records decisions, deviations, questions, answers and failures for the report
-  - Teardown: `./e2e/run-e2e.sh --uninstall-base` removes the monitoring stack and the controller install, lists any namespace that was not on the cluster when detection ran as `LEFTOVER NAMESPACE`, and records a cleanup that fails or is cut short under Leftovers in the report
-  - `E2E_SPEC_TIMEOUT` and `E2E_CLEANUP_GRACE` overrides for `./e2e/run-e2e.sh`
+- Add an evaluation agent (Alpha): an AI agent (Claude Code or Codex) works the workshop against a user-provided cluster. `AGENTS.md` holds the rules and how to start; `skills/`, `.claude/commands/` and `.mcp.json` (the Solo docs server) back it; the README section `## Alpha: Evaluate with an agent` points at it
+  - `/evaluate`: runs the LLM or MCP track in use-case order, explains each lab before it runs, stops on the first failure, cleans up every lab and the base install, and writes a local report
+  - `/adapt-lab`: turns one or more shipped labs into a custom lab and spec under `custom-labs/<name>/` for the user's own requirements (extend, combine or reskin), proves it on their cluster, and hands it off with a report
+  - `/contribute-lab`: promotes a custom lab that passed to a shipped lab, conforms it to the style guide, proves it as a shipped spec, scrubs it for leaks, commits it on a new version branch, and stops before the push
+- `e2e/`: the harness gains `--track <llm|mcp> --env <class>`, `--skip`, `--report` and `--report-only` in `run-e2e.sh`, environment detection (`e2e/lib/detect-env.sh`), a session log, Markdown and JSON reports with `compare`, `--install-base` and `--uninstall-base` that remove only what the session added and list leftovers, stricter cleanup failure reporting, and `E2E_SPEC_TIMEOUT` and `E2E_CLEANUP_GRACE` overrides, and `--custom <name>` (with `--keep`) to run and lint a custom lab, whose spec must declare requirements and which fails when it leaves anything behind; `e2e/lib/scrub.py` reports candidate leaks (addresses, hostnames, emails, keys) in a custom lab, and `e2e/lib/promote.py` copies it into `labs/`, `e2e/specs/` and `lib/` with a dry run first and an undo
+- `rbac/evaluator.yaml` and `rbac/mint-kubeconfig.sh`: a least-privilege `agw-evaluator` identity with no wildcards, and a kubeconfig that embeds the cluster CA, carries the context's TLS server name and proxy, and is checked against the cluster before use
 - `001-install-enterprise-agentgateway.md` Uninstall: the optional Gateway API CRD removal is its own block, so the eval agent harness never runs it
 - Cleanup in `in-cluster-mcp`, `mcp-tool-federation`, `mcp-tool-mode-search`, `mcp-tool-mode-code`, `mcp-byo-grpc-ext-authz` and `mcp-tool-rate-limiting` now deletes the `mcp` namespace and waits for it to go
 

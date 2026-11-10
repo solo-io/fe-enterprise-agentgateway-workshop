@@ -2,6 +2,7 @@
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -26,13 +27,13 @@ class ReportCase(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def build(self, work=None, session=None):
+    def build(self, work=None, session=None, extra=()):
         work = work or os.path.join(FIX, "work")
         proc = subprocess.run(
             [sys.executable, os.path.join(LIB, "report.py"), "build", "--work", work,
              "--track", "t", "--env-json", os.path.join(FIX, "env.json"),
              "--session", session or self.session, "--out", self.tmp.name,
-             "--specs-dir", os.path.join(FIX, "specs"), "--tracks-dir", os.path.join(FIX, "tracks")],
+             "--specs-dir", os.path.join(FIX, "specs"), "--tracks-dir", os.path.join(FIX, "tracks"), *extra],
             capture_output=True, text=True)
         self.assertEqual(proc.returncode, 0, proc.stderr)
         md, js = proc.stdout.split()
@@ -51,6 +52,20 @@ class TestBuild(ReportCase):
         md, js, _, _ = self.build()
         self.assertRegex(os.path.basename(md), r"^\d{8}-\d{6}-vind-t\.md$")
         self.assertTrue(js.endswith(".json"))
+
+    def test_env_class_overrides_detected_class(self):
+        md, _, text, data = self.build(extra=("--env-class", "eks"))
+        self.assertRegex(os.path.basename(md), r"^\d{8}-\d{6}-eks-t\.md$")
+        self.assertIn("track on eks", text.splitlines()[0])
+        self.assertEqual((data["environment"]["class"], data["environment"]["detected_class"]), ("eks", "vind"))
+        # With no outcome file, the plan for the run's class decides the row.
+        work = os.path.join(self.tmp.name, "w")
+        shutil.copytree(os.path.join(FIX, "work"), work)
+        os.remove(os.path.join(work, "routing", "e", "outcome"))
+        _, _, _, vind = self.build(work=work)
+        _, _, _, eks = self.build(work=work, extra=("--env-class", "eks"))
+        self.assertEqual(self.row(vind, "routing/e", 1)["result"], "NOT APPLICABLE (only on eks)")
+        self.assertNotIn("NOT APPLICABLE", self.row(eks, "routing/e", 1)["result"])
 
     def test_pass_with_deviation_is_marked(self):
         _, _, _, data = self.build()

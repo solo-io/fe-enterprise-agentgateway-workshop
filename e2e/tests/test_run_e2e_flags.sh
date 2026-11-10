@@ -27,6 +27,12 @@ fi
 [[ "\$1 \$2" == "get gateway" && -f "${TMP}/gw" ]] && cat "${TMP}/gw"
 [[ "\$1 \$2" == "get namespaces" && -f "${TMP}/ns" ]] && cat "${TMP}/ns"
 [[ "\$1" == "get" && "\$2" == namespaces,* && -f "${TMP}/snap" ]] && sort "${TMP}/snap"
+# \${TMP}/crds lists the cluster's CRDs; \`delete crd\` removes names from it and logs the call.
+[[ "\$1 \$2" == "get crd" && -f "${TMP}/crds" ]] && sed 's#^#customresourcedefinition.apiextensions.k8s.io/#' "${TMP}/crds"
+if [[ "\$1 \$2" == "delete crd" ]]; then
+  echo "\$*" >> "${TMP}/crd-deletes"
+  for n in "\${@:3}"; do [[ "\$n" == --* ]] || { grep -vxF "\$n" "${TMP}/crds" > "${TMP}/crds.new"; mv "${TMP}/crds.new" "${TMP}/crds"; }; done
+fi
 exit 0
 STUB
 chmod +x "${TMP}/bin/kubectl"
@@ -210,6 +216,64 @@ E2E_SPEC_DIR="$FIX" "$RUNNER" fx/cleanfail --no-prompt >/dev/null 2>&1
 grep -qx "CLEANUP BLOCK FAILED: fx/cleanfail" "${TMP}/work/leftovers.txt" 2>/dev/null \
   && ok "failed cleanup block listed in leftovers.txt" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
 
+# A cleanup block's exit code is its last command's. A failed command before it
+# still counts, unless it only failed with NotFound.
+mkclean() {  # mkclean <name> <cleanup script line>
+  cat > "${FIX}/fx/$1.yaml" <<YAML
+lab: ${LAB}
+description: fixture $1
+tier: t0
+requires: []
+timeout: 30
+steps:
+  - probe: "fixture probe"
+    script: |
+      echo hi
+    assert:
+      - contains: "hi"
+cleanup:
+  - probe: "cleanup"
+    script: |
+      $2
+      true
+YAML
+}
+mkclean midfail 'echo "Error from server (Forbidden): rlc is forbidden" >&2; false'
+mkclean midnotfound 'echo "Error from server (NotFound): rlc not found" >&2; false'
+rm -f "${TMP}/work/leftovers.txt"
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/midfail --no-prompt >/dev/null 2>&1
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/midnotfound --no-prompt >/dev/null 2>&1
+[[ "$(outcome_of midfail)" == *"cleanup_fail=1" ]] && grep -qx "CLEANUP BLOCK FAILED: fx/midfail" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "a failed command before the last cleanup line is reported" || fail "midfail outcome: '$(outcome_of midfail)'"
+[[ "$(outcome_of midnotfound)" != *cleanup_fail* ]] && ! grep -q midnotfound "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "a NotFound in cleanup is not a failure" || fail "midnotfound outcome: '$(outcome_of midnotfound)'"
+
+# A timed-out lab whose cleanup is killed is listed once under leftovers.
+cat > "${FIX}/fx/slowclean.yaml" <<YAML
+lab: ${LAB}
+description: fixture slowclean
+tier: t0
+requires: []
+timeout: 1
+steps:
+  - probe: "slow"
+    script: |
+      sleep 30
+cleanup:
+  - probe: "slow cleanup"
+    script: |
+      sleep 30
+YAML
+rm -f "${TMP}/work/leftovers.txt"
+E2E_CLEANUP_GRACE=1 E2E_SPEC_DIR="$FIX" "$RUNNER" fx/slowclean --no-prompt >/dev/null 2>&1
+[[ "$(grep -c "CLEANUP INCOMPLETE: fx/slowclean" "${TMP}/work/leftovers.txt" 2>/dev/null)" == 1 ]] \
+  && ok "killed cleanup listed once" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
+
+# A --report run whose report cannot be written exits non-zero.
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --no-prompt --report=/dev/null/nope 2>&1)"; rc=$?
+[[ $rc != 0 && "$out" == *"report build failed"* ]] && ok "report failure fails the run" \
+  || fail "report failure (rc=$rc): $(printf '%s' "$out" | tail -3)"
+
 # Baseline drift in a single-lab run is persisted for the report.
 mkfix drifter t0 "" 30 "echo '80|changed' > ${TMP}/gw; echo hi" hi
 echo "80|agentgateway-config" > "${TMP}/gw"
@@ -220,7 +284,7 @@ grep -qx "BASELINE DRIFT: fx/drifter" "${TMP}/work/leftovers.txt" 2>/dev/null \
   && ok "single-lab drift written to leftovers.txt" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
 [[ "$(outcome_of drifter)" == "status=fail "*"drift=1" ]] && ok "drift=1 in the outcome" || fail "drifter outcome: '$(outcome_of drifter)'"
 
-# --uninstall-base lists namespaces that were not in detect-env's snapshot.
+# --uninstall-base compares against the record --install-base wrote.
 mkdir -p "${FIX}/_base"
 for n in 901-uninstall-monitoring 902-uninstall-agentgateway; do
   cat > "${FIX}/_base/${n}.yaml" <<YAML
@@ -235,21 +299,62 @@ steps:
       echo ok
 YAML
 done
-echo '{"class":"vind","namespaces":["default","kube-system"]}' > "${TMP}/work/env.json"
+REC="${TMP}/work/base-install.json"
+# The teardown probe: prints existing_install from ${TMP}/existing (empty when absent).
+cat > "${TMP}/bin/detect-env-stub" <<STUB
+#!/usr/bin/env bash
+echo "existing_install: \$(cat "${TMP}/existing" 2>/dev/null)"
+STUB
+chmod +x "${TMP}/bin/detect-env-stub"
+export E2E_DETECT_ENV="${TMP}/bin/detect-env-stub"
+# detect-env's namespace list is not what the uninstall compares against.
+echo '{"class":"vind","namespaces":["default","kube-system","mcp"]}' > "${TMP}/work/env.json"
+echo '{"namespaces":["default","kube-system"],"existing_install":"","crds_only":false,"crds":["old.monitoring.coreos.com","keep.example.io"]}' > "$REC"
 printf 'default Active\nkube-system Active\nagw-evaluator Active\nmcp Active\n' > "${TMP}/ns"
-rm -f "${TMP}/work/leftovers.txt"
+printf '%s\n' old.monitoring.coreos.com keep.example.io podmonitors.monitoring.coreos.com \
+  httproutes.gateway.networking.k8s.io stray.enterpriseagentgateway.solo.io > "${TMP}/crds"
+rm -f "${TMP}/work/leftovers.txt" "${TMP}/crd-deletes"
 out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" --uninstall-base 2>&1)"; rc=$?
 [[ $rc == 1 && "$out" == *"LEFTOVER NAMESPACE: mcp (Active)"* ]] && ok "uninstall names a leftover namespace and exits 1" \
   || fail "uninstall (rc=$rc): $(printf '%s' "$out" | tail -5)"
 [[ "$out" != *"LEFTOVER NAMESPACE: agw-evaluator"* ]] && ok "agw-evaluator is not a leftover" || fail "agw-evaluator flagged"
 grep -qx "LEFTOVER NAMESPACE: mcp (Active)" "${TMP}/work/leftovers.txt" 2>/dev/null \
   && ok "leftover namespace written to leftovers.txt" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
-echo '{"class":"vind"}' > "${TMP}/work/env.json"
+grep -q "podmonitors.monitoring.coreos.com" "${TMP}/crd-deletes" 2>/dev/null && ! grep -q "old.monitoring" "${TMP}/crd-deletes" \
+  && ok "deletes only the monitoring CRDs the session added" || fail "crd deletes: $(cat "${TMP}/crd-deletes" 2>/dev/null)"
+grep -qx "LEFTOVER CRD: stray.enterpriseagentgateway.solo.io" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "a CRD the session added is a leftover" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
+grep -q "LEFTOVER CRD: .*gateway.networking" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && fail "Gateway API CRD flagged as leftover" || ok "Gateway API CRDs are not leftovers"
+grep -q "^KEPT: 1 Gateway API CRD" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "kept Gateway API CRDs are listed" || fail "leftovers: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
+[[ -s "$REC" ]] && ok "a failed uninstall keeps the record" || fail "record removed after a failed uninstall"
+
+# A clean uninstall exits 0 and drops the record.
+printf 'default Active\nkube-system Active\n' > "${TMP}/ns"
+printf '%s\n' old.monitoring.coreos.com keep.example.io > "${TMP}/crds"
 rm -f "${TMP}/work/leftovers.txt"
-out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" --uninstall-base 2>&1)"
-grep -q "NAMESPACE CHECK NOT RUN" "${TMP}/work/leftovers.txt" 2>/dev/null \
-  && ok "missing snapshot is reported, not passed silently" || fail "no snapshot: $(cat "${TMP}/work/leftovers.txt" 2>/dev/null)"
-rm -f "${TMP}/work/env.json" "${TMP}/ns" "${TMP}/work/leftovers.txt"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" --uninstall-base 2>&1)"; rc=$?
+[[ $rc == 0 && "$out" == *"Baseline removed."* && ! -e "$REC" ]] && ok "clean uninstall exits 0 and removes the record" \
+  || fail "clean uninstall (rc=$rc): $(printf '%s' "$out" | tail -5)"
+
+# No record: nothing is removed.
+rm -rf "${TMP}/work/leftovers.txt" "${TMP}/work/_base"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" --uninstall-base 2>&1)"; rc=$?
+[[ $rc == 1 && ! -d "${TMP}/work/_base/901-uninstall-monitoring" ]] && grep -q "^BASE NOT REMOVED: no record" "${TMP}/work/leftovers.txt" 2>/dev/null \
+  && ok "no record: refuses and removes nothing" || fail "no record (rc=$rc): $(printf '%s' "$out" | tail -3)"
+
+# An install from before the session is never removed.
+for pre in '"existing_install":"agentgateway-system","crds_only":false' '"existing_install":"","crds_only":true'; do
+  echo "{\"namespaces\":[\"default\"],${pre},\"crds\":[]}" > "$REC"
+  rm -rf "${TMP}/work/leftovers.txt" "${TMP}/work/_base"
+  out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" --uninstall-base 2>&1)"; rc=$?
+  [[ $rc == 1 && "$out" == *"before this session"* && ! -d "${TMP}/work/_base/901-uninstall-monitoring" ]] \
+    && grep -q "^BASE NOT REMOVED: Enterprise Agentgateway was installed before this session" "${TMP}/work/leftovers.txt" 2>/dev/null \
+    && ok "pre-existing install kept (${pre%%,*})" || fail "pre-existing (rc=$rc): $(printf '%s' "$out" | tail -3)"
+done
+rm -f "${TMP}/work/env.json" "${TMP}/ns" "${TMP}/crds" "${TMP}/crd-deletes" "${TMP}/work/leftovers.txt" "$REC"
+unset E2E_DETECT_ENV
 rm -rf "${FIX}/_base" "${TMP}/work/_base"
 
 # --report / --report-only: flag parsing and the no-run path.
@@ -266,6 +371,12 @@ grep -q "routing/rpt" "$MD" 2>/dev/null && ok "--report-only reads existing outc
 run "--report-only --track mcp builds the mcp report" 0 "-vind-mcp.md" --report-only="$RPT" --track mcp --env vind
 (cd "$TMP" && "$RUNNER" --report-only=out --env vind >/dev/null 2>&1)
 ls "${TMP}"/out/*-vind-adhoc.md >/dev/null 2>&1 && ok "--report-only=out creates a relative dir" || fail "relative dir not created"
+# The report uses the class the run used, not env.json's.
+echo '{"class":"kind"}' > "${TMP}/work/env.json"
+run "--report-only --env overrides env.json's class" 0 "-eks-mcp.md" --report-only="$RPT" --track mcp --env eks
+"$RUNNER" --track mcp --env gke --resolve-creds --no-prompt >/dev/null 2>&1
+run "--report-only without --env uses the track run's class" 0 "-gke-mcp.md" --report-only="$RPT" --track mcp
+rm -f "${TMP}/work/env.json" "${TMP}/work/track-env-mcp"
 run "--report-only rejects a positional argument" 2 "--report-only takes no positional argument" --report-only routing/rpt
 run "--report-only rejects a bare directory word" 2 "--report-only takes no positional argument" --report-only "$RPT"
 [[ ! -d "${TMP}/work/.run.lock" ]] && ok "--report-only takes no lock" || fail "lock left behind"

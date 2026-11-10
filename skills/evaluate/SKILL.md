@@ -24,9 +24,9 @@ Run:
 ./e2e/lib/detect-env.sh
 ```
 
-Exit 0: continue. Exit 2: stop and show the message; it names the missing CLI, missing PyYAML, a bash older than 4, an unsupported server version, a missing LoadBalancer, or the permissions to grant with `kubectl apply -f rbac/evaluator.yaml`. Exit 1: the cluster is unreachable, so ask the user to fix their kubeconfig. See `skills/detect-environment/SKILL.md`.
+Exit 0: continue. Exit 2: stop and show the message; it names the missing CLI, missing PyYAML, a bash older than 4, an unsupported server version, a missing LoadBalancer, or the permissions to grant with `kubectl apply -f rbac/evaluator.yaml`. Exit 1: show the error; usually the cluster is unreachable, so ask the user to fix their kubeconfig. See `skills/detect-environment/SKILL.md`.
 
-If `existing_install` in `e2e/.work/env.json` is non-empty, say what it names and ask before continuing.
+If `existing_install` in `e2e/.work/env.json` is non-empty, say what it names and ask before continuing. Tell the user that the base install in step 4 upgrades that install in place, and that the session will not remove it at the end.
 
 ## 2. Choose track and mode
 
@@ -107,7 +107,9 @@ Then offer the four options from that skill once, for the whole set, and do noth
 
 ## 7. Keep or remove the base
 
-Ask whether to keep or remove the base install. If they keep it:
+If `existing_install` was non-empty in step 1, the install was there before the session, and `--uninstall-base` refuses to remove it. Do not offer removal. Tell the user it stays and log `keep-base` as below.
+
+Otherwise ask whether to keep or remove the base install. If they keep it:
 
 ```bash
 e2e/lib/session-log.sh add keep-base - "base install kept at the user's request"
@@ -119,7 +121,7 @@ Otherwise:
 ./e2e/run-e2e.sh --uninstall-base
 ```
 
-It removes the base, lists any `LEFTOVER NAMESPACE:` that was not on the cluster when detection ran, and writes `e2e/.work/env-teardown.json`. Show `existing_install` from that file and confirm it is empty. If the command exits non-zero, show what it names; the report lists the same lines under Leftovers.
+It removes the base and the `monitoring.coreos.com` CRDs the base added. It compares the cluster with `e2e/.work/base-install.json`, the record `--install-base` wrote, and prints `LEFTOVER NAMESPACE:` and `LEFTOVER CRD:` for anything the session added that remains. It keeps the Gateway API CRDs because they are cluster-wide, and prints how many it kept. It writes `e2e/.work/env-teardown.json`. Show `existing_install` from that file and confirm it is empty. If the command exits non-zero, show what it names; the report lists the same lines under Leftovers. `BASE NOT REMOVED:` means there was no record or the install predates the session, and nothing was removed.
 
 ## 8. Build and show the report
 

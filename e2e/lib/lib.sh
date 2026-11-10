@@ -29,7 +29,8 @@ E2E_RC=0
 E2E_OUT=""          # path to the last block's captured output
 E2E_LAST=""         # last block's output, in memory
 E2E_CLEANUP_DONE=0
-E2E_CLEANUP_FAIL=0  # cleanup blocks that exited non-zero (tolerated, but reported)
+E2E_CLEANUP_FAIL=0  # cleanup blocks with a failed command (tolerated, but reported)
+E2E_BLOCK_ERRS=0    # commands that failed in the last cleanup block (ERR trap)
 E2E_PHASE=""
 E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
@@ -72,9 +73,15 @@ e2e_run_block() {
     # `tail -n1` still finds a bare `-w '%{http_code}'` number, and the
     # separating newline is required — concatenating a meter with no trailing
     # newline glues it onto stdout's first line and breaks `^HTTP/` matches.
+    # A cleanup block's exit code is its last command's, so an ERR trap counts
+    # the commands that failed before it (a Forbidden delete, then a namespace
+    # wait that succeeds).
+    E2E_BLOCK_ERRS=0
+    [[ "$E2E_PHASE" == "cleanup" ]] && trap 'E2E_BLOCK_ERRS=$((E2E_BLOCK_ERRS + 1))' ERR
     # shellcheck disable=SC1090
     source "$block" >"${E2E_OUT}.stdout" 2>"${E2E_OUT}.stderr"
     E2E_RC=$?
+    trap - ERR
     if [[ -s "${E2E_OUT}.stderr" ]]; then
       { cat "${E2E_OUT}.stderr"; printf '\n'; cat "${E2E_OUT}.stdout"; } >"$E2E_OUT"
     else
@@ -104,7 +111,15 @@ e2e_run_block() {
   local suffix=""
   (( attempt > 1 )) && suffix=" ${DIM}(attempt ${attempt}/${attempts})${NC}"
 
-  if [[ "$E2E_RC" -eq 0 ]]; then
+  local cleanup_err=""
+  if [[ "$E2E_PHASE" == "cleanup" && "$E2E_RC" -eq 0 && "$E2E_BLOCK_ERRS" -gt 0 ]]; then
+    cleanup_err="$(e2e_cleanup_error_line)"
+  fi
+
+  if [[ -n "$cleanup_err" ]]; then
+    printf "  ${CYAN}▸${NC} %-58s ${DIM}ran (a command failed, tolerated): %s${NC}\n" "$label" "$cleanup_err"
+    E2E_CLEANUP_FAIL=$((E2E_CLEANUP_FAIL + 1))
+  elif [[ "$E2E_RC" -eq 0 ]]; then
     printf "  ${CYAN}▸${NC} %-58s ${DIM}ran${NC}%b\n" "$label" "$suffix"
   elif [[ "$allow" == "1" ]]; then
     printf "  ${CYAN}▸${NC} %-58s ${DIM}ran (rc=%s, tolerated)${NC}\n" "$label" "$E2E_RC"
@@ -119,6 +134,14 @@ e2e_run_block() {
 
   [[ "$E2E_VERBOSE" == "1" ]] && e2e_dump_output
   return 0
+}
+
+# e2e_cleanup_error_line: the first error line in the last block's output that
+#   is not a NotFound. Cleanup runs after a lab that failed part-way, so deleting
+#   something the lab never created is expected and does not count.
+e2e_cleanup_error_line() {
+  grep -E '^(Error from server|error:|Error:)' <<<"$E2E_LAST" \
+    | grep -viE 'NotFound|not found' | head -n1 | cut -c1-160
 }
 
 e2e_dump_output() {

@@ -37,11 +37,18 @@ kubectl apply -f rbac/evaluator.yaml
 The script embeds the cluster CA in the kubeconfig. It takes the CA from the
 current context, or from the `kube-root-ca.crt` ConfigMap when the context skips
 TLS verification (vind and some kind setups), and `--ca-file <path>` supplies it
-directly. The script prints an `export KUBECONFIG=...` line. Run it, then run the
-evaluation as the `agw-evaluator` identity. Options:
+directly. With the `kube-root-ca.crt` CA, the kubeconfig verifies the apiserver
+as `kubernetes.default.svc`, the name pods use with that CA, because the address
+such a context connects to is often missing from the apiserver certificate.
+`--tls-server-name <name>` sets a different name. The script copies
+`tls-server-name` and `proxy-url` from the current context. It checks that the
+new kubeconfig reaches the cluster, then prints an `export KUBECONFIG=...` line;
+when the check fails it deletes the kubeconfig and prints the error. Run the
+export line, then run the evaluation as the `agw-evaluator` identity. Options:
 
 ```bash
 ./rbac/mint-kubeconfig.sh --duration 24h --out /path/to/evaluator.kubeconfig --ca-file /path/to/ca.crt
+./rbac/mint-kubeconfig.sh --tls-server-name kubernetes
 ```
 
 The default token lifetime is 8 hours and the default output is

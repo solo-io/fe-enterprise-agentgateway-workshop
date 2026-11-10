@@ -2,10 +2,11 @@
 """report.py: build the evaluation report from a run's outcome files.
 
 Usage:
-  report.py build --work DIR --track <llm|mcp|adhoc> --env-json PATH
+  report.py build --work DIR --track <llm|mcp|adhoc> --env-json PATH [--env-class C]
                   --session PATH --out DIR [--specs-dir D] [--tracks-dir T]
       writes <out>/<YYYYMMDD-HHMMSS>-<class>-<track>.md and .json (UTC; -1, -2
-      appended when that name exists), prints both paths
+      appended when that name exists), prints both paths. <class> is --env-class
+      when given, else the env json's class
   report.py build --work DIR --custom <name> --env-json PATH --session PATH --out DIR
       the single-row report for custom-labs/<name> (key custom/<name>), written as
       <stamp>-<class>-custom-<name>.md and .json; adds a Runs section. Reads
@@ -184,13 +185,20 @@ def track_use_cases(track, env_class, specs_dir, tracks_dir):
             for uc in data.get("use_cases") or []], statuses
 
 
-def build_data(work, track, env_json, session, specs_dir, tracks_dir, custom=None):
+def build_data(work, track, env_json, session, specs_dir, tracks_dir, custom=None, env_class=None):
     try:
         with open(env_json, encoding="utf-8") as fh:
             env = json.load(fh)
     except (OSError, ValueError) as exc:
         print(f"report.py: cannot read env json {env_json}: {exc}", file=sys.stderr)
         raise SystemExit(2)
+    # The class the run planned with (run-e2e.sh --env) wins over the detected
+    # one, so the title, the file name and the NOT APPLICABLE rows match the run.
+    if env_class and env_class != env.get("class"):
+        env = dict(env)
+        if "class" in env:
+            env["detected_class"] = env["class"]
+        env["class"] = env_class
     events = read_session(session)
     if custom:
         # A custom report covers only its own lab: session-wide events (no lab)
@@ -336,7 +344,7 @@ def render_markdown(data):
 
 def cmd_build(args):
     data = build_data(args.work, args.track, args.env_json, args.session, args.specs_dir, args.tracks_dir,
-                      custom=args.custom)
+                      custom=args.custom, env_class=args.env_class)
     stamp = datetime.datetime.strptime(data["generated_at"], "%Y-%m-%dT%H:%M:%SZ").strftime("%Y%m%d-%H%M%S")
     suffix = f"custom-{args.custom}" if args.custom else args.track
     base = f"{stamp}-{data['environment'].get('class') or 'unknown'}-{suffix}"
@@ -393,6 +401,7 @@ def main(argv=None):
     which.add_argument("--track")
     which.add_argument("--custom", help="build the single-row report for custom-labs/<name>")
     b.add_argument("--env-json", required=True)
+    b.add_argument("--env-class", help="the class the run used (run-e2e.sh --env); overrides the env json's class")
     b.add_argument("--session", required=True)
     b.add_argument("--out", required=True)
     b.add_argument("--specs-dir", default=tracks.DEFAULT_SPECS)

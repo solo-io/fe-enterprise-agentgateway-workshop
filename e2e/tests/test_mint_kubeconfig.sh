@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests for rbac/mint-kubeconfig.sh's cluster CA handling. Offline: kubectl is a
 # stub. MINT_CA selects what the admin context carries (none or data) and
-# MINT_CM whether kube-root-ca.crt answers.
+# MINT_CM whether kube-root-ca.crt answers. MINT_CA=named adds tls-server-name and
+# proxy-url to the context; MINT_VERIFY=fail fails the check of the new kubeconfig.
 E2E="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MINT="${E2E}/../rbac/mint-kubeconfig.sh"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
@@ -12,12 +13,18 @@ case "$*" in
   "config view --raw --minify -o json")
     if [[ "$MINT_CA" == data ]]; then
       echo '{"clusters":[{"cluster":{"server":"https://10.0.0.1:6443","certificate-authority-data":"Q09OVEVYVA=="}}]}'
+    elif [[ "$MINT_CA" == named ]]; then
+      echo '{"clusters":[{"cluster":{"server":"https://10.0.0.1:6443","certificate-authority-data":"Q09OVEVYVA==","tls-server-name":"api.internal","proxy-url":"socks5://127.0.0.1:1080"}}]}'
     else
       echo '{"clusters":[{"cluster":{"server":"https://10.0.0.1:6443","insecure-skip-tls-verify":true}}]}'
     fi ;;
   "get configmap kube-root-ca.crt -n default"*)
     [[ "$MINT_CM" == yes ]] && printf -- '-----BEGIN CERTIFICATE-----\nTESTPEM\n-----END CERTIFICATE-----' ;;
   "create token"*) echo tok123 ;;
+  "--kubeconfig "*" get --raw /version")
+    if [[ "${MINT_VERIFY:-}" == fail ]]; then
+      echo "Unable to connect to the server: x509: certificate is valid for kubernetes, not 10.0.0.1" >&2; exit 1
+    fi ;;
 esac
 exit 0
 STUB
@@ -49,6 +56,22 @@ MINT_CA=none MINT_CM=no mint --ca-file "${TMP}/ca.pem"
 
 MINT_CA=data MINT_CM=yes mint
 [[ $RC == 0 && "$(ca_of)" == CONTEXT ]] && ok "context CA wins over the ConfigMap" || fail "rc=$RC ca=$(ca_of)"
+grep -q 'tls-server-name' "$OUT_K" && fail "tls-server-name set for a context CA" || ok "no tls-server-name for a context CA"
+
+MINT_CA=none MINT_CM=yes mint
+grep -q 'tls-server-name: kubernetes.default.svc' "$OUT_K" && ok "kube-root-ca.crt CA verifies as kubernetes.default.svc" \
+  || fail "kubeconfig: $(cat "$OUT_K")"
+
+MINT_CA=none MINT_CM=yes mint --tls-server-name my.api
+grep -q 'tls-server-name: my.api' "$OUT_K" && ok "--tls-server-name wins" || fail "kubeconfig: $(cat "$OUT_K")"
+
+MINT_CA=named MINT_CM=yes mint
+grep -q 'tls-server-name: api.internal' "$OUT_K" && grep -q 'proxy-url: socks5://127.0.0.1:1080' "$OUT_K" \
+  && ok "context tls-server-name and proxy-url are carried" || fail "kubeconfig: $(cat "$OUT_K")"
+
+MINT_VERIFY=fail MINT_CA=none MINT_CM=yes mint
+[[ $RC == 1 && "$OUT" == *x509* && ! -e "$OUT_K" ]] && ok "a kubeconfig that cannot connect is removed and named" \
+  || fail "rc=$RC: $OUT"
 
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 [[ "$T_FAIL" -eq 0 ]]

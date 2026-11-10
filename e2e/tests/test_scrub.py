@@ -47,7 +47,9 @@ class TestRules(unittest.TestCase):
         slack = "xo" + "xb-" + "1234567890-abcdefABCDEF"
         pat = "github" + "_pat_" + "11ABCDEFG0123456789"
         gkey = "AI" + "za" + "SyA1b2C3d4E5f6G7h8"
-        for token in (gh, slack, pat, gkey):
+        aws_long = "AK" + "IA" + "ABCDEFGHIJKLMNOP"
+        aws_sts = "AS" + "IA" + "ABCDEFGHIJKLMNOP"
+        for token in (gh, slack, pat, gkey, aws_long, aws_sts):
             self.assertIn(("secret-prefix", token), self.hits("token: %s" % token), token)
 
     def test_base64_blob(self):
