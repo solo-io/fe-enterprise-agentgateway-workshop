@@ -1,6 +1,6 @@
 # Changelog
 
-0.15.3 - (11-10-26)
+0.15.3 - (11-11-26)
 ---
 - Add an evaluation agent (Alpha): an AI agent in Claude Code or Codex runs the workshop labs on your own test cluster, explains each one, and writes a local report. Run `/evaluate` in Claude Code, or start from `AGENTS.md` and the README section `## Alpha: Evaluate with an agent`
   - `/evaluate`: runs the LLM or MCP track, explains each lab before it runs, stops on the first failure, cleans up every lab and the base install, and writes a local report
