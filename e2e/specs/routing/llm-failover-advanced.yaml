@@ -110,6 +110,23 @@ steps:
   - section: "Apply the Combined Configuration"
     run: all
 
+  # The section above restarts the 1-replica proxy. `rollout status` returns
+  # while the old pod drains (60s grace period), and the load balancer can
+  # still send the test requests to it. Their access-log lines then leave with
+  # that pod, and the order probe below reads nothing. Wait until the new pod
+  # is the only one.
+  - probe: "the restarted proxy pod is the only one before the test requests"
+    script: |
+      for i in $(seq 1 60); do
+        n=$(kubectl get pods -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy \
+          --no-headers 2>/dev/null | wc -l | tr -d ' ')
+        [ "$n" = 1 ] && break
+        sleep 2
+      done
+      echo "proxy_pods=$n"
+    assert:
+      - contains: "proxy_pods=1"
+
   - section: "Test the Combined Behavior"
     run: all
     retry:
@@ -133,10 +150,12 @@ steps:
       - contains: "api.openai.com:443"
 
   - probe: "group 2 was only reached after both group-1 providers were evicted"
+    # Reads the one proxy pod through `deploy/`, bounded by time instead of a
+    # line count.
     script: |
-      kubectl logs -n agentgateway-system \
-        -l app.kubernetes.io/name=agentgateway-proxy --tail 200 \
-        | grep 'route=agentgateway-system/combined-failover' \
+      logs="$(kubectl logs -n agentgateway-system deploy/agentgateway-proxy --since=10m)"
+      echo "log_lines=$(wc -l <<<"$logs" | tr -d ' ')"
+      grep 'route=agentgateway-system/combined-failover' <<<"$logs" \
         | grep -oE 'endpoint=[a-z0-9.:-]+' | awk '!seen[$0]++' | head -5
     retry:
       attempts: 6

@@ -234,6 +234,22 @@ visible to later probes too (the MCP spec defines `mcp_init`/`mcp_rpc` once).
 **Anything asynchronous needs `retry`.** Route programming, policy attachment, and
 label-selector backend discovery all complete after `kubectl apply` returns.
 
+**A draining proxy pod still serves requests.** After a scale-down or `rollout
+restart`, the old pod drains for up to 60s and the load balancer can still send it
+requests. Their access-log lines leave with the pod. Before sending requests that a
+log probe will read, wait until the proxy has the expected pod count.
+
+**Don't swap a backend pod right before a test request.** After a scale to 0 or a
+rollout, the gateway keeps the old pod's address for a while, and a request to it
+hangs on connect until the request timeout. Deploy the failing backend at the start
+of the lab instead.
+
+**Don't retry a loop that spends a rate-limit budget.** Each attempt counts against
+the limit. Confirm the limit is enforced, clear the counters in place with
+`kubectl exec deploy/ext-cache-enterprise-agentgateway -- redis-cli FLUSHALL`, and
+run the measured loop once. A `rollout restart` of ext-cache also clears them, but
+the rate limiter fails open (one `500`, then uncounted `200`s) while it reconnects.
+
 **Drivers run with no `set -e`, `-u`, or `-o pipefail`,** deliberately, to match
 a reader's terminal. `pipefail` breaks `cmd | grep -q`: grep exits at the first
 match, the producer takes SIGPIPE, and the pipeline reports failure. It only

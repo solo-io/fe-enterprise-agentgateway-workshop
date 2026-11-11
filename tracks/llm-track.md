@@ -163,13 +163,12 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 ---
 
-### Use Case 9 — Resilience, Evaluations & Load Testing
+### Use Case 9 — Resilience & Load Testing
 
-**Value:** Validate model quality, test capacity limits, and tune autoscaling before a production rollout.
+**Value:** Test capacity limits and tune autoscaling before a production rollout.
 
 | Lab | What you'll learn |
 |---|---|
-| [Evaluate OpenAI Model Performance](../labs/evaluations/evaluate-openai-model-performance.md) | Run structured LLM evaluations |
 | [LLM Load Testing with k6](../labs/load-testing/llm-load-testing-k6.md) | Ramping and constant load patterns; integration with Grafana |
 | [Production Observability, Alerting, and Scaling](../labs/observability/production-observability-alerting-and-scaling.md) | Dashboards, alert rules, and HPA guidance |
 

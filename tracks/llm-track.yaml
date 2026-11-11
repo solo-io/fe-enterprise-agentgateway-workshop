@@ -116,10 +116,9 @@ use_cases:
       - spec: inference/configure-inference-routing-with-vllm
         lab: labs/inference/configure-inference-routing-with-vllm.md
         status: no-spec
-  - name: Resilience, Evaluations & Load Testing
-    value: Validate model quality, test capacity limits, and tune autoscaling before a production rollout.
+  - name: Resilience & Load Testing
+    value: Test capacity limits and tune autoscaling before a production rollout.
     labs:
-      - spec: evaluations/evaluate-openai-model-performance
       - spec: load-testing/llm-load-testing-k6
         lab: labs/load-testing/llm-load-testing-k6.md
         status: no-spec

@@ -6,15 +6,15 @@ In this lab, you'll learn how timeout, retry, and backoff policies interact toge
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
 ## Lab Objectives
-- Deploy a mock OpenAI server
+- Deploy two mock OpenAI servers: one healthy, and one that answers every request with `503`
 - Configure a combined timeout and retry policy with backoff
 - Observe how timeouts, retries, and backoff work together
 - Test different backoff configurations to see their impact on retry behavior
 - See retry attempts in logs when retries exhaust the timeout
 
-## Create a Mock vLLM Server
+## Create the Mock vLLM Servers
 
-Deploy the mock server:
+Deploy the healthy mock server:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -81,9 +81,80 @@ spec:
 EOF
 ```
 
+Deploy a second mock server that answers every request with `503 Service Unavailable`. `--failure-injection-rate 100` makes the vLLM simulator fail every request, and `--failure-types server_error` makes each failure a `503`. Both mocks run for the whole lab, so the gateway already knows the failing mock's endpoint when you test retries:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-gpt-4o-503
+  namespace: agentgateway-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-gpt-4o-503
+  template:
+    metadata:
+      labels:
+        app: mock-gpt-4o-503
+    spec:
+      containers:
+      - args:
+        - --model
+        - mock-gpt-4o
+        - --port
+        - "8000"
+        - --max-loras
+        - "2"
+        - --lora-modules
+        - '{"name": "food-review-1"}'
+        - --failure-injection-rate
+        - "100"
+        - --failure-types
+        - server_error
+        image: ghcr.io/llm-d/llm-d-inference-sim:latest
+        imagePullPolicy: IfNotPresent
+        name: vllm-sim
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.namespace
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-gpt-4o-503-svc
+  namespace: agentgateway-system
+  labels:
+    app: mock-gpt-4o-503
+spec:
+  selector:
+    app: mock-gpt-4o-503
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: 8000
+      name: http
+  type: ClusterIP
+EOF
+```
+
 ## Configure Route and Model
 
-Create the HTTPRoute and the `AgentgatewayModel` for the mock server:
+Create an HTTPRoute and an `AgentgatewayModel` for each mock server. `/openai` goes to the healthy mock and `/openai-503` goes to the failing one:
 
 ```bash
 kubectl apply -f - <<EOF
@@ -126,6 +197,46 @@ spec:
     transformations:
       - field: model
         expression: '"mock-gpt-4o"'
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mock-openai-503
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /openai-503
+      backendRefs:
+        - group: agentgateway.dev
+          kind: AgentgatewayModel
+          name: "*"
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayModel
+metadata:
+  name: mock-openai-503
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai-503
+  match:
+    model: "*"
+  provider: OpenAI
+  baseURL: http://mock-gpt-4o-503-svc.agentgateway-system.svc.cluster.local:8000/v1
+  policies:
+    auth:
+      passthrough: {}
+    transformations:
+      - field: model
+        expression: '"mock-gpt-4o"'
 EOF
 ```
 
@@ -157,6 +268,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: mock-openai
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai-503
   traffic:
     timeouts:
       request: 100ms
@@ -211,19 +325,13 @@ You should receive a successful `200 OK` response.
 Start tailing the AgentGateway logs in one terminal:
 
 ```bash
-kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
+kubectl logs -n agentgateway-system deploy/agentgateway-proxy --tail 20
 ```
 
-Back in the original terminal, scale the mock server deployment to 0 to trigger 503 errors:
+Back in the original terminal, send a request to the failing mock:
 
 ```bash
-kubectl scale deployment/mock-gpt-4o -n agentgateway-system --replicas=0
-```
-
-Make a request:
-
-```bash
-curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
+curl -i "$GATEWAY_IP:8080/openai-503/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -249,13 +357,13 @@ request timeout
 Check the agentgateway logs, you should see that the request was retried a few times before the timeout. The access log is a single logfmt line; these are the relevant fields from it:
 
 ```
-http.status=504 retry.attempt=3 error="request timeout" reason=Timeout duration=102ms
+http.status=504 retry.attempt=3 error="request timeout" reason=Timeout duration=101ms
 ```
 
 ### What Happened?
 
-1. Request sent to scaled-down backend (no pods available)
-2. 503 Service Unavailable returned
+1. Request sent to the failing mock server
+2. The mock returns 503 Service Unavailable
 3. Gateway retries automatically (up to 10 attempts configured)
 4. Only 3 retries completed: the 25ms backoff delays consume the timeout window quickly
 5. 100ms timeout exceeded after retry attempt 3
@@ -279,6 +387,9 @@ spec:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: mock-openai
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mock-openai-503
   traffic:
     timeouts:
       request: 2s
@@ -292,10 +403,10 @@ EOF
 
 The longer 2s timeout leaves room for several 200ms backoff delays before the request times out.
 
-Make another request with the mock server still scaled to 0:
+Send another request to the failing mock:
 
 ```bash
-curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
+curl -i "$GATEWAY_IP:8080/openai-503/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -311,13 +422,13 @@ curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
 Check the logs to see the retry attempts with backoff delays:
 
 ```bash
-kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
+kubectl logs -n agentgateway-system deploy/agentgateway-proxy --tail 20
 ```
 
 You should see output similar to:
 
 ```
-http.status=504 retry.attempt=7 error="request timeout" reason=Timeout duration=2003ms
+http.status=504 retry.attempt=9 error="request timeout" reason=Timeout duration=2001ms
 ```
 
 ### Observing Backoff Behavior
@@ -329,7 +440,7 @@ With a 200ms backoff and 2s timeout, the gateway will make approximately:
 - Retry 3: ~600ms
 - ...continuing until timeout
 
-The total time consumed = (retry attempts × backoff delay) + network latency. With 200ms backoff and 2s timeout, you should see around **7 retry attempts** before the timeout is reached.
+The total time consumed = (retry attempts × backoff delay) + network latency. With 200ms backoff and 2s timeout, you should see around **9 retry attempts** before the timeout is reached.
 
 ## Cleanup
 
@@ -345,8 +456,8 @@ Delete the lab resources:
 
 ```bash
 kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system timeout-retry-policy
-kubectl delete httproute -n agentgateway-system mock-openai
-kubectl delete agentgatewaymodel -n agentgateway-system mock-openai
-kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc
-kubectl delete -n agentgateway-system deploy/mock-gpt-4o
+kubectl delete httproute -n agentgateway-system mock-openai mock-openai-503
+kubectl delete agentgatewaymodel -n agentgateway-system mock-openai mock-openai-503
+kubectl delete -n agentgateway-system svc/mock-gpt-4o-svc svc/mock-gpt-4o-503-svc
+kubectl delete -n agentgateway-system deploy/mock-gpt-4o deploy/mock-gpt-4o-503
 ```
