@@ -1,5 +1,5 @@
 lab: labs/routing/timeouts-and-retries.md
-description: request timeout + 503 retry with backoff, verified via 504 and retry logs
+description: request timeout + 503 retry with backoff against an always-503 mock, verified via 504 and retry logs
 tier: t0
 requires: []
 timeout: 600
@@ -8,9 +8,14 @@ timeout: 600
 # its Cleanup scales back to 2, so the baseline is restored. Cleanup runs from an
 # EXIT trap, so that holds even if an assertion fails partway through.
 steps:
-  - section: "Create a Mock vLLM Server"
+  # blocks: [1] healthy mock  [2] mock with 100% server_error (503) injection.
+  # The failing mock exists from the start on purpose: when a mock pod is
+  # replaced mid-lab (scale to 0, or a rollout that turns on injection), the
+  # gateway keeps the old pod's address for a while, the request hangs on
+  # connect until the timeout, and no 503 ever reaches the retry policy.
+  - section: "Create the Mock vLLM Servers"
     run: all
-    wait: "--for=condition=Available deploy/mock-gpt-4o -n agentgateway-system --timeout=300s"
+    wait: "--for=condition=Available deploy/mock-gpt-4o deploy/mock-gpt-4o-503 -n agentgateway-system --timeout=300s"
 
   - section: "Configure Route and Model"
     run: all
@@ -18,6 +23,21 @@ steps:
   - section: "Scale AgentGateway to 1 Replica"
     run: all
     wait: "--for=condition=Available deploy/agentgateway-proxy -n agentgateway-system --timeout=300s"
+
+  # The removed pod drains for up to 60s and can still take requests from the
+  # load balancer, and its access-log lines leave with it. The probes below
+  # read `deploy/`, so every request must land on the pod that stays.
+  - probe: "the proxy is down to the one pod the probes read"
+    script: |
+      for i in $(seq 1 60); do
+        n=$(kubectl get pods -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy \
+          --no-headers 2>/dev/null | wc -l | tr -d ' ')
+        [ "$n" = 1 ] && break
+        sleep 2
+      done
+      echo "proxy_pods=$n"
+    assert:
+      - contains: "proxy_pods=1"
 
   # blocks: [1] apply 100ms timeout / 10 retries / 25ms backoff  [2] get policies
   - section: "Configure Timeout and Retry Policy"
@@ -39,13 +59,13 @@ steps:
       - status: 200
       - contains: "mock-gpt-4o"
 
-  # blocks: [1] tail logs (pre-failure, nothing to assert)  [2] scale mock to 0
-  #         [3] the request that should now time out
+  # blocks: [1] tail logs (pre-failure, nothing to assert)
+  #         [2] the request to /openai-503 that should time out
   - section: "Trigger Timeout and Retry Behavior"
-    run: [1, 2]
+    run: [1]
 
   - section: "Trigger Timeout and Retry Behavior"
-    run: [3]
+    run: [2]
     retry:
       attempts: 6
       delay: 3
@@ -54,17 +74,17 @@ steps:
       - status: 504
       - contains: "request timeout"
 
-  # The access log is logfmt (`retry.attempt=3 ... duration=102ms`), not the JSON
-  # object the lab prints as its expected output. The lab's *numbers* are right:
-  # ~3 retries inside the 100ms budget, ~7 inside the 2s budget.
+  # The access log is logfmt (`retry.attempt=3 ... duration=101ms`): about 3
+  # retries inside the 100ms budget and about 9 inside the 2s budget.
   #
-  # `kubectl logs -l` concatenates the pods one after another, so a bare `tail -1`
-  # returns the last line of whichever pod is listed last, not the newest 504.
-  # Sort on the leading RFC3339 timestamp instead — which means no `--prefix`,
-  # since that would put the pod name ahead of the timestamp in the sort key.
+  # The lab scales the proxy to 1 replica, and the second pod can still be
+  # terminating when this runs. `kubectl logs -l` lists that pod and then fails
+  # with `pods "..." not found` once it is gone, so read `deploy/`, which picks
+  # one ready pod. The sort on the leading RFC3339 timestamp stays, so the probe
+  # reads the newest 504 (no `--prefix`, which would sort on the pod name).
   - probe: "the 100ms budget allowed ~3 retries before the 504"
     script: |
-      line="$(kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy \
+      line="$(kubectl logs -n agentgateway-system deploy/agentgateway-proxy \
         --tail 40 | grep -E 'http.status=504' | sort | tail -1)"
       # Kept for the 2s probe below, which asserts the comparison rather than a
       # sampled attempt count. Blocks share one shell, so this carries forward.
@@ -94,23 +114,13 @@ steps:
     assert:
       - contains: "agentgateway-proxy"
 
-  # Deliberately does NOT assert a retry count. The policy retries `codes: [503]`
-  # only, and the lab produces failure by scaling the mock to 0 — so whether the
-  # proxy answers a zero-endpoint Service with a quick 503 (retried, many
-  # attempts) or simply hangs until the request timeout (no retry at all, and no
-  # `retry.attempt` field in the log) is a race. Three runs on this cluster
-  # measured 7, 4, and none, so any count assertion here — a sampled `[5-9]`, a
-  # bracketed `[3-9]`, or even "at least as many as the 100ms budget" — fails for
-  # reasons that have nothing to do with the gateway working.
-  #
-  # What IS invariant is the timeout: the request runs the full ~2s window, which
-  # is exactly what proves the new policy took effect, since the 100ms policy caps
-  # the same request at ~1xx ms. The retry count is echoed for diagnosis only.
-  # The lab's documented `retry.attempt=7` is likewise only one sample — see
-  # HANDOFF §8.
+  # The always-503 mock answers at once, so the retry count is fixed by the
+  # backoff: measured 9 retries in the 2s window and 3 in the 100ms window on
+  # every run. The 7-10 band allows for scheduling jitter on a busy node and
+  # still fails if the policy stopped retrying.
   - probe: "the 2s timeout took effect and ran the full window"
     script: |
-      line="$(kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy \
+      line="$(kubectl logs -n agentgateway-system deploy/agentgateway-proxy \
         --tail 60 | grep -E 'http.status=504' | sort | tail -1)"
       echo "$line"
       echo "attempts_2s=$(grep -oE 'retry\.attempt=[0-9]+' <<<"$line" | cut -d= -f2 || true) attempts_100ms=${E2E_ATT_100MS:-unset}"
@@ -118,6 +128,7 @@ steps:
       - contains: "http.status=504"
       - contains: "reason=Timeout"
       - matches: 'duration=200[0-9]ms'
+      - matches: 'retry\.attempt=([7-9]|10)\b'
 
 cleanup:
   section: "Cleanup"

@@ -1,0 +1,9 @@
+track: t
+title: Stale Track
+use_cases:
+  - name: First
+    value: First value.
+    labs:
+      - spec: routing/a
+        lab: labs/a.md
+        status: no-spec

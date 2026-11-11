@@ -14,7 +14,7 @@ steps:
   - section: "Get Gateway IP"
     run: all
     assert:
-      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[a-z0-9.-]+\.'
 
   - section: "Run the MCP Inspector"
     run: none

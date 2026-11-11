@@ -1,0 +1,3 @@
+lab: labs/gated.md
+tier: excluded
+reason: Needs a browser.

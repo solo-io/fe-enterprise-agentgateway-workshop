@@ -1,0 +1,5 @@
+lab: labs/x.md
+tier: excluded
+reason: >-
+  Needs a live Keycloak
+  server.

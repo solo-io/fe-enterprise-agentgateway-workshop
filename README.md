@@ -36,18 +36,18 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 > **Start here.** All other labs depend on these two.
 
-- [001 — Install Enterprise Agentgateway](001-install-enterprise-agentgateway.md)
-- [002 — Set Up Monitoring Tools](002-set-up-monitoring-tools.md)
+- [001: Install Enterprise Agentgateway](001-install-enterprise-agentgateway.md)
+- [002: Set Up Monitoring Tools](002-set-up-monitoring-tools.md)
 
 > **OpenShift users:** Use the OpenShift-specific versions instead:
 >
-> [001 — Install Enterprise Agentgateway (OCP)](labs/installation/openshift/001-set-up-enterprise-agentgateway-ocp.md)
+> [001: Install Enterprise Agentgateway (OCP)](labs/installation/openshift/001-set-up-enterprise-agentgateway-ocp.md)
 >
-> [002 — Set Up Monitoring Tools (OCP)](labs/installation/openshift/002-set-up-monitoring-tools-ocp.md)
+> [002: Set Up Monitoring Tools (OCP)](labs/installation/openshift/002-set-up-monitoring-tools-ocp.md)
 
 > **Air-gapped / private-registry users:** Use the air-gap variant that mirrors all chart-managed images into a private registry:
 >
-> [001 — Install Enterprise Agentgateway (Air-Gap)](labs/installation/airgap/001-airgap.md)
+> [001: Install Enterprise Agentgateway (Air-Gap)](labs/installation/airgap/001-airgap.md)
 
 ---
 
@@ -141,12 +141,12 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 - [In-Cluster MCP](labs/mcp/in-cluster-mcp.md)
 - [Remote MCP](labs/mcp/remote-mcp.md)
-- [OpenAPI to MCP — External API](labs/mcp/openapi-to-mcp-external-api.md)
-- [OpenAPI to MCP — In-Cluster Deployment](labs/mcp/openapi-to-mcp-in-cluster.md)
+- [OpenAPI to MCP: External API](labs/mcp/openapi-to-mcp-external-api.md)
+- [OpenAPI to MCP: In-Cluster Deployment](labs/mcp/openapi-to-mcp-in-cluster.md)
 - [MCP Tool Federation](labs/mcp/mcp-tool-federation.md)
-- [Composable MCP — Tool Aggregation & Orchestration](labs/mcp/composable-mcp.md): one tool call fans out to distinct MCP + HTTP backends and merges the responses (vs. federation, which routes each call)
-- [MCP Tool Mode — Search](labs/mcp/mcp-tool-mode-search.md)
-- [MCP Tool Mode — Code](labs/mcp/mcp-tool-mode-code.md)
+- [Composable MCP: Tool Aggregation & Orchestration](labs/mcp/composable-mcp.md): one tool call fans out to distinct MCP + HTTP backends and merges the responses (vs. federation, which routes each call)
+- [MCP Tool Mode: Search](labs/mcp/mcp-tool-mode-search.md)
+- [MCP Tool Mode: Code](labs/mcp/mcp-tool-mode-code.md)
 - [MCP Tool Rate Limiting](labs/mcp/mcp-tool-rate-limiting.md) _(see also: Rate Limiting)_
 - [MCP BYO gRPC External Authorization (ext-authz)](labs/mcp/mcp-byo-grpc-ext-authz.md) _(see also: Security)_
 - [Guard MCP Tool Calls with an External Policy Server](labs/mcp/mcp-guardrails.md): per-persona tool lists, argument-based purchase-order limits, email allowlists, and redaction of tool results, with fail-closed and fail-open processors _(see also: Guardrails, Security)_
@@ -220,7 +220,7 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 > Strategies for upgrading Enterprise Agentgateway without dropping traffic.
 
-- [In-Place Rolling Upgrades — Validate Zero Downtime](labs/upgrades/in-place-rolling-upgrades.md)
+- [In-Place Rolling Upgrades: Validate Zero Downtime](labs/upgrades/in-place-rolling-upgrades.md)
 - [Blue/Green Upgrades Across Namespaces](labs/upgrades/blue-green-namespaces.md)
 - [Multi-Cluster Upgrades](labs/upgrades/multi-cluster-upgrades.md): upgrade a whole cluster while a peer serves the same global LLM over an ambient multicluster mesh
 
@@ -232,6 +232,16 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [LLM Access, Centralized: The Platform as Provider](labs/platform-engineering/centralized-llm-ops-helm-chart.md): LLM backends are a vendor relationship, so the platform runs LLM consumption as an internal product: a model-alias catalog, per-team API keys and token budgets, one chart, no self-service
 - [Networking Architecture: Every Connection in a Single-Cluster Install](labs/platform-engineering/networking-architecture.md): how the controller, proxies, extension services, and observability stack communicate: every port, protocol, and initiator, with a connection reference table for firewall and NetworkPolicy planning
 - [Admission Control with Kyverno](labs/platform-engineering/kyverno-admission-control.md)
+
+---
+
+## Alpha: Evaluate with an agent
+
+An AI agent can run the LLM or MCP track against your own cluster, explain each lab, and write a local report. To start it from the repo root, run `/evaluate` in Claude Code, or tell Codex to read `AGENTS.md` and run the evaluate skill. See [AGENTS.md](AGENTS.md) for prerequisites, the identity to run as, and the hard rules the agent follows.
+
+The same agent can also build a custom lab for your own scenario. Run `/adapt-lab` in Claude Code, or tell Codex to read `AGENTS.md` and run the adapt-lab skill, then name the labs to start from or describe what you need. The agent writes a proposal, waits for your approval, then writes a lab and an e2e spec under `custom-labs/<name>/` and runs the spec on your cluster until every requirement passes. The folder is gitignored and stays on your machine.
+
+To contribute a custom lab back to the workshop, run `/contribute-lab <name>` in Claude Code, or tell Codex to read `AGENTS.md` and run the contribute-lab skill; the agent commits the lab on a new version branch, shows you the diff, and pushes only when you say yes. It works from a clone of this repo or of your fork.
 
 ---
 

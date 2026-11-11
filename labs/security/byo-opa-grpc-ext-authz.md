@@ -870,7 +870,7 @@ kubectl delete deployment -n agentgateway-system opa-ext-authz
 kubectl delete service -n agentgateway-system opa-ext-authz
 kubectl delete configmap -n agentgateway-system opa-ext-authz-config
 # If you completed the bundle alternative
-kubectl delete deployment -n agentgateway-system opa-bundle-server 2>/dev/null
-kubectl delete service -n agentgateway-system opa-bundle-server 2>/dev/null
-kubectl delete configmap -n agentgateway-system opa-bundle-files 2>/dev/null
+kubectl delete deployment -n agentgateway-system opa-bundle-server --ignore-not-found
+kubectl delete service -n agentgateway-system opa-bundle-server --ignore-not-found
+kubectl delete configmap -n agentgateway-system opa-bundle-files --ignore-not-found
 ```

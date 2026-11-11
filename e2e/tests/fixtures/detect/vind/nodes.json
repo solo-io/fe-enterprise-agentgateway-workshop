@@ -1,0 +1,38 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "cluster1",
+        "labels": {
+          "kubernetes.io/hostname": "cluster1"
+        }
+      },
+      "spec": {
+        "providerID": "vcluster://cluster1"
+      },
+      "status": {
+        "allocatable": {
+          "cpu": "4",
+          "memory": "16000000Ki"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "name": "worker-1",
+        "labels": {
+          "kubernetes.io/hostname": "worker-1"
+        }
+      },
+      "spec": {
+        "providerID": "vcluster://worker-1"
+      },
+      "status": {
+        "allocatable": {
+          "cpu": "4",
+          "memory": "16000000Ki"
+        }
+      }
+    }
+  ]
+}

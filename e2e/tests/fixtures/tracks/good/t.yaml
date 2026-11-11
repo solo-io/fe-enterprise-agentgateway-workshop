@@ -1,0 +1,12 @@
+track: t
+title: Test Track
+use_cases:
+  - name: First
+    value: First value.
+    labs:
+      - spec: routing/a
+      - spec: routing/b
+  - name: Second
+    value: Second value.
+    labs:
+      - spec: routing/c

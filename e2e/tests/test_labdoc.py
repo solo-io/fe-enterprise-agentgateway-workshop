@@ -1,6 +1,7 @@
 """Tests for labdoc.py — pure parse/plan logic, no cluster needed."""
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -109,6 +110,19 @@ class TestDriver(unittest.TestCase):
         body = driver.split("e2e_define_cleanup() {")[1].split("}")[0]
         self.assertIn("e2e_phase cleanup", body)
 
+    def test_only_proving_steps_record_their_result(self):
+        # req-spec.yaml: step 1 proves nothing, step 2 proves R1.
+        self.assertNotIn("e2e_step_", self.build())
+        driver = labdoc.build_driver(LAB, os.path.join(FIX, "req-spec.yaml"), tempfile.mkdtemp(), "/REPO")
+        lines = driver.splitlines()
+        begin, end = lines.index("e2e_step_begin"), lines.index("e2e_step_end 2 R1")
+        self.assertEqual(driver.count("e2e_step_begin"), 1)
+        # The wrapper encloses step 2's block and its assertions, nothing of step 1.
+        inside = lines[begin + 1:end]
+        self.assertEqual(sum(l.startswith("e2e_run_block") for l in inside), 1)
+        self.assertTrue(any(l.startswith("assert_status 200 ") for l in inside))
+        self.assertFalse(any(l.startswith("e2e_wait") for l in inside))
+
 
 class TestUncovered(unittest.TestCase):
     def test_uncovered_sections_lists_only_unnamed(self):
@@ -146,6 +160,105 @@ class TestResourceVerb(unittest.TestCase):
             _y.safe_dump(bad, f); path = f.name
         with self.assertRaises(SystemExit):
             labdoc.build_driver(LAB, path, tempfile.mkdtemp(), repo_root="/REPO")
+
+
+class TestRequirements(unittest.TestCase):
+    def spec(self, **kw):
+        base = {"lab": "x.md", "steps": [{"section": "A", "assert": [{"status": 200}]}]}
+        base.update(kw)
+        return base
+
+    def test_no_requirements_key_is_clean(self):
+        self.assertEqual(labdoc.check_requirements(self.spec()), [])
+
+    def test_requirement_without_step_reported(self):
+        s = self.spec(requirements=[{"id": "R1", "text": "no token is rejected"}])
+        errs = labdoc.check_requirements(s)
+        self.assertEqual(errs, ["requirement R1 has no step that proves it"])
+
+    def test_proves_unknown_id_reported(self):
+        s = self.spec(requirements=[{"id": "R1", "text": "t"}],
+                      steps=[{"section": "A", "proves": ["R9"], "assert": [{"status": 401}]}])
+        errs = labdoc.check_requirements(s)
+        self.assertIn("step 1 proves undeclared requirement R9", errs)
+        self.assertIn("requirement R1 has no step that proves it", errs)
+
+    def test_proving_step_without_assert_reported(self):
+        s = self.spec(requirements=[{"id": "R1", "text": "t"}],
+                      steps=[{"section": "A", "proves": ["R1"]}])
+        self.assertEqual(labdoc.check_requirements(s),
+                         ["step 1 proves R1 but has no assert"])
+
+    def test_requirement_missing_id_or_text_reported(self):
+        s = self.spec(requirements=[{"id": "R1"}, {"text": "no id"}])
+        errs = labdoc.check_requirements(s)
+        self.assertIn("requirement 1 has no text", errs)
+        self.assertIn("requirement 2 has no id", errs)
+
+    def test_covered_requirement_is_clean(self):
+        s = self.spec(requirements=[{"id": "R1", "text": "t"}],
+                      steps=[{"section": "A", "proves": ["R1"], "assert": [{"status": 401}]}])
+        self.assertEqual(labdoc.check_requirements(s), [])
+
+    def test_lint_cli_fails_on_uncovered_requirement(self):
+        spec = os.path.join(FIX, "req-spec.yaml")
+        proc = subprocess.run([sys.executable, os.path.join(HERE, "..", "lib", "labdoc.py"),
+                               "lint", LAB, spec], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn("requirement R2 has no step that proves it", proc.stdout + proc.stderr)
+
+    def test_parked_step_with_reason_and_assert_has_no_assert(self):
+        s = self.spec(requirements=[{"id": "R1", "text": "t"}],
+                      steps=[{"section": "A", "proves": ["R1"], "run": "none",
+                              "reason": "parked", "assert": [{"status": 200}]}])
+        self.assertEqual(labdoc.check_requirements(s), ["step 1 proves R1 but has no assert"])
+
+
+class TestCustomRequirements(unittest.TestCase):
+    """labdoc.py lint --custom: the stricter rules for a user's custom lab."""
+
+    def spec(self, **kw):
+        base = {"lab": "x.md", "requirements": [{"id": "R1", "text": "t"}],
+                "steps": [{"section": "A", "proves": ["R1"], "assert": [{"status": 200}]}]}
+        base.update(kw)
+        return base
+
+    def test_clean_custom_spec(self):
+        self.assertEqual(labdoc.check_requirements(self.spec(), custom=True), [])
+
+    def test_no_requirements(self):
+        s = self.spec(requirements=[], steps=[{"section": "A", "assert": [{"status": 200}]}])
+        self.assertEqual(labdoc.check_requirements(s, custom=True), ["custom spec declares no requirements"])
+        s.pop("requirements")
+        self.assertEqual(labdoc.check_requirements(s, custom=True), ["custom spec declares no requirements"])
+        self.assertEqual(labdoc.check_requirements(s), [])
+
+    def test_proves_on_resource_step(self):
+        s = self.spec(steps=[{"resource": "deployment/x", "jsonpath": "{.a}", "expect": "1", "proves": ["R1"]}])
+        errs = labdoc.check_requirements(s, custom=True)
+        self.assertIn("step 1 proves R1 but is a resource check", errs)
+        self.assertNotIn("step 1 proves R1 but has no assert", errs)
+
+    def test_run_none_without_reason(self):
+        s = self.spec(steps=[{"section": "A", "proves": ["R1"], "assert": [{"status": 200}]},
+                             {"section": "B", "run": "none"}])
+        self.assertEqual(labdoc.check_requirements(s, custom=True), ["step 2 has run: none and no reason"])
+        s["steps"][1]["reason"] = "covered elsewhere"
+        self.assertEqual(labdoc.check_requirements(s, custom=True), [])
+        s["steps"][1].pop("reason")
+        self.assertEqual(labdoc.check_requirements(s), [])
+
+    def test_lint_cli_custom_flag(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            spec = os.path.join(tmp, "spec.yaml")
+            with open(spec, "w") as fh:
+                fh.write("lab: x.md\ntier: t0\nsteps:\n  - section: \"Send a request\"\n")
+            cli = [sys.executable, os.path.join(HERE, "..", "lib", "labdoc.py"), "lint"]
+            proc = subprocess.run(cli + ["--custom", LAB, spec], capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            self.assertIn("custom spec declares no requirements", proc.stdout)
+            proc = subprocess.run(cli + [LAB, spec], capture_output=True, text=True)
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
 
 if __name__ == "__main__":

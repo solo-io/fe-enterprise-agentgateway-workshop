@@ -1,0 +1,14 @@
+lab: e2e/tests/fixtures/custom-labs/keptroute/keptroute.md
+description: fixture custom lab that adds an HTTPRoute in the baseline namespace
+tier: t0
+timeout: 60
+requirements:
+  - id: R1
+    text: the lab makes a route
+steps:
+  - section: "Make a route"
+    proves: [R1]
+    assert:
+      - contains: "made a route"
+cleanup:
+  section: "Cleanup"

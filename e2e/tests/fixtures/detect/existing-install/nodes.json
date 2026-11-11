@@ -1,0 +1,38 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "name": "ip-10-0-1-1",
+        "labels": {
+          "kubernetes.io/hostname": "ip-10-0-1-1"
+        }
+      },
+      "spec": {
+        "providerID": "aws:///us-west-2a/ip-10-0-1-1"
+      },
+      "status": {
+        "allocatable": {
+          "cpu": "4",
+          "memory": "16000000Ki"
+        }
+      }
+    },
+    {
+      "metadata": {
+        "name": "ip-10-0-1-2",
+        "labels": {
+          "kubernetes.io/hostname": "ip-10-0-1-2"
+        }
+      },
+      "spec": {
+        "providerID": "aws:///us-west-2a/ip-10-0-1-2"
+      },
+      "status": {
+        "allocatable": {
+          "cpu": "4",
+          "memory": "16000000Ki"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "enabledMcpjsonServers": ["solo-knowledge"],
+  "permissions": {
+    "deny": [
+      "WebSearch",
+      "WebFetch",
+      "Bash(sudo:*)",
+      "Bash(kubectl delete crd:*)",
+      "Bash(kubectl delete crds:*)",
+      "Bash(kubectl delete customresourcedefinition:*)",
+      "Bash(kubectl delete customresourcedefinitions:*)"
+    ],
+    "ask": [
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)"
+    ]
+  }
+}

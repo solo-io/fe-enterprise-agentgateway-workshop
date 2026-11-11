@@ -1,0 +1,46 @@
+# Static checks for the harness and the agent layer (skills, AGENTS.md, e2e/lib,
+# rbac). Every test here runs offline against stub kubectl and helm.
+#
+# Not run here, because they need a cluster: ./e2e/run-e2e.sh lab runs,
+# --install-base and --uninstall-base, detect-env.sh against a real context, and
+# rbac/mint-kubeconfig.sh against a real API server. No secrets are used.
+name: agent-layer
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  static-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML and jq
+        run: |
+          python3 -m pip install pyyaml
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq
+          bash --version | head -1
+          jq --version
+
+      - name: Python tests
+        run: python3 -m unittest discover -s e2e/tests
+
+      - name: Shell tests
+        run: |
+          rc=0
+          for t in e2e/tests/*.sh; do
+            echo "::group::$t"
+            bash "$t" || { echo "::error file=$t::$t failed"; rc=1; }
+            echo "::endgroup::"
+          done
+          exit "$rc"

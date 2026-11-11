@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Stub kubectl for test_detect_env.sh. DETECT_FIXTURE names the fixture dir,
+# falling back to ../_default. DETECT_LOG collects create/delete calls.
+BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fx() { local f="${DETECT_FIXTURE}/$1"; [[ -e "$f" ]] || f="${BIN}/../_default/$1"; cat "$f"; }
+has() { [[ -e "${DETECT_FIXTURE}/$1" ]]; }
+args="$*"
+case "$args" in
+  "config current-context") fx context ;;
+  "get nodes -o json") fx nodes.json ;;
+  "version -o json") fx version.json ;;
+  "version --client -o json") echo '{"clientVersion": {"gitVersion": "v1.34.0"}}' ;;
+  "auth whoami -o json") fx whoami.json ;;
+  "get namespaces -o name") fx namespaces ;;
+  api-resources*config.openshift.io*) has openshift && echo "clusteroperators" ;;
+  "get crd "*) has crd && echo "customresourcedefinition/x" || { echo "NotFound" >&2; exit 1; } ;;
+  "get svc e2e-lb-probe"*)
+    if has lb-ingress; then echo '{"status": {"loadBalancer": {"ingress": [{"ip": "172.18.0.50"}]}}}'
+    else echo '{"status": {"loadBalancer": {}}}'; fi ;;
+  "auth can-i "*)
+    want="${args#auth can-i }"
+    if [[ -e "${DETECT_FIXTURE}/can-i-no" ]] && grep -qxF "$want" "${DETECT_FIXTURE}/can-i-no"; then echo no; exit 1; fi
+    if [[ -e "${DETECT_FIXTURE}/can-i-notype" ]] && grep -qxF "$want" "${DETECT_FIXTURE}/can-i-notype"; then
+      echo "Warning: the server doesn't have a resource type 'x' in group 'y'" >&2; echo no; exit 1; fi
+    if [[ -e "${DETECT_FIXTURE}/can-i-error" ]] && grep -qxF "$want" "${DETECT_FIXTURE}/can-i-error"; then
+      echo "Error from server: apiserver unavailable" >&2; exit 1; fi
+    echo yes ;;
+  create*) echo "create $args" >> "$DETECT_LOG"; cat >/dev/null ;;
+  delete*) echo "delete $args" >> "$DETECT_LOG" ;;
+esac
+exit 0

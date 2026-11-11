@@ -51,7 +51,7 @@ steps:
   - section: "Run the CrewAI Two-Agent Crew"
     run: [3]
     assert:
-      - matches: 'Using base_url: http://[0-9.]+:8080/openai/v1'
+      - matches: 'Using base_url: http://[a-z0-9.-]+:8080/openai/v1'
       - contains: "AI Gateway key patterns and concepts"
       - contains: "FINAL BLOG POST:"
       - not_contains: "Traceback"

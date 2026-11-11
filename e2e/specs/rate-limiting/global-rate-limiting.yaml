@@ -36,12 +36,32 @@ steps:
   - section: "Configure a global REQUEST-based rate limit of 5 requests per hour"
     run: all
 
+  # The policy takes a few seconds to reach the proxy after `kubectl apply`. A
+  # retry on the measured loop would spend the 5-per-hour budget while the
+  # policy is still arriving, and the attempt the harness keeps starts at 429.
+  # So wait for enforcement here, then clear the counter and run the measured
+  # loop once from zero. FLUSHALL empties Redis in place: a `rollout restart`
+  # of ext-cache (the lab's documented reset, used at the top of this spec)
+  # leaves the rate limiter failing open while it reconnects, so the first
+  # request after it returned 500 and the next five returned 200 uncounted.
+  # The loop below also waits out that window from the opening restart.
+  - probe: "the 5-per-hour limit is enforced; clear its counter before the measured run"
+    script: |
+      for i in $(seq 1 30); do
+        code=$(curl -s -o /dev/null -w '%{http_code}' "$GATEWAY_IP:8080/openai/v1/chat/completions" \
+          -H 'content-type: application/json' \
+          -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}')
+        [ "$code" = 429 ] && break
+        sleep 2
+      done
+      echo "enforced_after=$i last=$code"
+      kubectl exec -n agentgateway-system deploy/ext-cache-enterprise-agentgateway -- redis-cli FLUSHALL
+    assert:
+      - contains: "last=429"
+      - contains: "OK"
+
   - section: "curl openai until the request limit trips"
     run: [1]
-    retry:
-      attempts: 4
-      delay: 10
-      until: "HTTP 429"
     assert:
       - contains: "request 1: HTTP 200"
       # 5/hour, so the sixth call is the first rejection.
@@ -221,18 +241,38 @@ steps:
   - section: "Configure mixed time windows (burst + sustained)"
     run: all
 
+  # blocks: [1] mint USER_TOKEN  [2] the burst loop
   - section: "Phase 1: exhaust the per-minute burst"
-    run: all
-    retry:
-      attempts: 3
-      delay: 20
-      until: "HTTP 429"
+    run: [1]
+
+  # Same reason as the REQUEST probe above: Phase 2 needs the hourly counter
+  # to hold only what Phase 1 spent, so a retried Phase 1 would break it.
+  - probe: "the mixed-window limits are enforced; clear their counters before Phase 1"
+    script: |
+      for i in $(seq 1 30); do
+        code=$(curl -s -o /dev/null -w '%{http_code}' "$GATEWAY_IP:8080/openai/v1/chat/completions" \
+          -H 'content-type: application/json' \
+          -H "Authorization: Bearer $USER_TOKEN" \
+          -d '{"model":"gpt-5.4-nano","messages":[{"role":"user","content":"hi"}]}')
+        [ "$code" = 429 ] && break
+        sleep 2
+      done
+      echo "enforced_after=$i last=$code"
+      kubectl exec -n agentgateway-system deploy/ext-cache-enterprise-agentgateway -- redis-cli FLUSHALL
+    assert:
+      - contains: "last=429"
+      - contains: "OK"
+
+  - section: "Phase 1: exhaust the per-minute burst"
+    run: [2]
     assert:
       - contains: "Request 1: HTTP 200"
       - contains: "HTTP 429"
 
   # The lab's point: the minute bucket resets but the hour counter did not, so
-  # 200s return briefly and then 429 arrives sooner than in Phase 1.
+  # 200s return briefly and then 429 arrives sooner than in Phase 1. Phase 1
+  # starts at the top of a minute, so its burst stays in one window and leaves
+  # room in the 50-token hourly budget for at least one request here.
   - section: "Phase 2: minute resets, hour limit takes over"
     run: all
     assert:

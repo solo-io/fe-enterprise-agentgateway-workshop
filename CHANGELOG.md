@@ -1,5 +1,18 @@
 # Changelog
 
+0.15.3 - (11-11-26)
+---
+- Add an evaluation agent (Alpha): an AI agent in Claude Code or Codex runs the workshop labs on your own test cluster, explains each one, and writes a local report. Run `/evaluate` in Claude Code, or start from `AGENTS.md` and the README section `## Alpha: Evaluate with an agent`
+  - `/evaluate`: runs the LLM or MCP track, explains each lab before it runs, stops on the first failure, cleans up every lab and the base install, and writes a local report
+  - `/adapt-lab`: builds a custom lab from one or more shipped labs for your own requirements, proves each requirement on your cluster, and keeps the result in `custom-labs/<name>/` on your machine
+  - `/contribute-lab`: turns a custom lab that passed into a shipped lab and a pull request, from a clone of this repo or of your fork, and pushes only after you approve the diff
+  - The agent writes its prose, labs, and pull requests by `skills/stop-slop/SKILL.md`: plain words, no filler, no em dashes
+  - A custom lab keeps its run files in its own folder, `custom-labs/<name>/.work/run/`, so deleting `custom-labs/<name>/` removes all of it. `/contribute-lab` leaves `.work/` out of its staging copy
+  - Nothing about your cluster goes to Solo: the agent sends only generic product questions to the Solo docs server, and the report stays on your machine
+  - `rbac/evaluator.yaml` and `rbac/mint-kubeconfig.sh` set up an `agw-evaluator` identity for the agent with no wildcards. It is privilege-equivalent to cluster-admin, so use it on disposable clusters only
+- `001-install-enterprise-agentgateway.md` Uninstall: the optional Gateway API CRD removal is its own block
+- Cleanup in `in-cluster-mcp`, `mcp-tool-federation`, `mcp-tool-mode-search`, `mcp-tool-mode-code`, `mcp-byo-grpc-ext-authz` and `mcp-tool-rate-limiting` now deletes the `mcp` namespace and waits for it to go
+
 0.15.2 - (11-4-26)
 ---
 - "View Metrics Endpoint" in 18 routing, agent-harness, agent-framework and guardrail labs: scrape every proxy replica instead of port-forwarding to one pod of the deployment

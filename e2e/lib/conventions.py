@@ -122,7 +122,7 @@ def check_gateway_ip(root, files, allow=GATEWAY_IP_ALLOW):
 def check_cleanup(root, files, allow=CLEANUP_ALLOW):
     errs = []
     for rel in files:
-        if not rel.startswith("labs/") or rel in allow:
+        if not rel.startswith(("labs/", "custom-labs/")) or rel in allow:
             continue
         text = open(os.path.join(root, rel), encoding="utf-8").read()
         if not re.search(r"^#{2,3}\s+Cleanup\s*$", text, re.MULTILINE):
@@ -191,7 +191,9 @@ def _siblings(lines, ind):
 
 def main():
     root = sys.argv[1] if len(sys.argv) > 1 else "."
-    files = md_files(root)
+    argv = sys.argv[2:]
+    named = [argv[i + 1] for i, a in enumerate(argv[:-1]) if a == "--file"]
+    files = named if named else md_files(root)
     errs = (check_links(root, files) + check_gateway_ip(root, files)
             + check_cleanup(root, files) + check_eagb(root, files)
             + check_ai_backend(root, files))

@@ -11,6 +11,10 @@ Subcommands:
   sections <lab.md>              list normalized section headings + block counts
   plan <lab.md> <spec.yaml>      emit the bash driver on stdout
   lint <lab.md> <spec.yaml>      validate the spec against the lab, no output
+  lint --custom <lab.md> <spec.yaml>
+                                 the same, plus the custom-lab rules: requirements
+                                 required, no proves on resource: steps, run: none
+                                 needs a reason
   meta <spec.yaml>               emit shell-eval'able metadata (tier/requires/timeout)
 
 A spec step is exactly one of:
@@ -139,6 +143,50 @@ def load_spec(path):
     if tier not in VALID_TIERS:
         raise SystemExit(f"{path}: invalid tier {tier!r}; expected one of {sorted(VALID_TIERS)}")
     return spec
+
+
+def check_requirements(spec, custom=False):
+    """Check the optional requirements/proves coverage. Returns a list of error strings.
+
+    custom=True adds the rules for a user's custom lab: requirements are
+    mandatory, a resource: step cannot prove one, and run: none needs a reason.
+    """
+    errs = []
+    reqs = spec.get("requirements") or []
+    if custom and not reqs:
+        errs.append("custom spec declares no requirements")
+    declared = set()
+    for i, r in enumerate(reqs, 1):
+        r = r if isinstance(r, dict) else {}
+        if not r.get("id"):
+            errs.append(f"requirement {i} has no id")
+        else:
+            declared.add(str(r["id"]))
+        if not r.get("text"):
+            errs.append(f"requirement {i} has no text")
+    proven = set()
+    for n, step in enumerate(spec.get("steps") or [], 1):
+        if custom and step.get("run") == "none" and not step.get("reason"):
+            errs.append(f"step {n} has run: none and no reason")
+        proves = [str(p) for p in (step.get("proves") or [])]
+        if not proves:
+            continue
+        has_assert = bool(step.get("assert")) and step.get("run") != "none"
+        is_resource = custom and "resource" in step
+        for rid in proves:
+            if rid not in declared:
+                errs.append(f"step {n} proves undeclared requirement {rid}")
+            else:
+                proven.add(rid)
+                if is_resource:
+                    errs.append(f"step {n} proves {rid} but is a resource check")
+                elif not has_assert:
+                    errs.append(f"step {n} proves {rid} but has no assert")
+    for r in reqs:
+        rid = str(r.get("id", "")) if isinstance(r, dict) else ""
+        if rid and rid not in proven:
+            errs.append(f"requirement {rid} has no step that proves it")
+    return errs
 
 
 # ---------------------------------------------------------------------------
@@ -290,7 +338,14 @@ def build_driver(lab_path, spec_path, workdir, repo_root):
     counter = BlockCounter()
     out = []
     for idx, step in enumerate(spec.get("steps") or [], start=1):
+        # A step that proves requirements records its own result, so the report
+        # can judge each requirement on the steps that prove it.
+        proves = [str(p) for p in (step.get("proves") or [])]
+        if proves:
+            out.append("e2e_step_begin")
         emit_step(out, step, sections, lab_path, workdir, idx, counter)
+        if proves:
+            out.append(f"e2e_step_end {idx} " + " ".join(q(p) for p in proves))
 
     cleanup_lines = []
     cleanup = spec.get("cleanup")
@@ -350,6 +405,9 @@ def main():
         return
 
     if cmd in ("plan", "lint"):
+        custom = cmd == "lint" and args[0] == "--custom"
+        if custom:
+            args = args[1:]
         lab, spec_path = args[0], args[1]
         workdir = args[2] if len(args) > 2 else os.path.join("/tmp", "e2e-lint")
         driver = build_driver(lab, spec_path, workdir, repo_root)
@@ -360,6 +418,11 @@ def main():
             missed = uncovered_sections(lab, spec_path)
             note = f"  [uncovered: {', '.join(missed)}]" if missed else ""
             print(f"{spec_path} -> {n} block(s) from {lab}{note}")
+            errs = check_requirements(load_spec(spec_path), custom=custom)
+            for e in errs:
+                print(f"  \u2717 {e}")
+            if errs:
+                sys.exit(1)
         return
 
     sys.exit(f"unknown subcommand {cmd!r}\n{__doc__}")

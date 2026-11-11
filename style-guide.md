@@ -31,7 +31,7 @@ Pick the archetype before writing; conventions differ slightly.
 1. **Lightweight flat lab** (~100–420 lines): one feature, terse, imperative. Setup → configure → test → observability → cleanup. Examples: `configure-routing-openai.md`, `in-cluster-mcp.md`, `local-token-rate-limiting.md`.
 2. **Heavyweight runbook** (~600–1100 lines): multi-system integration (IdPs, OAuth, upgrades). Numbered steps, background/why sections, ASCII architecture diagrams, troubleshooting tables, validated-version statements. Examples: `mcp-eager-auth-auth0.md`, `figma-mcp-auth0/README.md`, `in-place-rolling-upgrades.md`.
 3. **Subdirectory lab**: a runbook that ships assets (see §4).
-4. **Reference guide** (rare): no hands-on skeleton, e.g. `production-observability-alerting-and-scaling.md`, `system-requirements.md`. Prose + tables + query cookbook. Only use this shape for genuinely non-hands-on content.
+4. **Reference guide** (rare): no hands-on skeleton, e.g. `production-observability-alerting-and-scaling.md`, `system-requirements.md`. Prose + tables + query cookbook. Only use this shape for content with no hands-on steps.
 
 ## 3. Canonical lab skeleton (normative)
 
@@ -64,8 +64,8 @@ Rules:
 - **Title**: H1, Title Case, describes the outcome, no lab number. Verb-first (`# Configure Basic Routing to OpenAI`) or `<Feature> using Agentgateway` (`# Transformations using Agentgateway`) are both established; verb-first preferred for new labs.
 - **Pre-requisites boilerplate** (use verbatim): *"This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana."* Reference labs `001`/`002` by bare backticked number in this sentence; reference all other labs with relative markdown links (`[Mock OpenAI Server lab](configure-mock-openai-server.md)`, `[001 — Install...](../../001-install-enterprise-agentgateway.md)` from two levels deep).
 - **Hard requirements** (architecture, sizing, version gates) go in bold-lead blockquotes right after Pre-requisites: `> **Node architecture (important):** ...`. Labs assume the version `001` installs, so skip version gates for features that version already ships. Add one only for a feature from the last release or two, which users on a slightly older install may lack. State it plainly (*"available in **v2026.9.3 and later**"*), and remove it once the gate is a few releases old.
-- **Lab Objectives**: always present, bulleted, verb-first, e.g. `- Create a route to OpenAI using an `AgentgatewayModel` and `HTTPRoute``. Multi-part labs may use bold sub-labels: `- **Part A — Impersonation:** ...`.
-- **Step headings** (normative): for multi-step runbooks use `## Step N — Title` (em-dash; this is the dominant style; do **not** use `## Step N: Title`). Short labs skip numbering and use plain descriptive `##`/`###` Title Case headings. Use `---` horizontal rules between major sections in long labs.
+- **Lab Objectives**: always present, bulleted, verb-first, e.g. `- Create a route to OpenAI using an `AgentgatewayModel` and `HTTPRoute``. Multi-part labs may use bold sub-labels: `- **Part A: Impersonation:** ...`.
+- **Step headings** (normative): for multi-step runbooks use `## Step N: Title`. Short labs skip numbering and use plain descriptive `##`/`###` Title Case headings. Use `---` horizontal rules between major sections in long labs.
 - **Runbooks** should state what they were validated against: *"This runbook was validated against controller **v2026.6.1** on a local KinD cluster."*
 - There is no "Next Steps" section convention; cross-link related labs inline instead. `## Key Takeaways` as a closing bullet list is optional.
 
@@ -90,10 +90,11 @@ labs/mcp/<lab-name>/
 
 ## 5. Tone and voice
 
+- Follow `skills/stop-slop/SKILL.md`: plain words, no filler, no em dashes, name the actor.
 - Second person, imperative, present tense: "Create one Secret per user...", "Send a request as alice:". Occasional "we"/"let's" in verification prose is fine ("We should see...").
-- **Why-first**: every non-trivial config gets a rationale *before* the command. Three established vehicles: a `### Why ...?` sub-header, a `> **Why ...?**` blockquote at the point of a surprising choice, or a comparison table. The strongest labs explain what the client *cannot* forge/override, what fails without the setting, and what error you'd see.
+- **Why-first**: every config a reader would not guess gets a rationale *before* the command. Use a `### Why ...?` sub-header, a `> **Why ...?**` blockquote at the point of a surprising choice, or a comparison table. The strongest labs explain what the client *cannot* forge/override, what fails without the setting, and what error you'd see.
 - Be honest about limitations and report real observed numbers with versions: *"Observed result (v2026.6.1, `shutdown.max: 110`): `streams_completed`: 157, `streams_cut`: 3"*, including when the result is imperfect, with the explanation.
-- Call out gotchas at the exact step where they bite, including misleading error messages (*"a misleading 403 — it means 'malformed request', not 'no access'"*).
+- Call out gotchas at the exact step where they bite, including misleading error messages (*"a misleading 403: it means 'malformed request', not 'no access'"*).
 
 ## 6. Command-block conventions
 
@@ -137,7 +138,7 @@ export ENTERPRISE_AGW_VERSION=$(helm get metadata enterprise-agentgateway -n age
 Every mutating step is immediately followed by a check. Two accepted styles:
 
 1. **`Expected output:`** label + fenced block (use this exact casing for new labs; the repo also has `Expected Output:` / `Expected response:` / `Expected behavior:` drift). Truncate long output and say so: `Expected output (truncated):`.
-2. Prose assertion for simple cases: *"Both should return `HTTP 200`"*, *"Verify that the request is denied with a 403"*. Guardrail-style compact form: `Expected: `HTTP 403` — <message>`.
+2. Prose assertion for simple cases: *"Both should return `HTTP 200`"*, *"Verify that the request is denied with a 403"*. Guardrail-style compact form: `Expected: `HTTP 403` with <message>`.
 
 Standard verification tools:
 
@@ -218,11 +219,11 @@ Standard verification tools:
   ```
 
   Plain `#` lines for explanatory comments; numbered `# 1.` / `# 2.` comment headers to structure multi-part cleanup blocks.
-- MCP Services: use `appProtocol: agentgateway.dev/mcp` on the Service port: this is the standardized value across all labs (previously `kgateway.dev/mcp` also appeared; both worked, but the repo has since converged on `agentgateway.dev/mcp`). OpenAPI-protocol MCP backends must use the enterprise `spec.entMcp` (+ `openAPI.schemaRef`); OSS `spec.mcp` only supports `StreamableHTTP`/`SSE`.
+- MCP Services: use `appProtocol: agentgateway.dev/mcp` on the Service port: this is the standardized value across all labs. OpenAPI-protocol MCP backends must use the enterprise `spec.entMcp` (+ `openAPI.schemaRef`); OSS `spec.mcp` only supports `StreamableHTTP`/`SSE`.
 
 ## 9. Callouts, tables, diagrams, images
 
-- **Callouts (normative)**: bold-lead blockquotes such as `> **Note:** ...`, `> **Tip:** ...`, `> **Why ...?** ...`, `> **Note — <specific topic>:** ...`. This is the dominant house style. GitHub alert syntax (`> [!NOTE]`) appears only in `001` and the newest labs (WAF); either is acceptable but don't mix both within one lab. Inline `**Bold:**` lead-ins (not blockquoted) are used for structured explanation lists (`**Key Configuration Points:**`, `**What's happening:**`).
+- **Callouts (normative)**: bold-lead blockquotes such as `> **Note:** ...`, `> **Tip:** ...`, `> **Why ...?** ...`, `> **Note on <specific topic>:** ...`. This is the dominant house style. GitHub alert syntax (`> [!NOTE]`) appears only in `001` and the newest labs (WAF); either is acceptable but don't mix both within one lab. Inline `**Bold:**` lead-ins (not blockquoted) are used for structured explanation lists (`**Key Configuration Points:**`, `**What's happening:**`).
 - **Diagrams**: ASCII art in fenced code blocks. **No mermaid anywhere in the repo**; keep it that way for consistency (renders everywhere, diffable). Two established shapes: boxed left-to-right flows with numbered arrows (OAuth flows), and fan-out topologies (federation).
 - **Tables**: GitHub pipe tables for decision matrices (X vs Y), variable references, tool-name mappings, metric references, results summaries, and, in runbooks, a **Troubleshooting table** (`| Symptom | Likely cause | Fix |`).
 - **Images**: screenshots only for UI-heavy steps (IdP consoles, Grafana, Claude Desktop). Reference with relative paths (`../../images/claude-desktop/...` or `images/01-...png` in subdirectory labs). Zero-padded numbered kebab names.
@@ -258,7 +259,7 @@ kubectl delete secret -n agentgateway-system openai-secret --ignore-not-found
   ```
 
 - **k6 load scripts** are the exception: embedded inline as ConfigMap heredocs (`<<'EOF'` to protect `__ENV`) and run as `batch/v1` Jobs mounting the ConfigMap. Pin the image version (`grafana/k6:0.54.0`, not `:latest`).
-- **JWT test identities**: prefer the shared helper, `lib/jwt/generate-jwt.sh` with persona claim files in `lib/jwt/claims/` (`kid: workshop-jwt-key-001`, issuer `workshop.solo.io` chosen deliberately so lab JWTs don't cross-validate against other labs' policies). Demo keypairs must be flagged "**Demo-only — do not use outside this workshop.**" (Be aware a second, older system exists: `jwt-auth-with-rbac.md` embeds static pre-signed tokens with inline JWKS `kid: solo-public-key-001`. Don't create a third.)
+- **JWT test identities**: prefer the shared helper, `lib/jwt/generate-jwt.sh` with persona claim files in `lib/jwt/claims/` (`kid: workshop-jwt-key-001`, issuer `workshop.solo.io` chosen deliberately so lab JWTs don't cross-validate against other labs' policies). Demo keypairs must be flagged "**Demo-only: do not use outside this workshop.**" (Be aware a second, older system exists: `jwt-auth-with-rbac.md` embeds static pre-signed tokens with inline JWKS `kid: solo-public-key-001`. Don't create a third.)
 - For live-IdP labs, mint tokens via the IdP API into env vars: `export USER_JWT=$(curl ... | jq -r '.access_token')`.
 
 ## 12. Observability section
@@ -277,14 +278,14 @@ Most labs end feature work with a near-verbatim `## Observability` block; copy i
 - **Testing tiers** (pick per lab weight): (1) **MCP Inspector**: `npx @modelcontextprotocol/inspector@0.21.1` (pin the version), UI steps: Transport `Streamable HTTP`, URL `http://$GATEWAY_IP:8080/mcp`, Connect → Tools → List Tools → Run Tool; (2) **Claude Code**: `claude mcp add --transport http <name> http://$GATEWAY_IP:8080/mcp`, verify with `/mcp` and `claude mcp list`; (3) **raw curl JSON-RPC** for "under the hood" sections.
 - The canonical curl JSON-RPC sequence: `initialize` with `-i` to capture headers, extract `mcp-session-id` into `SID`, then pass `-H "Mcp-Session-Id: $SID"` on every call, always with the dual Accept header `application/json, text/event-stream`. Pipe responses to `python3 -m json.tool`. Note that with `sessionRouting: Stateless` no session id is emitted and the empty header is harmless.
 - **SSE requires single-replica session affinity**: if your lab uses `protocol: SSE`, include the replica patch and the note; StreamableHTTP/OpenAPI backends scale across replicas.
-- External APIs used by MCP labs get prereq bullets with signup links and a required/optional label (*"**FRED API key** (required — the pod won't start without it)"*); prefer key-free APIs (Open-Meteo) where possible.
+- External APIs used by MCP labs get prereq bullets with signup links and a required/optional label (*"**FRED API key** (required; the pod won't start without it)"*); prefer key-free APIs (Open-Meteo) where possible.
 - IdP console setup is documented as numbered steps under a dedicated `### <IdP> (Layer A)` heading with exact copy-paste callback URLs in fenced blocks, plus a variable reference table.
 
 ### Variant labs (multi-IdP)
 
 The established pattern is **clone-and-substitute, explicitly scoped**: copy the closest existing lab wholesale, swap the IdP-specific prereq block, env-var prefix, JWKS/issuer config, and callback URLs, and add a top-of-file blockquote declaring the delta:
 
-> **This is the Entra variant of [`../figma-mcp-auth0/`](../figma-mcp-auth0/README.md).** Only **Layer A** (the inbound MCP auth) changed — Auth0 → Entra. **Layer B is unchanged.**
+> **This is the Entra variant of [`../figma-mcp-auth0/`](../figma-mcp-auth0/README.md).** Only **Layer A** (the inbound MCP auth) changed: Auth0 → Entra. **Layer B is unchanged.**
 
 Mark unchanged sections as *"Identical to the Auth0 lab."* rather than re-explaining them. Keep verification/cleanup blocks byte-identical to the sibling except for the IdP name.
 
@@ -298,12 +299,12 @@ For a substantial new lab, the repo workflow is brainstorm → design → plan �
 
 ## 15. Repo maintenance when adding a lab
 
-**A README.md bullet and a CHANGELOG.md entry are required for every new lab, not optional cleanup.** A lab isn't done until both are updated in the same change. `tracks/` is the one exception: it's a curated, opt-in learning path, so only add a row there when the lab genuinely fits an existing `### Use Case` grouping; skip it otherwise without treating that as unfinished work.
+**A README.md bullet and a CHANGELOG.md entry are required for every new lab.** A lab isn't done until both are updated in the same change. `tracks/` is the one exception: it's a curated, opt-in learning path, so only add a row there when the lab fits an existing `### Use Case` grouping; skip it otherwise without treating that as unfinished work.
 
 **README.md** (the index):
 
 - Add a bullet under the correct `## <Category>` section: `- [Lab Title](labs/<category>/<name>.md) _(Provider)_`. Provider/tech tags in trailing italics: `_(OpenAI)_`, `_(AWS Bedrock / EKS)_`.
-- Multi-category labs are listed under **each** relevant section with reciprocal `_(see also: <Other Categories>)_` italics. An em-dash description may follow the link for complex labs.
+- Multi-category labs are listed under **each** relevant section with reciprocal `_(see also: <Other Categories>)_` italics. A colon and a short description may follow the link for complex labs.
 - New category → new `## Section`, `---` separator, and a `# Table of Contents` anchor entry.
 - Add capability bullets under `# Use Cases`.
 - Bump `## Validated on` if you validated on newer versions.
@@ -324,7 +325,7 @@ These exist in the corpus; new labs should follow the **normative** column.
 
 | Drift observed | Normative choice for new labs |
 |---|---|
-| `## Step N — Title` vs `## Step N: Title` vs unnumbered | `## Step N — Title` (em-dash) for runbooks; unnumbered `##`/`###` for short labs |
+| `## Step N: Title` vs unnumbered | `## Step N: Title` for runbooks; unnumbered `##`/`###` for short labs |
 | `kubectl apply -f -` vs `-f-` | `-f -` (with space) |
 | `Expected output:` / `Expected Output:` / `Expected response:` | `Expected output:` |
 | `> **Note:**` blockquotes vs `> [!NOTE]` alerts | Bold-lead blockquotes; don't mix styles in one lab |

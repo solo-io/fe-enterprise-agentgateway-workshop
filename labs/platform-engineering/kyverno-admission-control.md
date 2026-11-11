@@ -742,4 +742,9 @@ Now remove Kyverno itself:
 ```bash
 helm uninstall kyverno -n kyverno
 kubectl delete namespace kyverno --ignore-not-found
+
+# Kyverno's controllers create their webhook configurations at runtime, so
+# helm uninstall can leave some behind. Delete any that remain.
+kubectl delete validatingwebhookconfiguration,mutatingwebhookconfiguration \
+  -l webhook.kyverno.io/managed-by=kyverno --ignore-not-found
 ```

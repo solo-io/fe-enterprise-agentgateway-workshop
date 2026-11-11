@@ -17,7 +17,7 @@ steps:
   - section: "Step 3: Verify with MCP Inspector"
     run: [1]
     assert:
-      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'
+      - matches: '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+|[a-z0-9.-]+\.'
 
   # sessionRouting: Stateless, so $SID is expected to be empty (see the sibling
   # search-mode lab). Assert only that the step ran.

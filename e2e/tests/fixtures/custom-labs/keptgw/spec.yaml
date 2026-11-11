@@ -1,0 +1,14 @@
+lab: e2e/tests/fixtures/custom-labs/keptgw/keptgw.md
+description: fixture custom lab that rewrites the shared Gateway
+tier: t0
+timeout: 60
+requirements:
+  - id: R1
+    text: the lab changes the gateway
+steps:
+  - section: "Change the gateway"
+    proves: [R1]
+    assert:
+      - contains: "changed the gateway"
+cleanup:
+  section: "Cleanup"

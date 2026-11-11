@@ -996,8 +996,9 @@ Reuse the analyst token from the JWT section:
 export USER_TOKEN=$(./lib/jwt/generate-jwt.sh lib/jwt/claims/analyst.json)
 ```
 
-Send requests until the 20-token/minute bucket is exhausted and you hit `429`:
+Send requests until the 20-token/minute bucket is exhausted and you hit `429`. The minute window is a fixed clock minute, so the loop first waits for the next minute to start. If the burst crossed into a new minute, the extra requests that succeed would spend the hourly budget before Phase 2:
 ```bash
+sleep $((60 - 10#$(date +%S)))
 for i in $(seq 1 25); do
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
     -H "content-type: application/json" \
@@ -1026,7 +1027,7 @@ for i in $(seq 1 10); do
 done
 ```
 
-You'll see `200` responses again briefly: the minute bucket has reset. But the hourly counter never stopped: tokens from Phase 1 are still counted against the 50-token/hour budget, so you'll hit `429` again sooner than Phase 1 did. The two limits operate on independent Redis counters with independent windows; a request is denied when **either** fires.
+You'll see one or two `200` responses again: the minute bucket has reset. But the hourly counter never stopped: tokens from Phase 1 are still counted against the 50-token/hour budget, so you'll hit `429` again sooner than Phase 1 did. The two limits operate on independent Redis counters with independent windows; a request is denied when **either** fires.
 
 ## Cleanup
 ```bash

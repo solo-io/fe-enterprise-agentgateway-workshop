@@ -62,6 +62,8 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 |---|---|
 | [Configure Mock OpenAI Server](../labs/routing/configure-mock-openai-server.md) | Mock (safe sandbox for testing) |
 | [Basic Routing to OpenAI](../labs/routing/configure-routing-openai.md) | OpenAI |
+| [Migrate from AgentgatewayBackend to AgentgatewayModel](../labs/routing/migrate-agentgatewaybackend-to-agentgatewaymodel.md) | OpenAI and a mock LLM |
+| [Configure Enterprise AgentGateway for Codex](../labs/agent-harnesses/codex.md) | OpenAI (Codex CLI) |
 | [Routing to AWS Bedrock](../labs/routing/configure-routing-aws-bedrock.md) | AWS Bedrock |
 | [Routing to AWS Bedrock via API Keys](../labs/routing/configure-routing-aws-bedrock-apikey.md) | AWS Bedrock |
 | [AWS Bedrock with IRSA](../labs/routing/configure-routing-aws-bedrock-irsa.md) | AWS Bedrock / EKS |
@@ -79,6 +81,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | Lab | What you'll learn |
 |---|---|
 | [Routing by Match Type (Path, Header, Query Parameter)](../labs/routing/routing-match-types.md) | Route the same models via path, header, or query param matching |
+| [Direct Response](../labs/routing/direct-response.md) | Return a fixed HTTP response from a route without calling an LLM |
 | [Body-Based Routing](../labs/routing/configure-body-based-routing.md) | Route on request body fields (e.g., `model`, `stream`) |
 | [Semantic Routing with vLLM Semantic Router](../labs/routing/configure-semantic-routing-vllm-sr.md) | One virtual model name, routed to an economy, mid, or high tier model by prompt content via ExtProc |
 | [Semantic Routing with Jev](../labs/routing/configure-semantic-routing-jev.md) | The same tier routing, classified by Jev with a confidence gate that sends uncertain prompts to a fallback tier |
@@ -102,6 +105,8 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | [SNI Matching](../labs/security/sni-matching.md) | Route HTTPS traffic by hostname without decryption |
 | [OPA Authorization](../labs/security/opa-authorization.md) | Write custom Rego policies for fine-grained access control |
 | [LLM BYO gRPC External Authorization](../labs/security/llm-byo-grpc-ext-authz.md) | Integrate your own ext-authz service |
+| [BYO OPA gRPC External Authorization](../labs/security/byo-opa-grpc-ext-authz.md) | Run open-source OPA as a gRPC ext-authz service and protect an LLM route and an MCP route with one Rego policy |
+| [Admission Control with Kyverno](../labs/platform-engineering/kyverno-admission-control.md) | Reject unsafe backend and model manifests at the Kubernetes API server before the controller sees them |
 
 ---
 
@@ -115,6 +120,7 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | [Global Rate Limiting (Request-Based & Token-Based)](../labs/rate-limiting/global-rate-limiting.md) | Enforce cluster-wide request or token quotas with a Redis backend |
 | [Virtual Keys](../labs/security/virtual-keys.md) | Per-key token budgets with budget isolation |
 | [LLM Cost Management](../labs/observability/llm-cost-management.md) | Solo UI Cost Management dashboard: per-user/group spend, budgets, model cost catalog |
+| [Scope Solo UI Access per Team with Fine-Grained RBAC](../labs/observability/solo-ui-fine-grained-rbac.md) | Grant each team access to only its own namespace's budgets and virtual keys in the Solo UI |
 
 ---
 
@@ -157,13 +163,12 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 
 ---
 
-### Use Case 9 — Resilience, Evaluations & Load Testing
+### Use Case 9 — Resilience & Load Testing
 
-**Value:** Validate model quality, test capacity limits, and tune autoscaling before a production rollout.
+**Value:** Test capacity limits and tune autoscaling before a production rollout.
 
 | Lab | What you'll learn |
 |---|---|
-| [Evaluate OpenAI Model Performance](../labs/evaluations/evaluate-openai-model-performance.md) | Run structured LLM evaluations |
 | [LLM Load Testing with k6](../labs/load-testing/llm-load-testing-k6.md) | Ramping and constant load patterns; integration with Grafana |
 | [Production Observability, Alerting, and Scaling](../labs/observability/production-observability-alerting-and-scaling.md) | Dashboards, alert rules, and HPA guidance |
 

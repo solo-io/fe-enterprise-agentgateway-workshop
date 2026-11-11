@@ -35,7 +35,7 @@ steps:
         -o jsonpath='{range .status.listeners[*]}{.name}={range .conditions[?(@.type=="Programmed")]}{.status}{end} {end}'
       echo
     assert:
-      - matches: 'programmed=True [0-9]'
+      - matches: 'programmed=True [0-9a-z]'
       - contains: "foo:443"
       - contains: "bar:443"
       - contains: "foo=True"
@@ -54,8 +54,9 @@ steps:
   # blocks: [1] curl foo  [2] curl bar  [3] curl baz (expected to fail TLS)
   - section: "Validate connectivity to the application over HTTPS"
     run: [1]
+    # A new AWS load balancer hostname can take a couple of minutes to resolve.
     retry:
-      attempts: 8
+      attempts: 40
       delay: 3
       until: "HTTP/[0-9.]+ 200"
     assert:
@@ -66,8 +67,9 @@ steps:
 
   - section: "Validate connectivity to the application over HTTPS"
     run: [2]
+    # A new AWS load balancer hostname can take a couple of minutes to resolve.
     retry:
-      attempts: 8
+      attempts: 40
       delay: 3
       until: "HTTP/[0-9.]+ 200"
     assert:

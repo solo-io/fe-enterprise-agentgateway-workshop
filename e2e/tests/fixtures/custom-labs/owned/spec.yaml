@@ -1,0 +1,14 @@
+lab: e2e/tests/fixtures/custom-labs/owned/owned.md
+description: fixture custom lab that leaves only owned and controller-managed objects
+tier: t0
+timeout: 60
+requirements:
+  - id: R1
+    text: the step runs
+steps:
+  - section: "Leave only owned and controller objects"
+    proves: [R1]
+    assert:
+      - contains: "left owned objects"
+cleanup:
+  section: "Cleanup"

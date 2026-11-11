@@ -29,20 +29,48 @@ E2E_RC=0
 E2E_OUT=""          # path to the last block's captured output
 E2E_LAST=""         # last block's output, in memory
 E2E_CLEANUP_DONE=0
+E2E_CLEANUP_FAIL=0  # cleanup blocks with a failed command (tolerated, but reported)
+E2E_BLOCK_ERRS=0    # commands that failed in the last cleanup block (ERR trap)
+E2E_PHASE=""
 E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
 e2e_begin() {
   mkdir -p "${E2E_WORKDIR}/blocks"
   : >"${E2E_WORKDIR}/result"
+  rm -f "${E2E_WORKDIR}/steps"
 }
 
 e2e_phase() {
+  E2E_PHASE="$1"
   printf "  ${DIM}── %s ──${NC}\n" "$1"
 }
 
 e2e_note() {
   printf "  ${YELLOW}⊘${NC} %-58s ${YELLOW}SKIP${NC} — %s\n" "$1" "${2:-}"
   E2E_SKIP=$((E2E_SKIP + 1))
+}
+
+# ---------------------------------------------------------------------------
+# e2e_step_begin / e2e_step_end <step> <requirement-id...>
+#   Wrap a spec step that `proves:` requirements. e2e_step_end appends one line
+#   per id to ${E2E_WORKDIR}/steps: `step=<n> status=<pass|fail|skip> req=<id>`.
+#   fail: a block, wait or assertion in the step failed. skip: the step ran
+#   nothing (run: none). report.py builds the Requirements table from the file.
+#   A step the driver never finished (timeout, interrupt) writes no line.
+# ---------------------------------------------------------------------------
+E2E_STEP_PASS0=0; E2E_STEP_FAIL0=0; E2E_STEP_SKIP0=0
+e2e_step_begin() {
+  E2E_STEP_PASS0=$E2E_PASS; E2E_STEP_FAIL0=$E2E_FAIL; E2E_STEP_SKIP0=$E2E_SKIP
+}
+
+e2e_step_end() {
+  local n="$1" status=pass id; shift
+  if (( E2E_FAIL > E2E_STEP_FAIL0 )); then status=fail
+  elif (( E2E_PASS == E2E_STEP_PASS0 && E2E_SKIP > E2E_STEP_SKIP0 )); then status=skip
+  fi
+  for id in "$@"; do
+    printf 'step=%s status=%s req=%s\n' "$n" "$status" "$id" >>"${E2E_WORKDIR}/steps"
+  done
 }
 
 # ---------------------------------------------------------------------------
@@ -69,9 +97,15 @@ e2e_run_block() {
     # `tail -n1` still finds a bare `-w '%{http_code}'` number, and the
     # separating newline is required — concatenating a meter with no trailing
     # newline glues it onto stdout's first line and breaks `^HTTP/` matches.
+    # A cleanup block's exit code is its last command's, so an ERR trap counts
+    # the commands that failed before it (a Forbidden delete, then a namespace
+    # wait that succeeds).
+    E2E_BLOCK_ERRS=0
+    [[ "$E2E_PHASE" == "cleanup" ]] && trap 'E2E_BLOCK_ERRS=$((E2E_BLOCK_ERRS + 1))' ERR
     # shellcheck disable=SC1090
     source "$block" >"${E2E_OUT}.stdout" 2>"${E2E_OUT}.stderr"
     E2E_RC=$?
+    trap - ERR
     if [[ -s "${E2E_OUT}.stderr" ]]; then
       { cat "${E2E_OUT}.stderr"; printf '\n'; cat "${E2E_OUT}.stdout"; } >"$E2E_OUT"
     else
@@ -101,10 +135,21 @@ e2e_run_block() {
   local suffix=""
   (( attempt > 1 )) && suffix=" ${DIM}(attempt ${attempt}/${attempts})${NC}"
 
-  if [[ "$E2E_RC" -eq 0 ]]; then
+  local cleanup_err=""
+  if [[ "$E2E_PHASE" == "cleanup" && "$E2E_RC" -eq 0 && "$E2E_BLOCK_ERRS" -gt 0 ]]; then
+    cleanup_err="$(e2e_cleanup_error_line)"
+  fi
+
+  if [[ -n "$cleanup_err" ]]; then
+    printf "  ${CYAN}▸${NC} %-58s ${DIM}ran (a command failed, tolerated): %s${NC}\n" "$label" "$cleanup_err"
+    E2E_CLEANUP_FAIL=$((E2E_CLEANUP_FAIL + 1))
+  elif [[ "$E2E_RC" -eq 0 ]]; then
     printf "  ${CYAN}▸${NC} %-58s ${DIM}ran${NC}%b\n" "$label" "$suffix"
   elif [[ "$allow" == "1" ]]; then
     printf "  ${CYAN}▸${NC} %-58s ${DIM}ran (rc=%s, tolerated)${NC}\n" "$label" "$E2E_RC"
+    # A failed cleanup block may leave something on the cluster; the runner
+    # reports it as a leftover even when the lab passed.
+    [[ "$E2E_PHASE" == "cleanup" ]] && E2E_CLEANUP_FAIL=$((E2E_CLEANUP_FAIL + 1))
   else
     printf "  ${RED}✗${NC} %-58s ${RED}FAIL${NC} — block exited %s\n" "$label" "$E2E_RC"
     e2e_dump_output
@@ -113,6 +158,14 @@ e2e_run_block() {
 
   [[ "$E2E_VERBOSE" == "1" ]] && e2e_dump_output
   return 0
+}
+
+# e2e_cleanup_error_line: the first error line in the last block's output that
+#   is not a NotFound. Cleanup runs after a lab that failed part-way, so deleting
+#   something the lab never created is expected and does not count.
+e2e_cleanup_error_line() {
+  grep -E '^(Error from server|error:|Error:)' <<<"$E2E_LAST" \
+    | grep -viE 'NotFound|not found' | head -n1 | cut -c1-160
 }
 
 e2e_dump_output() {
@@ -352,7 +405,9 @@ e2e_run_cleanup() {
   # Kill anything the lab backgrounded (port-forwards, tail -f).
   jobs -p 2>/dev/null | while read -r pid; do kill "$pid" 2>/dev/null; done
 
-  if declare -F e2e_define_cleanup >/dev/null; then
+  if [[ "${E2E_KEEP:-0}" == "1" ]]; then
+    printf "  cleanup skipped (--keep)\n"
+  elif declare -F e2e_define_cleanup >/dev/null; then
     e2e_define_cleanup
   fi
   e2e_write_result
@@ -360,8 +415,8 @@ e2e_run_cleanup() {
 }
 
 e2e_write_result() {
-  printf 'pass=%s fail=%s skip=%s blocks=%s\n' \
-    "$E2E_PASS" "$E2E_FAIL" "$E2E_SKIP" "$E2E_BLOCKS" >"${E2E_WORKDIR}/result"
+  printf 'pass=%s fail=%s skip=%s blocks=%s cleanup_fail=%s\n' \
+    "$E2E_PASS" "$E2E_FAIL" "$E2E_SKIP" "$E2E_BLOCKS" "$E2E_CLEANUP_FAIL" >"${E2E_WORKDIR}/result"
 }
 
 e2e_end() {

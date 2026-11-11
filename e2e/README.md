@@ -19,7 +19,7 @@ whether it has a spec; `--lint` prints the ones that do not.
 ```
 
 Flags: `--install-base`, `--only-base`, `--tier <t0|t1-key|…>`, `--lint`,
-`--list`, `--no-prompt`, `--verbose`, `--keep-work`.
+`--list`, `--no-prompt`, `--verbose`, `--keep-work`, `--custom <name>`, `--keep`.
 
 `--list` is the authority on tiers and per-lab coverage, and `--lint` on which
 labs have no spec yet. Both are derived from `e2e/specs/`, so re-run them after
@@ -28,7 +28,7 @@ passing assertions than the last one, with nothing removed, means coverage
 stopped running.
 
 `--lint` also runs `e2e/lib/conventions.py` against every README/tracks/labs
-markdown file. It checks five things: relative `.md` links resolve, every
+markdown file. It checks that relative `.md` links resolve, every
 `export GATEWAY_IP=$(kubectl get svc ...)` block matches the canonical form in
 style-guide.md §6 byte-for-byte (labs with a legitimate different Gateway are
 allowlisted in `GATEWAY_IP_ALLOW`), every lab has a `Cleanup` section at heading level 2 or 3
@@ -40,6 +40,98 @@ allowlisted in `AI_BACKEND_ALLOW`).
 
 Requires bash ≥ 4, `python3` + PyYAML, `kubectl`, `helm`, `jq` (`k6` for the
 load-testing labs).
+
+## Custom labs
+
+`custom-labs/` at the repo root is gitignored and holds labs the adapt-lab skill
+builds for one user. Each lives in its own folder:
+
+```
+custom-labs/<name>/
+  <name>.md      the lab
+  spec.yaml      its spec; lab: custom-labs/<name>/<name>.md
+  CHANGES.md     source labs and the requirement-to-assertion table
+  reports/       --report-only output
+  assets/        optional files the lab applies
+```
+
+```bash
+./e2e/run-e2e.sh --custom <name> --lint         # spec against lab, coverage, conventions
+./e2e/run-e2e.sh --custom <name>                # run it, key custom/<name>
+./e2e/run-e2e.sh --custom <name> --keep         # run it and skip Cleanup
+./e2e/run-e2e.sh --custom <name> --report-only  # report into custom-labs/<name>/reports/
+```
+
+A custom spec declares top-level `requirements:` (a list of `id` and `text`)
+and names them in each step's `proves:` list. `--custom <name> --lint` fails when:
+
+- the spec declares no requirements
+- a requirement has no proving step
+- a proving step has no `assert`, or is a `resource:` check
+- a `proves` id is undeclared
+- a step has `run: none` and no `reason:`
+- the spec's `lab:` is not `custom-labs/<name>/<name>.md`
+
+Shipped specs under `e2e/specs/` may declare `requirements:` and `proves:` too.
+The keys are optional there, and recommended for new specs. When a shipped spec
+has them, `--lint` fails when a requirement has no proving step, a proving step
+has no `assert`, or a `proves` id is undeclared.
+
+Each step with `proves:` records its result in `e2e/.work/<key>/steps` (for a custom lab,
+`custom-labs/<name>/.work/run/steps`), one line
+per id: `step=<n> status=<pass|fail|skip> req=<id>`. The report gives every lab
+whose spec declares requirements a table under `## Requirements`, one row per
+id that ends in its result: `| R1 | <text> | PASS |`. A requirement is `PASS`
+when every step that proves it ran and failed no check, `FAIL` when one failed
+or did not run (a timeout, an interrupt), and `SKIP` when the lab was skipped,
+declined or excluded. The reason for each `FAIL` and `SKIP` follows the table.
+A requirement row judges only its own steps, so it can pass while the lab row
+fails on drift or a leftover.
+
+Every lab run except the `_base` ones snapshots namespaces, the cluster-scoped
+kinds the labs create, and the common namespaced kinds in `agentgateway-system`
+and `default`, before the lab and after its Cleanup. That is three name-only
+`kubectl get` calls per snapshot. A shipped lab only warns: the run prints
+`LEFTOVER (warning): <kind>/<name>` for anything new, the outcome records
+`leftover_warn=<n>` (`0` when clean), and the report lists the lines under
+`## Leftover warnings`. A failed snapshot on a shipped lab prints `LEFTOVER
+CHECK NOT RUN (warning)` and records `leftover_check=not-run` instead. Neither
+changes the lab's result. `--uninstall-base` keeps its own namespace and CRD
+check.
+
+A `--custom` run prints `LEFTOVER: <kind>/<name>` (or
+`LEFTOVER: <namespace> <kind>/<name>`) for anything new, and any leftover fails
+the run. Objects with an owner (a Gateway's Deployment, a Deployment's
+ReplicaSet), Helm release secrets, and the controller's `enterprise-jwks-store-*`
+ConfigMaps are not counted, since the controller manages them. `LEFTOVER CHECK
+NOT RUN` means a snapshot failed, and that fails the run too; kubectl's stderr
+is in `custom-labs/<name>/.work/run/snapshot.err`. A `--keep` run skips the check. It also skips the HTTPRoute, policy, and model inventory in the baseline-integrity guard, since the lab leaves those up on purpose, and records `inventory_check=skipped`; a change to the shared Gateway still fails a kept run. Work files, including the run's own
+`leftovers.txt`, go to `custom-labs/<name>/.work/run/`, inside the lab's folder; a custom run never writes
+the shared `e2e/.work/leftovers.txt`, and a `--track` run leaves custom files
+alone.
+
+Tracks, `--list`, `--lint`, and a plain `./e2e/run-e2e.sh` read `e2e/specs/`
+only and never see `custom-labs/`.
+
+### Contributing a custom lab
+
+The contribute-lab skill (`/contribute-lab <name>`) turns a custom lab that
+passed into a shipped lab on a new version branch. `scrub.py` and `promote.py` do the mechanical
+work on a staging copy at `e2e/.work/contribute/<name>/stage/`,
+so `custom-labs/<name>/` stays as the user left it:
+
+```bash
+python3 e2e/lib/scrub.py --summary --from-changes <stage>/CHANGES.md <stage>   # candidate leaks for the user to rule on
+python3 e2e/lib/promote.py <name> --category <cat> [--lib <asset>=<concern>] [--subdir] [--dry-run]
+python3 e2e/lib/promote.py <name> --record README.md                           # save a repo file before editing it
+python3 e2e/lib/promote.py <name> --undo                                       # remove what promote created, restore recorded files
+```
+
+`scrub.py` prints one line per candidate (`<file>:<line>`, rule, match) for
+addresses, hostnames, emails, tokens, cloud ids, and the values listed in
+`CHANGES.md`. `promote.py` copies the lab, spec, and assets into `labs/`,
+`e2e/specs/`, and `lib/`, rewrites asset paths and relative links, and writes
+`e2e/.work/contribute/<name>/manifest.json` for `--undo`.
 
 ## Adding a lab
 
@@ -109,7 +201,7 @@ Field reads use `resource:` instead of a probe:
   name: proxy is scaled out        # optional label
 ```
 
-Reserve `probe:` for genuinely imperative verification (MCP protocol
+Reserve `probe:` for imperative verification (MCP protocol
 drives, browser-verified labs, multi-step curl flows).
 
 ## Things that will bite you
@@ -141,6 +233,22 @@ visible to later probes too (the MCP spec defines `mcp_init`/`mcp_rpc` once).
 
 **Anything asynchronous needs `retry`.** Route programming, policy attachment, and
 label-selector backend discovery all complete after `kubectl apply` returns.
+
+**A draining proxy pod still serves requests.** After a scale-down or `rollout
+restart`, the old pod drains for up to 60s and the load balancer can still send it
+requests. Their access-log lines leave with the pod. Before sending requests that a
+log probe will read, wait until the proxy has the expected pod count.
+
+**Don't swap a backend pod right before a test request.** After a scale to 0 or a
+rollout, the gateway keeps the old pod's address for a while, and a request to it
+hangs on connect until the request timeout. Deploy the failing backend at the start
+of the lab instead.
+
+**Don't retry a loop that spends a rate-limit budget.** Each attempt counts against
+the limit. Confirm the limit is enforced, clear the counters in place with
+`kubectl exec deploy/ext-cache-enterprise-agentgateway -- redis-cli FLUSHALL`, and
+run the measured loop once. A `rollout restart` of ext-cache also clears them, but
+the rate limiter fails open (one `500`, then uncounted `200`s) while it reconnects.
 
 **Drivers run with no `set -e`, `-u`, or `-o pipefail`,** deliberately, to match
 a reader's terminal. `pipefail` breaks `cmd | grep -q`: grep exits at the first
@@ -200,8 +308,7 @@ the lab's relative paths keep working unchanged. See `routing/openai-audio`.
 replayed by a real shell, so `kubectl apply -f - <<EOF` with `\\s` in a YAML
 double-quoted scalar collapses to `\s` and kubectl rejects it:
 `error converting YAML to JSON: found unknown escape character`. Quote it
-(`<<'EOF'`) as `builtin-guardrails` does. This is a lab bug, not a harness
-limitation: the reader hits it too. `security/WAF` Use Case D shipped this way.
+(`<<'EOF'`) as `builtin-guardrails` does. Readers hit this bug too, so fix it in the lab.
 
 **Never run two suite invocations against one cluster.** The labs share one
 Gateway, and several attach Gateway-scoped policies while they run: `virtual-keys`
@@ -226,8 +333,8 @@ single call, and allow ~10s of settle after the policy attaches.
 **The baseline-integrity guard fingerprints the shared Gateway** on
 `listeners[*].port` plus `infrastructure.parametersRef.name`, before and after
 every lab. It names the lab that changed either one and re-patches the
-`parametersRef`; leftover HTTPRoutes and policies are reported for manual
-cleanup. A full `kubectl apply` of the shared Gateway drops `parametersRef`,
+`parametersRef`; it reports leftover HTTPRoutes and policies for you to
+clean up. A full `kubectl apply` of the shared Gateway drops `parametersRef`,
 which detaches the params and freezes the proxy replica count. A lab that needs
 its own listener should patch one in and remove it on Cleanup, as
 `security/tls-termination` and `security/frontend-mtls` do.
@@ -247,7 +354,7 @@ its own listener should patch one in and remove it on Cleanup, as
 
 `lib.sh` exports `e2e_mcp_init`, `_rpc`, `_tool`, `_tools`, `_status`, and
 `_expect`; use them rather than hand-rolling JSON-RPC. `e2e_mcp_expect <needle>
-present|absent <cmd...>` polls, which took `in-cluster-mcp` from 77s to 51s.
+present|absent <cmd...>` polls until the needle appears or disappears.
 
 - The gateway answers MCP over `text/event-stream`, so bodies arrive as
   `data: {...}`. Strip the prefix with `sed -n 's/^data: //p'` before any JSON
@@ -261,15 +368,25 @@ present|absent <cmd...>` polls, which took `in-cluster-mcp` from 77s to 51s.
 
 ## Debugging
 
-Every block and its captured output is kept under `e2e/.work/<lab>/`:
+Every block and its captured output is kept under `e2e/.work/<lab>/`, or
+`custom-labs/<name>/.work/run/` for a custom lab:
 
 ```
 e2e/.work/mcp/in-cluster-mcp/
-  driver.sh          the generated bash driver — read this first
+  driver.sh          the generated bash driver; read this first
   blocks/0007.sh     the exact block that ran
   blocks/0007.out    its combined output
   result             pass/fail/skip counts
+  outcome            the one-line outcome the report reads
+  steps              per-requirement step results (specs with proves: only)
 ```
+
+`outcome` is one line of space-separated `key=value` fields:
+`status=<pass|fail|timeout|interrupted|skip|excluded|no-spec|not-applicable>
+rc=<n> duration=<secs> requires=<VAR,VAR>`, then optional `only_on=<class>`,
+`drift=1`, `cleanup_fail=<n|incomplete>`, `reason=declined`, `keep=1`,
+`leftover=<n>` (custom), `leftover_warn=<n>` (shipped), and
+`leftover_check=not-run`.
 
 `-v` streams block output live. To see the driver without running it:
 
@@ -283,11 +400,15 @@ python3 e2e/lib/labdoc.py plan labs/mcp/in-cluster-mcp.md \
 The harness has its own tests, no cluster needed:
 
 ```bash
-python3 -m unittest discover -s e2e/tests   # labdoc.py parse/plan logic
+python3 -m unittest discover -s e2e/tests   # Python tests: labdoc.py, tracks, report, scrub, promote, RBAC, agent layer
 bash e2e/tests/test_assertions.sh           # lib.sh assertion semantics
+bash e2e/tests/test_detect_env.sh           # detect-env.sh with stub kubectl and helm
+bash e2e/tests/test_mint_kubeconfig.sh      # rbac/mint-kubeconfig.sh cluster CA handling
+bash e2e/tests/test_run_e2e_flags.sh        # run-e2e.sh --track, --env, --resolve-creds
+bash e2e/tests/test_session_log.sh          # session-log.sh
 ```
 
-Run both after changing `e2e/lib/`.
+Run all of them after changing `e2e/lib/`, `rbac/`, `skills/` or `AGENTS.md`.
 
 ## Credentials
 
@@ -296,4 +417,4 @@ the matching `export VAR=` line is evaluated, never the whole file) → interact
 prompt → skip. Prompted values are cached to `e2e/.env.local` (`chmod 600`,
 gitignored). All resolution happens before the first lab runs, so prompts come in
 one batch. `--no-prompt` makes it CI-safe; unresolved keys mean the lab reports
-`SKIP — missing: VAR` rather than passing quietly.
+`SKIP` and names the missing `VAR` rather than passing quietly.

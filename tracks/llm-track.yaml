@@ -1,0 +1,125 @@
+track: llm
+title: LLM Track
+use_cases:
+  - name: Installation
+    value: Get a running gateway and monitoring stack as the foundation for every subsequent lab.
+    labs:
+      - spec: installation/system-requirements
+      - spec: installation/openshift/001-set-up-enterprise-agentgateway-ocp
+        lab: labs/installation/openshift/001-set-up-enterprise-agentgateway-ocp.md
+        status: no-spec
+        only_on:
+          - openshift
+      - spec: installation/openshift/002-set-up-monitoring-tools-ocp
+        lab: labs/installation/openshift/002-set-up-monitoring-tools-ocp.md
+        status: no-spec
+        only_on:
+          - openshift
+  - name: Unified LLM Access Point
+    value: Replace per-team, per-provider SDK configurations with one stable gateway endpoint. Teams get the same OpenAI-compatible API regardless of which model is behind it.
+    labs:
+      - spec: routing/configure-mock-openai-server
+      - spec: routing/configure-routing-openai
+      - spec: routing/migrate-agentgatewaybackend-to-agentgatewaymodel
+      - spec: agent-harnesses/codex
+      - spec: routing/configure-routing-aws-bedrock
+        lab: labs/routing/configure-routing-aws-bedrock.md
+        status: no-spec
+      - spec: routing/configure-routing-aws-bedrock-apikey
+        lab: labs/routing/configure-routing-aws-bedrock-apikey.md
+        status: no-spec
+      - spec: routing/configure-routing-aws-bedrock-irsa
+        lab: labs/routing/configure-routing-aws-bedrock-irsa.md
+        status: no-spec
+        only_on:
+          - eks
+      - spec: routing/configure-routing-anthropic
+        lab: labs/routing/configure-routing-anthropic.md
+        status: no-spec
+      - spec: routing/configure-routing-azure-openai
+        lab: labs/routing/configure-routing-azure-openai.md
+        status: no-spec
+      - spec: routing/configure-routing-vertexai
+        lab: labs/routing/configure-routing-vertexai.md
+        status: no-spec
+      - spec: routing/configure-routing-vertexai-service-account
+        lab: labs/routing/configure-routing-vertexai-service-account.md
+        status: no-spec
+        only_on:
+          - gke
+  - name: Advanced Routing Strategies
+    value: Route based on request content, headers, or path to optimize for cost, latency, or model capability, and keep traffic moving when providers go down.
+    labs:
+      - spec: routing/routing-match-types
+      - spec: routing/direct-response
+      - spec: routing/configure-body-based-routing
+      - spec: routing/configure-semantic-routing-vllm-sr
+        lab: labs/routing/configure-semantic-routing-vllm-sr.md
+        status: no-spec
+      - spec: routing/configure-semantic-routing-jev
+        lab: labs/routing/configure-semantic-routing-jev.md
+        status: no-spec
+      - spec: routing/timeouts-and-retries
+      - spec: routing/llm-failover
+      - spec: routing/llm-failover-advanced
+  - name: Security & Access Control
+    value: Enforce zero-trust access to LLM endpoints, from simple API key gating through full mTLS and policy-engine-driven authorization.
+    labs:
+      - spec: security/virtual-keys
+      - spec: security/jwt-auth-with-rbac
+        lab: labs/security/jwt-auth-with-rbac.md
+        status: no-spec
+      - spec: agent-harnesses/claude-code-auth0-pkce
+        lab: labs/agent-harnesses/claude-code-auth0-pkce.md
+        status: no-spec
+      - spec: security/tls-termination
+      - spec: security/frontend-mtls
+      - spec: security/sni-matching
+      - spec: security/opa-authorization
+      - spec: security/llm-byo-grpc-ext-authz
+      - spec: security/byo-opa-grpc-ext-authz
+      - spec: platform-engineering/kyverno-admission-control
+  - name: Rate Limiting & Cost Control
+    value: Prevent runaway usage, enforce fair-use policies, and attribute spend back to the teams and users that generated it.
+    labs:
+      - spec: rate-limiting/local-token-rate-limiting
+      - spec: rate-limiting/global-rate-limiting
+      - spec: security/virtual-keys
+      - spec: observability/llm-cost-management
+      - spec: observability/solo-ui-fine-grained-rbac
+  - name: Content Safety & Guardrails
+    value: Stop prompt injection, jailbreaks, PII leakage, and harmful content before requests reach the model, or before responses reach the client.
+    labs:
+      - spec: guardrails/builtin-guardrails
+      - spec: guardrails/external-moderation-guardrails
+      - spec: guardrails/advanced-guardrails-webhook
+      - spec: guardrails/advanced-guardrails-webhook-jev
+        lab: labs/guardrails/advanced-guardrails-webhook-jev.md
+        status: no-spec
+      - spec: transformations/prompt-enrichment
+      - spec: transformations/transformations
+  - name: Embeddings, Batches & Multimodal
+    value: Extend the gateway beyond chat completions to cover the full API surface (embeddings, async batch processing, and audio) without provider-specific client changes.
+    labs:
+      - spec: routing/configure-openai-embeddings
+      - spec: routing/configure-routing-aws-bedrock-titan-embeddings
+        lab: labs/routing/configure-routing-aws-bedrock-titan-embeddings.md
+        status: no-spec
+      - spec: routing/configure-openai-batches
+        lab: labs/routing/configure-openai-batches.md
+        status: no-spec
+      - spec: routing/openai-streaming
+      - spec: routing/openai-audio
+  - name: Inference Routing (In-Cluster Models)
+    value: Route to self-hosted LLMs running in the cluster using the Gateway API Inference Extension, ideal for teams that need data sovereignty or lower-latency inference.
+    labs:
+      - spec: inference/configure-inference-routing-with-vllm
+        lab: labs/inference/configure-inference-routing-with-vllm.md
+        status: no-spec
+  - name: Resilience & Load Testing
+    value: Test capacity limits and tune autoscaling before a production rollout.
+    labs:
+      - spec: load-testing/llm-load-testing-k6
+        lab: labs/load-testing/llm-load-testing-k6.md
+        status: no-spec
+      - spec: observability/production-observability-alerting-and-scaling

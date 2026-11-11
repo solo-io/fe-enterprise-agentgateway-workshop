@@ -642,6 +642,6 @@ kubectl delete enterpriseagentgatewaybackend -n agentgateway-system mcp-federati
 kubectl delete deployment -n mcp mcp-airxiv mcp-fred mcp-sec-edgar mcp-bls --ignore-not-found
 kubectl delete service    -n mcp mcp-airxiv mcp-fred mcp-sec-edgar mcp-bls --ignore-not-found
 kubectl delete secret     -n mcp fred-api-key bls-api-key --ignore-not-found
+kubectl delete namespace mcp --ignore-not-found
+kubectl wait --for=delete namespace/mcp --timeout=120s
 ```
-
-The `mcp` namespace is left in place; other workshop labs may share it.
