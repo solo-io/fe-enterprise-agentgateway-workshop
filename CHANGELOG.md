@@ -10,10 +10,8 @@
   - A custom lab keeps its run files in its own folder, `custom-labs/<name>/.work/run/`, so deleting `custom-labs/<name>/` removes all of it. `/contribute-lab` leaves `.work/` out of its staging copy
   - Nothing about your cluster goes to Solo: the agent sends only generic product questions to the Solo docs server, and the report stays on your machine
   - `rbac/evaluator.yaml` and `rbac/mint-kubeconfig.sh` set up an `agw-evaluator` identity for the agent with no wildcards. It is privilege-equivalent to cluster-admin, so use it on disposable clusters only
-- e2e: `tracks.py list` marks a track entry whose spec tier is `excluded` or `t5-manual` as `excluded`, so the plan `/evaluate` shows names it before the run. A `--track` run prints `EXCLUDED` with the spec's reason and records `status=excluded`, and the report shows `NOT AUTOMATED` with that reason. `mcp-eager-auth-keycloak` is the one such entry: it upgrades the shared controller and needs a browser consent flow
 - `001-install-enterprise-agentgateway.md` Uninstall: the optional Gateway API CRD removal is its own block
 - Cleanup in `in-cluster-mcp`, `mcp-tool-federation`, `mcp-tool-mode-search`, `mcp-tool-mode-code`, `mcp-byo-grpc-ext-authz` and `mcp-tool-rate-limiting` now deletes the `mcp` namespace and waits for it to go
-- e2e: `--custom <name> --keep` no longer fails on baseline drift for the routes, policies, and models the kept lab leaves up. The outcome records `inventory_check=skipped`, and a change to the shared Gateway still fails the run
 
 0.15.2 - (11-4-26)
 ---
