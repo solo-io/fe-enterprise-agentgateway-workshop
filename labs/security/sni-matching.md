@@ -160,7 +160,7 @@ Set up an SNI Gateway that serves multiple hosts on the same port.
 > the shared one would replace its listener list, dropping the HTTP `8080`
 > listener the other labs route through, and detach its
 > `infrastructure.parametersRef`. A dedicated Gateway also gets its own
-> LoadBalancer address, which is what the SNI checks below resolve against.
+> LoadBalancer address, which is what the SNI checks below connect to.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -280,11 +280,16 @@ EOF
 
 ## Validate connectivity to the application over HTTPS
 
+> [!NOTE]
+> On EKS and other clouds whose load balancers get a hostname instead of an IP,
+> `GATEWAY_IP` holds that hostname. A new hostname can take a couple of minutes
+> to resolve. If curl reports `Could not resolve host`, wait and run it again.
+
 curl mock-openai-foo over https:
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-sni -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -ikv --resolve "mock-openai-foo.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-foo.try-solo.io:443/v1/chat/completions \
+curl -ikv --connect-to "mock-openai-foo.try-solo.io:443:${GATEWAY_IP}:443" https://mock-openai-foo.try-solo.io:443/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -299,7 +304,8 @@ curl -ikv --resolve "mock-openai-foo.try-solo.io:443:${GATEWAY_IP}" https://mock
 
 We can see the TLS handshake occurring
 ```
-* Connected to mock-openai-foo.try-solo.io (192.168.64.2) port 443
+* Connecting to hostname: 192.168.64.2
+* Connected to 192.168.64.2 (192.168.64.2) port 443
 * ALPN: curl offers h2,http/1.1
 * (304) (OUT), TLS handshake, Client hello (1):
 * (304) (IN), TLS handshake, Server hello (2):
@@ -319,7 +325,7 @@ We can see the TLS handshake occurring
 
 curl mock-openai-bar over https:
 ```bash
-curl -ikv --resolve "mock-openai-bar.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-bar.try-solo.io:443/v1/chat/completions \
+curl -ikv --connect-to "mock-openai-bar.try-solo.io:443:${GATEWAY_IP}:443" https://mock-openai-bar.try-solo.io:443/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",
@@ -334,7 +340,8 @@ curl -ikv --resolve "mock-openai-bar.try-solo.io:443:${GATEWAY_IP}" https://mock
 
 Again we can see the TLS handshake occurring, but this time for `mock-openai-bar.try-solo.io`
 ```
-* Connected to mock-openai-bar.try-solo.io (192.168.64.2) port 443
+* Connecting to hostname: 192.168.64.2
+* Connected to 192.168.64.2 (192.168.64.2) port 443
 * ALPN: curl offers h2,http/1.1
 * (304) (OUT), TLS handshake, Client hello (1):
 * (304) (IN), TLS handshake, Server hello (2):
@@ -354,7 +361,7 @@ Again we can see the TLS handshake occurring, but this time for `mock-openai-bar
 
 Now curl mock-openai-baz over https:
 ```bash
-curl -ikv --resolve "mock-openai-baz.try-solo.io:443:${GATEWAY_IP}" https://mock-openai-baz.try-solo.io:443/v1/chat/completions \
+curl -ikv --connect-to "mock-openai-baz.try-solo.io:443:${GATEWAY_IP}:443" https://mock-openai-baz.try-solo.io:443/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{
     "model": "mock-gpt-4o",

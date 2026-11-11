@@ -39,7 +39,7 @@ steps:
     assert:
       # The script prints the base_url it dialled: proof the SDK was pointed at
       # the gateway rather than api.openai.com, which is the whole lab.
-      - matches: 'Using base_url: http://[0-9.]+:8080/openai/v1'
+      - matches: 'Using base_url: http://[a-z0-9.-]+:8080/openai/v1'
       - contains: "AI Gateway key patterns and concepts"
       - contains: "Running Researcher agent"
       - contains: "Running Writer agent"
