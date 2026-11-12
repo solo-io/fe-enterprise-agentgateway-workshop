@@ -14,6 +14,7 @@
 - `openai-audio.md`: transcriptions log `gen_ai.usage.audio_seconds` and `agw.ai.usage.cost.total`
 - `production-observability-alerting-and-scaling.md`: the `agentgateway_build_info` `tag` label has no leading `v` (`2026.11.0`)
 - e2e: specs for `codex`, `in-cluster-mcp`, `remote-mcp`, `mcp-guardrails`, `global-rate-limiting` and `openai-audio` assert the new output
+- Evaluation agent: add `e2e/env.local.example`, a template for `e2e/.env.local` with `SOLO_TRIAL_LICENSE_KEY`, `OPENAI_API_KEY` and `FRED_API_KEY`. The README and `AGENTS.md` point to it. `/evaluate` requires `SOLO_TRIAL_LICENSE_KEY` and stops at the plan until it is set. It always asks about `OPENAI_API_KEY`, and for any other missing key such as `FRED_API_KEY` it names the variable and the labs it gates, then waits for the user to add the key or continue and skip those labs
 
 0.15.3 - (11-11-26)
 ---
