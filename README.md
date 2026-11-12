@@ -6,7 +6,7 @@
 
 Before starting this workshop, you will need:
 - **Solo.io Trial License Key**: Enterprise Agentgateway requires a valid license key. You can obtain a free trial license by visiting [Solo.io](https://www.solo.io/) or contacting Solo.io sales.
-- Kubernetes cluster (version 1.29.4 - 1.33.3 or compatible)
+- Kubernetes cluster on a version in the [compatibility matrix](https://docs.solo.io/agentgateway/kubernetes/latest/release-notes/versions/#compatibility-matrix)
 - kubectl CLI installed and configured
 - helm CLI installed
 
@@ -239,6 +239,15 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 An AI agent can run the LLM or MCP track against your own cluster, explain each lab, and write a local report. To start it from the repo root, run `/evaluate` in Claude Code, or tell Codex to read `AGENTS.md` and run the evaluate skill. See [AGENTS.md](AGENTS.md) for prerequisites, the identity to run as, and the hard rules the agent follows.
 
+The agent cannot prompt for keys, so set them before you start it. `/evaluate` requires `SOLO_TRIAL_LICENSE_KEY` and asks about `OPENAI_API_KEY`. You can continue without the OpenAI key, and the labs that need it skip, as do the labs that need other optional keys such as `FRED_API_KEY`. Export the keys in your shell, add it to `~/.zshrc`, or copy the template and fill it in:
+
+```bash
+cp e2e/env.local.example e2e/.env.local
+chmod 600 e2e/.env.local
+```
+
+`e2e/.env.local` is gitignored.
+
 The same agent can also build a custom lab for your own scenario. Run `/adapt-lab` in Claude Code, or tell Codex to read `AGENTS.md` and run the adapt-lab skill, then name the labs to start from or describe what you need. The agent writes a proposal, waits for your approval, then writes a lab and an e2e spec under `custom-labs/<name>/` and runs the spec on your cluster until every requirement passes. The folder is gitignored and stays on your machine.
 
 To contribute a custom lab back to the workshop, run `/contribute-lab <name>` in Claude Code, or tell Codex to read `AGENTS.md` and run the contribute-lab skill; the agent commits the lab on a new version branch, shows you the diff, and pushes only when you say yes. It works from a clone of this repo or of your fork.
@@ -350,8 +359,8 @@ To contribute a custom lab back to the workshop, run `/contribute-lab <name>` in
 
 
 ## Validated on
-- Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway v2026.10.1
+- Kubernetes: a version in the [compatibility matrix](https://docs.solo.io/agentgateway/kubernetes/latest/release-notes/versions/#compatibility-matrix)
+- Enterprise Agentgateway v2026.11.0
 
 
 ## User Stories / Acceptance Criteria

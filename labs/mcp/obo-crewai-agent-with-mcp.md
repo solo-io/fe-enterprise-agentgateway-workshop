@@ -163,7 +163,7 @@ Upgrade the controller helm release, adding the `tokenExchange` block pointing t
 
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.10.1
+export ENTERPRISE_AGW_VERSION=v2026.11.0
 ```
 
 ```bash
@@ -443,7 +443,7 @@ Expected Output:
 ```
 HTTP/1.1 401 Unauthorized
 ...
-authentication failure: no bearer token found
+authentication failed
 ```
 
 ---
@@ -500,7 +500,7 @@ Expected Output:
 2. Before logging in, enter a question in the main form and click **Ask Expert**. The UI shows:
    - `Log in with Keycloak first (sidebar →)`
    - `Agentgateway rejected the request: HTTP 401`
-   - `authentication failure: no bearer token found`
+   - `authentication failed`
 
    This confirms the JWT policy is active: unauthenticated requests are rejected at the gateway before reaching the backend.
 

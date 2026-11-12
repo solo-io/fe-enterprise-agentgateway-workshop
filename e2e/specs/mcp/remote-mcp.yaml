@@ -121,7 +121,7 @@ steps:
       e2e_mcp_tool "$SID" get_chunks '{"query":"x"}'
     assert:
       - contains: "search"
-      - contains: "Unknown tool: get_chunks"
+      - contains: "unknown resource"
 
 # Cleanup block 2 is `claude mcp remove` / `claude mcp add`, which would rewrite
 # the operator's Claude Code config. Only the Kubernetes teardown is run.

@@ -707,8 +707,8 @@ mcp_call "$APPROVER" tools/list | jq -c .
 ```
 
 ```
-{"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":"mcpGuardrails checkRequest failed: no healthy backends"}}
-{"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":"mcpGuardrails checkResponse failed: no healthy backends"}}
+{"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":"guardrail check failed"}}
+{"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":"guardrail check failed"}}
 ```
 
 Every governed call fails, including the finance approver's.
@@ -840,7 +840,7 @@ jwt.sub=bailey-buyer	gen_ai.tool.name=create_purchase_order	error="mcp: mcpGuard
 jwt.sub=bailey-buyer	gen_ai.tool.name=send_supplier_email	error="mcp: mcpGuardrails rejected: recipient domain gmail.com not allowed"
 jwt.sub=bailey-buyer	gen_ai.tool.name=send_supplier_email	error="mcp: mcpGuardrails rejected: recipient domain try-solo.io.attacker.example not allowed"
 jwt.sub=fran-finance	gen_ai.tool.name=delete_supplier	error="mcp: mcpGuardrails rejected: tool delete_supplier is disabled"
-jwt.sub=fran-finance	gen_ai.tool.name=list_purchase_orders	error="mcp: mcpGuardrails rejected: mcpGuardrails checkRequest failed: no healthy backends"
+jwt.sub=fran-finance	gen_ai.tool.name=list_purchase_orders	error="mcp: mcpGuardrails rejected: guardrail check failed"
 jwt.sub=riley-requester	gen_ai.tool.name=delete_supplier	error="mcp: mcpGuardrails rejected: persona requester may not call delete_supplier"
 ```
 

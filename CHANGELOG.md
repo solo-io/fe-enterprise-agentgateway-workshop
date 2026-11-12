@@ -1,5 +1,21 @@
 # Changelog
 
+0.15.4 - (11-12-26)
+---
+- Bump to Enterprise Agentgateway `v2026.11.0`: `001`, the air-gap, OpenShift and multi-cluster upgrade installs, the three OBO labs, `image-list.md`, the chart `appVersion` fields and README "Validated on"
+- `image-list.md`: third-party image tags move to `solo-enterprise-autoauth:v0.2.6`, `opentelemetry-collector-contrib:0.165.0` and `clickhouse-server:26.3.62.3-alpine`
+- `system-requirements.md`: Kubernetes 1.33 to 1.37 and Gateway API 1.4 to 1.7, from the v2026.11.0 compatibility matrix
+- README Prerequisites, README "Validated on" and `tracks/llm-track.md`: link to the compatibility matrix for the supported Kubernetes versions
+- `001` and the air-gap install: the expected CRD list includes `EnterpriseAgentgatewayRoleBinding`
+- **Breaking:** a failed JWT check returns the body `authentication failed`. The reason, such as `authentication failure: no bearer token found`, is in the access log only. Updated the expected output in `jwt-auth-with-rbac`, both `jwt-auth-through-corporate-proxy` labs, `global-rate-limiting`, `claude-code-auth0-pkce`, `claude-desktop-sso-entra`, `obo-token-exchange-fundamentals`, `msft-entra-obo`, `obo-crewai-agent-with-mcp`, `composable-mcp`, `in-cluster-mcp`, `remote-mcp` and `mcp-tool-federation`
+- **Breaking:** a call to an MCP tool that authorization filtered out returns `unknown resource` in place of `Unknown tool: <name>` (`in-cluster-mcp`, `remote-mcp`)
+- **Breaking:** `mcp-guardrails.md`: with a `FailClosed` processor down, the client and the access log both report `guardrail check failed`
+- `codex.md`: add the `codex-models-route` `directResponse` for `GET /codex/v1/models`. Codex 0.167 fails to decode the model list the gateway returns for the route
+- `openai-audio.md`: transcriptions log `gen_ai.usage.audio_seconds` and `agw.ai.usage.cost.total`
+- `production-observability-alerting-and-scaling.md`: the `agentgateway_build_info` `tag` label has no leading `v` (`2026.11.0`)
+- e2e: specs for `codex`, `in-cluster-mcp`, `remote-mcp`, `mcp-guardrails`, `global-rate-limiting` and `openai-audio` assert the new output
+- Evaluation agent: add `e2e/env.local.example`, a template for `e2e/.env.local` with `SOLO_TRIAL_LICENSE_KEY`, `OPENAI_API_KEY` and `FRED_API_KEY`. The README and `AGENTS.md` point to it. `/evaluate` requires `SOLO_TRIAL_LICENSE_KEY` and stops at the plan until it is set. It always asks about `OPENAI_API_KEY`, and for any other missing key such as `FRED_API_KEY` it names the variable and the labs it gates, then waits for the user to add the key or continue and skip those labs
+
 0.15.3 - (11-11-26)
 ---
 - Add an evaluation agent (Alpha): an AI agent in Claude Code or Codex runs the workshop labs on your own test cluster, explains each one, and writes a local report. Run `/evaluate` in Claude Code, or start from `AGENTS.md` and the README section `## Alpha: Evaluate with an agent`

@@ -151,10 +151,13 @@ steps:
     retry:
       attempts: 6
       delay: 4
-      until: "checkResponse failed"
+      until: "guardrail check failed"
     assert:
-      - contains: "mcpGuardrails checkRequest failed"
-      - contains: "mcpGuardrails checkResponse failed"
+      # tools/call fails on the request check and tools/list on the response
+      # check. Both print the same generic message, so also assert that neither
+      # call returned a result.
+      - contains: '"message":"guardrail check failed"'
+      - not_contains: '"result"'
       - not_contains: "PO-1001"
 
   - section: "Restore both servers"

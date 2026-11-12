@@ -49,12 +49,14 @@ and bash 4 or later first on the PATH (macOS ships bash 3.2; run
 `./e2e/lib/detect-env.sh` checks all of them. Contribute mode also needs `gh`,
 logged in.
 
-The base install needs `SOLO_TRIAL_LICENSE_KEY`. Labs that call a provider need
-that provider's key, for example `OPENAI_API_KEY`. The agent's shell has no
+`SOLO_TRIAL_LICENSE_KEY` is required for `evaluate`; the agent stops until it is
+set. The agent asks about `OPENAI_API_KEY`; if you continue without it, the labs
+that need it skip. Other provider keys, such as `FRED_API_KEY`, are optional. The agent's shell has no
 terminal, so it cannot prompt for keys. Provide each one in one of three ways:
 export it in the shell before starting the agent, put it in a shell rc file
 such as `~/.zshrc`, or put `KEY=value` lines in `e2e/.env.local` (gitignored).
 The harness sources `e2e/.env.local`, so quote any value that contains spaces or `#`.
+Copy `e2e/env.local.example` to start.
 Labs whose key is missing in all three places skip.
 
 ## Identity

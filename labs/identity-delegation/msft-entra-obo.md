@@ -82,7 +82,7 @@ export ENTRA_DOWNSTREAM_SCOPE="$ENTRA_DOWNSTREAM_SCOPE"  # e.g. "api://ffffffff-
 export ENTRA_OBO_CLIENT_SECRET="$ENTRA_OBO_CLIENT_SECRET"
 
 # Controller version and license (set these to match your environment)
-export ENTERPRISE_AGW_VERSION=v2026.10.1
+export ENTERPRISE_AGW_VERSION=v2026.11.0
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
 ```
 
@@ -510,6 +510,8 @@ The `aud` is now the downstream API, not the middle-tier app. The OBO exchange s
 
 **Troubleshooting:**
 
+A `401` response body reads `authentication failed`. The reason is in the `error` field of the gateway access log.
+
 | Symptom | Likely Cause |
 |---|---|
 | `401 authentication failure: no bearer token found` | Token not passed in the `Authorization` header |
@@ -534,7 +536,7 @@ Expected Output:
 ```
 HTTP/1.1 401 Unauthorized
 ...
-authentication failure: no bearer token found
+authentication failed
 ```
 
 ---

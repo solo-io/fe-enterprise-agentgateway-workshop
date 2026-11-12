@@ -147,10 +147,11 @@ steps:
     retry:
       attempts: 10
       delay: 3
-      until: "authentication failure|401"
+      until: "authentication failed|401"
     assert:
       # JWT validation rejects before the rate limiter is consulted at all.
-      - contains: "authentication failure: no bearer token found"
+      - status: 401
+      - contains: "authentication failed"
 
   - section: "Test JWT claim-based rate limiting"
     run: [2]
@@ -235,7 +236,7 @@ steps:
       # distinguishing property of the IP descriptor.
       - contains: "Request 1: HTTP 200"
       - contains: "HTTP 429"
-      - not_contains: "authentication failure"
+      - not_contains: "authentication failed"
 
   # ---- Mixed windows: minute burst plus hourly sustained ----
   - section: "Configure mixed time windows (burst + sustained)"

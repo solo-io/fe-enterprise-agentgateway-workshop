@@ -91,9 +91,9 @@ steps:
       # log contains no request at all. Assert the request line itself.
       - matches: 'http\.path=/v1/audio/(speech|transcriptions).*http\.status=200'
 
-  # The lab's closing Note tells the reader audio responses carry no token usage, so
-  # token-level metrics are unavailable while request counts and statuses are
-  # still tracked. Assert both halves of that.
+  # The lab's closing Note tells the reader audio requests carry no token usage,
+  # request counts and statuses are tracked, and transcriptions log audio seconds
+  # and cost. Assert each part.
   - probe: "audio endpoints are proxied but not parsed as LLM completions"
     script: |
       logs=$(kubectl logs -n agentgateway-system \
@@ -101,8 +101,12 @@ steps:
                | grep -E 'http.path=/v1/audio/')
       grep -oE 'http.path=/v1/audio/[a-z]+' <<<"$logs" | sort -u
       grep -q 'http.status=200' <<<"$logs" && echo "audio requests tracked"
-      grep -q 'gen_ai.usage' <<<"$logs" \
+      grep -q 'gen_ai.usage.input_tokens' <<<"$logs" \
         && echo "token metrics present" || echo "no token metrics, as documented"
+      grep '/v1/audio/transcriptions' <<<"$logs" | grep -q 'gen_ai.usage.audio_seconds=[1-9]' \
+        && echo "transcription audio seconds logged"
+      grep '/v1/audio/transcriptions' <<<"$logs" | grep -q 'agw.ai.usage.cost.total=' \
+        && echo "transcription cost logged"
     retry:
       attempts: 6
       delay: 5
@@ -112,6 +116,8 @@ steps:
       - contains: "http.path=/v1/audio/transcriptions"
       - contains: "audio requests tracked"
       - contains: "no token metrics, as documented"
+      - contains: "transcription audio seconds logged"
+      - contains: "transcription cost logged"
 
   - section: "View Metrics in Grafana"
     run: none

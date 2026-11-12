@@ -49,7 +49,7 @@ referencegrants      refgrant     gateway.networking.k8s.io/v1   true         Re
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.10.1
+export ENTERPRISE_AGW_VERSION=v2026.11.0
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -86,6 +86,7 @@ enterpriseagentgatewayexternalsecrets   eages        enterpriseagentgateway.solo
 enterpriseagentgatewayparameters        eagpar       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
 enterpriseagentgatewaypolicies          eagpol       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
 enterpriseagentgatewayrbacpolicies      eagrbacpol   enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayRBACPolicy
+enterpriseagentgatewayrolebindings      eagrb        enterpriseagentgateway.solo.io/v1alpha1   false        EnterpriseAgentgatewayRoleBinding
 authconfigs                             ac           extauth.solo.io/v1                        true         AuthConfig
 ratelimitconfigs                        rlc          ratelimit.solo.io/v1alpha1                true         RateLimitConfig
 ```

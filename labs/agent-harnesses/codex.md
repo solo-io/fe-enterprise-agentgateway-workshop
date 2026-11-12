@@ -9,7 +9,7 @@ You also need the [Codex CLI](https://github.com/openai/codex) installed locally
 - Create a Kubernetes secret that contains your OpenAI API key
 - Create a route to OpenAI's Responses API using an `AgentgatewayModel` and `HTTPRoute`
 - Add retry and token rate limit policies to the route
-- Let the gateway answer the Codex model catalog request from the models the route serves
+- Answer the Codex model catalog request at the gateway with a `directResponse`
 - Test the route with curl to verify connectivity
 - Use the Codex CLI through the agentgateway proxy with a Codex profile
 - Validate Codex requests in Grafana, the Solo UI, and access logs
@@ -114,7 +114,43 @@ EOF
 
 The `RequestHeaderModifier` filter removes any `Authorization` header the client sends, so the only credential that reaches OpenAI is the one in `codex-openai-apikey`. The gateway recognizes Responses API traffic from the `/v1/responses` path and parses it, which gives you token counts, cost, and model names in metrics, logs, and traces. The policy retries transient upstream failures and caps the route at 5 million LLM tokens per hour.
 
-At startup Codex requests its model catalog from `<base_url>/models`. The gateway answers `GET /codex/v1/models` itself with the models the route serves, so the request never reaches OpenAI.
+## Answer the Codex Model Catalog Request
+
+At startup Codex requests its model catalog from `<base_url>/models` and expects a JSON object with a `models` list. The gateway answers `GET /codex/v1/models` on `codex-route` in the OpenAI list format, which Codex fails to decode. The following route answers the request with an empty catalog, so Codex uses its built-in model metadata. Its `Exact` match takes precedence over the `/codex` prefix match on `codex-route`:
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: codex-models-route
+  namespace: agentgateway-system
+spec:
+  parentRefs:
+    - name: agentgateway-proxy
+      namespace: agentgateway-system
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: /codex/v1/models
+---
+apiVersion: enterpriseagentgateway.solo.io/v1alpha1
+kind: EnterpriseAgentgatewayPolicy
+metadata:
+  name: codex-models-response
+  namespace: agentgateway-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: codex-models-route
+  traffic:
+    directResponse:
+      status: 200
+      body: '{"models":[]}'
+EOF
+```
 
 ## Export the Gateway IP
 
@@ -178,7 +214,7 @@ codex
 hello from agentgateway
 ```
 
-The output has no `failed to refresh available models` error, because the gateway answered the catalog request.
+The output has no `failed to refresh available models` error, because `codex-models-route` answered the catalog request.
 
 Start an interactive Codex session through the gateway:
 ```bash
@@ -246,7 +282,7 @@ Each log line carries:
 
 Codex resends its full conversation on every turn, so after the first turn most input tokens show up as `gen_ai.usage.cache_read.input_tokens`.
 
-When Codex refreshes its model catalog, the request logs as `route=agentgateway-system/codex-route http.method=GET http.path=/codex/v1/models?client_version=... http.status=200`, answered by the gateway without an upstream `endpoint`. Codex caches the catalog, so not every session sends this request.
+When Codex refreshes its model catalog, the request logs as `route=agentgateway-system/codex-models-route http.method=GET http.path=/codex/v1/models?client_version=... http.status=200`, answered by the gateway without an upstream `endpoint`. Codex caches the catalog, so not every session sends this request.
 
 ### View Metrics Endpoint
 
@@ -273,8 +309,8 @@ Look for metrics like:
 ## Cleanup
 
 ```bash
-kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system codex-policies
-kubectl delete httproute -n agentgateway-system codex-route
+kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system codex-policies codex-models-response
+kubectl delete httproute -n agentgateway-system codex-route codex-models-route
 kubectl delete agentgatewaymodel -n agentgateway-system codex-openai-model
 kubectl delete secret -n agentgateway-system codex-openai-apikey
 rm -f ~/.codex/agentgateway.config.toml

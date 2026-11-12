@@ -63,7 +63,11 @@ The `tracks.py list` output has one line per lab: `<key>`, `<status>`, `<use-cas
   ```bash
   e2e/lib/session-log.sh add decision <key> declined
   ```
-- the labs that will skip because a credential is missing: join the `⊘ VAR` lines from the `--resolve-creds` output against the REQUIRES column of `--list`, filtered to this track's keys
+- the labs that will skip because a credential is missing: join the `⊘ VAR` lines from the `--resolve-creds` output against the REQUIRES column of `--list`, filtered to this track's keys. `SOLO_TRIAL_LICENSE_KEY` is required. `--resolve-creds` does not check it, so ask the user to confirm it is in the shell, a shell rc file, or `e2e/.env.local`. If it is missing, stop before step 4 and give the fix below; the base install fails without it.
+
+`OPENAI_API_KEY` is expected. Always ask about it, even when `--resolve-creds` does not list it as missing (an MCP track may not gate on it). If it is missing, name the variable and the labs it gates, then offer two choices: the user adds the key and says continue (re-run `--resolve-creds`), or the user continues without it and those labs skip. Handle any other missing key, such as `FRED_API_KEY`, the same way.
+
+The fix for a missing key: copy `e2e/env.local.example` to `e2e/.env.local` and add `VAR=value`, or export it in the shell that started the agent. Never ask the user to paste a key into the chat, and never write a key yourself.
 - the labs with status `duplicate`: listed under two use cases, run once, and shown in both report tables
 - the labs marked `no-spec`, reported as `NOT AUTOMATED`; the user can run these by hand from the lab markdown
 - the labs marked `excluded`, reported as `NOT AUTOMATED` with the `reason` from `e2e/specs/<key>.yaml`; say that reason, and that the user can run the lab by hand

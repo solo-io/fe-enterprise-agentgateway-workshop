@@ -27,7 +27,7 @@ After completing this track you should be able to:
 
 | Requirement | Notes |
 |---|---|
-| Kubernetes cluster | v1.29.4 – v1.33.3 (or compatible) |
+| Kubernetes cluster | A version in the [compatibility matrix](https://docs.solo.io/agentgateway/kubernetes/latest/release-notes/versions/#compatibility-matrix) |
 | Solo.io Trial License Key | Required for Enterprise Agentgateway |
 | `kubectl` CLI | Configured against your cluster |
 | `helm` CLI | v3+ |

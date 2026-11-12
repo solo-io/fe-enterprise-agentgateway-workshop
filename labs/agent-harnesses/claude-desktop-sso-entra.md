@@ -223,7 +223,7 @@ curl -i "http://localhost:8080/claude/v1/messages" \
   }'
 ```
 
-Expected output: `401 Unauthorized` with `authentication failure: no bearer token found`. Unlike the static-key setup, the route no longer serves anonymous callers: a valid token from your Entra tenant is the only way through, and the first client to present one is Claude Desktop itself in the next section.
+Expected output: `401 Unauthorized` with `authentication failed`. Unlike the static-key setup, the route no longer serves anonymous callers: a valid token from your Entra tenant is the only way through, and the first client to present one is Claude Desktop itself in the next section.
 
 Leave the port-forward running for the Claude Desktop steps below.
 

@@ -221,7 +221,7 @@ kubectl port-forward svc/grafana-prometheus -n monitoring 3000:3000
 
 3. Navigate to **Dashboards > AgentGateway Dashboard** to view request metrics
 
-> **Note:** OpenAI's audio responses carry no token usage, so token-level metrics are not available for these requests. AgentGateway still tracks request counts, latencies, and status codes.
+> **Note:** Audio requests carry no token usage, so the token panels stay empty for them. The gateway tracks request counts, latencies, and status codes for both endpoints. For transcriptions the access log also records the audio length as `gen_ai.usage.audio_seconds` and the cost as `agw.ai.usage.cost.total`.
 
 ## Cleanup
 
