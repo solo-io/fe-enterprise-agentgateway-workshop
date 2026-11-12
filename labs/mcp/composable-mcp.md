@@ -1044,10 +1044,12 @@ You should see output similar to the following:
 401
 ```
 
-The response body confirms why:
+The response body is generic:
 ```
-authentication failure: no bearer token found
+authentication failed
 ```
+
+The access log records the reason as `authentication failure: no bearer token found`.
 
 The same request with the minted token attached succeeds, and the composite tool call behind it returns the same structured brief Step 6 produced:
 

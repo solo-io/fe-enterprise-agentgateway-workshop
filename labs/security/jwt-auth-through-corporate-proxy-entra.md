@@ -285,7 +285,7 @@ curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
   }'
 ```
 
-Expected output: the request fails with `authentication failure: no bearer token found`. This happens even before any JWKS fetch: agentgateway only needs to resolve the tunneled JWKS the first time it has to validate a token's signature.
+Expected output: the request fails with `401 Unauthorized` and the body `authentication failed`. The access log records the reason as `authentication failure: no bearer token found`. This happens even before any JWKS fetch: agentgateway only needs to resolve the tunneled JWKS the first time it has to validate a token's signature.
 
 ### Get a token from Entra
 

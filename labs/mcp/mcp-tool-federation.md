@@ -467,7 +467,7 @@ EOF
 In MCP Inspector, click **Disconnect** then **Connect**. You should see:
 
 ```
-MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: authentication failure: no bearer token found
+MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: authentication failed
 ```
 
 ### Mint an admin token and reconnect

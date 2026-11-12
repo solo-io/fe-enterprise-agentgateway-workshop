@@ -113,7 +113,7 @@ Upgrade the controller helm release, adding the `tokenExchange` block pointing t
 
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.10.1
+export ENTERPRISE_AGW_VERSION=v2026.11.0
 ```
 
 ```bash
@@ -390,7 +390,7 @@ Expected Output:
 ```
 HTTP/1.1 401 Unauthorized
 ...
-authentication failure: no bearer token found
+authentication failed
 ```
 
 ---
@@ -528,7 +528,7 @@ Expected Output:
 ```
 HTTP/1.1 401 Unauthorized
 ...
-authentication failure: token uses the unknown key "..."
+authentication failed
 ```
 
 The Keycloak JWT is signed by Keycloak's key, not the STS. Only tokens issued by the STS are accepted by the route.
@@ -747,7 +747,7 @@ Expected Output:
 ```
 HTTP/1.1 401 Unauthorized
 ...
-authentication failure: token uses the unknown key "..."
+authentication failed
 ```
 
 Only tokens issued by the STS, whether impersonation tokens (Part A) or delegation tokens (Part B), are accepted by the protected route.

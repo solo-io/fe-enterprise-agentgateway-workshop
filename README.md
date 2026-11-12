@@ -6,7 +6,7 @@
 
 Before starting this workshop, you will need:
 - **Solo.io Trial License Key**: Enterprise Agentgateway requires a valid license key. You can obtain a free trial license by visiting [Solo.io](https://www.solo.io/) or contacting Solo.io sales.
-- Kubernetes cluster (version 1.29.4 - 1.33.3 or compatible)
+- Kubernetes cluster on a version in the [compatibility matrix](https://docs.solo.io/agentgateway/kubernetes/latest/release-notes/versions/#compatibility-matrix)
 - kubectl CLI installed and configured
 - helm CLI installed
 
@@ -350,8 +350,8 @@ To contribute a custom lab back to the workshop, run `/contribute-lab <name>` in
 
 
 ## Validated on
-- Kubernetes 1.29.4 - 1.33.3
-- Enterprise Agentgateway v2026.10.1
+- Kubernetes: a version in the [compatibility matrix](https://docs.solo.io/agentgateway/kubernetes/latest/release-notes/versions/#compatibility-matrix)
+- Enterprise Agentgateway v2026.11.0
 
 
 ## User Stories / Acceptance Criteria

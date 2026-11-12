@@ -555,7 +555,7 @@ curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
     ]
   }'
 ```
-The request fails with `authentication failure: no bearer token found`.
+The request fails with `401 Unauthorized` and the body `authentication failed`.
 
 Now send requests as **User A**. The prompt `"Whats your favorite poem?"` is about 11 input tokens, more than the whole 10-input-tokens-per-minute budget, so the first request succeeds and spends the quota:
 ```bash

@@ -50,7 +50,7 @@ udproutes                         gateway.networking.k8s.io/v1alpha2   true     
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.10.1
+export ENTERPRISE_AGW_VERSION=v2026.11.0
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -87,6 +87,7 @@ enterpriseagentgatewayexternalsecrets   eages        enterpriseagentgateway.solo
 enterpriseagentgatewayparameters        eagpar       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayParameters
 enterpriseagentgatewaypolicies          eagpol       enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayPolicy
 enterpriseagentgatewayrbacpolicies      eagrbacpol   enterpriseagentgateway.solo.io/v1alpha1   true         EnterpriseAgentgatewayRBACPolicy
+enterpriseagentgatewayrolebindings      eagrb        enterpriseagentgateway.solo.io/v1alpha1   false        EnterpriseAgentgatewayRoleBinding
 authconfigs                             ac           extauth.solo.io/v1                        true         AuthConfig
 ratelimitconfigs                        rlc          ratelimit.solo.io/v1alpha1                true         RateLimitConfig
 ```
@@ -94,7 +95,7 @@ ratelimitconfigs                        rlc          ratelimit.solo.io/v1alpha1 
 ## Install Enterprise Agentgateway Controller
 
 > [!NOTE]
-> The top-level Helm `image.registry` is the global default registry for every chart-managed image: the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.10.1`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.7-alpine`). Mirror each image at the tag shown in the [Air-Gap Mirror Reference](../image-list.md#air-gap-mirror-reference-dockerioably7). The top-level Helm `imagePullSecrets` is the global default too, and it reaches the proxy and every extension. Add a per-CR pull-secret override only when one extension uses a different secret than the rest.
+> The top-level Helm `image.registry` is the global default registry for every chart-managed image: the controller, the agentgateway proxy, and the auto-provisioned extensions (`ext-auth-service`, `rate-limiter`, `waf-server`, and `ext-cache`/`redis`). A single `image.registry: docker.io/ably7` override covers them all. The Solo-built images inherit the chart-version tag (`2026.11.0`); the `ext-cache` Redis image keeps its own upstream tag (`8.6.7-alpine`). Mirror each image at the tag shown in the [Air-Gap Mirror Reference](../image-list.md#air-gap-mirror-reference-dockerioably7). The top-level Helm `imagePullSecrets` is the global default too, and it reaches the proxy and every extension. Add a per-CR pull-secret override only when one extension uses a different secret than the rest.
 
 The `enterprise-agentgateway` chart also installs the Solo UI through its `ui` subchart. The UI includes a built-in OpenTelemetry collector (`enterprise-agentgateway-ui-telemetry-collector`) that receives traces from Agentgateway. `ui.global.imageRegistry` keeps each image's repository path (for example `enterprise-agentgateway/solo-enterprise-ui-backend`), and a Docker Hub namespace holds only one path level. The `ui` values set `registry` and `repository` per image, so each image resolves to `docker.io/ably7/<name>`.
 

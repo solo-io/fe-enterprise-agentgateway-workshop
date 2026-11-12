@@ -285,7 +285,7 @@ curl -s "$GATEWAY_IP:8080/claude/v1/messages" \
 Expected output:
 
 ```
-authentication failure: no bearer token found
+authentication failed
 ```
 
 Nothing reached Anthropic, so this request costs nothing.

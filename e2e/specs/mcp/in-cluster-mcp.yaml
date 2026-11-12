@@ -170,7 +170,7 @@ steps:
   - section: "Limit tool access"
     run: [2]
     assert:
-      - contains: "Unknown tool: get-sum"
+      - contains: "unknown resource"
 
 cleanup:
   section: "Cleanup"

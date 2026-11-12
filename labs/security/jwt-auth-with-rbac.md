@@ -407,7 +407,7 @@ EOF
 ```
 
 ## curl with no token
-Make a curl request to the OpenAI endpoint without a JWT, this should fail with `authentication failure: no bearer token found`
+Make a curl request to the OpenAI endpoint without a JWT, this should fail with `401 Unauthorized` and the body `authentication failed`. The access log records the reason as `authentication failure: no bearer token found`.
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
@@ -426,7 +426,7 @@ curl -i "$GATEWAY_IP:8080/openai/v1/chat/completions" \
 
 ## curl with previous JWT token (invalid token)
 
-Make a curl request to the OpenAI endpoint without a JWT, this should fail with `authentication failure: token uses the unknown key "solo-public-key-001"`
+Make a curl request to the OpenAI endpoint without a JWT, this should fail with `401 Unauthorized` and the body `authentication failed`. The access log records the reason as `authentication failure: token uses the unknown key "solo-public-key-001"`.
 ```bash
 export DEV_TOKEN_1="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InNvbG8tcHVibGljLWtleS0wMDEifQ.eyJpc3MiOiJzb2xvLmlvIiwib3JnIjoic29sby5pbyIsInN1YiI6InVzZXItaWQiLCJ0ZWFtIjoidGVhbS1pZCIsImV4cCI6MjA3OTU1NjEwNCwibGxtcyI6eyJvcGVuYWkiOlsiZ3B0LTRvIl19fQ.e49g9XE6yrttR9gQAPpT_qcWVKe-bO6A7yJarMDCMCh8PhYs67br00wT6v0Wt8QXMMN09dd8UUEjTunhXqdkF5oeRMXiyVjpTPY4CJeoF1LfKhgebVkJeX8kLhqBYbMXp3cxr2GAmc3gkNfS2XnL2j-bowtVzwNqVI5D8L0heCpYO96xsci37pFP8jz6r5pRNZ597AT5bnYaeu7dHO0a5VGJqiClSyX9lwgVCXaK03zD1EthwPoq34a7MwtGy2mFS_pD1MTnPK86QfW10LCHxtahzGHSQ4jfiL-zp13s8MyDgTkbtanCk_dxURIyynwX54QJC_o5X7ooDc3dxbd8Cw"
 

@@ -405,10 +405,10 @@ EOF
 
 From the MCP Inspector, click **Reconnect** and verify that the connection fails with an error message similar to the following, because no valid JWT was provided from the MCP inspector tool (MCP client) to the agentgateway proxy.
 ```
-MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: authentication failure: no bearer token found
+MCP error -32001: Streamable HTTP error: Error POSTing to endpoint: authentication failed
 ```
 
-This error also appears in the access logs as `authentication failure: no bearer token found` with an `http.status=401` and `reason=JwtAuth`
+The access logs record the reason as `authentication failure: no bearer token found` with an `http.status=401` and `reason=JwtAuth`
 ```bash
 kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway-proxy --prefix --tail 20
 ```
@@ -458,10 +458,10 @@ EOF
 
 Our token carries `org=solo.io`, not `org=admin`, so access is now denied. In the MCP Inspector, click **Reconnect**, then from the **Tools** tab click **Clear** and **List Tools**: the list comes back empty.
 
-Unauthorized tools are filtered out of the catalog rather than merely blocked on call, so a denied caller sees an MCP server with no tools at all. Attempting a call anyway is rejected as an unknown tool:
+Unauthorized tools are filtered out of the catalog rather than merely blocked on call, so a denied caller sees an MCP server with no tools at all. Attempting a call anyway is rejected as an unknown resource:
 
 ```
-{"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"Unknown tool: echo"}}
+{"jsonrpc":"2.0","id":3,"error":{"code":-32602,"message":"unknown resource"}}
 ```
 
 ### Inspect the JWT
@@ -572,10 +572,10 @@ curl -s -X POST "http://$GATEWAY_IP:8080/mcp" \
 
 Example output:
 ```
-{"jsonrpc":"2.0","id":2,"error":{"code":-32602,"message":"Unknown tool: get-sum"}}
+{"jsonrpc":"2.0","id":2,"error":{"code":-32602,"message":"unknown resource"}}
 ```
 
-Because the tool was filtered out of the catalog, the gateway rejects the call as an unknown tool rather than as an authorization failure. Note this response arrives as plain JSON with a `400 Bad Request` status, whereas successful tool calls stream back as `text/event-stream` with a `data:` prefix.
+Because the tool was filtered out of the catalog, the gateway rejects the call as an unknown resource rather than as an authorization failure. Note this response arrives as plain JSON with a `400 Bad Request` status, whereas successful tool calls stream back as `text/event-stream` with a `data:` prefix.
 
 ## Cleanup
 ```bash

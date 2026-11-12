@@ -15,6 +15,9 @@ steps:
   - section: "Create the Codex Route and Model"
     run: all
 
+  - section: "Answer the Codex Model Catalog Request"
+    run: all
+
   - section: "Export the Gateway IP"
     run: all
 
