@@ -12,7 +12,7 @@ The harness has already stopped the lab. `<key>` is the lab key, for example `mc
    ```bash
    e2e/lib/session-log.sh add failure <key> "<one-line explanation>"
    ```
-2. Explain in plain language, by `skills/stop-slop/SKILL.md`: what the lab expected, what the cluster returned, and the most likely cause. A missing or rejected key, a provider outage, or a rate limit at the provider are common causes outside the lab. If the cause is a product question, you may consult `solo-knowledge` with a generic query, following `skills/ask-the-docs/SKILL.md`. Never paste cluster output into that query.
+2. Explain in plain language, by `skills/stop-slop/SKILL.md`: what the lab expected, what the cluster returned, and the most likely cause. A missing or rejected key, a provider outage, or a rate limit at the provider are common causes outside the lab. If the cause is a product question, you may consult `soloio-docs-mcp` with a generic query, following `skills/ask-the-docs/SKILL.md`. Never paste cluster output into that query.
 3. Offer exactly these options:
 
    - Retry the lab

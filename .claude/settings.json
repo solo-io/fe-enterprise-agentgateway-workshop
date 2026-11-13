@@ -1,5 +1,5 @@
 {
-  "enabledMcpjsonServers": ["solo-knowledge"],
+  "enabledMcpjsonServers": ["soloio-docs-mcp"],
   "permissions": {
     "deny": [
       "WebSearch",

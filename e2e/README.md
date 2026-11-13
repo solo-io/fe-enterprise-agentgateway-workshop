@@ -41,6 +41,79 @@ allowlisted in `AI_BACKEND_ALLOW`).
 Requires bash ≥ 4, `python3` + PyYAML, `kubectl`, `helm`, `jq` (`k6` for the
 load-testing labs).
 
+## Install evaluation prerequisites on macOS
+
+The evaluation needs Bash 4 or later first on `PATH` and a Python interpreter
+that imports PyYAML. macOS ships Bash 3.2. If you use Homebrew, install Bash with
+`brew install bash` and put its `bin` directory first on `PATH`.
+
+To install Bash without Homebrew or `sudo`, build it under `~/.local`. This
+downloads GNU Bash from `ftp.gnu.org` and requires Apple's command-line tools
+(`cc` and `make`). If those tools are missing, run `xcode-select --install` and
+finish the installer before continuing. Run these commands from the repo root:
+
+```sh
+(
+  set -eu
+  build_dir="$(mktemp -d)"
+  trap 'rm -rf "$build_dir"' EXIT
+  cd "$build_dir"
+  curl -fL -o bash-5.3.tar.gz https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz
+  tar -xzf bash-5.3.tar.gz
+  cd bash-5.3
+  ./configure --prefix="$HOME/.local"
+  make
+  make install
+)
+export PATH="$HOME/.local/bin:$PATH"
+bash --version
+```
+
+Install PyYAML in a virtual environment from the repo root. This downloads the
+package from PyPI and keeps it in the gitignored `e2e/.venv/` directory:
+
+```sh
+python3 -m venv e2e/.venv
+e2e/.venv/bin/python -m pip install PyYAML
+e2e/.venv/bin/python -c 'import yaml; print(yaml.__version__)'
+```
+
+Both evaluation scripts automatically check `e2e/.venv/bin/python` before Python
+interpreters on `PATH`. Set `E2E_PYTHON` to use a different interpreter; it takes
+priority over the local environment. Keep Bash 4 or later first on `PATH` in each
+terminal, or add the Bash path export to your shell rc file. Start the agent from
+that terminal so it inherits `PATH`. Then run:
+
+```sh
+./e2e/lib/detect-env.sh
+```
+
+## Solo docs connection
+
+The repo uses the public Solo docs MCP at `https://search.solo.io/mcp`, which
+requires no authentication. It includes `.codex/config.toml` for Codex and
+`.mcp.json` for Claude Code.
+The agent checks the actual Solo tools at the start of each mode. When the tools
+are absent or fail, it also checks the endpoint:
+
+```sh
+python3 e2e/lib/check-solo-docs.py
+```
+
+The check sends only MCP metadata to the Solo docs endpoint. It reports a failed
+connection explicitly, including HTTP 403. A successful endpoint check and tools
+available inside the agent are separate checks. If Codex does not recognize the
+project configuration, check `codex mcp get soloio-docs-mcp` and use the global
+setup instructions in `skills/ask-the-docs/SKILL.md`.
+
+YAML authoring requires a local CRD schema for the target API version. The public
+server supplies documentation search and page retrieval. Cluster output and
+schemas stay local; see `skills/ask-the-docs/SKILL.md`.
+
+Specs can declare a `preflight` shell command for local prerequisites. The runner
+checks it before creating lab resources. The CrewAI spec uses this to require a
+Python 3.11 or 3.12 interpreter with `venv`; set `CREWAI_PYTHON` to select one.
+
 ## Custom labs
 
 `custom-labs/` at the repo root is gitignored and holds labs the adapt-lab skill

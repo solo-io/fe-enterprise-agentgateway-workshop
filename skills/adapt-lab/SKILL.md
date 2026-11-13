@@ -23,11 +23,15 @@ Never edit a shipped lab under `labs/` or a shipped spec under `e2e/specs/`.
 
 ## 1. Set expectations
 
+First follow the startup connection check in `skills/ask-the-docs/SKILL.md`.
+Report missing Solo tools or connection failures before cluster changes, and
+stop before writing CRD YAML if the required schemas cannot be read.
+
 Tell the user, in four sentences:
 
 - Nothing touches the cluster until they approve a written proposal.
 - The result is a lab they can run by hand plus a spec that re-runs the proof, both under `custom-labs/<name>/`.
-- Nothing about the cluster or their requirements is sent anywhere; the only outbound call is a generic product or schema question to the Solo docs server.
+- Nothing about the cluster or their requirements is sent anywhere; the only outbound call is a generic product question to the Solo docs server.
 - At the end they choose whether the custom configuration stays on the cluster.
 
 ## 2. Intake
@@ -64,7 +68,7 @@ Write every requirement as a numbered, testable statement in the user's terms, f
 
 ## 3. Proposal
 
-Before you write any CRD YAML, call `get_crd_map` then `get_crd_schema` for each kind through `solo-knowledge`, as `skills/ask-the-docs/SKILL.md` describes. Never emit a field the schema does not define. Queries name the product and the kind only, never the user's requirements, org names, or lab text.
+Before you write any CRD YAML, read the local `openAPIV3Schema` for each target kind and served version, as `skills/ask-the-docs/SKILL.md` describes. Never emit a field the schema does not define. Stop if the schema is unavailable. Docs queries contain generic product concepts only, never the user's requirements, org names, or lab text.
 
 Write `custom-labs/<name>/CHANGES.md` from this template and show it:
 

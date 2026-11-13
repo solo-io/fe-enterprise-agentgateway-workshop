@@ -119,8 +119,21 @@ EOF
 
 Create a root certificate for the try-solo.io domain. You use this certificate to sign the certificate for your client and gateway later.
 ```bash
-mkdir example_certs
-openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -subj '/O=Solo.io/CN=try-solo.io' -keyout example_certs/try-solo.io.key -out example_certs/try-solo.io.crt
+mkdir -p example_certs
+cat > example_certs/ca.cnf <<'EOF'
+[req]
+distinguished_name = dn
+x509_extensions = ca
+prompt = no
+[dn]
+O = Solo.io
+CN = try-solo.io
+[ca]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+EOF
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -config example_certs/ca.cnf -keyout example_certs/try-solo.io.key -out example_certs/try-solo.io.crt
 ```
 
 Create a gateway certificate that is signed by the root CA certificate that you created in the previous step.
@@ -129,14 +142,26 @@ First for mock-openai-foo.try-solo.io
 ```bash
 openssl req -out example_certs/mock-openai-foo.try-solo.io.csr -newkey rsa:2048 -nodes -keyout example_certs/mock-openai-foo.try-solo.io.key -subj "/CN=mock-openai-foo.try-solo.io/O=mock-openai organization"
 
-openssl x509 -req -sha256 -days 365 -CA example_certs/try-solo.io.crt -CAkey example_certs/try-solo.io.key -set_serial 0 -in example_certs/mock-openai-foo.try-solo.io.csr -out example_certs/mock-openai-foo.try-solo.io.crt
+cat > example_certs/mock-openai-foo.try-solo.io.ext <<'EOF'
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = DNS:mock-openai-foo.try-solo.io
+EOF
+openssl x509 -req -sha256 -days 365 -CA example_certs/try-solo.io.crt -CAkey example_certs/try-solo.io.key -set_serial 1 -in example_certs/mock-openai-foo.try-solo.io.csr -out example_certs/mock-openai-foo.try-solo.io.crt -extfile example_certs/mock-openai-foo.try-solo.io.ext
 ```
 
 Then for mock-openai-bar.try-solo.io
 ```bash
 openssl req -out example_certs/mock-openai-bar.try-solo.io.csr -newkey rsa:2048 -nodes -keyout example_certs/mock-openai-bar.try-solo.io.key -subj "/CN=mock-openai-bar.try-solo.io/O=solo.io"
 
-openssl x509 -req -sha256 -days 365 -CA example_certs/try-solo.io.crt -CAkey example_certs/try-solo.io.key -set_serial 1 -in example_certs/mock-openai-bar.try-solo.io.csr -out example_certs/mock-openai-bar.try-solo.io.crt
+cat > example_certs/mock-openai-bar.try-solo.io.ext <<'EOF'
+basicConstraints = critical,CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = DNS:mock-openai-bar.try-solo.io
+EOF
+openssl x509 -req -sha256 -days 365 -CA example_certs/try-solo.io.crt -CAkey example_certs/try-solo.io.key -set_serial 2 -in example_certs/mock-openai-bar.try-solo.io.csr -out example_certs/mock-openai-bar.try-solo.io.crt -extfile example_certs/mock-openai-bar.try-solo.io.ext
 ```
 
 Store the credentials for the mock-openai-foo.try-solo.io domain in a Kubernetes secret.

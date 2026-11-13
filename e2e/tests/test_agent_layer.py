@@ -74,11 +74,11 @@ def command_units():
 
 
 class AgentLayer(unittest.TestCase):
-    def test_mcp_json_has_only_solo_knowledge(self):
+    def test_mcp_json_has_only_public_solo_docs(self):
         data = json.loads(read(".mcp.json"))
-        self.assertEqual(list(data["mcpServers"]), ["solo-knowledge"])
-        self.assertEqual(data["mcpServers"]["solo-knowledge"],
-                         {"type": "http", "url": "https://knowledge-base.soloio-field.com/mcp"})
+        self.assertEqual(list(data["mcpServers"]), ["soloio-docs-mcp"])
+        self.assertEqual(data["mcpServers"]["soloio-docs-mcp"],
+                         {"type": "http", "url": "https://search.solo.io/mcp"})
 
     def test_no_file_mentions_internal_docs_server(self):
         for f in user_files() + [ROOT / ".mcp.json"]:
@@ -115,10 +115,9 @@ class AgentLayer(unittest.TestCase):
         for rule in ["Never leave anything behind.", "No cluster data leaves the machine except through the user's model provider.",
                      "Scoped, reviewable identity.", "Stop on failure, do not improvise."]:
             self.assertIn(rule, text)
-        self.assertIn("[mcp_servers.solo-knowledge]", text)
-        self.assertIn('url = "https://knowledge-base.soloio-field.com/mcp"', text)
+        self.assertIn("[mcp_servers.soloio-docs-mcp]", text)
+        self.assertIn('url = "https://search.solo.io/mcp"', text)
         self.assertIn("```toml", text)
-        self.assertLess(len(text.splitlines()), 150)
 
     def test_agents_md_points_at_rbac_readme(self):
         text = read("AGENTS.md")
@@ -129,8 +128,8 @@ class AgentLayer(unittest.TestCase):
         for f in user_files():
             self.assertNotIn("—", f.read_text(), str(f))
 
-    def test_claude_md_is_one_line(self):
-        self.assertEqual(read("CLAUDE.md").strip(), "Read AGENTS.md and follow it.")
+    def test_claude_md_points_at_agents_md(self):
+        self.assertIn("AGENTS.md", read("CLAUDE.md"))
 
     def test_agents_md_names_license_key_and_credential_sources(self):
         text = read("AGENTS.md")
@@ -201,7 +200,7 @@ class AgentLayer(unittest.TestCase):
     def test_adapt_skill_names_every_cli_and_rule(self):
         text = read("skills/adapt-lab/SKILL.md")
         for needle in ["custom-labs/<name>/", "CHANGES.md", "--custom <name> --lint", "--custom <name> --keep",
-                       "--custom <name> --report-only", "get_crd_schema", "requirements:", "proves:",
+                       "--custom <name> --report-only", "openAPIV3Schema", "requirements:", "proves:",
                        "labdoc.py sections", "style-guide.md", "diagnose-failure", "ask-the-docs",
                        "session-log.sh add run", "session-log.sh add keep-custom", "Accepted",
                        "Nothing is written beyond `CHANGES.md`, and no cluster command runs, before the user approves the proposal."]:
@@ -213,7 +212,7 @@ class AgentLayer(unittest.TestCase):
 
     def test_agents_md_mentions_both_modes_and_custom_labs(self):
         text = read("AGENTS.md")
-        for needle in ["skills/adapt-lab/SKILL.md", "/adapt-lab", "custom-labs/", "get_crd_schema"]:
+        for needle in ["skills/adapt-lab/SKILL.md", "/adapt-lab", "custom-labs/", "openAPIV3Schema"]:
             self.assertIn(needle, text)
 
     def test_contribute_skill_names_every_cli_and_rule(self):

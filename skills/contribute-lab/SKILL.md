@@ -9,6 +9,9 @@ Work from the repo root. Follow the steps in order. The four hard rules in `AGEN
 
 Run this only when the user asks for it. Adapt mode never calls it. The user's request covers the local commit in step 6. Nothing is pushed until the user says yes to the diff.
 
+Before cluster changes, follow the startup connection check in
+`skills/ask-the-docs/SKILL.md` and tell the user whether Solo docs is connected.
+
 The user's folder `custom-labs/<name>/` is never edited. You scrub a staging copy, and the promoter copies from that staging copy into the repo. The folder stays re-runnable with `./e2e/run-e2e.sh --custom <name>`.
 
 Session files live under `e2e/.work/contribute/<name>/`:

@@ -402,6 +402,7 @@ def main():
         print(f"E2E_SPEC_REQUIRES={q(' '.join(req))}")
         print(f"E2E_SPEC_REASON={q(spec.get('reason', ''))}")
         print(f"E2E_SPEC_DESC={q(spec.get('description', ''))}")
+        print(f"E2E_SPEC_PREFLIGHT={q(spec.get('preflight', ''))}")
         return
 
     if cmd in ("plan", "lint"):

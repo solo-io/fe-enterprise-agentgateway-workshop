@@ -15,14 +15,14 @@ point it at a shared or production cluster.
 ## Hard rules
 
 1. **Never leave anything behind.** Every lab's Cleanup section runs whether the lab passed, failed, or was abandoned mid-way. After every lab the runner checks `agentgateway-system` against its baseline and lists every object the lab left behind. A custom lab with a leftover fails. A shipped lab's leftovers print as `LEFTOVER (warning):` lines in this release. Report every leftover and every baseline difference to the user. The session removes the base install (001 and 002) at the end unless the user says to keep it. An Enterprise Agentgateway install that was on the cluster before the session is never removed; `--uninstall-base` refuses.
-2. **No cluster data leaves the machine except through the user's model provider.** No cluster output, logs, resource YAML, node details, report content, or `custom-labs/` content (lab text, requirements, the user's org names) goes to the Solo knowledge-base MCP server or to any other service. Queries to that server are generic product questions ("how does entRateLimit attach to a route"). Do not use web search, web fetch, or any other MCP server, even if the harness offers them. The agent's own model traffic goes only where the user's harness already sends it (their Anthropic, Bedrock, Vertex, or OpenAI route), and it carries what the agent reads. The report is a local file; if the user wants Solo to see it, they send it themselves. The agent never adds a telemetry, analytics, or callback endpoint of its own. "Outbound calls" below lists every other connection a session makes.
+2. **No cluster data leaves the machine except through the user's model provider.** No cluster output, logs, resource YAML, node details, report content, or `custom-labs/` content (lab text, requirements, the user's org names) goes to the public Solo docs MCP server or to any other service. Queries to that server are generic product questions ("how does entRateLimit attach to a route"). Do not use web search, web fetch, or any other MCP server, even if the harness offers them. The agent's own model traffic goes only where the user's harness already sends it (their Anthropic, Bedrock, Vertex, or OpenAI route), and it carries what the agent reads. The report is a local file; if the user wants Solo to see it, they send it themselves. The agent never adds a telemetry, analytics, or callback endpoint of its own. "Outbound calls" below lists every other connection a session makes.
 3. **Scoped, reviewable identity.** The repo ships a `ClusterRole` that enumerates what the labs need, with no wildcards, a `ServiceAccount` bound to it, and a script that mints a kubeconfig for that identity. Detection runs a permission preflight (`kubectl auth can-i`) against that list and names every missing permission before anything is installed. The agent never asks the user to grant more than the role lists. The role guards against accidents, not against a hostile agent: it can create ClusterRoles and bindings and read Secrets cluster-wide, so it is privilege-equivalent to cluster-admin. That is why the cluster must be disposable.
 4. **Stop on failure, do not improvise.** When a lab step fails the agent stops, explains what it saw, and waits. It does not patch the cluster, edit the lab, or retry with different YAML on its own. The user chooses. Never edit a shipped lab under `labs/` or a shipped spec under `e2e/specs/`. In adapt mode the agent may fix its own lab and spec under `custom-labs/` as `skills/adapt-lab/SKILL.md` allows. In contribute mode the agent may edit only the files in the session manifest's `created` list and the files it recorded with `--record`.
 
 Before you state how a product feature behaves, ask the Solo docs server with a
 generic query, as `skills/ask-the-docs/SKILL.md` describes. Before writing any
-CRD YAML, read the schema with `get_crd_map` then `get_crd_schema` through
-`solo-knowledge`, and never emit a field the schema does not define.
+CRD YAML, read the local `openAPIV3Schema` for the target kind and served version,
+as `skills/ask-the-docs/SKILL.md` describes. Never emit a field the schema does not define.
 
 Write all prose by `skills/stop-slop/SKILL.md`: what you tell the user, lab
 text, `CHANGES.md`, commit messages, and PR bodies.
@@ -36,16 +36,18 @@ Besides the model provider, a session connects to these:
 
 | Mode | From | To | Why |
 |------|------|----|-----|
-| All | the agent | `knowledge-base.soloio-field.com` | generic product questions to `solo-knowledge` |
+| All | the agent | `search.solo.io` | generic product questions to `soloio-docs-mcp` |
 | Evaluate, adapt | the harness and the cluster | `github.com`, `us-docker.pkg.dev`, `prometheus-community.github.io` | Gateway API CRDs, the Enterprise Agentgateway charts and images, the monitoring chart |
 | Evaluate, adapt | the cluster | the images and endpoints each lab names | lab workloads, and the provider APIs that paid labs call |
 | Contribute | the agent | `github.com` | `git fetch`, `git ls-remote`, `gh`, and, after the user's yes, `git push` and `gh pr create` |
 
 ## Prerequisites
 
-`kubectl`, `helm`, `jq`, `python3` with PyYAML (`python3 -m pip install pyyaml`),
-and bash 4 or later first on the PATH (macOS ships bash 3.2; run
-`brew install bash`), plus a kubeconfig that points at the cluster.
+`kubectl`, `helm`, `jq`, `python3` with PyYAML,
+and bash 4 or later first on the PATH (macOS ships bash 3.2), plus a kubeconfig
+that points at the cluster. See [evaluation prerequisite setup](e2e/README.md#install-evaluation-prerequisites-on-macos)
+for Homebrew and local Bash installation options, and PyYAML in a virtual
+environment selected with `E2E_PYTHON`.
 `./e2e/lib/detect-env.sh` checks all of them. Contribute mode also needs `gh`,
 logged in.
 
@@ -84,7 +86,7 @@ unattended and reports every failure at the end.
 Adapt (`skills/adapt-lab/SKILL.md`, `/adapt-lab`) turns one or more shipped labs
 into a custom lab for the user's own requirements, proves it with a spec, and
 writes both to `custom-labs/<name>/`, which is gitignored. Adapt never edits a
-shipped lab, and it reads each CRD schema with `get_crd_schema` before writing YAML.
+shipped lab, and it reads each local CRD `openAPIV3Schema` before writing YAML.
 
 Contribute (`skills/contribute-lab/SKILL.md`, `/contribute-lab <name>`) promotes
 a custom lab that passed adapt mode to a shipped lab, proves it as a shipped spec,
@@ -116,12 +118,17 @@ for this project with `/mcp`.
 
 Codex reads this file. It has no slash commands, so tell it which mode to run,
 for example "read AGENTS.md and follow skills/evaluate/SKILL.md". The skills
-live in `skills/`. Add the Solo docs server to `~/.codex/config.toml`:
+live in `skills/`. The repo's `.codex/config.toml` configures Solo docs for this
+project. For other repos, the same entry can go in `~/.codex/config.toml`:
 
 ```toml
-[mcp_servers.solo-knowledge]
-url = "https://knowledge-base.soloio-field.com/mcp"
+[mcp_servers.soloio-docs-mcp]
+url = "https://search.solo.io/mcp"
 ```
+
+At the start of every mode, follow the connection check in
+`skills/ask-the-docs/SKILL.md`. Report missing tools or failed connections before
+installing anything. A configured server is not proof of a working connection.
 
 Leave Codex web search off: do not start it with `--search`. Codex has no
 equivalent of `.claude/settings.json` in this repo, so rule 2 rests on the

@@ -2,6 +2,7 @@ lab: labs/agent-frameworks/crewai-with-agentgateway.md
 description: CrewAI researcher→writer crew whose LLM calls traverse the gateway
 tier: t1-key
 timeout: 1200
+preflight: bash lib/crewai/select-python.sh
 requires:
   - OPENAI_API_KEY
 
@@ -15,6 +16,10 @@ requires:
 # venv is removed by the lab's Cleanup.
 
 steps:
+  - section: "Pre-requisites"
+    run: none
+    reason: the spec preflight checks the local runtime before cluster changes
+
   - section: "Configure Required Variables"
     run: all
 
@@ -41,15 +46,14 @@ steps:
       # Guards the one line that keeps first-run prompts off app.crewai.com.
       - contains: "tracing=False"
 
-  # tiktoken has no wheels for Python 3.13+, so the lab pins 3.12. Slow pip
-  # install, hence this spec's long timeout.
+  # Select the same interpreter checked by preflight before installing packages.
   - section: "Run the CrewAI Two-Agent Crew"
     run: [1]
     assert:
       - not_contains: "ERROR: "
 
   - section: "Run the CrewAI Two-Agent Crew"
-    run: [3]
+    run: [2]
     assert:
       - matches: 'Using base_url: http://[a-z0-9.-]+:8080/openai/v1'
       - contains: "AI Gateway key patterns and concepts"
@@ -57,7 +61,7 @@ steps:
       - not_contains: "Traceback"
 
   - section: "Run the CrewAI Two-Agent Crew"
-    run: [4]
+    run: [3]
     assert:
       - contains: "Service Mesh key patterns and concepts"
       - contains: "FINAL BLOG POST:"
