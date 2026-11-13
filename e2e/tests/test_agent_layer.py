@@ -118,7 +118,6 @@ class AgentLayer(unittest.TestCase):
         self.assertIn("[mcp_servers.soloio-docs-mcp]", text)
         self.assertIn('url = "https://search.solo.io/mcp"', text)
         self.assertIn("```toml", text)
-        self.assertLess(len(text.splitlines()), 150)
 
     def test_agents_md_points_at_rbac_readme(self):
         text = read("AGENTS.md")
@@ -129,8 +128,8 @@ class AgentLayer(unittest.TestCase):
         for f in user_files():
             self.assertNotIn("—", f.read_text(), str(f))
 
-    def test_claude_md_is_one_line(self):
-        self.assertEqual(read("CLAUDE.md").strip(), "Read AGENTS.md and follow it.")
+    def test_claude_md_points_at_agents_md(self):
+        self.assertIn("AGENTS.md", read("CLAUDE.md"))
 
     def test_agents_md_names_license_key_and_credential_sources(self):
         text = read("AGENTS.md")

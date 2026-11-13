@@ -1,5 +1,17 @@
 # Changelog
 
+0.15.6 - (11-13-26)
+---
+- Evaluation agent:
+  - Use the public `soloio-docs-mcp` at `search.solo.io` instead of `solo-knowledge`
+  - Check the Solo docs connection first in each mode, with `e2e/lib/check-solo-docs.py` as the fallback
+  - Read the local `openAPIV3Schema` before writing CRD YAML, and stop if it is unavailable
+  - `e2e/README.md`: add macOS setup for Bash 4+ and PyYAML in a virtual environment, linked from the error messages
+  - Add `test_evaluation_fixes.py`, close the convention linter's file handles, and loosen `test_agent_layer.py` so `CLAUDE.md` must mention `AGENTS.md` and `AGENTS.md` has no line limit
+- `crewai-with-agentgateway`: pick Python 3.11 or 3.12 with `lib/crewai/select-python.sh`, run as a spec preflight
+- `tls-termination`, `sni-matching`, `frontend-mtls`: generate certificates with a proper CA, SANs and key usages
+- `global-rate-limiting`: load the JWKS from this clone's `lib/jwt/jwks.json` instead of a hardcoded key
+
 0.15.5 - (11-13-26)
 ---
 - README update - reformat the Evaluate with an Agent section
