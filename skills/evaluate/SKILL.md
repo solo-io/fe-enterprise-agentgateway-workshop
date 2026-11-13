@@ -9,6 +9,10 @@ Work from the repo root. Follow the steps in order. The four hard rules in `AGEN
 
 ## 1. Set expectations and detect the environment
 
+First run the connection check in `skills/ask-the-docs/SKILL.md` and report
+whether Solo docs is connected to this session. Check the actual tools and
+endpoint, even when MCP configuration is present.
+
 Tell the user, in four sentences:
 
 - This is a dedicated test cluster, and the session installs and removes cluster-scoped resources.

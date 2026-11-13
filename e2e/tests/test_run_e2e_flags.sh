@@ -656,5 +656,36 @@ out="$(E2E_CUSTOM_ROOT="${TMP}/lintlabs" "$RUNNER" --custom noreq --lint 2>&1)";
 [[ "$rc" -eq 1 && "$out" == *"custom spec declares no requirements"* ]] \
   && ok "custom lint requires requirements" || fail "requirements lint (rc=$rc): $(printf '%s' "$out" | tail -4)"
 
+# A failed prerequisite must stop before the driver or cluster lab blocks run.
+mkdir -p "${TMP}/preflight/demo"
+cat > "${TMP}/preflight/demo/demo.md" <<'LAB'
+# Prerequisite test
+## Run
+```bash
+echo should-not-run
+```
+## Cleanup
+```bash
+echo should-not-clean-up-an-unstarted-lab
+```
+LAB
+PREFLIGHT_REL="$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))' "${TMP}/preflight/demo/demo.md" "${E2E}/..")"
+cat > "${TMP}/preflight/demo/spec.yaml" <<YAML
+lab: ${PREFLIGHT_REL}
+tier: t0
+preflight: "printf 'missing runtime'; exit 7"
+steps:
+  - section: Run
+cleanup:
+  section: Cleanup
+YAML
+out="$(E2E_CUSTOM_ROOT="${TMP}/preflight" "$RUNNER" --custom demo --no-prompt 2>&1)"; rc=$?
+[[ "$rc" -ne 0 && "$out" == *"prerequisite: missing runtime"* && "$out" != *"should-not-run"* ]] \
+  && ok "failed prerequisite stops before lab execution" || fail "preflight failure: $out"
+[[ ! -f "${TMP}/preflight/demo/.work/run/driver.sh" ]] \
+  && ok "failed prerequisite creates no driver" || fail "preflight generated a driver"
+grep -q 'status=fail' "${TMP}/preflight/demo/.work/run/outcome" \
+  && ok "failed prerequisite records a failure" || fail "preflight outcome missing"
+
 printf '\n%s passed, %s failed\n' "$T_PASS" "$T_FAIL"
 [[ "$T_FAIL" -eq 0 ]]

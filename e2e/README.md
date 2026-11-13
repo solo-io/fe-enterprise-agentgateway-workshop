@@ -75,17 +75,44 @@ package from PyPI and keeps it in the gitignored `e2e/.venv/` directory:
 ```sh
 python3 -m venv e2e/.venv
 e2e/.venv/bin/python -m pip install PyYAML
-export E2E_PYTHON="$PWD/e2e/.venv/bin/python"
-"$E2E_PYTHON" -c 'import yaml; print(yaml.__version__)'
+e2e/.venv/bin/python -c 'import yaml; print(yaml.__version__)'
 ```
 
-Use these exports in each terminal where you run the evaluation, or add them to
-your shell rc file using the absolute path to the Python interpreter. Start the
-agent from that terminal so it inherits `PATH` and `E2E_PYTHON`. Then run:
+Both evaluation scripts automatically check `e2e/.venv/bin/python` before Python
+interpreters on `PATH`. Set `E2E_PYTHON` to use a different interpreter; it takes
+priority over the local environment. Keep Bash 4 or later first on `PATH` in each
+terminal, or add the Bash path export to your shell rc file. Start the agent from
+that terminal so it inherits `PATH`. Then run:
 
 ```sh
 ./e2e/lib/detect-env.sh
 ```
+
+## Solo docs connection
+
+The repo uses the public Solo docs MCP at `https://search.solo.io/mcp`, which
+requires no authentication. It includes `.codex/config.toml` for Codex and
+`.mcp.json` for Claude Code.
+The agent checks the actual Solo tools at the start of each mode. When the tools
+are absent or fail, it also checks the endpoint:
+
+```sh
+python3 e2e/lib/check-solo-docs.py
+```
+
+The check sends only MCP metadata to the Solo docs endpoint. It reports a failed
+connection explicitly, including HTTP 403. A successful endpoint check and tools
+available inside the agent are separate checks. If Codex does not recognize the
+project configuration, check `codex mcp get soloio-docs-mcp` and use the global
+setup instructions in `skills/ask-the-docs/SKILL.md`.
+
+YAML authoring requires a local CRD schema for the target API version. The public
+server supplies documentation search and page retrieval. Cluster output and
+schemas stay local; see `skills/ask-the-docs/SKILL.md`.
+
+Specs can declare a `preflight` shell command for local prerequisites. The runner
+checks it before creating lab resources. The CrewAI spec uses this to require a
+Python 3.11 or 3.12 interpreter with `venv`; set `CREWAI_PYTHON` to select one.
 
 ## Custom labs
 

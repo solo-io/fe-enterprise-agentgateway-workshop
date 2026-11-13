@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "solo-knowledge": {
+    "soloio-docs-mcp": {
       "type": "http",
-      "url": "https://knowledge-base.soloio-field.com/mcp"
+      "url": "https://search.solo.io/mcp"
     }
   }
 }

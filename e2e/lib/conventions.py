@@ -19,6 +19,7 @@ Rules:
 Usage: conventions.py <repo_root>     exit 1 on any violation
 """
 import os
+from pathlib import Path
 import re
 import sys
 
@@ -90,7 +91,7 @@ def md_files(root):
 def check_links(root, files):
     errs = []
     for rel in files:
-        text = open(os.path.join(root, rel), encoding="utf-8").read()
+        text = Path(root, rel).read_text(encoding="utf-8")
         for target in LINK.findall(text):
             target = target.split("#")[0]
             if not target or "://" in target or target.startswith("mailto:"):
@@ -124,7 +125,7 @@ def check_cleanup(root, files, allow=CLEANUP_ALLOW):
     for rel in files:
         if not rel.startswith(("labs/", "custom-labs/")) or rel in allow:
             continue
-        text = open(os.path.join(root, rel), encoding="utf-8").read()
+        text = Path(root, rel).read_text(encoding="utf-8")
         if not re.search(r"^#{2,3}\s+Cleanup\s*$", text, re.MULTILINE):
             errs.append(f"{rel}: no `## Cleanup` section (style-guide §10)")
     return errs
@@ -135,7 +136,7 @@ def check_eagb(root, files, allow=EAGB_ALLOW):
     for rel in files:
         if rel in allow:
             continue
-        text = open(os.path.join(root, rel), encoding="utf-8").read()
+        text = Path(root, rel).read_text(encoding="utf-8")
         for m in EAGB_BARE.finditer(text):
             line = text.count("\n", 0, m.start()) + 1
             errs.append(f"{rel}:{line}: bare `kind: AgentgatewayBackend` — "
@@ -148,7 +149,7 @@ def check_ai_backend(root, files, allow=AI_BACKEND_ALLOW):
     for rel in files:
         if rel in allow:
             continue
-        text = open(os.path.join(root, rel), encoding="utf-8").read()
+        text = Path(root, rel).read_text(encoding="utf-8")
         lines = text.splitlines()
         for m in EAGB_DOC.finditer(text):
             ind = m.group(1)

@@ -3,6 +3,14 @@
 ## Pre-requisites
 This lab assumes that you have completed the setup in `001`. `002` is optional but recommended if you want to observe metrics in Grafana.
 
+Install Python 3.11 or 3.12 with `venv`, then check it before creating cluster resources:
+
+```bash
+bash lib/crewai/select-python.sh
+```
+
+Set `CREWAI_PYTHON` to an executable path to use a specific installation.
+
 ## Lab Objectives
 - Create a Kubernetes secret that contains your OpenAI API key credentials
 - Create a route to OpenAI as the backend LLM provider using an `AgentgatewayModel` and `HTTPRoute`
@@ -115,17 +123,13 @@ You should receive a `200 OK` response with a JSON body containing a `choices` a
 
 The crew script and its dependencies live in `lib/crewai/multi-agent-researcher-writer/`. Install them in a local virtual environment.
 
-> **Note:** `crewai` depends on `tiktoken`, which requires Python ≤3.12 for pre-built wheels. Use `python3.12` or `python3.11`; Python 3.13+ will attempt to compile `tiktoken` from source and fail without a Rust toolchain.
+Use the Python 3.11 or 3.12 interpreter selected by the prerequisite check.
 
 ```bash
-python3.12 -m venv lib/crewai/multi-agent-researcher-writer/.venv
-lib/crewai/multi-agent-researcher-writer/.venv/bin/pip install --upgrade pip -q
+CREWAI_PYTHON="$(bash lib/crewai/select-python.sh)" &&
+"$CREWAI_PYTHON" -m venv lib/crewai/multi-agent-researcher-writer/.venv &&
+lib/crewai/multi-agent-researcher-writer/.venv/bin/pip install --upgrade pip -q &&
 lib/crewai/multi-agent-researcher-writer/.venv/bin/pip install -r lib/crewai/multi-agent-researcher-writer/requirements.txt
-```
-
-If `python3.12` is not available, try `python3.11`:
-```bash
-python3.11 -m venv lib/crewai/multi-agent-researcher-writer/.venv
 ```
 
 Run the crew with your chosen topic:

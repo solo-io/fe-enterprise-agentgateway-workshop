@@ -67,7 +67,7 @@ fi
 # labdoc.py needs PyYAML, and the python3 first on PATH can lack it (a fresh
 # Homebrew python, for example). Use the first interpreter that imports yaml.
 PYTHON=""
-for py in "${E2E_PYTHON:-}" python3 python3.13 python3.12 python3.11 /usr/bin/python3; do
+for py in "${E2E_PYTHON:-}" "${E2E_DIR}/.venv/bin/python" python3 python3.13 python3.12 python3.11 /usr/bin/python3; do
   [[ -n "$py" ]] && command -v "$py" >/dev/null 2>&1 && "$py" -c 'import yaml' 2>/dev/null \
     && { PYTHON="$py"; break; }
 done
@@ -486,6 +486,14 @@ run_lab() {
   if [[ -n "$E2E_SPEC_REQUIRES" ]] && ! e2e_keys_present $E2E_SPEC_REQUIRES; then
     printf "  ${YELLOW}⊘${NC} %-58s ${YELLOW}SKIP${NC} — missing: %s\n" "$key" "$E2E_SPEC_REQUIRES"
     TOTAL_SKIP=$((TOTAL_SKIP+1)); SKIPPED+=("${key} (${E2E_SPEC_REQUIRES})"); write_outcome skip 0; return
+  fi
+
+  if [[ -n "$E2E_SPEC_PREFLIGHT" ]]; then
+    local preflight_out
+    if ! preflight_out="$(cd "$REPO_ROOT" && bash -c "$E2E_SPEC_PREFLIGHT" 2>&1)"; then
+      printf "  ${RED}✗${NC} %-58s ${RED}FAIL${NC} — prerequisite: %s\n" "$key" "$preflight_out"
+      TOTAL_FAIL=$((TOTAL_FAIL+1)); FAILED+=("$key"); write_outcome fail 1; return
+    fi
   fi
 
   local workdir; workdir="$(key_dir "$key")"

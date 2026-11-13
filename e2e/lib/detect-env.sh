@@ -42,7 +42,7 @@ done
 probe_clis() {  # fills CLIS_JSON and PY; a missing CLI stops the session
   CLIS_JSON='{}'
   local name ver py
-  for py in "${E2E_PYTHON:-}" python3 python3.13 python3.12 python3.11 /usr/bin/python3; do
+  for py in "${E2E_PYTHON:-}" "${REPO}/e2e/.venv/bin/python" python3 python3.13 python3.12 python3.11 /usr/bin/python3; do
     [[ -n "$py" ]] && command -v "$py" >/dev/null 2>&1 && "$py" -c 'import yaml' 2>/dev/null \
       && { PY="$py"; break; }
   done
