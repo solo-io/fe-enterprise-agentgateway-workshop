@@ -237,9 +237,17 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 
 ## Alpha: Evaluate with an agent
 
-An AI agent can run the LLM or MCP track against your own cluster, explain each lab, and write a local report. To start it from the repo root, run `/evaluate` in Claude Code, or tell Codex to read `AGENTS.md` and run the evaluate skill. See [AGENTS.md](AGENTS.md) for prerequisites, the identity to run as, and the hard rules the agent follows.
+An AI agent can run the workshop labs against your own cluster, build a custom lab for your scenario, and contribute it back. Start it from the repo root in Claude Code with the slash command, or tell Codex to read `AGENTS.md` and run the named skill. See [AGENTS.md](AGENTS.md) for prerequisites, the identity to run as, and the hard rules the agent follows.
 
-The agent cannot prompt for keys, so set them before you start it. `/evaluate` requires `SOLO_TRIAL_LICENSE_KEY` and asks about `OPENAI_API_KEY`. You can continue without the OpenAI key, and the labs that need it skip, as do the labs that need other optional keys such as `FRED_API_KEY`. Export the keys in your shell, add it to `~/.zshrc`, or copy the template and fill it in:
+| Skill | Claude Code | What it does |
+|-------|-------------|--------------|
+| `evaluate` | `/evaluate` | Runs the LLM or MCP track on your cluster, explains each lab, and writes a local report |
+| `adapt-lab` | `/adapt-lab` | Builds a custom lab for your scenario. Name the labs to start from or describe what you need. The agent writes a proposal, waits for your approval, then writes a lab and an e2e spec under `custom-labs/<name>/` and runs the spec until every requirement passes. The folder is gitignored and stays on your machine |
+| `contribute-lab` | `/contribute-lab <name>` | Commits a custom lab on a new version branch, shows you the diff, and pushes only when you say yes. Works from a clone of this repo or of your fork |
+
+### Set your keys first
+
+The agent cannot prompt for keys, so set them before you start it. `/evaluate` requires `SOLO_TRIAL_LICENSE_KEY` and asks about `OPENAI_API_KEY`. You can continue without the OpenAI key, and the labs that need it skip, as do the labs that need other optional keys such as `FRED_API_KEY`. Export the keys in your shell, add them to `~/.zshrc`, or copy the template and fill it in:
 
 ```bash
 cp e2e/env.local.example e2e/.env.local
@@ -247,10 +255,6 @@ chmod 600 e2e/.env.local
 ```
 
 `e2e/.env.local` is gitignored.
-
-The same agent can also build a custom lab for your own scenario. Run `/adapt-lab` in Claude Code, or tell Codex to read `AGENTS.md` and run the adapt-lab skill, then name the labs to start from or describe what you need. The agent writes a proposal, waits for your approval, then writes a lab and an e2e spec under `custom-labs/<name>/` and runs the spec on your cluster until every requirement passes. The folder is gitignored and stays on your machine.
-
-To contribute a custom lab back to the workshop, run `/contribute-lab <name>` in Claude Code, or tell Codex to read `AGENTS.md` and run the contribute-lab skill; the agent commits the lab on a new version branch, shows you the diff, and pushes only when you say yes. It works from a clone of this repo or of your fork.
 
 ---
 
