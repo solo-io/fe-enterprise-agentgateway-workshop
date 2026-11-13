@@ -41,6 +41,52 @@ allowlisted in `AI_BACKEND_ALLOW`).
 Requires bash ≥ 4, `python3` + PyYAML, `kubectl`, `helm`, `jq` (`k6` for the
 load-testing labs).
 
+## Install evaluation prerequisites on macOS
+
+The evaluation needs Bash 4 or later first on `PATH` and a Python interpreter
+that imports PyYAML. macOS ships Bash 3.2. If you use Homebrew, install Bash with
+`brew install bash` and put its `bin` directory first on `PATH`.
+
+To install Bash without Homebrew or `sudo`, build it under `~/.local`. This
+downloads GNU Bash from `ftp.gnu.org` and requires Apple's command-line tools
+(`cc` and `make`). If those tools are missing, run `xcode-select --install` and
+finish the installer before continuing. Run these commands from the repo root:
+
+```sh
+(
+  set -eu
+  build_dir="$(mktemp -d)"
+  trap 'rm -rf "$build_dir"' EXIT
+  cd "$build_dir"
+  curl -fL -o bash-5.3.tar.gz https://ftp.gnu.org/gnu/bash/bash-5.3.tar.gz
+  tar -xzf bash-5.3.tar.gz
+  cd bash-5.3
+  ./configure --prefix="$HOME/.local"
+  make
+  make install
+)
+export PATH="$HOME/.local/bin:$PATH"
+bash --version
+```
+
+Install PyYAML in a virtual environment from the repo root. This downloads the
+package from PyPI and keeps it in the gitignored `e2e/.venv/` directory:
+
+```sh
+python3 -m venv e2e/.venv
+e2e/.venv/bin/python -m pip install PyYAML
+export E2E_PYTHON="$PWD/e2e/.venv/bin/python"
+"$E2E_PYTHON" -c 'import yaml; print(yaml.__version__)'
+```
+
+Use these exports in each terminal where you run the evaluation, or add them to
+your shell rc file using the absolute path to the Python interpreter. Start the
+agent from that terminal so it inherits `PATH` and `E2E_PYTHON`. Then run:
+
+```sh
+./e2e/lib/detect-env.sh
+```
+
 ## Custom labs
 
 `custom-labs/` at the repo root is gitignored and holds labs the adapt-lab skill

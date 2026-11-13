@@ -43,9 +43,11 @@ Besides the model provider, a session connects to these:
 
 ## Prerequisites
 
-`kubectl`, `helm`, `jq`, `python3` with PyYAML (`python3 -m pip install pyyaml`),
-and bash 4 or later first on the PATH (macOS ships bash 3.2; run
-`brew install bash`), plus a kubeconfig that points at the cluster.
+`kubectl`, `helm`, `jq`, `python3` with PyYAML,
+and bash 4 or later first on the PATH (macOS ships bash 3.2), plus a kubeconfig
+that points at the cluster. See [evaluation prerequisite setup](e2e/README.md#install-evaluation-prerequisites-on-macos)
+for Homebrew and local Bash installation options, and PyYAML in a virtual
+environment selected with `E2E_PYTHON`.
 `./e2e/lib/detect-env.sh` checks all of them. Contribute mode also needs `gh`,
 logged in.
 

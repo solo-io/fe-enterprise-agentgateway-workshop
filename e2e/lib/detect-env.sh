@@ -56,12 +56,12 @@ probe_clis() {  # fills CLIS_JSON and PY; a missing CLI stops the session
         bash)    # run-e2e.sh runs under the first bash on PATH and needs 4+.
                  ver="$(bash -c 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"' 2>/dev/null)"
                  if [[ "${ver%%.*}" =~ ^[0-9]+$ ]] && (( ${ver%%.*} < 4 )); then
-                   STOP+=("bash ${ver} is first on PATH: install bash 4+ (brew install bash) and make sure it is first on PATH")
+                   STOP+=("bash ${ver} is first on PATH: install bash 4+ and put it first on PATH; see e2e/README.md#install-evaluation-prerequisites-on-macos (Homebrew or local build)")
                  fi ;;
       esac
     elif [[ "$name" == pyyaml ]]; then
       if [[ -n "$PY" ]]; then ver="$("$PY" -c 'import yaml; print(yaml.__version__)' 2>/dev/null)"
-      else ver=missing; STOP+=("missing PyYAML: python3 -m pip install pyyaml (or set E2E_PYTHON to a python3 that has it)"); fi
+      else ver=missing; STOP+=("missing PyYAML: install it in a virtual environment and set E2E_PYTHON to that environment's python; see e2e/README.md#install-evaluation-prerequisites-on-macos"); fi
     else
       ver=missing; STOP+=("missing CLI: ${name}")
     fi

@@ -58,10 +58,9 @@ unset E2E_KEEP
 # Captured before any spec's metadata is eval'd, since that sets the same name.
 E2E_TIMEOUT_OVERRIDE="${E2E_SPEC_TIMEOUT:-}"
 
-# Bash 4+ is required (associative arrays). macOS /bin/bash is 3.2; the
-# shebang picks up homebrew bash from PATH.
+# Bash 4+ is required (associative arrays). The shebang uses the first bash on PATH.
 if (( BASH_VERSINFO[0] < 4 )); then
-  printf "${RED}ERROR: bash >= 4 required (running %s). Try: brew install bash${NC}\n" "$BASH_VERSION" >&2
+  printf "${RED}ERROR: bash >= 4 required (running %s). Put bash 4+ first on PATH; see e2e/README.md#install-evaluation-prerequisites-on-macos (Homebrew or local build)${NC}\n" "$BASH_VERSION" >&2
   exit 1
 fi
 
@@ -73,7 +72,7 @@ for py in "${E2E_PYTHON:-}" python3 python3.13 python3.12 python3.11 /usr/bin/py
     && { PYTHON="$py"; break; }
 done
 if [[ -z "$PYTHON" ]]; then
-  printf "${RED}ERROR: no python3 with PyYAML found. Run 'python3 -m pip install pyyaml' or set E2E_PYTHON${NC}\n" >&2
+  printf "${RED}ERROR: no python3 with PyYAML found. Install it in a virtual environment and set E2E_PYTHON to that environment's python; see e2e/README.md#install-evaluation-prerequisites-on-macos${NC}\n" >&2
   exit 1
 fi
 
