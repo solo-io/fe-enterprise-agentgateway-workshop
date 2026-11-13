@@ -1,5 +1,9 @@
 # Changelog
 
+0.15.5 - (11-13-26)
+---
+- README update - reformat the Evaluate with an Agent section
+
 0.15.4 - (11-12-26)
 ---
 - Bump to Enterprise Agentgateway `v2026.11.0`: `001`, the air-gap, OpenShift and multi-cluster upgrade installs, the three OBO labs, `image-list.md`, the chart `appVersion` fields and README "Validated on"
