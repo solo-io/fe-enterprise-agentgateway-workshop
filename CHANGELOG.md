@@ -1,5 +1,17 @@
 # Changelog
 
+0.15.7 - (11-16-26)
+---
+- `configure-routing-aws-bedrock-apikey.md`: call Bedrock in `us-east-1` in place of `us-west-2`. A short-term API key works only in the Region it was generated in
+- `configure-routing-aws-bedrock.md` and `configure-routing-aws-bedrock-apikey.md`: replace the Mistral and Llama models with OpenAI `gpt-oss-120b` and Google `gemma-3-12b-it`, so the lab routes to three model vendors through Bedrock. Paths are now `/bedrock/gpt-oss` and `/bedrock/gemma`
+- Remove `configure-routing-aws-bedrock-titan-embeddings.md`, with its README, `tracks/llm-track` and `migrate-agentgatewaybackend-to-agentgatewaymodel.md` references
+- Evaluation agent:
+  - Add specs for `configure-routing-aws-bedrock`, `configure-routing-aws-bedrock-apikey` and `configure-routing-azure-openai` (tier `t3-cloud`). Each runs when its credentials are in the shell, a shell rc file or `e2e/.env.local`, and reports `SKIP (missing VAR)` when they are absent
+  - Add a spec for `configure-routing-anthropic` (tier `t1-key`, needs `CLAUDE_API_KEY`)
+  - `e2e/env.local.example`: list the Anthropic, AWS, Bedrock and Azure variables
+  - Report labs that need a person as `MANUAL`, with the reason and a link to the lab, in place of `NOT AUTOMATED` and `no spec for this lab`. Covers the four `mcp-eager-auth` Auth0, Okta and Entra labs, `obo-crewai-agent-with-mcp`, `claude-code`, `claude-code-auth0-pkce` and `claude-desktop`, which now have `t5-manual` specs
+  - `skills/evaluate`: ask before running `t3-cloud` labs, and describe `MANUAL` rows
+
 0.15.6 - (11-13-26)
 ---
 - Evaluation agent:

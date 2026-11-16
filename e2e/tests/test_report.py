@@ -85,6 +85,23 @@ class TestBuild(ReportCase):
         r = self.row(data, "routing/d", 1)
         self.assertEqual((r["result"], r["note"]), ("NOT AUTOMATED", "Needs a live Keycloak server."))
 
+    def test_manual_tier_is_manual_with_lab_link(self):
+        # No outcome file: the track plan alone must produce the row.
+        _, _, text, data = self.build()
+        r = self.row(data, "routing/h", 1)
+        self.assertEqual(r["result"], "MANUAL")
+        self.assertEqual(r["note"], "Needs user interaction. Browser login. "
+                                    "Validate by hand: [labs/routing/h.md](../labs/routing/h.md)")
+        self.assertIn("| routing/h | MANUAL | - |", text)
+        # An outcome the runner wrote gives the same row.
+        work = os.path.join(self.tmp.name, "wm")
+        shutil.copytree(os.path.join(FIX, "work"), work)
+        os.makedirs(os.path.join(work, "routing", "h"))
+        with open(os.path.join(work, "routing", "h", "outcome"), "w") as fh:
+            fh.write("status=excluded rc=0 duration=0 requires=\n")
+        _, _, _, data = self.build(work=work)
+        self.assertEqual(self.row(data, "routing/h", 1)["result"], "MANUAL")
+
     def test_not_applicable_names_env(self):
         _, _, _, data = self.build()
         self.assertEqual(self.row(data, "routing/e", 1)["result"], "NOT APPLICABLE (only on eks)")

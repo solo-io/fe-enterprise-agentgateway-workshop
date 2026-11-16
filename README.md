@@ -64,7 +64,6 @@ See [System Requirements](labs/installation/system-requirements.md) for detailed
 - [Routing to AWS Bedrock](labs/routing/configure-routing-aws-bedrock.md) _(AWS Bedrock)_
 - [Routing to AWS Bedrock via API Keys](labs/routing/configure-routing-aws-bedrock-apikey.md) _(AWS Bedrock)_
 - [AWS Bedrock with IRSA](labs/routing/configure-routing-aws-bedrock-irsa.md) _(AWS Bedrock / EKS)_
-- [AWS Bedrock Titan Embeddings](labs/routing/configure-routing-aws-bedrock-titan-embeddings.md) _(AWS Bedrock)_
 - [Routing to Anthropic](labs/routing/configure-routing-anthropic.md) _(Anthropic)_
 - [Routing to Groq](labs/routing/configure-routing-groq.md) _(Groq)_: OpenAI-compatible provider through the built-in `Groq` provider
 - [Routing to Azure OpenAI and Azure AI Foundry](labs/routing/configure-routing-azure-openai.md) _(Azure OpenAI / Azure AI Foundry)_
@@ -271,7 +270,6 @@ chmod 600 e2e/.env.local
         - Google Vertex AI (user auth and GCP service account)
         - Groq (built-in provider), and any other OpenAI-compatible provider through `baseURL`
     - OpenAI Embeddings support
-    - AWS Bedrock Titan embeddings support
     - OpenAI Batches API support (asynchronous batch processing)
     - Streaming responses support for real-time token generation
     - OpenAI Audio API support (Text-to-Speech and Speech-to-Text)

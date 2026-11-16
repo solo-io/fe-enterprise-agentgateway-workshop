@@ -62,7 +62,7 @@ python3 e2e/lib/tracks.py list <t> --env <class>
 
 The `tracks.py list` output has one line per lab: `<key>`, `<status>`, `<use-case>`. Show it grouped by use case. Name:
 
-- the labs that need a paid provider key (tier `t1-key` in `--list`), and ask before running them. For each paid lab the user declines, log it and pass `--skip <key>` on every later `run-e2e.sh` call; the report shows it as `SKIP (declined)`:
+- the labs that need a paid provider key or cloud account (tier `t1-key` or `t3-cloud` in `--list`), and ask before running them. For each paid lab the user declines, log it and pass `--skip <key>` on every later `run-e2e.sh` call; the report shows it as `SKIP (declined)`:
 
   ```bash
   e2e/lib/session-log.sh add decision <key> declined
@@ -74,7 +74,7 @@ The `tracks.py list` output has one line per lab: `<key>`, `<status>`, `<use-cas
 The fix for a missing key: copy `e2e/env.local.example` to `e2e/.env.local` and add `VAR=value`, or export it in the shell that started the agent. Never ask the user to paste a key into the chat, and never write a key yourself.
 - the labs with status `duplicate`: listed under two use cases, run once, and shown in both report tables
 - the labs marked `no-spec`, reported as `NOT AUTOMATED`; the user can run these by hand from the lab markdown
-- the labs marked `excluded`, reported as `NOT AUTOMATED` with the `reason` from `e2e/specs/<key>.yaml`; say that reason, and that the user can run the lab by hand
+- the labs marked `excluded`. `--list` shows the tier. A `t5-manual` lab needs a person, such as a browser login, and is reported as `MANUAL` with the `reason` from `e2e/specs/<key>.yaml` and a link to the lab; say that reason, and that the user validates the lab by hand. An `excluded` lab is reported as `NOT AUTOMATED` with its `reason`; say that reason, and that the user can run the lab by hand
 - the labs marked `not-applicable:<class>`, reported as `NOT APPLICABLE` on this cluster
 
 ## 4. Install the base

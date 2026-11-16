@@ -77,13 +77,27 @@ def read_session(path):
     return events
 
 
-def spec_reason(specs_dir, key):
+def excluded_row(specs_dir, key):
+    """The row for a lab the harness never runs.
+
+    A `t5-manual` lab needs a person (a browser login, a desktop app), so it is
+    MANUAL and its note links the lab to follow by hand. The link is relative
+    to reports/ at the repo root. Any other excluded lab stays NOT AUTOMATED.
+    """
     try:
         with open(os.path.join(specs_dir, key + ".yaml"), encoding="utf-8") as fh:
             spec = yaml.safe_load(fh) or {}
     except OSError:
-        return ""
-    return " ".join(str(spec.get("reason") or "").split())
+        spec = {}
+    note = " ".join(str(spec.get("reason") or "").split())
+    result = "NOT AUTOMATED"
+    if spec.get("tier") == "t5-manual":
+        result = "MANUAL"
+        lab = spec.get("lab") or ""
+        if lab:
+            link = f"Validate by hand: [{lab}](../{lab})"
+            note = f"{note} {link}" if note else link
+    return {"key": key, "result": result, "duration": "-", "note": note}
 
 
 def spec_path(key, specs_dir, custom_root):
@@ -144,7 +158,7 @@ def requirement_rows(key, outcome, row, reqs, expected, steps):
     for r in reqs:
         rid, result, detail = r["id"], "FAIL", ""
         if status not in RAN:
-            if row["result"].startswith(("SKIP", "NOT AUTOMATED", "NOT APPLICABLE")):
+            if row["result"].startswith(("SKIP", "NOT AUTOMATED", "NOT APPLICABLE", "MANUAL")):
                 result, detail = "SKIP", row["result"].lower()
             else:
                 detail = row["note"] or "lab did not run"
@@ -188,7 +202,7 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status="", stopped=False):
         if plan_status == "no-spec":
             return {"key": key, "result": "NOT AUTOMATED", "duration": "-", "note": "no spec for this lab"}
         if plan_status == "excluded":
-            return {"key": key, "result": "NOT AUTOMATED", "duration": "-", "note": spec_reason(specs_dir, key)}
+            return excluded_row(specs_dir, key)
         if plan_status.startswith("not-applicable:"):
             return {"key": key, "result": f"NOT APPLICABLE (only on {plan_status.split(':', 1)[1]})",
                     "duration": "-", "note": ""}
@@ -212,7 +226,8 @@ def lab_row(key, outcome, deviations, specs_dir, plan_status="", stopped=False):
     elif status == "interrupted":
         result, note = "FAIL", "interrupted"
     elif status == "excluded":
-        result, note = "NOT AUTOMATED", spec_reason(specs_dir, key)
+        row = excluded_row(specs_dir, key)
+        result, note = row["result"], row["note"]
     elif status == "skip":
         req = outcome.get("requires", "")
         if outcome.get("reason") == "declined":

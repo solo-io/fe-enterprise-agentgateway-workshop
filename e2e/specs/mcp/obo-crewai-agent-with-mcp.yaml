@@ -1,0 +1,5 @@
+lab: labs/mcp/obo-crewai-agent-with-mcp.md
+description: CrewAI agent calling MCP on behalf of a Keycloak user
+tier: t5-manual
+reason: >-
+  Needs user interaction. The user signs in to Keycloak through a Streamlit UI in the browser, and the agent runs from that session.

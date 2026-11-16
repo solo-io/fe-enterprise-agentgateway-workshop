@@ -109,13 +109,13 @@ else fail "outcome files ($checked checked, $bad wrong)"; fi
 # entry, and --resolve-creds runs nothing, so no outcome may exist for it.
 mkdir -p "${TMP}/work/security/virtual-keys"
 echo "status=pass stale" > "${TMP}/work/security/virtual-keys/outcome"
-mkdir -p "${TMP}/work/routing/configure-routing-anthropic"
-echo "status=pass stale" > "${TMP}/work/routing/configure-routing-anthropic/outcome"
+mkdir -p "${TMP}/work/routing/configure-routing-vertexai"
+echo "status=pass stale" > "${TMP}/work/routing/configure-routing-vertexai/outcome"
 run "--resolve-creds rerun" 0 "Resolving credentials" \
   --track llm --env gke --resolve-creds --no-prompt
 [[ ! -e "${TMP}/work/security/virtual-keys/outcome" ]] \
   && ok "stale outcome for run/duplicate key deleted" || fail "stale run-entry outcome survived"
-[[ "$(cat "${TMP}/work/routing/configure-routing-anthropic/outcome")" == "status=no-spec rc=0 duration=0 requires=" ]] \
+[[ "$(cat "${TMP}/work/routing/configure-routing-vertexai/outcome")" == "status=no-spec rc=0 duration=0 requires=" ]] \
   && ok "stale no-spec outcome rewritten" || fail "no-spec outcome not rewritten"
 
 # Failures from tracks.py itself are surfaced, not relabelled.

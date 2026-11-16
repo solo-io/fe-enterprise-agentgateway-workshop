@@ -49,13 +49,11 @@ CLEANUP_ALLOW = {
 EAGB_ALLOW = {"labs/platform-engineering/kyverno-admission-control.md"}
 
 # Labs that keep an LLM backend because their requests carry no `model` in the
-# body, which AgentgatewayModel needs: /v1/files and /v1/batches, and the native
-# Bedrock InvokeModel call (which also relies on a URLRewrite model rules reject).
+# body, which AgentgatewayModel needs: /v1/files and /v1/batches.
 AI_BACKEND_ALLOW = {
     # shows the backend-centric pattern as the "before" side of the migration
     "labs/routing/migrate-agentgatewaybackend-to-agentgatewaymodel.md",
     "labs/routing/configure-openai-batches.md",
-    "labs/routing/configure-routing-aws-bedrock-titan-embeddings.md",
 }
 
 # Labs whose GATEWAY_IP block legitimately differs from the canonical form

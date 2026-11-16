@@ -1,0 +1,5 @@
+lab: labs/agent-harnesses/claude-code.md
+description: Claude Code through the gateway
+tier: t5-manual
+reason: >-
+  Needs user interaction. The subscription path starts with an interactive `claude setup-token` login, and both paths are validated in a Claude Code session.

@@ -101,39 +101,39 @@ EOF
 ```
 
 ## Create AWS Bedrock Route and Models
-Create the AWS Bedrock route and `AgentgatewayModel` resources. For this setup we will configure multiple models using a single provider (AWS Bedrock) in a path-per-model routing configuration.
+Create the AWS Bedrock route and `AgentgatewayModel` resources. For this setup we will configure multiple models using a single provider (AWS Bedrock) in a path-per-model routing configuration. The models come from three model vendors: OpenAI (`gpt-oss-120b`), Anthropic (Claude Haiku, Opus and Sonnet) and Google (`gemma-3-12b-it`). One Bedrock credential and one API format reach all of them.
 
-Note the key difference from the [AWS Bedrock routing lab](configure-routing-aws-bedrock.md): we use `spec.policies.auth.secretRef` instead of `spec.policies.auth.aws` for API key authentication. The resource names below (`bedrock-mistral`, `bedrock-haiku4.5`, etc.) match the other Bedrock labs; clean up previous Bedrock lab resources before starting this one.
+Note the key difference from the [AWS Bedrock routing lab](configure-routing-aws-bedrock.md): we use `spec.policies.auth.secretRef` instead of `spec.policies.auth.aws` for API key authentication. The resource names below (`bedrock-gpt-oss`, `bedrock-haiku4.5`, etc.) match the other Bedrock labs; clean up previous Bedrock lab resources before starting this one.
 
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayModel
 metadata:
-  name: bedrock-mistral
+  name: bedrock-gpt-oss
   namespace: agentgateway-system
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: bedrock
-      sectionName: bedrock-mistral
+      sectionName: bedrock-gpt-oss
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: bedrock
-      sectionName: bedrock-mistral-2
+      sectionName: bedrock-gpt-oss-2
   match:
     model: "*"
   provider: Bedrock
   bedrock:
-    region: us-west-2
+    region: us-east-1
   policies:
     auth:
       secretRef:
         name: bedrock-apikey-secret
     transformations:
       - field: model
-        expression: '"mistral.voxtral-mini-3b-2507"'
+        expression: '"openai.gpt-oss-120b-1:0"'
 ---
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayModel
@@ -150,7 +150,7 @@ spec:
     model: "*"
   provider: Bedrock
   bedrock:
-    region: us-west-2
+    region: us-east-1
   policies:
     auth:
       secretRef:
@@ -174,7 +174,7 @@ spec:
     model: "*"
   provider: Bedrock
   bedrock:
-    region: us-west-2
+    region: us-east-1
   policies:
     auth:
       secretRef:
@@ -198,7 +198,7 @@ spec:
     model: "*"
   provider: Bedrock
   bedrock:
-    region: us-west-2
+    region: us-east-1
   policies:
     auth:
       secretRef:
@@ -210,26 +210,26 @@ spec:
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayModel
 metadata:
-  name: bedrock-llama3-8b
+  name: bedrock-gemma
   namespace: agentgateway-system
 spec:
   parentRefs:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
       name: bedrock
-      sectionName: bedrock-llama3-8b
+      sectionName: bedrock-gemma
   match:
     model: "*"
   provider: Bedrock
   bedrock:
-    region: us-west-2
+    region: us-east-1
   policies:
     auth:
       secretRef:
         name: bedrock-apikey-secret
     transformations:
       - field: model
-        expression: '"meta.llama3-1-8b-instruct-v1:0"'
+        expression: '"google.gemma-3-12b-it"'
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -276,30 +276,30 @@ spec:
           name: "*"
       timeouts:
         request: "120s"
-    - name: bedrock-mistral
+    - name: bedrock-gpt-oss
       matches:
         - path:
             type: PathPrefix
-            value: /bedrock/mistral
+            value: /bedrock/gpt-oss
       backendRefs:
         - group: agentgateway.dev
           kind: AgentgatewayModel
           name: "*"
       timeouts:
         request: "120s"
-    - name: bedrock-llama3-8b
+    - name: bedrock-gemma
       matches:
         - path:
             type: PathPrefix
-            value: /bedrock/llama3-8b
+            value: /bedrock/gemma
       backendRefs:
         - group: agentgateway.dev
           kind: AgentgatewayModel
           name: "*"
       timeouts:
         request: "120s"
-    # catch-all will route to the bedrock mistral upstream
-    - name: bedrock-mistral-2
+    # catch-all will route to the bedrock gpt-oss upstream
+    - name: bedrock-gpt-oss-2
       matches:
         - path:
             type: PathPrefix
@@ -315,11 +315,11 @@ EOF
 
 ## Test the Configuration
 
-### curl AWS Bedrock Mistral endpoint
+### curl AWS Bedrock gpt-oss endpoint
 ```bash
 export GATEWAY_IP=$(kubectl get svc -n agentgateway-system --selector=gateway.networking.k8s.io/gateway-name=agentgateway-proxy -o jsonpath='{.items[*].status.loadBalancer.ingress[0].ip}{.items[*].status.loadBalancer.ingress[0].hostname}')
 
-curl -i "$GATEWAY_IP:8080/bedrock/mistral/v1/chat/completions" \
+curl -i "$GATEWAY_IP:8080/bedrock/gpt-oss/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -377,9 +377,9 @@ curl -i "$GATEWAY_IP:8080/bedrock/sonnet/v1/chat/completions" \
   }'
 ```
 
-### curl AWS Bedrock llama3-8b endpoint
+### curl AWS Bedrock Gemma endpoint
 ```bash
-curl -i "$GATEWAY_IP:8080/bedrock/llama3-8b/v1/chat/completions" \
+curl -i "$GATEWAY_IP:8080/bedrock/gemma/v1/chat/completions" \
   -H "content-type: application/json" \
   -d '{
     "model": "",
@@ -475,10 +475,10 @@ Navigate to http://localhost:16686 in your browser to see the traces. Each span 
 ## Cleanup
 ```bash
 kubectl delete httproute -n agentgateway-system bedrock
-kubectl delete agentgatewaymodel -n agentgateway-system bedrock-mistral
+kubectl delete agentgatewaymodel -n agentgateway-system bedrock-gpt-oss
 kubectl delete agentgatewaymodel -n agentgateway-system bedrock-haiku4.5
 kubectl delete agentgatewaymodel -n agentgateway-system bedrock-opus
 kubectl delete agentgatewaymodel -n agentgateway-system bedrock-sonnet
-kubectl delete agentgatewaymodel -n agentgateway-system bedrock-llama3-8b
+kubectl delete agentgatewaymodel -n agentgateway-system bedrock-gemma
 kubectl delete secret -n agentgateway-system bedrock-apikey-secret
 ```
