@@ -1,0 +1,5 @@
+lab: labs/mcp/mcp-eager-auth-auth0.md
+description: eager OAuth for MCP with Auth0
+tier: t5-manual
+reason: >-
+  Needs user interaction. The lab needs your own Auth0 tenant, and its validation is a browser login and consent through MCP Inspector or Claude Code.

@@ -17,3 +17,4 @@ use_cases:
       - spec: routing/f
         status: no-spec
       - spec: routing/g
+      - spec: routing/h

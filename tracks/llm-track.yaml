@@ -23,22 +23,14 @@ use_cases:
       - spec: routing/migrate-agentgatewaybackend-to-agentgatewaymodel
       - spec: agent-harnesses/codex
       - spec: routing/configure-routing-aws-bedrock
-        lab: labs/routing/configure-routing-aws-bedrock.md
-        status: no-spec
       - spec: routing/configure-routing-aws-bedrock-apikey
-        lab: labs/routing/configure-routing-aws-bedrock-apikey.md
-        status: no-spec
       - spec: routing/configure-routing-aws-bedrock-irsa
         lab: labs/routing/configure-routing-aws-bedrock-irsa.md
         status: no-spec
         only_on:
           - eks
       - spec: routing/configure-routing-anthropic
-        lab: labs/routing/configure-routing-anthropic.md
-        status: no-spec
       - spec: routing/configure-routing-azure-openai
-        lab: labs/routing/configure-routing-azure-openai.md
-        status: no-spec
       - spec: routing/configure-routing-vertexai
         lab: labs/routing/configure-routing-vertexai.md
         status: no-spec
@@ -70,8 +62,6 @@ use_cases:
         lab: labs/security/jwt-auth-with-rbac.md
         status: no-spec
       - spec: agent-harnesses/claude-code-auth0-pkce
-        lab: labs/agent-harnesses/claude-code-auth0-pkce.md
-        status: no-spec
       - spec: security/tls-termination
       - spec: security/frontend-mtls
       - spec: security/sni-matching
@@ -102,9 +92,6 @@ use_cases:
     value: Extend the gateway beyond chat completions to cover the full API surface (embeddings, async batch processing, and audio) without provider-specific client changes.
     labs:
       - spec: routing/configure-openai-embeddings
-      - spec: routing/configure-routing-aws-bedrock-titan-embeddings
-        lab: labs/routing/configure-routing-aws-bedrock-titan-embeddings.md
-        status: no-spec
       - spec: routing/configure-openai-batches
         lab: labs/routing/configure-openai-batches.md
         status: no-spec

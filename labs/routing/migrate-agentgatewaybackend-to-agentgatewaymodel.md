@@ -568,7 +568,7 @@ HTTP 404
 
 ### What You Give Up
 
-- Every request needs a body `model`. Requests that carry none, such as `GET /v1/files` or `/v1/batches`, fail with `400`. Keep those on an `EnterpriseAgentgatewayBackend`, as the [Batches lab](configure-openai-batches.md) and [Titan embeddings lab](configure-routing-aws-bedrock-titan-embeddings.md) do.
+- Every request needs a body `model`. Requests that carry none, such as `GET /v1/files` or `/v1/batches`, fail with `400`. Keep those on an `EnterpriseAgentgatewayBackend`, as the [Batches lab](configure-openai-batches.md) does.
 - Clients change their path: model routes forward the provider API path, so clients call `/openai/v1/chat/completions` in place of `POST /openai`. SDK base URLs end in `/v1`.
 - `EnterpriseAgentgatewayPolicy` cannot target an `AgentgatewayModel`. Per-model settings go in `spec.policies`, and policies for a group of models target the `HTTPRoute` or one of its named rules.
 - A model rule takes `PathPrefix` matches only, rejects `URLRewrite` and `RequestRedirect` filters, and holds one `backendRef`. A multi-rule route needs rule names and `sectionName` on every model.

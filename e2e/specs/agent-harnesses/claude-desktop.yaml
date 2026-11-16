@@ -1,0 +1,5 @@
+lab: labs/agent-harnesses/claude-desktop.md
+description: Claude Desktop through the gateway
+tier: t5-manual
+reason: >-
+  Needs user interaction. The lab configures and drives the Claude Desktop app.

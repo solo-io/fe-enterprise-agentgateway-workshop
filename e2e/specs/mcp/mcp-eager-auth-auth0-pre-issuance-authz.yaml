@@ -1,0 +1,5 @@
+lab: labs/mcp/mcp-eager-auth-auth0-pre-issuance-authz.md
+description: eager OAuth for MCP with Auth0 and pre-issuance authorization
+tier: t5-manual
+reason: >-
+  Needs user interaction. The lab needs your own Auth0 tenant, and its validation is a browser login and consent through MCP Inspector.

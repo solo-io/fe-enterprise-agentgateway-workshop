@@ -1,0 +1,61 @@
+lab: labs/routing/configure-routing-azure-openai.md
+description: Azure OpenAI through a classic named deployment (Option B)
+tier: t3-cloud
+requires:
+  - AZURE_OPENAI_API_KEY
+  - AZURE_RESOURCE_NAME
+  - DEPLOYMENT_NAME
+timeout: 300
+
+steps:
+  # Block 1 overwrites the key and resource name with placeholder text. The
+  # harness resolves both variables itself.
+  - section: "Configure Required Variables"
+    run: [2, 3]
+
+  - section: "Option A: Azure AI Foundry (v1 API)"
+    run: none
+    reason: the curl body carries a placeholder model name the reader replaces; Option B covers the same route
+
+  # Block 1 is the placeholder DEPLOYMENT_NAME export.
+  - section: "Option B: Classic Deployment-Based Azure OpenAI"
+    run: [2, 3]
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "choices"
+      # The request sends an empty model, so a reply proves the transformation
+      # filled in the deployment name.
+      - matches: '"(prompt|input)_tokens": *[1-9]'
+
+  - section: "View Metrics Endpoint"
+    run: all
+    retry:
+      attempts: 3
+      delay: 3
+      until: "agentgateway_"
+    assert:
+      - contains: 'agentgateway_requests_total{'
+
+  - section: "View Metrics and Traces in Grafana"
+    run: none
+    reason: browser step
+
+  - section: "View Traces in the Solo UI"
+    run: none
+    reason: browser step
+
+  - section: "View Access Logs"
+    run: all
+    assert:
+      - contains: "agentgateway-proxy"
+
+  - section: "(Optional) View Traces in Jaeger"
+    run: none
+    reason: OpenShift-only alternative to the Solo UI
+
+cleanup:
+  section: "Cleanup"

@@ -1,0 +1,5 @@
+lab: labs/agent-harnesses/claude-code-auth0-pkce.md
+description: Claude Code through the gateway with an Auth0 PKCE login
+tier: t5-manual
+reason: >-
+  Needs user interaction. The lab needs your own Auth0 tenant and signs in through a browser PKCE flow.

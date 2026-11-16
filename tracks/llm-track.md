@@ -146,7 +146,6 @@ See [System Requirements](../labs/installation/system-requirements.md) for detai
 | Lab | What you'll learn |
 |---|---|
 | [OpenAI Embeddings](../labs/routing/configure-openai-embeddings.md) | Route embedding requests through the gateway |
-| [AWS Bedrock Titan Embeddings](../labs/routing/configure-routing-aws-bedrock-titan-embeddings.md) | Route Bedrock embedding requests |
 | [OpenAI Batch API](../labs/routing/configure-openai-batches.md) | Submit and retrieve async batch jobs |
 | [OpenAI Streaming](../labs/routing/openai-streaming.md) | Stream responses for real-time token generation |
 | [OpenAI Audio (TTS & STT)](../labs/routing/openai-audio.md) | Route Text-to-Speech and Speech-to-Text requests |

@@ -1,0 +1,27 @@
+lab: labs/routing/configure-routing-anthropic.md
+description: real Anthropic backend via secretRef, answered through the OpenAI-compatible path
+tier: t1-key
+requires:
+  - CLAUDE_API_KEY
+timeout: 300
+
+steps:
+  - section: "Set Environment Variables"
+    run: none
+    reason: placeholder export; the harness resolves CLAUDE_API_KEY itself
+
+  - section: "Set Up Anthropic Connection"
+    run: all
+    retry:
+      attempts: 8
+      delay: 3
+      until: "HTTP/[0-9.]+ 200"
+    assert:
+      - status: 200
+      - contains: "choices"
+      # The response names the model that answered, so a Claude id here means
+      # the request reached Anthropic.
+      - matches: '"model": *"claude-'
+
+cleanup:
+  section: "Cleanup"

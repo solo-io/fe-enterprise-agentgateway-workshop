@@ -1,0 +1,5 @@
+lab: labs/mcp/mcp-eager-auth-entra.md
+description: eager OAuth for MCP with Microsoft Entra ID
+tier: t5-manual
+reason: >-
+  Needs user interaction. The lab needs your own Entra tenant, and its validation is a browser login and consent through MCP Inspector or Claude Code.
