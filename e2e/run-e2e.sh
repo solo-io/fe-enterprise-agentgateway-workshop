@@ -18,6 +18,8 @@
 #   ./e2e/run-e2e.sh --track mcp --no-prompt --report[=dir]  # run, then write the report (default dir reports/)
 #   ./e2e/run-e2e.sh --report-only[=dir] --track mcp  # build from whatever outcomes exist, run nothing;
 #                                             # --track and --resolve-creds reset them, single-lab runs do not
+#   ./e2e/run-e2e.sh routing/x --resolve-creds  # start a single-lab session: reset, resolve, run nothing
+#   ./e2e/run-e2e.sh --report-only[=dir]      # report the labs run since that reset (file suffix -adhoc)
 #   ./e2e/run-e2e.sh --lint                   # validate specs against labs, run nothing
 #   ./e2e/run-e2e.sh --list                   # show coverage table
 #   ./e2e/run-e2e.sh --custom <name>          # run custom-labs/<name>/spec.yaml
@@ -98,7 +100,7 @@ declare -a SKIP_KEYS=()
 export E2E_VERBOSE="${E2E_VERBOSE:-0}"
 
 usage() {
-  sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+  sed -n '2,32p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 ORIGINAL_ARGS=("$@")
@@ -1050,6 +1052,13 @@ elif [[ -n "$SPECIFIC" ]]; then
   cand="${SPEC_DIR}/${SPECIFIC%.yaml}.yaml"
   [[ -f "$cand" ]] || { printf "${RED}No spec at %s${NC}\n" "$cand" >&2; exit 1; }
   RUN_SPECS=("$cand")
+  # <key> --resolve-creds opens a single-lab session the way --track does for
+  # a track: it drops earlier outcomes and leftovers, so a later --report-only
+  # covers only the labs run since. A plain <key> run keeps them.
+  if [[ "$RESOLVE_CREDS" == "true" ]]; then
+    find "$WORK_ROOT" -name outcome -type f -not -path "${WORK_ROOT}/custom/*" -delete 2>/dev/null
+    rm -f "${WORK_ROOT}/leftovers.txt"
+  fi
 else
   while IFS= read -r spec; do
     [[ "$spec" == *"/_base/"* ]] && continue

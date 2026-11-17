@@ -473,6 +473,32 @@ rm -f "${TMP}/work/env.json" "${TMP}/work/track-env-mcp"
 run "--report-only rejects a positional argument" 2 "--report-only takes no positional argument" --report-only routing/rpt
 run "--report-only rejects a bare directory word" 2 "--report-only takes no positional argument" --report-only "$RPT"
 [[ ! -d "${TMP}/work/.run.lock" ]] && ok "--report-only takes no lock" || fail "lock left behind"
+
+# <key> --resolve-creds starts a single-lab session: earlier outcomes and
+# leftovers go, custom-lab outcomes stay, and the report covers the labs run since.
+mkdir -p "${TMP}/work/routing/stale" "${TMP}/work/custom/keepme"
+echo "status=pass rc=0 duration=5 requires=" > "${TMP}/work/routing/stale/outcome"
+echo "status=pass rc=0 duration=5 requires=" > "${TMP}/work/custom/keepme/outcome"
+echo "LEFTOVER: namespace/old" > "${TMP}/work/leftovers.txt"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --resolve-creds --no-prompt 2>&1)"; rc=$?
+[[ $rc == 0 && ! -e "${TMP}/work/routing/stale/outcome" && ! -e "${TMP}/work/routing/rpt/outcome" \
+   && ! -e "${TMP}/work/leftovers.txt" ]] \
+  && ok "<key> --resolve-creds clears earlier outcomes and leftovers" || fail "single-lab reset (rc=$rc): $(printf '%s' "$out" | tail -3)"
+[[ -e "${TMP}/work/custom/keepme/outcome" ]] && ok "<key> --resolve-creds keeps custom-lab outcomes" || fail "custom outcome deleted"
+[[ ! -e "${TMP}/work/fx/passme/driver.sh" || ! -e "${TMP}/work/fx/passme/outcome" ]] \
+  && ok "<key> --resolve-creds runs nothing" || fail "<key> --resolve-creds ran the lab"
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --no-prompt >/dev/null 2>&1
+mkdir -p "${TMP}/work/routing/later"
+echo "status=pass rc=0 duration=5 requires=" > "${TMP}/work/routing/later/outcome"
+E2E_SPEC_DIR="$FIX" "$RUNNER" fx/passme --no-prompt >/dev/null 2>&1
+[[ -e "${TMP}/work/routing/later/outcome" ]] && ok "a plain <key> run keeps earlier outcomes" || fail "plain run cleared outcomes"
+rm -rf "${TMP}/work/routing/later"
+out="$(E2E_SPEC_DIR="$FIX" "$RUNNER" --report-only="$RPT" --env vind 2>&1)"; rc=$?
+MD="$(printf '%s\n' "$out" | grep '\.md$')"
+if [[ $rc == 0 ]] && grep -q "selected labs on vind" "$MD" && grep -q "fx/passme" "$MD" \
+   && ! grep -q -e "routing/stale" -e "namespace/old" "$MD"; then ok "single-lab report covers only the session's labs"
+else fail "single-lab report (rc=$rc): $out"; fi
+rm -rf "${TMP}/work/custom/keepme"
 run "--report with a bare spec keeps the spec positional" 1 "No spec at" --report routing/nope --no-prompt
 run "--report --resolve-creds exits before the report" 0 "Resolving credentials" \
   --track llm --env gke --report --resolve-creds --no-prompt
