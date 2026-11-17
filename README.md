@@ -240,7 +240,7 @@ An AI agent can run the workshop labs against your own cluster, build a custom l
 
 | Skill | Claude Code | What it does |
 |-------|-------------|--------------|
-| `evaluate` | `/evaluate` | Runs the LLM or MCP track on your cluster, explains each lab, and writes a local report |
+| `evaluate` | `/evaluate` | Runs the LLM or MCP track on your cluster, explains each lab, and writes a local report. To run only some labs, name them: `/evaluate routing/direct-response` |
 | `adapt-lab` | `/adapt-lab` | Builds a custom lab for your scenario. Name the labs to start from or describe what you need. The agent writes a proposal, waits for your approval, then writes a lab and an e2e spec under `custom-labs/<name>/` and runs the spec until every requirement passes. The folder is gitignored and stays on your machine |
 | `contribute-lab` | `/contribute-lab <name>` | Commits a custom lab on a new version branch, shows you the diff, and pushes only when you say yes. Works from a clone of this repo or of your fork |
 

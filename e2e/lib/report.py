@@ -7,6 +7,8 @@ Usage:
       writes <out>/<YYYYMMDD-HHMMSS>-<class>-<track>.md and .json (UTC; -1, -2
       appended when that name exists), prints both paths. <class> is --env-class
       when given, else the env json's class
+      --track adhoc reports every shipped-lab outcome under <work> in one
+      "Selected labs" table, for a session that ran named labs
   report.py build --work DIR --custom <name> --env-json PATH --session PATH --out DIR
                   [--custom-root R]
       the single-row report for custom-labs/<name> (key custom/<name>), written as
@@ -284,7 +286,7 @@ def adhoc_use_cases(work):
             # Skip --uninstall-base's own steps and custom labs (author runs).
             if not key.startswith(("_base" + os.sep, "custom" + os.sep)):
                 keys.append(key)
-    return [{"name": "Ad hoc run", "keys": sorted(keys)}], {}
+    return [{"name": "Selected labs", "keys": sorted(keys)}], {}
 
 
 def track_use_cases(track, env_class, specs_dir, tracks_dir):
@@ -429,6 +431,8 @@ def render_markdown(data):
     env_class = env.get("class", "unknown")
     if data.get("custom"):
         title = f"# Agentgateway custom lab report: {data['custom']} on {env_class}"
+    elif data["track"] == "adhoc":
+        title = f"# Agentgateway evaluation report: selected labs on {env_class}"
     else:
         title = f"# Agentgateway evaluation report: {data['track']} track on {env_class}"
     out = [title, "",

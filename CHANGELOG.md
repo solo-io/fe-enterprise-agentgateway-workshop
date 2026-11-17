@@ -1,5 +1,12 @@
 # Changelog
 
+0.15.8 - (11-17-26)
+---
+- Evaluation agent:
+  - `/evaluate`: name one or more labs, for example `/evaluate routing/direct-response`, and the agent installs the base, runs only those labs in enablement mode and reports them alone. It tells you before the base install when a named lab is manual, has no spec, or does not apply to the cluster
+  - `./e2e/run-e2e.sh <key> --resolve-creds` now starts a single-lab session: it deletes the outcomes and leftovers of earlier runs, as `--track <t> --resolve-creds` does. A plain `<key>` run still keeps them
+  - A report built with no `--track` is titled `selected labs` and has one `Selected labs` table, in place of `adhoc track` and `Ad hoc run`. The file name still ends in `-<class>-adhoc`
+
 0.15.7 - (11-16-26)
 ---
 - `configure-routing-aws-bedrock-apikey.md`: call Bedrock in `us-east-1` in place of `us-west-2`. A short-term API key works only in the Region it was generated in

@@ -81,7 +81,9 @@ identity also works.
 Evaluate (`skills/evaluate/SKILL.md`, `/evaluate`) runs the shipped labs of a
 track and proves they work on the cluster. Enablement mode explains each lab
 before it runs and stops on the first failure. Rig mode runs the whole track
-unattended and reports every failure at the end.
+unattended and reports every failure at the end. Name one or more labs, for
+example `/evaluate routing/direct-response`, and it runs only those on the base
+install and reports them alone.
 
 Adapt (`skills/adapt-lab/SKILL.md`, `/adapt-lab`) turns one or more shipped labs
 into a custom lab for the user's own requirements, proves it with a spec, and
@@ -136,7 +138,7 @@ agent following it.
 
 ## Output
 
-- Track reports: `reports/<YYYYMMDD-HHMMSS>-<class>-<track>.md` and `.json`, time in UTC, with `-1`, `-2` appended when the name exists. `reports/` is gitignored. A paid lab the user declined shows as `SKIP (declined)`.
+- Track reports: `reports/<YYYYMMDD-HHMMSS>-<class>-<track>.md` and `.json`, time in UTC, with `-1`, `-2` appended when the name exists. `reports/` is gitignored. A paid lab the user declined shows as `SKIP (declined)`. A report for named labs ends in `-<class>-adhoc`.
 - Custom labs: `custom-labs/<name>/` with `<name>.md`, `spec.yaml`, `CHANGES.md`, and reports in `custom-labs/<name>/reports/`. `custom-labs/` is gitignored. A custom lab's run files stay in its folder, in `custom-labs/<name>/.work/run/`, so deleting `custom-labs/<name>/` removes all of it.
 - Per-lab work files for a shipped lab: `e2e/.work/<key>/`. Contribute: `e2e/.work/contribute/<name>/`, which stays after the lab folder is deleted, since its manifest tracks the repo changes.
 - Session log: `e2e/.work/session.jsonl`. Environment: `e2e/.work/env.json`.

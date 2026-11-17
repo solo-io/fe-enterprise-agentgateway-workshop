@@ -1,6 +1,6 @@
 ---
 name: evaluate
-description: Run a guided Enterprise Agentgateway evaluation on the current cluster, from environment detection through labs, report, and cleanup. Use when the user asks to evaluate, try, or test Enterprise Agentgateway.
+description: Run a guided Enterprise Agentgateway evaluation on the current cluster, from environment detection through labs, report, and cleanup. Runs a whole track or only the labs the user names. Use when the user asks to evaluate, try, or test Enterprise Agentgateway.
 ---
 
 # Evaluate Enterprise Agentgateway
@@ -34,6 +34,8 @@ If `existing_install` in `e2e/.work/env.json` is non-empty, say what it names an
 
 ## 2. Choose track and mode
 
+If the user named one or more labs, in the arguments or in the request, go to "Named labs" at the end of this step. A track name is not a lab.
+
 Ask which track to run if the user has not said. Offer this heuristic: the MCP track if their interest is tools and agents talking to internal services, the LLM track if it is model access, cost, and guardrails. Both is allowed; run them one after the other. The second track's `--track` run clears the first track's outcomes, so build the first track's report with the step 8 command before you start the second, and ask keep-or-remove (step 7) only after the last track.
 
 Ask for the mode:
@@ -47,6 +49,35 @@ Start a fresh session log, then record the answer, with `<t>` as `llm` or `mcp` 
 e2e/lib/session-log.sh start
 e2e/lib/session-log.sh add decision - "track=<t> mode=<m>"
 ```
+
+### Named labs
+
+Run only the labs the user named, in the order given. The mode is `enablement`, and you skip the track question.
+
+Match each name to a lab key, the `<dir>/<file>` path under `labs/` without `.md`, such as `routing/direct-response`. Take the status of each key from these three commands:
+
+```bash
+./e2e/run-e2e.sh --list
+python3 e2e/lib/tracks.py list llm --env <class>
+python3 e2e/lib/tracks.py list mcp --env <class>
+```
+
+If a name matches several labs or none, show the closest keys and ask. Before step 4, tell the user about each lab that cannot run, and drop it from the list:
+
+- tier `t5-manual` or `excluded` in `--list`: give the `reason` from `e2e/specs/<key>.yaml` and link the lab markdown, which the user follows by hand
+- status `no-spec`, or a lab absent from `--list`: the lab has no spec, and the user follows the lab markdown by hand
+- status `not-applicable:<class>`: the lab runs only on that class of cluster
+
+If no lab is left, stop here. The base install is not needed.
+
+Start the session log and record the labs:
+
+```bash
+e2e/lib/session-log.sh start
+e2e/lib/session-log.sh add decision - "labs=<key>[,<key>...] mode=enablement"
+```
+
+Steps 3, 5, and 8 each have a "Named labs" variant. Steps 1, 4, and 7 are the same as for a track, and step 6 does not apply.
 
 ## 3. Resolve credentials and show the plan
 
@@ -77,6 +108,15 @@ The fix for a missing key: copy `e2e/env.local.example` to `e2e/.env.local` and 
 - the labs marked `excluded`. `--list` shows the tier. A `t5-manual` lab needs a person, such as a browser login, and is reported as `MANUAL` with the `reason` from `e2e/specs/<key>.yaml` and a link to the lab; say that reason, and that the user validates the lab by hand. An `excluded` lab is reported as `NOT AUTOMATED` with its `reason`; say that reason, and that the user can run the lab by hand
 - the labs marked `not-applicable:<class>`, reported as `NOT APPLICABLE` on this cluster
 
+Named labs: run `--resolve-creds` once for each named key, then `--list`:
+
+```bash
+./e2e/run-e2e.sh <key> --resolve-creds
+./e2e/run-e2e.sh --list
+```
+
+`<key> --resolve-creds` checks that lab's keys, prints a `⊘ VAR` line for each missing one, and runs nothing. It also deletes the outcomes and leftovers of earlier runs, so run it only in this step, before any lab runs. Show the named labs with their TIER and REQUIRES columns from `--list`. Ask before running a `t1-key` or `t3-cloud` lab, and handle a declined lab, `SOLO_TRIAL_LICENSE_KEY`, and any missing key as above. Ask about `OPENAI_API_KEY` only when a named lab lists it under REQUIRES.
+
 ## 4. Install the base
 
 ```bash
@@ -85,7 +125,7 @@ The fix for a missing key: copy `e2e/env.local.example` to `e2e/.env.local` and 
 
 If it exits non-zero, stop, show the last 30 lines of its output, and ask the user how to proceed. The usual cause is a missing `SOLO_TRIAL_LICENSE_KEY`.
 
-Otherwise narrate Use Case 1 from `tracks/<t>-track.md`.
+Otherwise narrate Use Case 1 from `tracks/<t>-track.md`. For named labs, use the track file that lists the first named lab.
 
 ## 5. Run the labs
 
@@ -109,6 +149,8 @@ Otherwise narrate Use Case 1 from `tracks/<t>-track.md`.
 4. On a failure, invoke `skills/diagnose-failure/SKILL.md` and do nothing else until the user chooses.
 
 After the last lab of a use case, pause and invite questions. Answer product questions with `skills/ask-the-docs/SKILL.md`.
+
+Named labs: follow the `enablement` steps for each named key, in the order the user gave, and invite questions after the last one.
 
 In both modes, name every `LEFTOVER (warning):`, `LEFTOVER CHECK NOT RUN`, `BASELINE DRIFT`, and `CLEANUP INCOMPLETE` line a run prints, as it happens, instead of waiting for step 7. A `LEFTOVER (warning):` line names an object a shipped lab left behind; it does not fail the lab in this release. Show it to the user and offer to delete it, and delete it only on a yes.
 
@@ -152,6 +194,12 @@ This builds the report from the work directory and runs nothing. Show the two pa
 
 ```bash
 python3 e2e/lib/report.py compare <older.json> <newer.json>
+```
+
+Named labs: leave `--track` out. The report then has one "Selected labs" table with the labs run in this session, and its file name ends in `-<class>-adhoc`:
+
+```bash
+./e2e/run-e2e.sh --report-only --env <class>
 ```
 
 Say the report is a local file and nothing was sent anywhere. If the user wants Solo to see it, they send it themselves.

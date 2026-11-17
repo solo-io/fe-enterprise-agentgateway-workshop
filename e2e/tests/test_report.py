@@ -293,6 +293,22 @@ class TestFinalWave(ReportCase):
         ucs, _ = report.adhoc_use_cases(work)
         self.assertEqual(ucs[0]["keys"], ["routing/a"])
 
+    def test_adhoc_report_title_and_heading(self):
+        work = self.work_with(**{"routing/a": "status=pass rc=0 duration=3 requires="})
+        proc = subprocess.run(
+            [sys.executable, os.path.join(LIB, "report.py"), "build", "--work", work,
+             "--track", "adhoc", "--env-json", os.path.join(FIX, "env.json"),
+             "--session", self.session_with(), "--out", self.tmp.name,
+             "--specs-dir", os.path.join(FIX, "specs")], capture_output=True, text=True)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        md = proc.stdout.split()[0]
+        self.assertTrue(md.endswith("-adhoc.md"), md)
+        with open(md, encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("evaluation report: selected labs on ", text)
+        self.assertIn("## Selected labs", text)
+        self.assertIn("| routing/a | PASS |", text)
+
     def test_filename_and_generated_at_share_utc_basis(self):
         md, _, _, data = self.build()
         stamp = data["generated_at"].replace("-", "").replace(":", "").replace("T", "-").rstrip("Z")

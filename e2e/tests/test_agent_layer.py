@@ -174,6 +174,16 @@ class AgentLayer(unittest.TestCase):
         self.assertIn("--skip <key>", text)
         self.assertIn("SKIP (declined)", read("AGENTS.md"))
 
+    def test_evaluate_runs_named_labs(self):
+        text = read("skills/evaluate/SKILL.md")
+        named = text[text.index("### Named labs"):]
+        for needle in ['add decision - "labs=<key>[,<key>...] mode=enablement"', "./e2e/run-e2e.sh <key> --resolve-creds",
+                       "./e2e/run-e2e.sh --report-only --env <class>", "`t5-manual`", "`no-spec`", "-<class>-adhoc"]:
+            self.assertIn(needle, named)
+        self.assertLess(text.index("### Named labs"), text.index("## 3. Resolve credentials"))
+        self.assertIn("/evaluate routing/direct-response", read("AGENTS.md"))
+        self.assertIn("/evaluate routing/direct-response", read("README.md"))
+
     def test_explain_lab_has_fallbacks(self):
         text = read("skills/explain-lab/SKILL.md")
         for needle in ["first H2", "`Source:` lines", "`Overview`", "`description:`"]:
