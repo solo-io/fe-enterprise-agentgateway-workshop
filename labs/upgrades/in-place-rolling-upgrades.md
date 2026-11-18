@@ -623,6 +623,9 @@ kubectl rollout status deployment/agentgateway-proxy -n agentgateway-system --ti
 > [!NOTE]
 > An upgrade to `v2026.10.1` or later encrypts the OAuth flow state and the upstream dynamic client registrations that the token exchange server stores. The upgrade deletes the existing upstream registrations, and agentgateway registers again on first use. Users of eager-OAuth MCP backends must authorize again, and logins in progress must restart.
 
+> [!NOTE]
+> From `v2026.11.1`, the Solo UI stores its data in a new ClickHouse database, `agwe`, and starts with an empty history. The ClickHouse that `001` installs keeps its data in temporary storage, and the upgrade replaces the ClickHouse pod, so traces and spend from before the upgrade are lost. If your ClickHouse has persistent storage (`ui.clickhouse.persistentVolume.enabled: true`), the earlier `agentgateway` database stays next to `agwe`, and you can copy its history into `agwe` with the steps in [Upgrade to the new UI database](https://docs.solo.io/agentgateway/kubernetes/latest/documentation/operations/upgrade/#ui-database).
+
 Run any of the k6 Jobs above during the upgrade to confirm the same zero-downtime behavior end-to-end.
 
 ### What to Monitor

@@ -49,7 +49,7 @@ referencegrants      refgrant     gateway.networking.k8s.io/v1   true         Re
 Export your Solo Trial license key variable and Enterprise Agentgateway version
 ```bash
 export SOLO_TRIAL_LICENSE_KEY=$SOLO_TRIAL_LICENSE_KEY
-export ENTERPRISE_AGW_VERSION=v2026.11.0
+export ENTERPRISE_AGW_VERSION=v2026.11.1
 ```
 
 ### Enterprise Agentgateway CRDs
@@ -164,7 +164,7 @@ NAME                                                              READY   STATUS
 enterprise-agentgateway-clickhouse-shard0-0                       1/1     Running   0          60s
 enterprise-agentgateway-ui-d77d84fc4-md7n8                        2/2     Running   0          60s
 enterprise-agentgateway-ui-k8sobjects-collector-cc6948cbc-d6t95   1/1     Running   0          60s
-enterprise-agentgateway-ui-telemetry-collector-0                  1/1     Running   0          60s
+enterprise-agentgateway-ui-telemetry-collector-7b9c6d5f4-x2kqp   1/1     Running   0          60s
 ```
 
 ## Deploy Agentgateway with customizations
