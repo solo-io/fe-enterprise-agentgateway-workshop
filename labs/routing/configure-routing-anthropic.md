@@ -13,7 +13,7 @@ This lab assumes that you have completed the setup in `001`. `002` is optional b
 Set your Anthropic API key for authenticating to Claude. You can get this from your [Anthropic Console](https://console.anthropic.com/).
 
 ```bash
-export CLAUDE_API_KEY=<your-anthropic-api-key>
+export ANTHROPIC_API_KEY=<your-anthropic-api-key>
 ```
 
 ## Set Up Anthropic Connection
@@ -22,7 +22,7 @@ The secret created below contains the Anthropic API key for interacting with Ant
 
 ```bash
 kubectl create secret generic anthropic-secret -n agentgateway-system \
---from-literal="Authorization=$CLAUDE_API_KEY" \
+--from-literal="Authorization=$ANTHROPIC_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 

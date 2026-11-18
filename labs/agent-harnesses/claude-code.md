@@ -220,13 +220,13 @@ unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY CLAUDE_OAUTH_TOKEN GATEWAY_IP
 
 Replace with a valid Anthropic API key:
 ```bash
-export CLAUDE_API_KEY=<your-anthropic-api-key>
+export ANTHROPIC_API_KEY=<your-anthropic-api-key>
 ```
 
 Create the Anthropic API key secret:
 ```bash
 kubectl create secret generic claude-direct-apikey -n agentgateway-system \
---from-literal="Authorization=$CLAUDE_API_KEY" \
+--from-literal="Authorization=$ANTHROPIC_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
@@ -353,7 +353,7 @@ kubectl delete enterpriseagentgatewaypolicy -n agentgateway-system claude-direct
 kubectl delete httproute -n agentgateway-system claude-directapikey-preflight
 kubectl delete agentgatewaymodel -n agentgateway-system claude-direct-apikey-model
 kubectl delete secret -n agentgateway-system claude-direct-apikey
-unset ANTHROPIC_BASE_URL CLAUDE_API_KEY GATEWAY_IP
+unset ANTHROPIC_BASE_URL ANTHROPIC_API_KEY GATEWAY_IP
 ```
 
 ---

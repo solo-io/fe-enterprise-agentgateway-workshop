@@ -1,5 +1,9 @@
 # Changelog
 
+0.16.0 - (11-18-26)
+---
+- Rename `CLAUDE_API_KEY` to `ANTHROPIC_API_KEY` in `configure-routing-anthropic`, `claude-code`, `claude-desktop`, the `configure-routing-anthropic` spec and `e2e/env.local.example`. One key name now works in every lab and in the standalone workshop. Set `ANTHROPIC_API_KEY` in `e2e/.env.local` or your shell
+
 0.15.9 - (11-18-26)
 ---
 - Bump to Enterprise Agentgateway `v2026.11.1` (LTS)

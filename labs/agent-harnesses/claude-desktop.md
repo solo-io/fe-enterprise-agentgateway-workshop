@@ -166,13 +166,13 @@ You should receive a `200 OK` with a Claude response body. Leave the port-forwar
 
 Replace with a valid Anthropic API key:
 ```bash
-export CLAUDE_API_KEY=<your-anthropic-api-key>
+export ANTHROPIC_API_KEY=<your-anthropic-api-key>
 ```
 
 Create the Anthropic API key secret:
 ```bash
 kubectl create secret generic claude-direct-apikey -n agentgateway-system \
---from-literal="Authorization=$CLAUDE_API_KEY" \
+--from-literal="Authorization=$ANTHROPIC_API_KEY" \
 --dry-run=client -oyaml | kubectl apply -f -
 ```
 
@@ -433,5 +433,5 @@ unset CLAUDE_CODE_OAUTH_TOKEN
 kubectl delete httproute -n agentgateway-system claude-directapikey-route
 kubectl delete agentgatewaymodel -n agentgateway-system claude-direct-apikey-model
 kubectl delete secret -n agentgateway-system claude-direct-apikey
-unset CLAUDE_API_KEY
+unset ANTHROPIC_API_KEY
 ```
