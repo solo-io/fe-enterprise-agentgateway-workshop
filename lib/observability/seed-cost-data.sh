@@ -2,7 +2,8 @@
 # Backfill ClickHouse with synthetic LLM spend so the Cost Management dashboard
 # renders a full history without waiting for live traffic to accrue.
 #
-# Rows are inserted into agentgateway.agw_spans_typed. The built-in materialized
+# Rows are inserted into <db>.agw_spans_typed, where <db> is the UI's ClickHouse
+# database (agwe from v2026.11.1, agentgateway before). The built-in materialized
 # views fire on insert and populate the 5-minute rollups the UI reads, so the
 # Dashboard tab fills in immediately.
 #
@@ -26,17 +27,25 @@ DAYS="${DAYS:-30}"
 
 ch() { kubectl exec -n "$NS" "$CH_POD" -- clickhouse-client "$@"; }
 
+# The UI chart names its database in this Secret. Older charts used another
+# Secret and the database agentgateway.
+if [ -z "${CH_DB:-}" ]; then
+  CH_DB=$(kubectl get secret -n "$NS" enterprise-agentgateway-ui-clickhouse-connection \
+    -o jsonpath='{.data.database}' 2>/dev/null | base64 -d 2>/dev/null || true)
+  CH_DB="${CH_DB:-agentgateway}"
+fi
+
 if [ "${TRUNCATE:-false}" = "true" ]; then
   echo "Truncating agw_spans_typed + cost rollups (this also discards real traffic) ..."
   for t in agw_spans_typed agw_cost_model_5m agw_cost_dimensions_5m; do
-    ch --query "TRUNCATE TABLE agentgateway.$t"
+    ch --query "TRUNCATE TABLE ${CH_DB}.$t"
   done
 fi
 
-echo "Seeding ${ROWS} synthetic spans across ${DAYS}d into agentgateway.agw_spans_typed ..."
+echo "Seeding ${ROWS} synthetic spans across ${DAYS}d into ${CH_DB}.agw_spans_typed ..."
 
 ch --query "
-INSERT INTO agentgateway.agw_spans_typed
+INSERT INTO ${CH_DB}.agw_spans_typed
 WITH
   [
     'gpt-5.6-luna','gpt-5.6-terra','gpt-5.6-sol','gpt-5.5',
@@ -123,7 +132,7 @@ FROM numbers(${ROWS})
 
 echo "Done. Totals now in ClickHouse:"
 ch --query "
-SELECT 'requests' AS k, formatReadableQuantity(count()) AS v FROM agentgateway.agw_spans_typed
-UNION ALL SELECT 'tokens', formatReadableQuantity(sum(InputTokens+OutputTokens)) FROM agentgateway.agw_spans_typed
-UNION ALL SELECT 'spend_usd', concat('\$', toString(round(sum(CostUsd),2))) FROM agentgateway.agw_spans_typed
+SELECT 'requests' AS k, formatReadableQuantity(count()) AS v FROM ${CH_DB}.agw_spans_typed
+UNION ALL SELECT 'tokens', formatReadableQuantity(sum(InputTokens+OutputTokens)) FROM ${CH_DB}.agw_spans_typed
+UNION ALL SELECT 'spend_usd', concat('\$', toString(round(sum(CostUsd),2))) FROM ${CH_DB}.agw_spans_typed
 "

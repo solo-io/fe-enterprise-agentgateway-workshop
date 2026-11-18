@@ -362,7 +362,7 @@ chmod 600 e2e/.env.local
 
 ## Validated on
 - Kubernetes: a version in the [compatibility matrix](https://docs.solo.io/agentgateway/kubernetes/latest/release-notes/versions/#compatibility-matrix)
-- Enterprise Agentgateway v2026.11.0
+- Enterprise Agentgateway v2026.11.1
 
 
 ## User Stories / Acceptance Criteria

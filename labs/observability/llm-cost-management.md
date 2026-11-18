@@ -549,7 +549,7 @@ Alice and bob keep the virtual keys you issued them, so the synthetic history li
 Expected output:
 
 ```
-Seeding 300000 synthetic spans across 30d into agentgateway.agw_spans_typed ...
+Seeding 300000 synthetic spans across 30d into agwe.agw_spans_typed ...
 Done. Totals now in ClickHouse:
 requests	292.52 thousand
 tokens	8.71 billion

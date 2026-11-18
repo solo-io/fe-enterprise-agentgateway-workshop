@@ -42,7 +42,7 @@ Checks the dashboard JSON parses, `dash_prices.py validate` passes, and the dash
 
 Backfills ClickHouse with synthetic LLM spend so the Cost Management dashboard renders a full history instead of the single spike a few live requests produce.
 
-Rows are inserted into `agentgateway.agw_spans_typed`; the built-in materialized views fire on insert and populate the 5-minute rollups the UI reads. The traffic covers OpenAI (the `gpt-5.6` family at the rates the cost lab's overlay catalog sets), Anthropic, Gemini, and AWS Bedrock, across five teams of one to three members each, keeping alice's and bob's virtual keys so seeded history lines up with live requests.
+Rows are inserted into `agw_spans_typed` in the UI's ClickHouse database (`agwe` from v2026.11.1). The script reads the database name from the `enterprise-agentgateway-ui-clickhouse-connection` Secret, or from `CH_DB` if set; the built-in materialized views fire on insert and populate the 5-minute rollups the UI reads. The traffic covers OpenAI (the `gpt-5.6` family at the rates the cost lab's overlay catalog sets), Anthropic, Gemini, and AWS Bedrock, across five teams of one to three members each, keeping alice's and bob's virtual keys so seeded history lines up with live requests.
 
 ```bash
 ./lib/observability/seed-cost-data.sh

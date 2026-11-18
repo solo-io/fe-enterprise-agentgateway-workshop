@@ -1,5 +1,13 @@
 # Changelog
 
+0.15.9 - (11-18-26)
+---
+- Bump to Enterprise Agentgateway `v2026.11.1` (LTS)
+- Update `image-list.md` and the air-gap install: `redis:8.6.8-alpine` and `clickhouse-server:26.3.65.10-alpine`
+- `001`: the UI telemetry collector runs as a Deployment, so its pod name has a hash suffix in place of `-0`
+- `seed-cost-data.sh`: the UI stores its data in the ClickHouse database `agwe`, not `agentgateway`. The script reads the database name from the `enterprise-agentgateway-ui-clickhouse-connection` Secret. Set `CH_DB` to override it. Updated the expected output in `llm-cost-management.md` and `lib/observability/README.md`
+- `in-place-rolling-upgrades.md`: add a note on the upgrade to `v2026.11.1`.
+
 0.15.8 - (11-17-26)
 ---
 - Evaluation agent:
